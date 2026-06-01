@@ -9,7 +9,7 @@ import (
 
 const (
 	serviceName = "api-gateway"
-	defaultPort = "3000"
+	defaultPort = "8080"
 )
 
 func main() {

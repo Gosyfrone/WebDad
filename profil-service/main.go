@@ -9,7 +9,7 @@ import (
 
 const (
 	serviceName = "profil-service"
-	defaultPort = "3003"
+	defaultPort = "8083"
 )
 
 func main() {

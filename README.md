@@ -6,8 +6,9 @@ chacun avec sa propre base de données.
 
 ## Prérequis
 
-- **Node.js** 18 ou supérieur
-- **npm** 9 ou supérieur
+- **Go** 1.22 ou supérieur (services backend)
+- **Node.js** 18 ou supérieur (frontend)
+- **npm** 9 ou supérieur (frontend)
 - **Docker** et **Docker Compose** (pour l'exécution conteneurisée — phase ultérieure)
 - **Git**
 
@@ -20,15 +21,14 @@ chacun avec sa propre base de données.
    cd WebDad
    ```
 
-2. Installer les dépendances de chaque service :
+2. Installer les dépendances de chaque service backend (Go) :
 
    ```bash
-   cd auth-service    && npm install && cd ..
-   cd user-service    && npm install && cd ..
-   cd profil-service  && npm install && cd ..
-   cd post-service    && npm install && cd ..
-   cd api-gateway     && npm install && cd ..
-   cd frontend        && npm install && cd ..
+   (cd auth-service   && go mod tidy)
+   (cd user-service   && go mod tidy)
+   (cd profil-service && go mod tidy)
+   (cd post-service   && go mod tidy)
+   (cd api-gateway    && go mod tidy)
    ```
 
 3. Copier les fichiers d'environnement :
@@ -39,26 +39,36 @@ chacun avec sa propre base de données.
    cp profil-service/.env.example  profil-service/.env
    cp post-service/.env.example    post-service/.env
    cp api-gateway/.env.example     api-gateway/.env
-   cp frontend/.env.example        frontend/.env
    ```
 
-4. Lancer un service en mode développement :
+4. Lancer un service backend en mode développement :
 
    ```bash
    cd <service-name>
+   make run     # ou : go run main.go
+   ```
+
+5. Lancer le frontend (Next.js) :
+
+   ```bash
+   cd frontend
+   npm install
+   cp .env.local.example .env.local
    npm run dev
    ```
 
+   Le frontend démarre sur [http://localhost:3000](http://localhost:3000).
+
 ## Services
 
-| Service          | Port | Base de données | Rôle                                                          |
-| ---------------- | ---- | --------------- | ------------------------------------------------------------- |
-| API Gateway      | 3000 | —               | Point d'entrée unique, routage, middleware d'authentification |
-| Auth Service     | 3001 | PostgreSQL      | Authentification, JWT, inscription / connexion                |
-| User Service     | 3002 | PostgreSQL      | Gestion CRUD des utilisateurs et des rôles                    |
-| Profil Service   | 3003 | MongoDB         | Profils utilisateurs (bio, avatar, préférences)               |
-| Post Service     | 3004 | MongoDB         | Création, lecture et gestion des posts                        |
-| Frontend         | 5173 | —               | Interface React (User, Moderator, Administrator)              |
+| Service        | Port | Stack                          | Base de données | Rôle                                                          |
+| -------------- | ---- | ------------------------------ | --------------- | ------------------------------------------------------------- |
+| frontend       | 3000 | Next.js 14 + Tailwind + shadcn | —               | Interface utilisateur (User, Moderator, Administrator)        |
+| api-gateway    | 8080 | Go 1.22 + Gin                  | —               | Point d'entrée unique, routage, middleware d'authentification |
+| auth-service   | 8081 | Go 1.22 + Gin                  | PostgreSQL      | Authentification, JWT, inscription / connexion                |
+| user-service   | 8082 | Go 1.22 + Gin                  | PostgreSQL      | Gestion CRUD des utilisateurs et des rôles                    |
+| profil-service | 8083 | Go 1.22 + Gin                  | MongoDB         | Profils utilisateurs (bio, avatar, préférences)               |
+| post-service   | 8084 | Go 1.22 + Gin                  | MongoDB         | Création, lecture et gestion des posts                        |
 
 ## Conventions de commits
 
@@ -97,8 +107,8 @@ Trois rôles utilisateurs distincts : **User**, **Moderator**, **Administrator**
 Chaque rôle dispose de permissions et d'écrans adaptés.
 
 ### 2. Couche Web
-**Frontend** React qui consomme exclusivement l'API Gateway.
-Toutes les requêtes passent par un point d'entrée unique.
+**Frontend** Next.js 14 (App Router, TypeScript, Tailwind, shadcn/ui) qui consomme
+exclusivement l'API Gateway. Toutes les requêtes passent par un point d'entrée unique.
 
 ### 3. Couche Services
 - **API Gateway** : point d'entrée HTTP unique, valide le JWT et route vers le bon service backend.
@@ -107,8 +117,8 @@ Toutes les requêtes passent par un point d'entrée unique.
 - **Profil Service** : informations de profil détaillées des utilisateurs.
 - **Post Service** : création, lecture, modération des posts.
 
-Chaque service est indépendant : son propre `package.json`, son propre `Dockerfile` (à venir) et sa
-propre base de données. La communication entre services passe par HTTP via l'API Gateway.
+Chaque service backend est indépendant : son propre **`go.mod`**, son propre `Dockerfile` (à venir)
+et sa propre base de données. La communication entre services passe par HTTP via l'API Gateway.
 
 ### 4. Couche Données
 - **PostgreSQL** pour les données relationnelles (Auth, User).
@@ -116,13 +126,23 @@ propre base de données. La communication entre services passe par HTTP via l'AP
 
 ## Scripts disponibles
 
-Dans chaque service backend :
+Dans chaque service **backend** (via le `Makefile`) :
 
 ```bash
-npm start      # Démarre le service en mode production
-npm run dev    # Démarre le service avec nodemon (hot reload)
-npm run lint   # Lance ESLint
-npm test       # Lance la suite de tests
+make run     # Démarre le service (go run main.go)
+make build   # Compile le binaire dans bin/<service-name>
+make lint    # Lance golangci-lint
+make test    # Lance go test ./...
+make tidy    # Met à jour go.mod / go.sum
+```
+
+Dans le **frontend** :
+
+```bash
+npm run dev    # Démarre Next.js sur le port 3000 (hot reload)
+npm run build  # Build de production
+npm start      # Sert le build de production sur le port 3000
+npm run lint   # Lance ESLint (config Next.js)
 ```
 
 ## Sécurité

@@ -9,7 +9,7 @@ import (
 
 const (
 	serviceName = "auth-service"
-	defaultPort = "3001"
+	defaultPort = "8081"
 )
 
 func main() {

@@ -9,7 +9,7 @@ import (
 
 const (
 	serviceName = "post-service"
-	defaultPort = "3004"
+	defaultPort = "8084"
 )
 
 func main() {
