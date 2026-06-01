@@ -1,0 +1,27 @@
+{
+  "name": "@app/frontend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Frontend React de l'application distribuée.",
+  "type": "module",
+  "scripts": {
+    "start": "vite preview --host --port 5173",
+    "dev": "vite",
+    "build": "vite build",
+    "lint": "eslint src",
+    "test": "echo \"(frontend) aucun test pour le moment\" && exit 0"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.1",
+    "eslint": "^8.57.0",
+    "prettier": "^3.3.3",
+    "vite": "^5.4.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

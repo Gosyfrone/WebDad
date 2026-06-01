@@ -27,6 +27,39 @@
 
 ---
 
+## 1bis. STACK TECHNIQUE
+
+**Backend**
+- Langage : **Go 1.22**
+- Framework HTTP : **Gin** (`github.com/gin-gonic/gin`)
+- Un service = **un module Go indépendant** (chacun a son propre `go.mod`)
+- Linter : **golangci-lint**
+- Hot reload (dev) : **air** (`github.com/cosmtrek/air`)
+- Build / lint / test par service : via `Makefile` (`make run`, `make build`, `make lint`, `make test`)
+
+**Frontend**
+- React 18 + Vite (JavaScript, pas TypeScript)
+
+**Ports par défaut**
+| Service          | Port |
+| ---------------- | ---- |
+| api-gateway      | 3000 |
+| auth-service     | 3001 |
+| user-service     | 3002 |
+| profil-service   | 3003 |
+| post-service     | 3004 |
+| frontend (Vite)  | 5173 |
+
+**Bases de données**
+| Service          | Base       |
+| ---------------- | ---------- |
+| auth-service     | PostgreSQL |
+| user-service     | PostgreSQL |
+| profil-service   | MongoDB    |
+| post-service     | MongoDB    |
+
+---
+
 ## 2. EVALUATION CRITERIA (grading grid)
 
 ### Group grade — Deliverable (written report)
