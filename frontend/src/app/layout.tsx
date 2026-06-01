@@ -7,8 +7,8 @@ import './globals.css'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'WebDad',
-  description: 'Application distribuée en microservices.',
+  title: 'Breezy',
+  description: 'Réseau social distribué en microservices.',
 }
 
 export default function RootLayout({
@@ -19,7 +19,17 @@ export default function RootLayout({
   return (
     <html lang="fr" suppressHydrationWarning>
       <body className={inter.className}>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+        {/*
+          Thème par défaut : clair. On n'active PAS `enableSystem` pour ne pas
+          suivre la préférence sombre de l'OS/navigateur (cf. CLAUDE.md §5).
+          Le mode sombre reste disponible via le futur sélecteur (setTheme('dark')).
+        */}
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="light"
+          enableSystem={false}
+          disableTransitionOnChange
+        >
           {children}
           <Toaster />
         </ThemeProvider>

@@ -120,7 +120,7 @@ Plus aucun conflit : le frontend (3000) et le backend (8080+) occupent des plage
 | Post Service | 🔴 TODO | MongoDB | CRUD posts |
 | Profil Service | 🔴 TODO | MongoDB | User profiles |
 | API Gateway | 🔴 TODO | — | Route dispatch, auth middleware |
-| Frontend | 🔴 TODO | — | React, all 3 roles |
+| Frontend | 🟡 WIP | — | Next.js 14 : squelette + routing + layout feed 3 colonnes (style X). Données feed = stubs, API à brancher |
 
 ### Features status
 | Feature | Type | Status |
@@ -128,7 +128,7 @@ Plus aucun conflit : le frontend (3000) et le backend (8080+) occupent des plage
 | Registration / Login | Primary | 🔴 TODO |
 | JWT auth + protected routes | Primary | 🔴 TODO |
 | Role management (User/Mod/Admin) | Primary | 🔴 TODO |
-| Post creation/reading | Primary | 🔴 TODO |
+| Post creation/reading | Primary | 🟡 UI faite (feed + composer 280 car.), lecture/écriture API à brancher |
 | User profile | Primary | 🔴 TODO |
 | Moderation (moderate posts) | Secondary | 🔴 TODO |
 | Admin panel | Secondary | 🔴 TODO |
@@ -176,7 +176,13 @@ project/
 | Topic | Decision | Reason |
 |---|---|---|
 | Gateway | *(e.g. Express / Kong / custom)* | |
-| Frontend | *(e.g. React + Vite)* | |
+| Frontend | Next.js 14 (App Router) + TS + Tailwind/shadcn | Stack imposée (§1bis) |
+| Frontend routing | Route groups `(auth)` (public) et `(app)` (authentifié) | Sépare layouts publics/privés sans polluer l'URL |
+| Frontend config | `lib/config.ts` (API Gateway) + `lib/routes.ts` (constantes de routes) | Source de vérité unique, pas de chaînes en dur |
+| Frontend nav par rôle | `navItemsForRole()` filtre les liens (user/mod/admin) | Reflète les 3 rôles côté UI |
+| Nom du produit | **Breezy** (logo `frontend/public/logo_breezy.png`) | WebDad = nom du projet/repo, Breezy = nom du réseau social |
+| Layout feed | 3 colonnes style X.com : nav (gauche) / fil (centre) / suggestions (droite) | UX familière, démo lisible (critère « Interface » §2) |
+| Thème / couleurs | Thème clair par défaut : fond blanc, primaire magenta `#e053ff` (texte foncé pour lisibilité). 2 dimensions : mode clair/sombre (next-themes, `.dark`) + accent (`[data-accent]` : pink défaut / blue / cyan). Registre dans `lib/themes.ts` | Identité visuelle + dark theme et thèmes custom anticipés sans dupliquer la palette |
 | Inter-service auth | JWT passed in header | Grading requirement |
 | Containerization | Docker + docker-compose | Grading requirement |
 | Config `.env` | Racine = vars transverses (`JWT_SECRET`, `JWT_EXPIRY`, `NEXT_PUBLIC_API_URL`) ; `<service>/.env` = config propre, chargée par compose via `env_file:` ; `environment:` réservé aux overrides Docker (host = nom de conteneur) | Découplage : un service tourne seul (`make run`) avec son `.env`, et en stack via compose. ⚠️ Les vars d'un `env_file` ne sont PAS interpolables (`${...}`) dans le compose — seul le `.env` racine l'est. DB host surchargé via `DB_HOST`/`MONGO_HOST` |
