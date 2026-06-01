@@ -27,6 +27,46 @@
 
 ---
 
+## 1bis. STACK TECHNIQUE
+
+**Backend**
+- Langage : **Go 1.22**
+- Framework HTTP : **Gin** (`github.com/gin-gonic/gin`)
+- Un service = **un module Go indépendant** (chacun a son propre `go.mod`)
+- Linter : **golangci-lint**
+- Hot reload (dev) : **air** (`github.com/cosmtrek/air`)
+- Build / lint / test par service : via `Makefile` (`make run`, `make build`, `make lint`, `make test`)
+
+**Frontend**
+- Framework : **Next.js 14** (App Router)
+- Langage : **TypeScript**
+- Style : **Tailwind CSS** + **shadcn/ui** (thème **slate**)
+- Gestionnaire de paquets : **npm**
+- Port de dev : **3000** (convention Next.js — `npm run dev` est configuré avec `next dev -p 3000`)
+- Variable d'environnement principale : `NEXT_PUBLIC_API_URL` (URL de l'API Gateway, par défaut `http://localhost:8080`)
+
+**Ports par défaut**
+| Service              | Port |
+| -------------------- | ---- |
+| frontend (Next.js)   | 3000 |
+| api-gateway          | 8080 |
+| auth-service         | 8081 |
+| user-service         | 8082 |
+| profil-service       | 8083 |
+| post-service         | 8084 |
+
+Plus aucun conflit : le frontend (3000) et le backend (8080+) occupent des plages distinctes.
+
+**Bases de données**
+| Service          | Base       |
+| ---------------- | ---------- |
+| auth-service     | PostgreSQL |
+| user-service     | PostgreSQL |
+| profil-service   | MongoDB    |
+| post-service     | MongoDB    |
+
+---
+
 ## 2. EVALUATION CRITERIA (grading grid)
 
 ### Group grade — Deliverable (written report)
