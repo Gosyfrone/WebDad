@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/gin-gonic/gin"
+	"github.com/user/myapi/internal/handler"
 )
 
 const (
@@ -19,13 +20,7 @@ func main() {
 	}
 
 	r := gin.Default()
-
-	r.GET("/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{
-			"status":  "ok",
-			"service": serviceName,
-		})
-	})
+	handler.RegisterRoutes(r, serviceName)
 
 	log.Printf("[%s] en écoute sur le port %s", serviceName, port)
 	if err := r.Run(":" + port); err != nil {
