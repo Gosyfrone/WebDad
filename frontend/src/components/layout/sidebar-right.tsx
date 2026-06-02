@@ -24,7 +24,7 @@ const TRENDS = [
 
 export function SidebarRight() {
   return (
-    <aside className="sticky top-0 flex h-screen w-[350px] flex-col gap-4 overflow-y-auto px-4 py-4">
+    <aside className="sticky top-0 hidden h-screen w-[350px] flex-col gap-4 overflow-y-auto px-4 py-4 xl:flex">
       {/* Search */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />

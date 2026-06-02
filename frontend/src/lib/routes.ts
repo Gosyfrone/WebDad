@@ -14,7 +14,11 @@ export const ROUTES = {
   register: '/register',
   // Espace authentifié (route group (app))
   feed: '/feed',
+  explorer: '/explorer',
+  notifications: '/notifications',
+  messages: '/messages',
   profil: '/profil',
+  parametres: '/parametres',
   moderation: '/moderation',
   admin: '/admin',
 } as const

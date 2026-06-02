@@ -9,6 +9,10 @@ const inter = Inter({ subsets: ['latin'] })
 export const metadata: Metadata = {
   title: 'Breezy',
   description: 'Réseau social distribué en microservices.',
+  icons: {
+    icon: '/logo_only.png',
+    apple: '/logo_only.png',
+  },
 }
 
 export default function RootLayout({
