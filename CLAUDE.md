@@ -119,13 +119,13 @@ Plus aucun conflit : le frontend (3000) et le backend (8080+) occupent des plage
 | User Service | 🔴 TODO | PostgreSQL | CRUD users |
 | Post Service | 🟡 WIP | MongoDB | Connexion Mongo via `.env` (URI construite, plus rien en dur). **Autonome** : crée ses collections (posts/comments/likes/reports) + validateurs `$jsonSchema` + index au boot (`EnsureSchema`, idempotent) → `post-init.js` supprimé. Champs snake_case (`author_id`/`content`/`created_at`). Routes posts create/list OK (testées) ; comments/likes = stubs. `make dev` vérifié (air + Mongo) |
 | Profil Service | 🔴 TODO | MongoDB | User profiles |
-| API Gateway | 🔴 TODO | — | Route dispatch, auth middleware |
+| API Gateway | 🟡 WIP | — | Reverse proxy (`httputil.ReverseProxy`) : préfixe `/auth`,`/users`,`/profils`,`/posts` → service cible (URLs via `.env`). Middleware CORS (origines via `CORS_ALLOWED_ORIGINS`). `/auth/*` proxifié vers auth-service. Middleware JWT à ajouter pour les routes protégées (login) |
 | Frontend | 🟡 WIP | — | Next.js 14 : squelette + routing + layout responsive (style X). Pages feed + profil (consultation/édition) + placeholders explorer/notifications/messages. Mobile-first : en-tête mobile (avatar→menu + logo), barre d'onglets en bas, FAB « + ». Données = stubs, API à brancher |
 
 ### Features status
 | Feature | Type | Status |
 |---|---|---|
-| Registration / Login | Primary | 🟡 Auth-service fait (register/login). UI + gateway à brancher |
+| Registration / Login | Primary | 🟡 Auth-service fait (register/login) + gateway proxy (`/auth/*`). UI à brancher |
 | JWT auth + protected routes | Primary | 🟡 Auth-service : génération + `/auth/validate` + middleware. Gateway à brancher |
 | Role management (User/Mod/Admin) | Primary | 🔴 TODO |
 | Post creation/reading | Primary | 🟡 UI faite (feed + composer 280 car. inline & popup sidebar), lecture/écriture API à brancher |
@@ -192,6 +192,7 @@ project/
 | Anti-débordement mobile | Colonne centrale en `overflow-x-clip` (+ `min-w-0`) | Empêche le défilement horizontal parasite sur téléphone. `clip` (et non `hidden`) : ne crée pas de conteneur de scroll → ne casse pas les en-têtes `sticky` ; les éléments `fixed` (barre d'onglets, FAB) ne sont pas rognés (leur bloc conteneur = viewport) |
 | Thème / couleurs | Thème clair par défaut : fond blanc, primaire magenta `#e053ff` (texte foncé pour lisibilité). 2 dimensions : mode clair/sombre (next-themes, `.dark`) + accent (`[data-accent]` : pink défaut / blue / cyan). Registre dans `lib/themes.ts` | Identité visuelle + dark theme et thèmes custom anticipés sans dupliquer la palette |
 | Inter-service auth | JWT passed in header | Grading requirement |
+| API Gateway | Reverse proxy mince (`httputil.ReverseProxy`, stdlib) : table préfixe→URL (`internal/proxy` + `internal/router`), forwarde méthode/chemin/corps/headers et renvoie la réponse intacte (`{data}`/`{error}` remontent). CORS maison (`internal/middleware`, gère le preflight OPTIONS). Routes publiques pour l'instant ; le middleware JWT (validation locale avec `JWT_SECRET` partagé) viendra protéger les préfixes au login | Mince + évolutif + « on l'a construit » (démo). Forward transparent vs handlers par endpoint (BFF) réservés à l'agrégation multi-services. Préfixe conservé (`/auth/...` → service sur `/auth/...`) |
 | Containerization | Docker + docker-compose | Grading requirement |
 | Dev hot-reload | `make dev` = overlay `docker-compose.dev.yml` par-dessus la base. Go : stage `dev` du Dockerfile (`air` épinglé `air-verse/air@v1.52.3`) + `.air.toml` par service + bind-mount source ; caches Go partagés (volumes `go-mod-cache`/`go-build-cache`). Frontend : stage `deps` + `command: npm run dev` + bind-mount + volume anonyme `node_modules` + `WATCHPACK_POLLING=true`. Le `frontend` voit son `depends_on` effacé via `!reset`. `make up` reste les images de prod figées | Itérer sans rebuild. Stage `dev` placé AVANT le runtime → `make up`/`build` produisent toujours l'image de prod (dernier stage). `!reset` car un `depends_on: []` ne vide pas (compose fusionne les mappings). `start_period: 90s` sur les services Go pour laisser le 1er build `air` se faire |
 | Config `.env` | Racine = vars transverses (`JWT_SECRET`, `JWT_EXPIRY`, `NEXT_PUBLIC_API_URL`) ; `<service>/.env` = config propre, chargée par compose via `env_file:` ; `environment:` réservé aux overrides Docker (host = nom de conteneur) | Découplage : un service tourne seul (`make run`) avec son `.env`, et en stack via compose. ⚠️ Les vars d'un `env_file` ne sont PAS interpolables (`${...}`) dans le compose — seul le `.env` racine l'est. DB host surchargé via `DB_HOST`/`MONGO_HOST` |
@@ -234,4 +235,4 @@ project/
 
 ---
 
-*Last updated: 02/06/2026 — feat(frontend) : navigation mobile responsive X.com-like (en-tête + tiroir latéral gauche + barre d'onglets + FAB « + », favicon logo_only) ; rebase sur develop (auth-service + post-service)*
+*Last updated: 02/06/2026 — feat(api-gateway) : reverse proxy vers les services + CORS ; feat(frontend) : navigation mobile responsive X.com-like (en-tête + tiroir latéral gauche + barre d'onglets + FAB « + », favicon logo_only)*
