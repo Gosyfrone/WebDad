@@ -46,6 +46,12 @@ const config: Config = {
           DEFAULT: 'hsl(var(--card))',
           foreground: 'hsl(var(--card-foreground))',
         },
+        // Couleurs de marque (dégradé du logo Breezy)
+        brand: {
+          pink: 'hsl(var(--brand-pink))',
+          blue: 'hsl(var(--brand-blue))',
+          cyan: 'hsl(var(--brand-cyan))',
+        },
       },
       borderRadius: {
         lg: 'var(--radius)',

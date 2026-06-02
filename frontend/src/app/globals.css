@@ -2,68 +2,141 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * SYSTÈME DE THÈMES (Breezy)
+ * ----------------------------------------------------------------------------
+ * Deux dimensions indépendantes, à la manière de X.com :
+ *
+ *   1. Mode  : clair / sombre / système   -> géré par next-themes (classe .dark)
+ *   2. Accent: couleur primaire de marque -> attribut [data-accent] sur <html>
+ *
+ * L'accent ne surcharge QUE --primary / --ring / --accent : il se combine donc
+ * automatiquement avec le mode clair ET le mode sombre, sans dupliquer toute la
+ * palette. L'accent par défaut (magenta "Breezy" #e053ff) est intégré à :root,
+ * donc aucun attribut n'est nécessaire tant qu'on reste sur le thème par défaut.
+ *
+ * Couleurs :
+ *   - magenta primaire #e053ff -> hsl(289 100% 66%)   (boutons, états actifs)
+ *   - bleu wordmark    #4D7CF5 -> hsl(223 85% 60%)     (accent alternatif)
+ *   - cyan tourbillon  #38BDF8 -> hsl(199 89% 48%)     (accent alternatif)
+ *
+ * Le texte des boutons primaires est foncé (et non blanc) : sur ce magenta clair,
+ * le blanc serait peu lisible (contraste ~3). Le foncé donne ~5.7 (AA).
+ *
+ * Le registre des thèmes (pour le futur sélecteur) est dans src/lib/themes.ts.
+ * ----------------------------------------------------------------------------
+ */
+
 @layer base {
+  /* ===== Mode CLAIR (défaut) + accent MAGENTA Breezy ===== */
   :root {
     --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --foreground: 224 47% 11%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 224 47% 11%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 224 47% 11%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 289 100% 66%;
+    --primary-foreground: 289 100% 12%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 289 50% 96%;
+    --secondary-foreground: 289 30% 20%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 289 20% 96%;
+    --muted-foreground: 289 6% 45%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 289 100% 96%;
+    --accent-foreground: 289 80% 34%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 289 20% 90%;
+    --input: 289 20% 90%;
+    --ring: 289 100% 66%;
 
     --radius: 0.5rem;
+
+    /* Couleurs de marque (dégradé du logo) — utilisables via text-brand-* etc. */
+    --brand-pink: 289 100% 66%;
+    --brand-blue: 223 85% 60%;
+    --brand-cyan: 199 89% 48%;
   }
 
+  /* ===== Mode SOMBRE ===== */
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    --background: 289 30% 6%;
+    --foreground: 289 20% 98%;
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+    --card: 289 28% 8%;
+    --card-foreground: 289 20% 98%;
 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 289 30% 7%;
+    --popover-foreground: 289 20% 98%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary: 289 100% 66%;
+    --primary-foreground: 289 100% 10%;
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 289 25% 15%;
+    --secondary-foreground: 289 20% 98%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted: 289 22% 15%;
+    --muted-foreground: 289 10% 65%;
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 289 40% 18%;
+    --accent-foreground: 289 20% 98%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 62% 45%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
+    --border: 289 22% 18%;
+    --input: 289 22% 18%;
+    --ring: 289 100% 66%;
+
+    --brand-pink: 289 100% 66%;
+    --brand-blue: 223 88% 65%;
+    --brand-cyan: 199 89% 58%;
   }
+
+  /* ===== Accents custom (composent avec clair ET sombre) ===== */
+
+  /* Accent BLEU (couleur du wordmark du logo) */
+  [data-accent='blue'] {
+    --primary: 223 85% 60%;
+    --primary-foreground: 0 0% 100%;
+    --accent: 223 90% 96%;
+    --accent-foreground: 223 70% 35%;
+    --ring: 223 85% 60%;
+  }
+  .dark[data-accent='blue'] {
+    --primary: 223 88% 65%;
+    --accent: 223 40% 18%;
+    --accent-foreground: 223 60% 90%;
+    --ring: 223 88% 65%;
+  }
+
+  /* Accent CYAN */
+  [data-accent='cyan'] {
+    --primary: 199 89% 45%;
+    --primary-foreground: 0 0% 100%;
+    --accent: 199 90% 95%;
+    --accent-foreground: 199 80% 26%;
+    --ring: 199 89% 45%;
+  }
+  .dark[data-accent='cyan'] {
+    --primary: 199 89% 55%;
+    --accent: 199 40% 16%;
+    --accent-foreground: 199 70% 85%;
+    --ring: 199 89% 55%;
+  }
+
+  /*
+   * Pour ajouter un nouvel accent : dupliquer un bloc ci-dessus avec un nouvel
+   * identifiant, puis l'enregistrer dans src/lib/themes.ts (ACCENTS).
+   */
 }
 
 @layer base {
