@@ -70,7 +70,7 @@ export function SidebarLeft({ role, username = 'Utilisateur' }: SidebarLeftProps
   )
 
   return (
-    <aside className="sticky top-0 flex h-screen w-[275px] flex-col justify-between overflow-y-auto px-3 py-4">
+    <aside className="sticky top-0 hidden h-screen w-[275px] flex-col justify-between overflow-y-auto px-3 py-4 lg:flex">
       {/* Logo */}
       <div className="flex flex-col gap-1">
         <Link

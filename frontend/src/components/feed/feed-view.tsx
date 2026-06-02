@@ -25,9 +25,9 @@ export function FeedView({ posts }: FeedViewProps) {
 
   return (
     <div className="flex flex-col">
-      {/* En-tête sticky */}
-      <div className="sticky top-0 z-10 border-b bg-background/80 backdrop-blur">
-        <h1 className="px-4 py-3 text-xl font-bold">Fil d&apos;actualité</h1>
+      {/* En-tête : sticky sur desktop ; sur mobile l'en-tête global (logo) prend le relais */}
+      <div className="z-10 border-b bg-background/80 backdrop-blur lg:sticky lg:top-0">
+        <h1 className="hidden px-4 py-3 text-xl font-bold lg:block">Fil d&apos;actualité</h1>
         {/* Onglets Pour toi / Abonnements */}
         <div className="flex">
           <TabButton active={tab === 'for-you'} onClick={() => setTab('for-you')}>
@@ -39,8 +39,10 @@ export function FeedView({ posts }: FeedViewProps) {
         </div>
       </div>
 
-      {/* Zone de création de post */}
-      <CreatePost />
+      {/* Zone de création de post inline (desktop) ; sur mobile, c'est le bouton « + » flottant */}
+      <div className="hidden lg:block">
+        <CreatePost />
+      </div>
 
       {/* Contenu selon l'onglet actif */}
       {tab === 'for-you' ? (
