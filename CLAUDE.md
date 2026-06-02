@@ -115,7 +115,7 @@ Plus aucun conflit : le frontend (3000) et le backend (8080+) occupent des plage
 ### Services status
 | Service | Status | DB | Notes |
 |---|---|---|---|
-| Auth Service | 🔴 TODO | PostgreSQL | JWT, login/register |
+| Auth Service | 🟡 WIP | PostgreSQL | Squelette fonctionnel (config/db/models/services/handlers/middleware/router). Routes `/auth/register`, `/auth/login`, `/auth/validate`, `/health` — testées de bout en bout. JWT HS256 (claims user_id/email/role), bcrypt. **Service autonome** : applique son propre schéma au boot (`internal/db/schema.sql` embarqué, idempotent) → plus de script init-db monté. Seed admin optionnel (`SEED_DEFAULT_ADMIN`). TODO : tests Go, refresh tokens |
 | User Service | 🔴 TODO | PostgreSQL | CRUD users |
 | Post Service | 🟡 WIP | MongoDB | Connexion Mongo via `.env` (URI construite, plus rien en dur). **Autonome** : crée ses collections (posts/comments/likes/reports) + validateurs `$jsonSchema` + index au boot (`EnsureSchema`, idempotent) → `post-init.js` supprimé. Champs snake_case (`author_id`/`content`/`created_at`). Routes posts create/list OK (testées) ; comments/likes = stubs. `make dev` vérifié (air + Mongo) |
 | Profil Service | 🔴 TODO | MongoDB | User profiles |
@@ -125,8 +125,8 @@ Plus aucun conflit : le frontend (3000) et le backend (8080+) occupent des plage
 ### Features status
 | Feature | Type | Status |
 |---|---|---|
-| Registration / Login | Primary | 🔴 TODO |
-| JWT auth + protected routes | Primary | 🔴 TODO |
+| Registration / Login | Primary | 🟡 Auth-service fait (register/login). UI + gateway à brancher |
+| JWT auth + protected routes | Primary | 🟡 Auth-service : génération + `/auth/validate` + middleware. Gateway à brancher |
 | Role management (User/Mod/Admin) | Primary | 🔴 TODO |
 | Post creation/reading | Primary | 🟡 UI faite (feed + composer 280 car. inline & popup sidebar), lecture/écriture API à brancher |
 | User profile | Primary | 🟡 UI faite (consultation : bannière/avatar/bio/compteurs/onglets + édition popup nom/bio + photo/bannière via sélecteur de fichier avec aperçu local). Upload réel + lecture/écriture API à brancher |
@@ -192,7 +192,8 @@ project/
 | Containerization | Docker + docker-compose | Grading requirement |
 | Dev hot-reload | `make dev` = overlay `docker-compose.dev.yml` par-dessus la base. Go : stage `dev` du Dockerfile (`air` épinglé `air-verse/air@v1.52.3`) + `.air.toml` par service + bind-mount source ; caches Go partagés (volumes `go-mod-cache`/`go-build-cache`). Frontend : stage `deps` + `command: npm run dev` + bind-mount + volume anonyme `node_modules` + `WATCHPACK_POLLING=true`. Le `frontend` voit son `depends_on` effacé via `!reset`. `make up` reste les images de prod figées | Itérer sans rebuild. Stage `dev` placé AVANT le runtime → `make up`/`build` produisent toujours l'image de prod (dernier stage). `!reset` car un `depends_on: []` ne vide pas (compose fusionne les mappings). `start_period: 90s` sur les services Go pour laisser le 1er build `air` se faire |
 | Config `.env` | Racine = vars transverses (`JWT_SECRET`, `JWT_EXPIRY`, `NEXT_PUBLIC_API_URL`) ; `<service>/.env` = config propre, chargée par compose via `env_file:` ; `environment:` réservé aux overrides Docker (host = nom de conteneur) | Découplage : un service tourne seul (`make run`) avec son `.env`, et en stack via compose. ⚠️ Les vars d'un `env_file` ne sont PAS interpolables (`${...}`) dans le compose — seul le `.env` racine l'est. DB host surchargé via `DB_HOST`/`MONGO_HOST` |
-| Schéma DB (post) | Le service possède son schéma : `EnsureSchema` (post-service/internal/database/init.go) crée collections + validateurs `$jsonSchema` + index au démarrage, idempotent. Aucun script monté dans `mongo-post`. Config Mongo construite depuis le `.env` (`internal/config`), zéro creds en dur. `scripts/init-db/post-init.js` et le `post-service/docker-compose.yaml` parasite supprimés | Source de vérité unique + service autonome (`make run`/`make dev` contre un Mongo vierge). Même pattern que la branche auth. ⚠️ user-service/profil-service restent sur init-db monté — à harmoniser quand on les traitera |
+| Schéma DB (post) | Le service possède son schéma : `EnsureSchema` (post-service/internal/database/init.go) crée collections + validateurs `$jsonSchema` + index au démarrage, idempotent. Aucun script monté dans `mongo-post`. Config Mongo construite depuis le `.env` (`internal/config`), zéro creds en dur. `scripts/init-db/post-init.js` et le `post-service/docker-compose.yaml` parasite supprimés | Source de vérité unique + service autonome (`make run`/`make dev` contre un Mongo vierge). Même pattern que auth. ⚠️ user-service/profil-service restent sur init-db monté — à harmoniser quand on les traitera |
+| Schéma DB (auth) | Le service possède son schéma : `auth-service/internal/db/schema.sql` (embarqué `go:embed`), appliqué au boot de façon idempotente (`EnsureSchema`). Aucun script monté dans `postgres-auth`. Seed admin via `SEED_DEFAULT_ADMIN`+`SEED_ADMIN_PASSWORD` (idempotent, UUID figé). `scripts/init-db/auth-init.sql` supprimé | Source de vérité unique + service autonome (`make run` contre un Postgres nu). Même pattern que post. ⚠️ user-service/profil restent sur init-db monté — à harmoniser quand on les traitera |
 
 ---
 
@@ -205,18 +206,29 @@ project/
   build. `docker compose up` ne rebuild PAS sur changement de source → un changement de code
   n'apparaît qu'après `make build`. **Pour développer avec hot-reload, utiliser `make dev`** (voir §5).
 
+- **À FAIRE — harmoniser la gestion de schéma des autres services.** Seul `auth-service` est
+  passé au pattern « le service possède son schéma » (schéma embarqué + `EnsureSchema` au boot,
+  cf. §5). `user-service`, `profil-service`, `post-service` reposent encore sur les scripts
+  `scripts/init-db/*` montés. **Quand on attaquera chacun de ces services, on changera leur init
+  BDD** pour le même pattern autonome (et on supprimera le script init-db correspondant). À voir
+  d'abord dans la branche Mongo.
+
 ---
 
 ## 7. INSTRUCTIONS FOR CLAUDE CODE
 
 1. **Read this file first** at every session start.
-2. **Update sections 3, 5, 6** after any significant change.
-3. **Never hardcode secrets** — use `.env` variables.
-4. **Each service is independent**: its own Dockerfile, its own DB.
-5. When implementing a feature, **update its status** in section 3 (🔴→🟡→🟢).
-6. Before any architectural decision, **check section 2** (evaluation criteria).
-7. Keep responses concise — update this file rather than re-explaining context.
+2. **⛔ NE PAS CODER avant validation de l'utilisateur.** Pour toute feature/tâche :
+   d'abord proposer (a) l'**architecture** et (b) **comment la feature sera implémentée**,
+   et **attendre l'accord explicite** avant d'écrire/modifier du code. Pas d'implémentation
+   spontanée.
+3. **Update sections 3, 5, 6** after any significant change.
+4. **Never hardcode secrets** — use `.env` variables.
+5. **Each service is independent**: its own Dockerfile, its own DB.
+6. When implementing a feature, **update its status** in section 3 (🔴→🟡→🟢).
+7. Before any architectural decision, **check section 2** (evaluation criteria).
+8. Keep responses concise — update this file rather than re-explaining context.
 
 ---
 
-*Last updated: 02/06/2026 — feat(frontend) : page profil + édition ; chore(post-service) : nettoyage Mongo (schéma autonome, config .env, suppression post-init.js)*
+*Last updated: 02/06/2026 — feat(auth-service) : squelette + schéma autonome ; feat(frontend) : page profil + édition ; chore(post-service) : nettoyage Mongo*
