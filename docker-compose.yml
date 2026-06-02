@@ -84,9 +84,11 @@ services:
     restart: unless-stopped
     env_file:
       - ./post-service/.env
+    # Pas de script d'init monté : post-service crée lui-même ses collections,
+    # validateurs et index au démarrage (EnsureSchema, idempotent) → source de
+    # vérité unique côté service, et le service reste autonome.
     volumes:
       - mongo-post-data:/data/db
-      - ./scripts/init-db/post-init.js:/docker-entrypoint-initdb.d/init.js:ro
     ports:
       - "27018:27017"
     networks:
