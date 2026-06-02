@@ -1,0 +1,29 @@
+version: "3.9"
+
+services:
+  mongo:
+    image: mongo:7
+    container_name: mongodb
+    restart: always
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: example
+    volumes:
+      - mongo_data:/data/db
+
+  post-service:
+    build: .
+    container_name: post-service
+    restart: always
+    ports:
+      - "8084:8084"
+    environment:
+      PORT: 8084
+      MONGO_URI: mongodb://root:example@mongo:27017
+    depends_on:
+      - mongo
+
+volumes:
+  mongo_data:
