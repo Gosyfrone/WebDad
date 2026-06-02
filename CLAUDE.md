@@ -117,7 +117,7 @@ Plus aucun conflit : le frontend (3000) et le backend (8080+) occupent des plage
 |---|---|---|---|
 | Auth Service | 🔴 TODO | PostgreSQL | JWT, login/register |
 | User Service | 🔴 TODO | PostgreSQL | CRUD users |
-| Post Service | 🔴 TODO | MongoDB | CRUD posts |
+| Post Service | 🟡 WIP | MongoDB | Connexion Mongo via `.env` (URI construite, plus rien en dur). **Autonome** : crée ses collections (posts/comments/likes/reports) + validateurs `$jsonSchema` + index au boot (`EnsureSchema`, idempotent) → `post-init.js` supprimé. Champs snake_case (`author_id`/`content`/`created_at`). Routes posts create/list OK (testées) ; comments/likes = stubs. `make dev` vérifié (air + Mongo) |
 | Profil Service | 🔴 TODO | MongoDB | User profiles |
 | API Gateway | 🔴 TODO | — | Route dispatch, auth middleware |
 | Frontend | 🟡 WIP | — | Next.js 14 : squelette + routing + layout feed 3 colonnes (style X). Pages feed + profil (consultation/édition) faites. Données = stubs, API à brancher |
@@ -192,6 +192,7 @@ project/
 | Containerization | Docker + docker-compose | Grading requirement |
 | Dev hot-reload | `make dev` = overlay `docker-compose.dev.yml` par-dessus la base. Go : stage `dev` du Dockerfile (`air` épinglé `air-verse/air@v1.52.3`) + `.air.toml` par service + bind-mount source ; caches Go partagés (volumes `go-mod-cache`/`go-build-cache`). Frontend : stage `deps` + `command: npm run dev` + bind-mount + volume anonyme `node_modules` + `WATCHPACK_POLLING=true`. Le `frontend` voit son `depends_on` effacé via `!reset`. `make up` reste les images de prod figées | Itérer sans rebuild. Stage `dev` placé AVANT le runtime → `make up`/`build` produisent toujours l'image de prod (dernier stage). `!reset` car un `depends_on: []` ne vide pas (compose fusionne les mappings). `start_period: 90s` sur les services Go pour laisser le 1er build `air` se faire |
 | Config `.env` | Racine = vars transverses (`JWT_SECRET`, `JWT_EXPIRY`, `NEXT_PUBLIC_API_URL`) ; `<service>/.env` = config propre, chargée par compose via `env_file:` ; `environment:` réservé aux overrides Docker (host = nom de conteneur) | Découplage : un service tourne seul (`make run`) avec son `.env`, et en stack via compose. ⚠️ Les vars d'un `env_file` ne sont PAS interpolables (`${...}`) dans le compose — seul le `.env` racine l'est. DB host surchargé via `DB_HOST`/`MONGO_HOST` |
+| Schéma DB (post) | Le service possède son schéma : `EnsureSchema` (post-service/internal/database/init.go) crée collections + validateurs `$jsonSchema` + index au démarrage, idempotent. Aucun script monté dans `mongo-post`. Config Mongo construite depuis le `.env` (`internal/config`), zéro creds en dur. `scripts/init-db/post-init.js` et le `post-service/docker-compose.yaml` parasite supprimés | Source de vérité unique + service autonome (`make run`/`make dev` contre un Mongo vierge). Même pattern que la branche auth. ⚠️ user-service/profil-service restent sur init-db monté — à harmoniser quand on les traitera |
 
 ---
 
@@ -218,4 +219,4 @@ project/
 
 ---
 
-*Last updated: 02/06/2026 — feat(frontend) : page profil + édition photo/bannière (sélecteur de fichier + aperçu data URL) — upload réel & API à brancher (back)*
+*Last updated: 02/06/2026 — feat(frontend) : page profil + édition ; chore(post-service) : nettoyage Mongo (schéma autonome, config .env, suppression post-init.js)*
