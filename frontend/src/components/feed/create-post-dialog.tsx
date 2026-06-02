@@ -1,0 +1,48 @@
+'use client'
+
+import { useState } from 'react'
+
+import { PostComposer } from '@/components/feed/post-composer'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
+
+interface CreatePostDialogProps {
+  /** Élément déclencheur (ex. bouton « Poster »), rendu via `asChild`. */
+  children: React.ReactNode
+}
+
+/**
+ * Popup de publication déclenchée depuis la sidebar.
+ *
+ * Réutilise {@link PostComposer} et ferme la fenêtre après envoi. Le titre et
+ * la description sont masqués visuellement mais présents pour l'accessibilité.
+ */
+export function CreatePostDialog({ children }: CreatePostDialogProps) {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>{children}</DialogTrigger>
+      <DialogContent className="top-24 translate-y-0 p-4 sm:max-w-xl">
+        <DialogHeader className="sr-only">
+          <DialogTitle>Créer un post</DialogTitle>
+          <DialogDescription>
+            Rédigez et publiez un nouveau post (280 caractères maximum).
+          </DialogDescription>
+        </DialogHeader>
+
+        <PostComposer
+          autoFocus
+          className="pt-6"
+          onPosted={() => setOpen(false)}
+        />
+      </DialogContent>
+    </Dialog>
+  )
+}

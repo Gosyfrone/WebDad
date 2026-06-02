@@ -128,7 +128,7 @@ Plus aucun conflit : le frontend (3000) et le backend (8080+) occupent des plage
 | Registration / Login | Primary | 🔴 TODO |
 | JWT auth + protected routes | Primary | 🔴 TODO |
 | Role management (User/Mod/Admin) | Primary | 🔴 TODO |
-| Post creation/reading | Primary | 🟡 UI faite (feed + composer 280 car.), lecture/écriture API à brancher |
+| Post creation/reading | Primary | 🟡 UI faite (feed + composer 280 car. inline & popup sidebar), lecture/écriture API à brancher |
 | User profile | Primary | 🔴 TODO |
 | Moderation (moderate posts) | Secondary | 🔴 TODO |
 | Admin panel | Secondary | 🔴 TODO |
@@ -182,6 +182,9 @@ project/
 | Frontend nav par rôle | `navItemsForRole()` filtre les liens (user/mod/admin) | Reflète les 3 rôles côté UI |
 | Nom du produit | **Breezy** (logo `frontend/public/logo_breezy.png`) | WebDad = nom du projet/repo, Breezy = nom du réseau social |
 | Layout feed | 3 colonnes style X.com : nav (gauche) / fil (centre) / suggestions (droite) | UX familière, démo lisible (critère « Interface » §2) |
+| Composer post | Logique de saisie factorisée dans `PostComposer` ; `CreatePost` = version inline (tête du fil), `CreatePostDialog` = popup (bouton « Poster » sidebar, shadcn `Dialog`) | Limite 280 car. + validation en un seul endroit, pas de duplication entre inline et modale |
+| Emoji picker | `EmojiPicker` (shadcn `Popover` + liste statique d'emojis), insertion à la position du curseur dans le composer | Pas de dépendance lourde ; fonctionne inline et dans la popup |
+| Onglets du fil | `FeedView` (client) gère l'état « Pour toi » / « Abonnements » ; Abonnements = placeholder (état vide) en attendant l'API | Switch d'onglet réel côté UI ; la page reste un Server Component qui passe les données stub |
 | Thème / couleurs | Thème clair par défaut : fond blanc, primaire magenta `#e053ff` (texte foncé pour lisibilité). 2 dimensions : mode clair/sombre (next-themes, `.dark`) + accent (`[data-accent]` : pink défaut / blue / cyan). Registre dans `lib/themes.ts` | Identité visuelle + dark theme et thèmes custom anticipés sans dupliquer la palette |
 | Inter-service auth | JWT passed in header | Grading requirement |
 | Containerization | Docker + docker-compose | Grading requirement |
@@ -222,4 +225,4 @@ project/
 
 ---
 
-*Last updated: [DATE — update manually or ask Claude Code to update]*
+*Last updated: 02/06/2026 — feat(frontend) : popup de publication + emoji picker + onglet Abonnements (placeholder)*
