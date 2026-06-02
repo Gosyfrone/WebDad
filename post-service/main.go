@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/gin-gonic/gin"
-	"github.com/user/myapi/internal/handler"
+	"github.com/webdad/post-service/internal/handler"
 )
 
 const (

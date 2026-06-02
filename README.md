@@ -39,6 +39,11 @@ Toute la stack (4 services + gateway + frontend + 4 bases de données) démarre 
    make up         # = docker compose up -d (vérifie d'abord que les .env existent)
    ```
 
+   `make up` sert les **images de production figées** : le code est compilé/buildé au
+   moment de la construction de l'image. Un changement de code n'apparaît qu'après
+   `make build`. Pour développer avec rechargement automatique, voir
+   [Mode développement Docker (hot-reload)](#mode-développement-docker-hot-reload).
+
 4. Vérifier que tout répond :
 
    ```bash
@@ -61,8 +66,46 @@ Toute la stack (4 services + gateway + frontend + 4 bases de données) démarre 
 > La config propre à un service vit dans `<service>/.env` et est chargée par
 > `docker compose` via `env_file:`. Les hôtes de bases (`DB_HOST`, `MONGO_HOST`)
 > sont surchargés automatiquement par le compose pour viser les conteneurs.
-> ⚠️ Les variables d'un `env_file` ne sont pas interpolables (`${...}`) dans le
+> Les variables d'un `env_file` ne sont pas interpolables (`${...}`) dans le
 > `docker-compose.yml` : seul le `.env` racine l'est.
+
+## Mode développement Docker (hot-reload)
+
+Même stack que `make up`, mais avec **rechargement automatique** : le code source est monté
+dans les conteneurs (bind mount) et un *watcher* recompile/recharge à chaque sauvegarde.
+C'est la façon recommandée pour développer sans quitter Docker.
+
+- **Frontend** : `next dev` (HMR React).
+- **Services Go** : [`air`](https://github.com/air-verse/air) recompile le binaire à chaque
+  modification d'un fichier `.go`.
+
+Prérequis : avoir créé les `.env` (`make env`, voir étape 2 ci-dessus).
+
+```bash
+make dev        # build les stages « dev », lance toute la stack en arrière-plan, puis rend la main
+```
+
+- Frontend → [http://localhost:3000](http://localhost:3000) — modifie un fichier, la page se recharge.
+- Backend → modifie un `.go`, `air` recompile le service concerné.
+- La stack tourne **en détaché** (arrière-plan). Pour suivre les logs utiles (front + Go,
+  sans le bruit des bases) :
+
+  ```bash
+  make dev-logs
+  ```
+
+  (ou par service : `make logs-front`, `make logs-post`, `make logs-gateway`, …)
+
+- Pour arrêter/nettoyer la stack de dev :
+
+  ```bash
+  make dev-down
+  ```
+
+**Sous le capot** : un overlay `docker-compose.dev.yml` se superpose à `docker-compose.yml`
+(`make dev` = `docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build -d`).
+Les Dockerfiles Go ont un stage `dev` (avec `air`) placé **avant** le runtime, donc `make up`
+et `make build` produisent toujours les images de prod ; le mode dev est purement opt-in.
 
 ## Développement hors Docker (service par service)
 
@@ -174,7 +217,10 @@ et sa propre base de données. La communication entre services passe par HTTP vi
 ```bash
 make help      # Liste toutes les commandes
 make env       # Crée les .env manquants depuis les .env.example
-make up        # Démarre toute la stack (docker compose up -d)
+make up        # Démarre toute la stack en images de prod (docker compose up -d)
+make dev       # Démarre en mode dev (détaché) : hot-reload front (next dev) + Go (air)
+make dev-logs  # Suit les logs front + Go (sans le bruit des bases de données)
+make dev-down  # Arrête la stack de dev
 make down      # Arrête les conteneurs
 make build     # Rebuild toutes les images (--no-cache)
 make ps        # Statut des conteneurs

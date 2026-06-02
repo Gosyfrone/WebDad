@@ -13,6 +13,17 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux \
     go build -ldflags="-w -s" -o service .
 
+# ─── Stage dev : hot-reload (air) ────────────────────────────────
+# Placé AVANT le runtime : `docker build` sans --target construit donc
+# toujours l'image de prod (dernier stage). Sélectionné en dev via
+# `target: dev` dans docker-compose.dev.yml. Le code source est monté
+# en bind mount par compose ; air recompile à chaud à chaque save.
+FROM golang:1.22-alpine AS dev
+RUN apk add --no-cache git wget ca-certificates tzdata && \
+    go install github.com/air-verse/air@v1.52.3
+WORKDIR /app
+CMD ["air", "-c", ".air.toml"]
+
 # ─── Stage 2 : Runtime ───────────────────────────────────────────
 FROM alpine:3.20
 

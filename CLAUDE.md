@@ -185,6 +185,7 @@ project/
 | Thème / couleurs | Thème clair par défaut : fond blanc, primaire magenta `#e053ff` (texte foncé pour lisibilité). 2 dimensions : mode clair/sombre (next-themes, `.dark`) + accent (`[data-accent]` : pink défaut / blue / cyan). Registre dans `lib/themes.ts` | Identité visuelle + dark theme et thèmes custom anticipés sans dupliquer la palette |
 | Inter-service auth | JWT passed in header | Grading requirement |
 | Containerization | Docker + docker-compose | Grading requirement |
+| Dev hot-reload | `make dev` = overlay `docker-compose.dev.yml` par-dessus la base. Go : stage `dev` du Dockerfile (`air` épinglé `air-verse/air@v1.52.3`) + `.air.toml` par service + bind-mount source ; caches Go partagés (volumes `go-mod-cache`/`go-build-cache`). Frontend : stage `deps` + `command: npm run dev` + bind-mount + volume anonyme `node_modules` + `WATCHPACK_POLLING=true`. Le `frontend` voit son `depends_on` effacé via `!reset`. `make up` reste les images de prod figées | Itérer sans rebuild. Stage `dev` placé AVANT le runtime → `make up`/`build` produisent toujours l'image de prod (dernier stage). `!reset` car un `depends_on: []` ne vide pas (compose fusionne les mappings). `start_period: 90s` sur les services Go pour laisser le 1er build `air` se faire |
 | Config `.env` | Racine = vars transverses (`JWT_SECRET`, `JWT_EXPIRY`, `NEXT_PUBLIC_API_URL`) ; `<service>/.env` = config propre, chargée par compose via `env_file:` ; `environment:` réservé aux overrides Docker (host = nom de conteneur) | Découplage : un service tourne seul (`make run`) avec son `.env`, et en stack via compose. ⚠️ Les vars d'un `env_file` ne sont PAS interpolables (`${...}`) dans le compose — seul le `.env` racine l'est. DB host surchargé via `DB_HOST`/`MONGO_HOST` |
 
 ---
@@ -193,20 +194,10 @@ project/
 
 > Add/remove as issues arise.
 
-- **Pas de hot-reload en conteneur (frontend & back Go).** `make up` sert un build **figé** :
-  l'image frontend embarque un `npm run build` (`output: standalone` → `node server.js`) réalisé au
-  moment du build de l'image, et les Dockerfiles Go compilent un binaire statique. Modifier le code
-  ne change donc rien tant qu'on ne rebuild pas (`make build`) — `docker compose up` ne rebuild PAS
-  sur changement de source, seulement si l'image est absente. Symptôme observé : `npm run dev`
-  (source live, port 3000) ≠ `make up` (image figée, antérieure au code).
-  → **TÂCHE FUTURE — mode dev Docker (option B, hot-reload)** :
-    1. Créer `docker-compose.dev.yml` : pour `frontend`, bind-mount `./frontend` + volume anonyme
-       `node_modules`, `command: npm run dev`, et **retirer** `depends_on: api-gateway`
-       (les services Go ne sont pas prêts → sinon le frontend ne démarre jamais).
-    2. Ajouter une cible `make dev` → `docker compose -f docker-compose.yml -f docker-compose.dev.yml up`.
-    3. `make up` reste le test de l'image **prod-like** ; `make dev` = hot-reload pour développer.
-    4. Quand les services Go existeront : même pattern avec **air** (`.air.toml` par service,
-       monter la source, lancer `air` au lieu du binaire compilé).
+- **Rappel : `make up` = images de prod FIGÉES.** L'image frontend embarque un `npm run build`
+  (`output: standalone` → `node server.js`) et les images Go un binaire statique, tous figés au
+  build. `docker compose up` ne rebuild PAS sur changement de source → un changement de code
+  n'apparaît qu'après `make build`. **Pour développer avec hot-reload, utiliser `make dev`** (voir §5).
 
 ---
 
