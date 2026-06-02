@@ -8,13 +8,23 @@
 #    - Go        : stage `dev` du Dockerfile → air (.air.toml)
 #    - Frontend  : stage `deps` + `npm run dev` (next dev)
 #
-#  Les caches Go (modules + build) sont des volumes nommés partagés entre
-#  services pour accélérer les recompilations.
+#  Chaque service Go a son PROPRE cache (modules + build), nommé par service.
+#  ⚠️ Ne PAS partager un même volume de modules entre services : leurs `go build`
+#  démarrent en parallèle et se télescopent sur l'extraction des modules
+#  (erreur « mkdir ... file exists »). Un cache par service = pas de course.
 # ════════════════════════════════════════════════════════════════════
 
 volumes:
-  go-mod-cache:      # /go/pkg/mod   — modules téléchargés
-  go-build-cache:    # cache de compilation Go (recompiles rapides)
+  go-mod-auth:       # /go/pkg/mod par service — modules téléchargés
+  go-build-auth:     # cache de compilation Go par service — recompiles rapides
+  go-mod-user:
+  go-build-user:
+  go-mod-profil:
+  go-build-profil:
+  go-mod-post:
+  go-build-post:
+  go-mod-gateway:
+  go-build-gateway:
 
 services:
 
@@ -25,8 +35,8 @@ services:
     volumes:
       - ./auth-service:/app          # code live
       - /app/tmp                     # binaire air (volume anonyme, pas sur l'hôte)
-      - go-mod-cache:/go/pkg/mod
-      - go-build-cache:/root/.cache/go-build
+      - go-mod-auth:/go/pkg/mod
+      - go-build-auth:/root/.cache/go-build
     healthcheck:
       start_period: 90s              # 1er build air (download modules) peut être long
 
@@ -36,8 +46,8 @@ services:
     volumes:
       - ./user-service:/app
       - /app/tmp
-      - go-mod-cache:/go/pkg/mod
-      - go-build-cache:/root/.cache/go-build
+      - go-mod-user:/go/pkg/mod
+      - go-build-user:/root/.cache/go-build
     healthcheck:
       start_period: 90s
 
@@ -47,8 +57,8 @@ services:
     volumes:
       - ./profil-service:/app
       - /app/tmp
-      - go-mod-cache:/go/pkg/mod
-      - go-build-cache:/root/.cache/go-build
+      - go-mod-profil:/go/pkg/mod
+      - go-build-profil:/root/.cache/go-build
     healthcheck:
       start_period: 90s
 
@@ -58,8 +68,8 @@ services:
     volumes:
       - ./post-service:/app
       - /app/tmp
-      - go-mod-cache:/go/pkg/mod
-      - go-build-cache:/root/.cache/go-build
+      - go-mod-post:/go/pkg/mod
+      - go-build-post:/root/.cache/go-build
     healthcheck:
       start_period: 90s
 
@@ -69,8 +79,8 @@ services:
     volumes:
       - ./api-gateway:/app
       - /app/tmp
-      - go-mod-cache:/go/pkg/mod
-      - go-build-cache:/root/.cache/go-build
+      - go-mod-gateway:/go/pkg/mod
+      - go-build-gateway:/root/.cache/go-build
     healthcheck:
       start_period: 90s
 

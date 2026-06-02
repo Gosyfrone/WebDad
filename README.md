@@ -82,12 +82,20 @@ C'est la façon recommandée pour développer sans quitter Docker.
 Prérequis : avoir créé les `.env` (`make env`, voir étape 2 ci-dessus).
 
 ```bash
-make dev        # build les stages « dev » puis lance toute la stack, au premier plan
+make dev        # build les stages « dev », lance toute la stack en arrière-plan, puis rend la main
 ```
 
 - Frontend → [http://localhost:3000](http://localhost:3000) — modifie un fichier, la page se recharge.
 - Backend → modifie un `.go`, `air` recompile le service concerné.
-- La commande tourne **au premier plan** (logs visibles) : `Ctrl-C` pour arrêter.
+- La stack tourne **en détaché** (arrière-plan). Pour suivre les logs utiles (front + Go,
+  sans le bruit des bases) :
+
+  ```bash
+  make dev-logs
+  ```
+
+  (ou par service : `make logs-front`, `make logs-post`, `make logs-gateway`, …)
+
 - Pour arrêter/nettoyer la stack de dev :
 
   ```bash
@@ -95,7 +103,7 @@ make dev        # build les stages « dev » puis lance toute la stack, au premi
   ```
 
 **Sous le capot** : un overlay `docker-compose.dev.yml` se superpose à `docker-compose.yml`
-(`make dev` = `docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build`).
+(`make dev` = `docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build -d`).
 Les Dockerfiles Go ont un stage `dev` (avec `air`) placé **avant** le runtime, donc `make up`
 et `make build` produisent toujours les images de prod ; le mode dev est purement opt-in.
 
@@ -210,7 +218,8 @@ et sa propre base de données. La communication entre services passe par HTTP vi
 make help      # Liste toutes les commandes
 make env       # Crée les .env manquants depuis les .env.example
 make up        # Démarre toute la stack en images de prod (docker compose up -d)
-make dev       # Démarre en mode dev : hot-reload front (next dev) + Go (air)
+make dev       # Démarre en mode dev (détaché) : hot-reload front (next dev) + Go (air)
+make dev-logs  # Suit les logs front + Go (sans le bruit des bases de données)
 make dev-down  # Arrête la stack de dev
 make down      # Arrête les conteneurs
 make build     # Rebuild toutes les images (--no-cache)

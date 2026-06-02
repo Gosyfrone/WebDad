@@ -1,4 +1,4 @@
-.PHONY: help env up dev dev-down down build logs ps clean reset db-only \
+.PHONY: help env up dev dev-down dev-logs down build logs ps clean reset db-only \
         logs-gateway logs-auth logs-user logs-profil logs-post logs-front logs-db \
         sh-auth sh-user sh-profil sh-post sh-gateway \
         psql-auth psql-user mongo-profil-cli mongo-post-cli
@@ -16,7 +16,8 @@ help:
 	@echo "  ────────────────────────────────────────────────────"
 	@echo "  make env       Créer les .env manquants depuis les .env.example"
 	@echo "  make up        Démarrer tout l'environnement (images de prod)"
-	@echo "  make dev       Démarrer en mode DEV : hot-reload front + Go (air)"
+	@echo "  make dev       Démarrer en mode DEV (détaché) : hot-reload front + Go (air)"
+	@echo "  make dev-logs  Suivre les logs front + Go (sans le bruit des BDD)"
 	@echo "  make dev-down  Arrêter la stack de dev"
 	@echo "  make down      Arrêter les conteneurs"
 	@echo "  make build     Rebuild toutes les images (--no-cache)"
@@ -62,15 +63,25 @@ down:
 #   - Go        : air (recompile à la sauvegarde) via le stage `dev`
 #   - Frontend  : next dev (HMR)
 # `--build` force la construction du stage `dev` (sinon compose
-# réutiliserait l'image de prod déjà taggée). Lancé au premier plan
-# pour voir les logs de rechargement (Ctrl-C pour arrêter).
+# réutiliserait l'image de prod déjà taggée). Lancé en DÉTACHÉ : la
+# commande rend la main, on consulte les logs à la demande (dev-logs).
 dev:
 	@test -f .env || { echo "❌ .env racine manquant — exécute : make env"; exit 1; }
 	@for s in $(SERVICES); do \
 		test -f $$s/.env || { echo "❌ $$s/.env manquant (requis par compose) — exécute : make env"; exit 1; }; \
 	done
-	@echo "  ▶ Mode DEV — hot-reload front + Go. Frontend → http://localhost:3000"
-	$(DEV) up --build
+	$(DEV) up --build -d
+	@echo ""
+	@echo "  ▶ Mode DEV démarré (hot-reload front + Go)"
+	@echo "    Frontend → http://localhost:3000   (édite un fichier → reload auto)"
+	@echo "    Gateway  → http://localhost:8080"
+	@echo "    Logs     → make dev-logs (front + Go)  |  make logs-front | logs-post ..."
+	@echo "    Arrêt    → make dev-down"
+	@echo ""
+
+# Logs des services applicatifs (front + Go), sans le bruit des BDD.
+dev-logs:
+	$(DEV) logs -f frontend api-gateway auth-service user-service profil-service post-service
 
 dev-down:
 	$(DEV) down
