@@ -18,6 +18,7 @@ import {
 import { cn } from '@/lib/utils'
 import { ROUTES } from '@/lib/routes'
 import type { UserRole } from '@/types'
+import { CreatePostDialog } from '@/components/feed/create-post-dialog'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import {
@@ -109,14 +110,15 @@ export function SidebarLeft({ role, username = 'Utilisateur' }: SidebarLeftProps
           )
         })}
 
-        {/* Post button */}
-        <Button
-          size="lg"
-          className="mt-4 w-[90%] rounded-full text-base font-bold"
-          disabled
-        >
-          Poster
-        </Button>
+        {/* Post button : ouvre la popup de publication */}
+        <CreatePostDialog>
+          <Button
+            size="lg"
+            className="mt-4 w-[90%] rounded-full text-base font-bold"
+          >
+            Poster
+          </Button>
+        </CreatePostDialog>
       </div>
 
       {/* User menu at bottom */}

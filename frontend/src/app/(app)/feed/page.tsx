@@ -1,5 +1,5 @@
-import { CreatePost } from '@/components/feed/create-post'
-import { PostCard, type PostCardProps } from '@/components/feed/post-card'
+import { FeedView } from '@/components/feed/feed-view'
+import type { PostCardProps } from '@/components/feed/post-card'
 
 // Données fictives pour le squelette (remplacées par l'API dans l'issue post)
 const STUB_POSTS: PostCardProps[] = [
@@ -71,31 +71,5 @@ const STUB_POSTS: PostCardProps[] = [
 ]
 
 export default function FeedPage() {
-  return (
-    <div className="flex flex-col">
-      {/* En-tête sticky */}
-      <div className="sticky top-0 z-10 border-b bg-background/80 backdrop-blur">
-        <h1 className="px-4 py-3 text-xl font-bold">Fil d&apos;actualité</h1>
-        {/* Onglets Pour toi / Abonnements */}
-        <div className="flex">
-          <button className="flex-1 border-b-2 border-primary py-3 text-sm font-bold">
-            Pour toi
-          </button>
-          <button className="flex-1 py-3 text-sm font-normal text-muted-foreground transition-colors hover:bg-muted/30">
-            Abonnements
-          </button>
-        </div>
-      </div>
-
-      {/* Zone de création de post */}
-      <CreatePost />
-
-      {/* Liste des posts */}
-      <div className="divide-y">
-        {STUB_POSTS.map((post) => (
-          <PostCard key={post.id} {...post} />
-        ))}
-      </div>
-    </div>
-  )
+  return <FeedView posts={STUB_POSTS} />
 }
