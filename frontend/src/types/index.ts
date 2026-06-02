@@ -25,3 +25,34 @@ export interface Profil {
   followersCount: number
   followingCount: number
 }
+
+/**
+ * Vue agrégée d'un profil pour la page de consultation : identité (issue de
+ * User), données de profil (Profil) et compteurs. Renvoyée par le
+ * profil-service via l'API Gateway (`GET /profils/me` ou `/profils/:username`).
+ */
+export interface ProfilDetails {
+  userId: string
+  /** Nom affiché (modifiable). */
+  displayName: string
+  /** Identifiant unique sans « @ » (immuable). */
+  username: string
+  role: UserRole
+  bio: string
+  avatarUrl: string
+  /** Image de bannière (en-tête du profil). */
+  bannerUrl: string
+  /** Date d'inscription (ISO 8601). */
+  joinedAt: string
+  followersCount: number
+  followingCount: number
+  postsCount: number
+}
+
+/** Champs modifiables d'un profil (formulaire d'édition). */
+export interface ProfilEditableFields {
+  displayName: string
+  bio: string
+  avatarUrl: string
+  bannerUrl: string
+}

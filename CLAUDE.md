@@ -120,7 +120,7 @@ Plus aucun conflit : le frontend (3000) et le backend (8080+) occupent des plage
 | Post Service | 🔴 TODO | MongoDB | CRUD posts |
 | Profil Service | 🔴 TODO | MongoDB | User profiles |
 | API Gateway | 🔴 TODO | — | Route dispatch, auth middleware |
-| Frontend | 🟡 WIP | — | Next.js 14 : squelette + routing + layout feed 3 colonnes (style X). Données feed = stubs, API à brancher |
+| Frontend | 🟡 WIP | — | Next.js 14 : squelette + routing + layout feed 3 colonnes (style X). Pages feed + profil (consultation/édition) faites. Données = stubs, API à brancher |
 
 ### Features status
 | Feature | Type | Status |
@@ -129,7 +129,7 @@ Plus aucun conflit : le frontend (3000) et le backend (8080+) occupent des plage
 | JWT auth + protected routes | Primary | 🔴 TODO |
 | Role management (User/Mod/Admin) | Primary | 🔴 TODO |
 | Post creation/reading | Primary | 🟡 UI faite (feed + composer 280 car. inline & popup sidebar), lecture/écriture API à brancher |
-| User profile | Primary | 🔴 TODO |
+| User profile | Primary | 🟡 UI faite (consultation : bannière/avatar/bio/compteurs/onglets + édition popup nom/bio + photo/bannière via sélecteur de fichier avec aperçu local). Upload réel + lecture/écriture API à brancher |
 | Moderation (moderate posts) | Secondary | 🔴 TODO |
 | Admin panel | Secondary | 🔴 TODO |
 | *(add features here)* | | |
@@ -185,6 +185,8 @@ project/
 | Composer post | Logique de saisie factorisée dans `PostComposer` ; `CreatePost` = version inline (tête du fil), `CreatePostDialog` = popup (bouton « Poster » sidebar, shadcn `Dialog`) | Limite 280 car. + validation en un seul endroit, pas de duplication entre inline et modale |
 | Emoji picker | `EmojiPicker` (shadcn `Popover` + liste statique d'emojis), insertion à la position du curseur dans le composer | Pas de dépendance lourde ; fonctionne inline et dans la popup |
 | Onglets du fil | `FeedView` (client) gère l'état « Pour toi » / « Abonnements » ; Abonnements = placeholder (état vide) en attendant l'API | Switch d'onglet réel côté UI ; la page reste un Server Component qui passe les données stub |
+| Page profil | `ProfilView` (client) orchestre : `ProfilHeader` (bannière/avatar/bio/compteurs/rôle) + onglets Posts/Réponses/J'aime (réutilise `PostCard`) + `EditProfilDialog`. Type `ProfilDetails`/`ProfilEditableFields` dans `types`. Édition optimiste (état local mis à jour à l'enregistrement) ; `isOwner` distingue bouton « Éditer » vs « Suivre ». Page = Server Component avec données stub | Consultation + édition en un seul flux ; édition réutilise le pattern `Dialog` du composer ; même convention stub+TODO que le feed (`PATCH /profils/me` à brancher) |
+| Édition photo/bannière | Front : composant `ImagePicker` (input file caché + aperçu en **data URL** via `FileReader`, overlay icône appareil photo) dans `EditProfilDialog` ; champs `avatarUrl`/`bannerUrl`. Back (TODO) : upload du fichier vers stockage objet/disque + persistance des URLs (`profil-service`) | L'aperçu est purement front et **ne survit pas au reload** (pas de stockage) — l'upload réel est une responsabilité backend, à brancher dans l'issue du service. Data URL choisie (pas d'`objectURL` à révoquer, transférable tel quel à l'API) |
 | Thème / couleurs | Thème clair par défaut : fond blanc, primaire magenta `#e053ff` (texte foncé pour lisibilité). 2 dimensions : mode clair/sombre (next-themes, `.dark`) + accent (`[data-accent]` : pink défaut / blue / cyan). Registre dans `lib/themes.ts` | Identité visuelle + dark theme et thèmes custom anticipés sans dupliquer la palette |
 | Inter-service auth | JWT passed in header | Grading requirement |
 | Containerization | Docker + docker-compose | Grading requirement |
@@ -216,4 +218,4 @@ project/
 
 ---
 
-*Last updated: 02/06/2026 — feat(frontend) : popup de publication + emoji picker + onglet Abonnements (placeholder)*
+*Last updated: 02/06/2026 — feat(frontend) : page profil + édition photo/bannière (sélecteur de fichier + aperçu data URL) — upload réel & API à brancher (back)*
