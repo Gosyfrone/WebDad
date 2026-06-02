@@ -1,42 +1,48 @@
 package handler
 
-import "github.com/gin-gonic/gin"
+import (
+	"github.com/gin-gonic/gin"
+	"github.com/webdad/post-service/internal/service"
+)
 
-func RegisterRoutes(r *gin.Engine, serviceName string) {
+func RegisterRoutes(r *gin.Engine, serviceName string, postService *service.PostService) {
 	r.GET("/health", Health(serviceName))
+	PostHandler := NewPostHandler(postService, serviceName)
+	LikeHandler := NewLikeHandler(postService, serviceName)
+	CommentHandler := NewCommentHandler(postService, serviceName)
 
 	v1 := r.Group("/api/v1")
 	{
-		v1.POST("/comments/:commentId", CreateComment(serviceName))
+		v1.POST("/comments/:commentId", CommentHandler.CreateComment)
+
 		posts := v1.Group("/posts")
 		{
-			posts.GET("", ListPosts(serviceName))
-			posts.POST("", CreatePost(serviceName))
+			posts.GET("", PostHandler.ListPosts)
+			posts.POST("", PostHandler.CreatePost)
 
 			post := posts.Group("/:id")
 			{
-				post.GET("", GetPost(serviceName))
-				post.DELETE("", DeletePost(serviceName))
+				post.GET("", PostHandler.GetPost)
+				post.DELETE("", PostHandler.DeletePost)
 
-				post.GET("/likes", ListPostLikes(serviceName))
-				post.POST("/like", LikePost(serviceName))
-				post.DELETE("/like", UnlikePost(serviceName))
+				post.GET("/likes", LikeHandler.ListPostLikes)
+				post.POST("/like", LikeHandler.LikePost)
+				post.DELETE("/like", LikeHandler.UnlikePost)
 
 				comment := post.Group("/comments")
 				{
-					comment.GET("", ListPostComments(serviceName))
-					comment.POST("", CreatPostComment(serviceName))
-					comment.DELETE("/:commentId", DeletePostComment(serviceName))
+					comment.GET("", CommentHandler.ListPostComments)
+					comment.POST("", CommentHandler.CreatPostComment)
+					comment.DELETE("/:commentId", CommentHandler.DeletePostComment)
 				}
 			}
 		}
 
 		profile := v1.Group("/profile/:id")
 		{
-			profile.GET("/likes", ListProfileLikes(serviceName))
-			profile.GET("/posts", ListProfilePosts(serviceName))
-			profile.GET("/comments", ListProfileComments(serviceName))
+			profile.GET("/likes", LikeHandler.ListProfileLikes)
+			profile.GET("/posts", PostHandler.ListProfilePosts)
+			profile.GET("/comments", CommentHandler.ListProfileComments)
 		}
 	}
 }
-

@@ -1,9 +1,13 @@
 SERVICE := post-service
 
-.PHONY: run build lint test tidy
+.PHONY: run dev build lint test tidy
 
 run:
 	go run main.go
+
+# Hot-reload local via air (en stack Docker, utiliser `make dev` à la racine).
+dev:
+	air -c .air.toml
 
 build:
 	go build -o bin/$(SERVICE)

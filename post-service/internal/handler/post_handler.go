@@ -1,55 +1,57 @@
 package handler
 
 import (
-    "github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin"
+
+	"github.com/webdad/post-service/internal/service"
 )
 
-func ListPosts(service string) gin.HandlerFunc {
-	//TODO Replace
-    return func(c *gin.Context) {
-        c.JSON(200, gin.H{
-            "status":  "ok",
-            "service": service,
-        })
-    }
+type PostHandler struct {
+	service *service.PostService
+	name    string
 }
 
-func CreatePost(service string) gin.HandlerFunc {
-	//TODO Replace
-    return func(c *gin.Context) {
-        c.JSON(200, gin.H{
-            "status":  "ok",
-            "service": service,
-        })
-    }
+func NewPostHandler(svc *service.PostService, serviceName string) *PostHandler {
+	return &PostHandler{
+		service: svc,
+		name:    serviceName,
+	}
 }
 
-func GetPost(service string) gin.HandlerFunc {
-	//TODO Replace
-    return func(c *gin.Context) {
-        c.JSON(200, gin.H{
-            "status":  "ok",
-            "service": service,
-        })
-    }
+func (h *PostHandler) CreatePost(c *gin.Context) {
+	var req struct {
+		AuthorID string `json:"author_id" binding:"required"`
+		Content  string `json:"content" binding:"required,max=280"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": "payload invalide : " + err.Error()})
+		return
+	}
+
+	if err := h.service.CreatePost(c.Request.Context(), req.AuthorID, req.Content); err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(201, gin.H{"status": "created"})
 }
 
-func DeletePost(service string) gin.HandlerFunc {
-	//TODO Replace
-    return func(c *gin.Context) {
-        c.JSON(200, gin.H{
-            "status":  "ok",
-            "service": service,
-        })
-    }
+func (h *PostHandler) ListPosts(c *gin.Context) {
+	posts, err := h.service.GetPosts(c.Request.Context())
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(200, gin.H{
+		"status": "ok",
+		"posts":  posts,
+	})
 }
 
-func ListProfilePosts(service string) gin.HandlerFunc {
-	//TODO Replace
-    return func(c *gin.Context) {
-        c.JSON(200, gin.H{
-            "status":  "ok",
-            "service": service,
-        })
-    }
-}
+func (h *PostHandler) GetPost(c *gin.Context) {}
+
+func (h *PostHandler) DeletePost(c *gin.Context) {}
+
+func (h *PostHandler) ListProfilePosts(c *gin.Context) {}
