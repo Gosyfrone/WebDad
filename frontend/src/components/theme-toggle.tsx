@@ -1,0 +1,114 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { Monitor, Moon, Sun } from 'lucide-react'
+import { useTheme } from 'next-themes'
+
+import { cn } from '@/lib/utils'
+
+/**
+ * Sélecteur d'apparence :
+ *   - un interrupteur façon iOS clair/sombre (curseur sur le Soleil ou la Lune) ;
+ *   - une ligne « Mode système » (icône écran) qui suit la préférence de l'OS.
+ *
+ * Quand le mode système est activé, l'interrupteur clair/sombre est grisé
+ * (désactivé) et reflète l'apparence effective déduite de l'OS (`resolvedTheme`).
+ * S'appuie sur next-themes ; persistance auto (localStorage). Le flag `mounted`
+ * évite le mismatch d'hydratation (le serveur ignore le thème).
+ */
+export function ThemeToggle() {
+  const { theme, resolvedTheme, setTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
+
+  // Sens du dernier basculement, pour jouer la bonne animation de slide.
+  // `null` = aucun (montage initial → pas d'animation parasite).
+  const [slide, setSlide] = useState<'left' | 'right' | null>(null)
+
+  const systemOn = mounted && theme === 'system'
+  const isDark = mounted && (systemOn ? resolvedTheme === 'dark' : theme === 'dark')
+
+  function toggleLightDark() {
+    if (systemOn) return
+    const goingDark = !isDark
+    setSlide(goingDark ? 'right' : 'left')
+    setTheme(goingDark ? 'dark' : 'light')
+  }
+
+  function toggleSystem() {
+    // Désactiver le système : on fige l'apparence courante en choix manuel.
+    if (systemOn) setTheme(resolvedTheme === 'dark' ? 'dark' : 'light')
+    else setTheme('system')
+  }
+
+  return (
+    <div className="px-2 py-1">
+      <span className="text-xs font-medium text-muted-foreground">Thème</span>
+
+      <div className="mt-2 flex flex-col gap-1">
+        {/* Interrupteur clair / sombre */}
+        <div className="flex items-center justify-between rounded-lg px-1 py-2">
+          <span className="text-sm">Apparence</span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={isDark}
+            aria-label="Basculer entre le mode clair et sombre"
+            disabled={systemOn}
+            onClick={toggleLightDark}
+            className={cn(
+              'relative inline-flex h-8 w-[3.75rem] shrink-0 items-center rounded-full bg-muted transition-opacity',
+              systemOn && 'cursor-not-allowed opacity-50',
+            )}
+          >
+            {/* Curseur qui glisse (animation directionnelle au clic) */}
+            <span
+              className={cn(
+                'absolute left-1 z-0 h-6 w-6 rounded-full bg-background shadow',
+                isDark ? 'translate-x-7' : 'translate-x-0',
+                slide === 'right' && 'animate-theme-thumb-right',
+                slide === 'left' && 'animate-theme-thumb-left',
+              )}
+            />
+            {/* Icônes aux deux extrémités */}
+            <Sun
+              className={cn(
+                'absolute left-2 z-10 h-4 w-4 transition-colors',
+                !isDark ? 'text-amber-500' : 'text-muted-foreground/50',
+              )}
+              aria-hidden
+            />
+            <Moon
+              className={cn(
+                'absolute right-2 z-10 h-4 w-4 transition-colors',
+                isDark ? 'text-foreground' : 'text-muted-foreground/50',
+              )}
+              aria-hidden
+            />
+          </button>
+        </div>
+
+        {/* Ligne Mode système */}
+        <button
+          type="button"
+          aria-pressed={systemOn}
+          onClick={toggleSystem}
+          className="flex items-center justify-between rounded-lg px-1 py-2 transition-colors hover:bg-accent"
+        >
+          <span className="flex items-center gap-2 text-sm">
+            <Monitor className="h-5 w-5" aria-hidden />
+            Mode système
+          </span>
+          <span
+            className={cn(
+              'text-xs font-medium',
+              systemOn ? 'text-primary' : 'text-muted-foreground',
+            )}
+          >
+            {systemOn ? 'Activé' : 'Désactivé'}
+          </span>
+        </button>
+      </div>
+    </div>
+  )
+}
