@@ -30,9 +30,11 @@ services:
     restart: unless-stopped
     env_file:
       - ./auth-service/.env          # POSTGRES_DB / USER / PASSWORD
+    # Pas de script d'init monté : auth-service applique lui-même son
+    # schéma au démarrage (internal/db/schema.sql, idempotent) → source
+    # de vérité unique, et le service reste autonome.
     volumes:
       - postgres-auth-data:/var/lib/postgresql/data
-      - ./scripts/init-db/auth-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     ports:
       - "5432:5432"
     networks:
