@@ -6,7 +6,7 @@
 export default function FeedPage() {
   return (
     <main className="container py-10">
-      <h1 className="text-3xl font-bold">Fil d'actualité</h1>
+      <h1 className="text-3xl font-bold">Fil d&apos;actualité</h1>
     </main>
   )
 }

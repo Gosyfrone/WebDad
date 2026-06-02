@@ -179,6 +179,7 @@ project/
 | Frontend | *(e.g. React + Vite)* | |
 | Inter-service auth | JWT passed in header | Grading requirement |
 | Containerization | Docker + docker-compose | Grading requirement |
+| Config `.env` | Racine = vars transverses (`JWT_SECRET`, `JWT_EXPIRY`, `NEXT_PUBLIC_API_URL`) ; `<service>/.env` = config propre, chargée par compose via `env_file:` ; `environment:` réservé aux overrides Docker (host = nom de conteneur) | Découplage : un service tourne seul (`make run`) avec son `.env`, et en stack via compose. ⚠️ Les vars d'un `env_file` ne sont PAS interpolables (`${...}`) dans le compose — seul le `.env` racine l'est. DB host surchargé via `DB_HOST`/`MONGO_HOST` |
 
 ---
 

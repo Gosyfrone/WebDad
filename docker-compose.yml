@@ -1,0 +1,248 @@
+networks:
+  webdad-net:
+    driver: bridge
+
+volumes:
+  postgres-auth-data:
+  postgres-user-data:
+  mongo-profil-data:
+  mongo-post-data:
+
+# ────────────────────────────────────────────────────────────────────
+# Convention de config :
+#   - .env (racine)      : variables TRANSVERSES (JWT_SECRET, JWT_EXPIRY...)
+#                          → seules celles-ci alimentent l'interpolation ${...}
+#   - <service>/.env     : config propre au service, lue via `env_file:`
+#                          (les variables d'un env_file ne sont PAS
+#                           interpolables dans ce fichier, seulement
+#                           injectées dans le conteneur).
+#   - environment:       : uniquement les OVERRIDES Docker (host = nom de
+#                          conteneur) + injection des secrets partagés.
+#
+# Prérequis : `cp .env.example .env` à la racine ET dans chaque service.
+# ────────────────────────────────────────────────────────────────────
+
+services:
+
+  # ─── Bases de données ────────────────────────────────────────────
+  postgres-auth:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    env_file:
+      - ./auth-service/.env          # POSTGRES_DB / USER / PASSWORD
+    volumes:
+      - postgres-auth-data:/var/lib/postgresql/data
+      - ./scripts/init-db/auth-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5432:5432"
+    networks:
+      - webdad-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  postgres-user:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    env_file:
+      - ./user-service/.env
+    volumes:
+      - postgres-user-data:/var/lib/postgresql/data
+      - ./scripts/init-db/user-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5433:5432"
+    networks:
+      - webdad-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mongo-profil:
+    image: mongo:7
+    restart: unless-stopped
+    env_file:
+      - ./profil-service/.env        # MONGO_INITDB_ROOT_* / DATABASE
+    volumes:
+      - mongo-profil-data:/data/db
+      - ./scripts/init-db/profil-init.js:/docker-entrypoint-initdb.d/init.js:ro
+    ports:
+      - "27017:27017"
+    networks:
+      - webdad-net
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  mongo-post:
+    image: mongo:7
+    restart: unless-stopped
+    env_file:
+      - ./post-service/.env
+    volumes:
+      - mongo-post-data:/data/db
+      - ./scripts/init-db/post-init.js:/docker-entrypoint-initdb.d/init.js:ro
+    ports:
+      - "27018:27017"
+    networks:
+      - webdad-net
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # ─── Services Go ─────────────────────────────────────────────────
+  auth-service:
+    build:
+      context: ./auth-service
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./auth-service/.env          # PORT, DB_*, POSTGRES_*
+    environment:
+      DB_HOST: postgres-auth         # override : nom du conteneur dans le réseau
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET requis}   # secret partagé (racine)
+      JWT_EXPIRY: ${JWT_EXPIRY:-24h}
+    ports:
+      - "8081:8081"
+    networks:
+      - webdad-net
+    depends_on:
+      postgres-auth:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8081/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  user-service:
+    build:
+      context: ./user-service
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./user-service/.env
+    environment:
+      DB_HOST: postgres-user
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET requis}
+    ports:
+      - "8082:8082"
+    networks:
+      - webdad-net
+    depends_on:
+      postgres-user:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8082/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  profil-service:
+    build:
+      context: ./profil-service
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./profil-service/.env
+    environment:
+      MONGO_HOST: mongo-profil       # override : nom du conteneur dans le réseau
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET requis}
+    ports:
+      - "8083:8083"
+    networks:
+      - webdad-net
+    depends_on:
+      mongo-profil:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8083/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  post-service:
+    build:
+      context: ./post-service
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./post-service/.env
+    environment:
+      MONGO_HOST: mongo-post         # override : nom du conteneur dans le réseau
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET requis}
+    ports:
+      - "8084:8084"
+    networks:
+      - webdad-net
+    depends_on:
+      mongo-post:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8084/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  api-gateway:
+    build:
+      context: ./api-gateway
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./api-gateway/.env
+    environment:
+      # override : on vise les conteneurs au lieu de localhost
+      AUTH_SERVICE_URL: http://auth-service:8081
+      USER_SERVICE_URL: http://user-service:8082
+      PROFIL_SERVICE_URL: http://profil-service:8083
+      POST_SERVICE_URL: http://post-service:8084
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET requis}
+    ports:
+      - "8080:8080"
+    networks:
+      - webdad-net
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      user-service:
+        condition: service_healthy
+      profil-service:
+        condition: service_healthy
+      post-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  # ─── Frontend ────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
+    ports:
+      - "3000:3000"
+    networks:
+      - webdad-net
+    depends_on:
+      api-gateway:
+        condition: service_healthy

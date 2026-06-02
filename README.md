@@ -6,13 +6,15 @@ chacun avec sa propre base de données.
 
 ## Prérequis
 
-- **Go** 1.22 ou supérieur (services backend)
-- **Node.js** 18 ou supérieur (frontend)
+- **Docker** et **Docker Compose** v2 (méthode recommandée — toute la stack en une commande)
+- **Go** 1.22 ou supérieur (pour lancer un service backend hors Docker)
+- **Node.js** 18 ou supérieur (pour lancer le frontend hors Docker)
 - **npm** 9 ou supérieur (frontend)
-- **Docker** et **Docker Compose** (pour l'exécution conteneurisée — phase ultérieure)
 - **Git**
 
-## Getting started
+## Démarrage rapide (Docker — recommandé)
+
+Toute la stack (4 services + gateway + frontend + 4 bases de données) démarre en une commande.
 
 1. Cloner le dépôt :
 
@@ -21,7 +23,58 @@ chacun avec sa propre base de données.
    cd WebDad
    ```
 
-2. Installer les dépendances de chaque service backend (Go) :
+2. Créer les fichiers d'environnement à partir des modèles :
+
+   ```bash
+   make env
+   ```
+
+   Cette cible copie chaque `.env.example` en `.env` (racine + chaque service) sans
+   écraser un fichier existant. **Édite ensuite les secrets** : au minimum un vrai
+   `JWT_SECRET` dans le `.env` racine, et les mots de passe des bases.
+
+3. Démarrer l'environnement :
+
+   ```bash
+   make up         # = docker compose up -d (vérifie d'abord que les .env existent)
+   ```
+
+4. Vérifier que tout répond :
+
+   ```bash
+   make ps                                  # tous les conteneurs doivent être "healthy"
+   for p in 8080 8081 8082 8083 8084; do curl -s localhost:$p/health; echo; done
+   ```
+
+   - Gateway → [http://localhost:8080](http://localhost:8080)
+   - Frontend → [http://localhost:3000](http://localhost:3000)
+
+5. Arrêter :
+
+   ```bash
+   make down       # arrêt simple
+   make reset      # arrêt + suppression des images locales ET des données (volumes)
+   ```
+
+> **Comment fonctionne la config `.env` :** le `.env` racine ne contient que les
+> variables **transverses** (`JWT_SECRET`, `JWT_EXPIRY`, `NEXT_PUBLIC_API_URL`).
+> La config propre à un service vit dans `<service>/.env` et est chargée par
+> `docker compose` via `env_file:`. Les hôtes de bases (`DB_HOST`, `MONGO_HOST`)
+> sont surchargés automatiquement par le compose pour viser les conteneurs.
+> ⚠️ Les variables d'un `env_file` ne sont pas interpolables (`${...}`) dans le
+> `docker-compose.yml` : seul le `.env` racine l'est.
+
+## Développement hors Docker (service par service)
+
+Pour itérer rapidement sur un seul service sans rebuild d'image :
+
+1. Démarrer uniquement les bases de données :
+
+   ```bash
+   make db-only
+   ```
+
+2. Installer les dépendances Go (une fois par service) :
 
    ```bash
    (cd auth-service   && go mod tidy)
@@ -31,24 +84,14 @@ chacun avec sa propre base de données.
    (cd api-gateway    && go mod tidy)
    ```
 
-3. Copier les fichiers d'environnement :
-
-   ```bash
-   cp auth-service/.env.example    auth-service/.env
-   cp user-service/.env.example    user-service/.env
-   cp profil-service/.env.example  profil-service/.env
-   cp post-service/.env.example    post-service/.env
-   cp api-gateway/.env.example     api-gateway/.env
-   ```
-
-4. Lancer un service backend en mode développement :
+3. Lancer un service backend (lit son `<service>/.env`, avec `DB_HOST=localhost`) :
 
    ```bash
    cd <service-name>
    make run     # ou : go run main.go
    ```
 
-5. Lancer le frontend (Next.js) :
+4. Lancer le frontend (Next.js) :
 
    ```bash
    cd frontend
@@ -117,7 +160,7 @@ exclusivement l'API Gateway. Toutes les requêtes passent par un point d'entrée
 - **Profil Service** : informations de profil détaillées des utilisateurs.
 - **Post Service** : création, lecture, modération des posts.
 
-Chaque service backend est indépendant : son propre **`go.mod`**, son propre `Dockerfile` (à venir)
+Chaque service backend est indépendant : son propre **`go.mod`**, son propre `Dockerfile`
 et sa propre base de données. La communication entre services passe par HTTP via l'API Gateway.
 
 ### 4. Couche Données
@@ -126,7 +169,25 @@ et sa propre base de données. La communication entre services passe par HTTP vi
 
 ## Scripts disponibles
 
-Dans chaque service **backend** (via le `Makefile`) :
+À la racine (via le `Makefile`, pilote tout l'environnement Docker) :
+
+```bash
+make help      # Liste toutes les commandes
+make env       # Crée les .env manquants depuis les .env.example
+make up        # Démarre toute la stack (docker compose up -d)
+make down      # Arrête les conteneurs
+make build     # Rebuild toutes les images (--no-cache)
+make ps        # Statut des conteneurs
+make logs      # Suit les logs de tous les services
+make db-only   # Démarre uniquement les 4 bases de données
+make reset     # Arrêt + suppression images locales ET données (volumes)
+
+# Logs d'un service : make logs-auth | logs-user | logs-profil | logs-post | logs-gateway | logs-front
+# Shell conteneur   : make sh-auth | sh-user | sh-profil | sh-post | sh-gateway
+# CLI base de données: make psql-auth | psql-user | mongo-profil-cli | mongo-post-cli
+```
+
+Dans chaque service **backend** (via le `Makefile` du service) :
 
 ```bash
 make run     # Démarre le service (go run main.go)
