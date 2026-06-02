@@ -21,6 +21,20 @@ type User struct {
 	CreatedAt    time.Time `json:"created_at"`
 }
 
+// AuthUser : vue publique d'un utilisateur renvoyée par l'API d'auth.
+// Découple le contrat HTTP du modèle DB : on n'expose que l'identité utile
+// au front (le rôle pilote la nav), sans `is_active`/`created_at`.
+type AuthUser struct {
+	ID    string `json:"id"`
+	Email string `json:"email"`
+	Role  string `json:"role"`
+}
+
+// NewAuthUser projette un User (modèle DB) vers sa vue publique.
+func NewAuthUser(u *User) AuthUser {
+	return AuthUser{ID: u.ID, Email: u.Email, Role: u.Role}
+}
+
 // RegisterRequest : payload de POST /auth/register.
 type RegisterRequest struct {
 	Email    string `json:"email" binding:"required,email"`

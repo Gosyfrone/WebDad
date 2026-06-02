@@ -51,11 +51,12 @@ func New(db *sql.DB, jwtSecret string, jwtExpiry time.Duration) *AuthService {
 	}
 }
 
-// Register crée un compte (role=user) et retourne l'utilisateur créé.
-func (s *AuthService) Register(email, password string) (*models.User, error) {
+// Register crée un compte (role=user), puis connecte l'utilisateur dans la
+// foulée : il retourne un JWT signé + l'utilisateur créé (symétrique de Login).
+func (s *AuthService) Register(email, password string) (string, *models.User, error) {
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
-		return nil, fmt.Errorf("hash mot de passe : %w", err)
+		return "", nil, fmt.Errorf("hash mot de passe : %w", err)
 	}
 
 	const q = `
@@ -68,11 +69,16 @@ func (s *AuthService) Register(email, password string) (*models.User, error) {
 		Scan(&u.ID, &u.Email, &u.Role, &u.IsActive, &u.CreatedAt)
 	if err != nil {
 		if isUniqueViolation(err) {
-			return nil, ErrEmailTaken
+			return "", nil, ErrEmailTaken
 		}
-		return nil, fmt.Errorf("insertion utilisateur : %w", err)
+		return "", nil, fmt.Errorf("insertion utilisateur : %w", err)
 	}
-	return u, nil
+
+	token, err := s.GenerateToken(u)
+	if err != nil {
+		return "", nil, err
+	}
+	return token, u, nil
 }
 
 // Login vérifie les credentials et retourne un JWT signé + l'utilisateur.
