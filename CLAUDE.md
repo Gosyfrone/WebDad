@@ -193,7 +193,20 @@ project/
 
 > Add/remove as issues arise.
 
-- *(none yet)*
+- **Pas de hot-reload en conteneur (frontend & back Go).** `make up` sert un build **figé** :
+  l'image frontend embarque un `npm run build` (`output: standalone` → `node server.js`) réalisé au
+  moment du build de l'image, et les Dockerfiles Go compilent un binaire statique. Modifier le code
+  ne change donc rien tant qu'on ne rebuild pas (`make build`) — `docker compose up` ne rebuild PAS
+  sur changement de source, seulement si l'image est absente. Symptôme observé : `npm run dev`
+  (source live, port 3000) ≠ `make up` (image figée, antérieure au code).
+  → **TÂCHE FUTURE — mode dev Docker (option B, hot-reload)** :
+    1. Créer `docker-compose.dev.yml` : pour `frontend`, bind-mount `./frontend` + volume anonyme
+       `node_modules`, `command: npm run dev`, et **retirer** `depends_on: api-gateway`
+       (les services Go ne sont pas prêts → sinon le frontend ne démarre jamais).
+    2. Ajouter une cible `make dev` → `docker compose -f docker-compose.yml -f docker-compose.dev.yml up`.
+    3. `make up` reste le test de l'image **prod-like** ; `make dev` = hot-reload pour développer.
+    4. Quand les services Go existeront : même pattern avec **air** (`.air.toml` par service,
+       monter la source, lancer `air` au lieu du binaire compilé).
 
 ---
 
