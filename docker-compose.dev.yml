@@ -1,0 +1,91 @@
+# ════════════════════════════════════════════════════════════════════
+#  Overlay DEV — hot-reload pour frontend + services Go
+#  Usage : docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+#          (ou simplement : make dev)
+#
+#  Principe : on ne sert PAS les images de prod figées, mais on monte le
+#  code source en bind mount + un watcher recompile/recharge à chaud.
+#    - Go        : stage `dev` du Dockerfile → air (.air.toml)
+#    - Frontend  : stage `deps` + `npm run dev` (next dev)
+#
+#  Les caches Go (modules + build) sont des volumes nommés partagés entre
+#  services pour accélérer les recompilations.
+# ════════════════════════════════════════════════════════════════════
+
+volumes:
+  go-mod-cache:      # /go/pkg/mod   — modules téléchargés
+  go-build-cache:    # cache de compilation Go (recompiles rapides)
+
+services:
+
+  # ─── Services Go (air) ───────────────────────────────────────────
+  auth-service:
+    build:
+      target: dev
+    volumes:
+      - ./auth-service:/app          # code live
+      - /app/tmp                     # binaire air (volume anonyme, pas sur l'hôte)
+      - go-mod-cache:/go/pkg/mod
+      - go-build-cache:/root/.cache/go-build
+    healthcheck:
+      start_period: 90s              # 1er build air (download modules) peut être long
+
+  user-service:
+    build:
+      target: dev
+    volumes:
+      - ./user-service:/app
+      - /app/tmp
+      - go-mod-cache:/go/pkg/mod
+      - go-build-cache:/root/.cache/go-build
+    healthcheck:
+      start_period: 90s
+
+  profil-service:
+    build:
+      target: dev
+    volumes:
+      - ./profil-service:/app
+      - /app/tmp
+      - go-mod-cache:/go/pkg/mod
+      - go-build-cache:/root/.cache/go-build
+    healthcheck:
+      start_period: 90s
+
+  post-service:
+    build:
+      target: dev
+    volumes:
+      - ./post-service:/app
+      - /app/tmp
+      - go-mod-cache:/go/pkg/mod
+      - go-build-cache:/root/.cache/go-build
+    healthcheck:
+      start_period: 90s
+
+  api-gateway:
+    build:
+      target: dev
+    volumes:
+      - ./api-gateway:/app
+      - /app/tmp
+      - go-mod-cache:/go/pkg/mod
+      - go-build-cache:/root/.cache/go-build
+    healthcheck:
+      start_period: 90s
+
+  # ─── Frontend (next dev) ─────────────────────────────────────────
+  frontend:
+    build:
+      target: deps                   # stage qui contient node_modules installés
+    command: npm run dev             # next dev -p 3000 (au lieu de node server.js)
+    environment:
+      # WATCHPACK_POLLING : fiabilise la détection des changements à travers
+      # le bind mount Docker (utile selon l'OS hôte). Coûte un peu de CPU.
+      WATCHPACK_POLLING: "true"
+    volumes:
+      - ./frontend:/app              # code live
+      - /app/node_modules            # garde le node_modules de l'image (volume anonyme)
+    # !reset efface le depends_on hérité de la base (un simple `[]` ne suffit
+    # pas : compose fusionne les mappings au lieu de les remplacer).
+    depends_on: !reset null          # le frontend ne doit pas attendre l'api-gateway en dev

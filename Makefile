@@ -1,4 +1,4 @@
-.PHONY: help env up down build logs ps clean reset db-only \
+.PHONY: help env up dev dev-down down build logs ps clean reset db-only \
         logs-gateway logs-auth logs-user logs-profil logs-post logs-front logs-db \
         sh-auth sh-user sh-profil sh-post sh-gateway \
         psql-auth psql-user mongo-profil-cli mongo-post-cli
@@ -6,13 +6,18 @@
 # Services possédant un .env propre (chargé par compose via env_file)
 SERVICES := auth-service user-service profil-service post-service api-gateway
 
+# Invocation compose en mode DEV (overlay hot-reload par-dessus la base)
+DEV := docker compose -f docker-compose.yml -f docker-compose.dev.yml
+
 # ─── Aide ────────────────────────────────────────────────────────
 help:
 	@echo ""
 	@echo "  WebDad — Commandes disponibles"
 	@echo "  ────────────────────────────────────────────────────"
 	@echo "  make env       Créer les .env manquants depuis les .env.example"
-	@echo "  make up        Démarrer tout l'environnement"
+	@echo "  make up        Démarrer tout l'environnement (images de prod)"
+	@echo "  make dev       Démarrer en mode DEV : hot-reload front + Go (air)"
+	@echo "  make dev-down  Arrêter la stack de dev"
 	@echo "  make down      Arrêter les conteneurs"
 	@echo "  make build     Rebuild toutes les images (--no-cache)"
 	@echo "  make logs      Suivre les logs (tous les services)"
@@ -51,6 +56,24 @@ up:
 
 down:
 	docker compose down
+
+# ─── Mode DEV (hot-reload) ────────────────────────────────────────
+# Monte le code source en bind mount et lance les watchers :
+#   - Go        : air (recompile à la sauvegarde) via le stage `dev`
+#   - Frontend  : next dev (HMR)
+# `--build` force la construction du stage `dev` (sinon compose
+# réutiliserait l'image de prod déjà taggée). Lancé au premier plan
+# pour voir les logs de rechargement (Ctrl-C pour arrêter).
+dev:
+	@test -f .env || { echo "❌ .env racine manquant — exécute : make env"; exit 1; }
+	@for s in $(SERVICES); do \
+		test -f $$s/.env || { echo "❌ $$s/.env manquant (requis par compose) — exécute : make env"; exit 1; }; \
+	done
+	@echo "  ▶ Mode DEV — hot-reload front + Go. Frontend → http://localhost:3000"
+	$(DEV) up --build
+
+dev-down:
+	$(DEV) down
 
 build:
 	docker compose build --no-cache
