@@ -67,10 +67,23 @@ const config: Config = {
           from: { height: 'var(--radix-accordion-content-height)' },
           to: { height: '0' },
         },
+        // Curseur de l'interrupteur de thème (immunisé contre
+        // `disableTransitionOnChange` de next-themes, qui désactive les
+        // `transition` mais pas les `animation`).
+        'theme-thumb-right': {
+          from: { transform: 'translateX(0)' },
+          to: { transform: 'translateX(1.75rem)' },
+        },
+        'theme-thumb-left': {
+          from: { transform: 'translateX(1.75rem)' },
+          to: { transform: 'translateX(0)' },
+        },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
+        'theme-thumb-right': 'theme-thumb-right 0.3s ease-in-out',
+        'theme-thumb-left': 'theme-thumb-left 0.3s ease-in-out',
       },
     },
   },

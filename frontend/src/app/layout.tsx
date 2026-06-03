@@ -24,14 +24,14 @@ export default function RootLayout({
     <html lang="fr" suppressHydrationWarning>
       <body className={inter.className}>
         {/*
-          Thème par défaut : clair. On n'active PAS `enableSystem` pour ne pas
-          suivre la préférence sombre de l'OS/navigateur (cf. CLAUDE.md §5).
-          Le mode sombre reste disponible via le futur sélecteur (setTheme('dark')).
+          Thème par défaut : clair. `enableSystem` est activé pour permettre
+          l'option « Système » du sélecteur (ThemeToggle), qui suit la préférence
+          de l'OS/navigateur. Le défaut reste clair (et non system).
         */}
         <ThemeProvider
           attribute="class"
           defaultTheme="light"
-          enableSystem={false}
+          enableSystem
           disableTransitionOnChange
         >
           {children}

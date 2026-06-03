@@ -9,6 +9,7 @@ import { LogOut, Settings } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ROUTES, navItemsForRole } from '@/lib/routes'
 import type { UserRole } from '@/types'
+import { ThemeToggle } from '@/components/theme-toggle'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import {
   Sheet,
@@ -136,8 +137,10 @@ export function MobileHeader({ role, username = 'Utilisateur' }: MobileHeaderPro
             })}
           </nav>
 
-          {/* Paramètres + déconnexion */}
+          {/* Thème + Paramètres + déconnexion */}
           <div className="border-t p-2">
+            {/* Le sélecteur de thème ne ferme pas le tiroir (on garde le retour visuel) */}
+            <ThemeToggle />
             <SheetClose asChild>
               <Link
                 href={ROUTES.parametres}
