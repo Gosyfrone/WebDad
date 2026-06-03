@@ -46,3 +46,10 @@ type LoginRequest struct {
 	Email    string `json:"email" binding:"required,email"`
 	Password string `json:"password" binding:"required"`
 }
+
+// RefreshRequest : payload de POST /auth/refresh et /auth/logout. Le refresh
+// token transite dans le corps (transmis par le BFF Next depuis le cookie
+// httpOnly) — pas de binding `required` pour que /logout reste best-effort.
+type RefreshRequest struct {
+	RefreshToken string `json:"refresh_token"`
+}

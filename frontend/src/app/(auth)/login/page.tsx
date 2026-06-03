@@ -15,6 +15,7 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { setAccessToken } from '@/lib/auth-client'
 import { ROUTES } from '@/lib/routes'
 
 type FormErrors = Partial<{
@@ -89,6 +90,12 @@ export default function LoginPage() {
             'La connexion a échoué. Vérifie tes identifiants.',
         })
         return
+      }
+
+      // L'access token court (15 min) vit en localStorage ; le refresh token
+      // a été posé en cookie httpOnly par le BFF (/api/auth/login).
+      if (payload?.accessToken) {
+        setAccessToken(payload.accessToken)
       }
 
       router.replace(ROUTES.feed)

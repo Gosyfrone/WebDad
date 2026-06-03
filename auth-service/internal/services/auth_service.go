@@ -4,7 +4,11 @@
 package services
 
 import (
+	"crypto/rand"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"time"
@@ -17,9 +21,10 @@ import (
 
 // Erreurs métier (mappées vers des codes HTTP par les handlers).
 var (
-	ErrEmailTaken         = errors.New("email déjà utilisé")
-	ErrInvalidCredentials = errors.New("email ou mot de passe invalide")
-	ErrUserInactive       = errors.New("compte désactivé")
+	ErrEmailTaken          = errors.New("email déjà utilisé")
+	ErrInvalidCredentials  = errors.New("email ou mot de passe invalide")
+	ErrUserInactive        = errors.New("compte désactivé")
+	ErrInvalidRefreshToken = errors.New("refresh token invalide ou expiré")
 )
 
 // defaultAdminID : UUID figé de l'admin par défaut, partagé avec les autres
@@ -37,26 +42,29 @@ type Claims struct {
 
 // AuthService regroupe les dépendances (DB + paramètres JWT).
 type AuthService struct {
-	db        *sql.DB
-	jwtSecret []byte
-	jwtExpiry time.Duration
+	db            *sql.DB
+	jwtSecret     []byte
+	jwtExpiry     time.Duration
+	refreshExpiry time.Duration
 }
 
 // New construit le service.
-func New(db *sql.DB, jwtSecret string, jwtExpiry time.Duration) *AuthService {
+func New(db *sql.DB, jwtSecret string, jwtExpiry, refreshExpiry time.Duration) *AuthService {
 	return &AuthService{
-		db:        db,
-		jwtSecret: []byte(jwtSecret),
-		jwtExpiry: jwtExpiry,
+		db:            db,
+		jwtSecret:     []byte(jwtSecret),
+		jwtExpiry:     jwtExpiry,
+		refreshExpiry: refreshExpiry,
 	}
 }
 
 // Register crée un compte (role=user), puis connecte l'utilisateur dans la
-// foulée : il retourne un JWT signé + l'utilisateur créé (symétrique de Login).
-func (s *AuthService) Register(email, password string) (string, *models.User, error) {
+// foulée : il retourne un access token + un refresh token + l'utilisateur créé
+// (symétrique de Login).
+func (s *AuthService) Register(email, password string) (string, string, *models.User, error) {
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
-		return "", nil, fmt.Errorf("hash mot de passe : %w", err)
+		return "", "", nil, fmt.Errorf("hash mot de passe : %w", err)
 	}
 
 	const q = `
@@ -69,20 +77,17 @@ func (s *AuthService) Register(email, password string) (string, *models.User, er
 		Scan(&u.ID, &u.Email, &u.Role, &u.IsActive, &u.CreatedAt)
 	if err != nil {
 		if isUniqueViolation(err) {
-			return "", nil, ErrEmailTaken
+			return "", "", nil, ErrEmailTaken
 		}
-		return "", nil, fmt.Errorf("insertion utilisateur : %w", err)
+		return "", "", nil, fmt.Errorf("insertion utilisateur : %w", err)
 	}
 
-	token, err := s.GenerateToken(u)
-	if err != nil {
-		return "", nil, err
-	}
-	return token, u, nil
+	return s.issueTokens(u)
 }
 
-// Login vérifie les credentials et retourne un JWT signé + l'utilisateur.
-func (s *AuthService) Login(email, password string) (string, *models.User, error) {
+// Login vérifie les credentials et retourne un access token + un refresh
+// token + l'utilisateur.
+func (s *AuthService) Login(email, password string) (string, string, *models.User, error) {
 	const q = `
 		SELECT id, email, password, role, is_active, created_at
 		FROM credentials WHERE email = $1`
@@ -91,24 +96,105 @@ func (s *AuthService) Login(email, password string) (string, *models.User, error
 	err := s.db.QueryRow(q, email).
 		Scan(&u.ID, &u.Email, &u.PasswordHash, &u.Role, &u.IsActive, &u.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
-		return "", nil, ErrInvalidCredentials
+		return "", "", nil, ErrInvalidCredentials
 	}
 	if err != nil {
-		return "", nil, fmt.Errorf("lecture utilisateur : %w", err)
+		return "", "", nil, fmt.Errorf("lecture utilisateur : %w", err)
 	}
 
 	if !u.IsActive {
-		return "", nil, ErrUserInactive
+		return "", "", nil, ErrUserInactive
 	}
 	if bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(password)) != nil {
-		return "", nil, ErrInvalidCredentials
+		return "", "", nil, ErrInvalidCredentials
 	}
 
-	token, err := s.GenerateToken(u)
-	if err != nil {
-		return "", nil, err
+	return s.issueTokens(u)
+}
+
+// Refresh échange un refresh token valide contre une NOUVELLE paire
+// (access + refresh). Rotation : l'ancien refresh token est révoqué, donc
+// rejouable une seule fois. Renvoie ErrInvalidRefreshToken si le token est
+// inconnu/expiré, ErrUserInactive si le compte a été désactivé entre-temps.
+func (s *AuthService) Refresh(rawToken string) (string, string, *models.User, error) {
+	tokenHash := hashToken(rawToken)
+
+	const q = `
+		SELECT c.id, c.email, c.role, c.is_active, c.created_at, rt.expires_at
+		FROM refresh_tokens rt
+		JOIN credentials c ON c.id = rt.user_id
+		WHERE rt.token = $1`
+
+	u := &models.User{}
+	var expiresAt time.Time
+	err := s.db.QueryRow(q, tokenHash).
+		Scan(&u.ID, &u.Email, &u.Role, &u.IsActive, &u.CreatedAt, &expiresAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", "", nil, ErrInvalidRefreshToken
 	}
-	return token, u, nil
+	if err != nil {
+		return "", "", nil, fmt.Errorf("lecture refresh token : %w", err)
+	}
+
+	// Expiré : on le purge et on refuse (le front redirigera vers /login).
+	if time.Now().After(expiresAt) {
+		_, _ = s.db.Exec(`DELETE FROM refresh_tokens WHERE token = $1`, tokenHash)
+		return "", "", nil, ErrInvalidRefreshToken
+	}
+	if !u.IsActive {
+		return "", "", nil, ErrUserInactive
+	}
+
+	// Rotation : révocation de l'ancien token avant d'en émettre un nouveau.
+	if _, err := s.db.Exec(`DELETE FROM refresh_tokens WHERE token = $1`, tokenHash); err != nil {
+		return "", "", nil, fmt.Errorf("révocation refresh token : %w", err)
+	}
+
+	return s.issueTokens(u)
+}
+
+// Logout révoque un refresh token (suppression en base). Idempotent : un
+// token absent/vide n'est pas une erreur (déconnexion = best-effort).
+func (s *AuthService) Logout(rawToken string) error {
+	if rawToken == "" {
+		return nil
+	}
+	if _, err := s.db.Exec(`DELETE FROM refresh_tokens WHERE token = $1`, hashToken(rawToken)); err != nil {
+		return fmt.Errorf("révocation refresh token : %w", err)
+	}
+	return nil
+}
+
+// issueTokens signe un access token (court) et crée un refresh token (long,
+// persisté haché). Retourné par Register/Login/Refresh.
+func (s *AuthService) issueTokens(u *models.User) (string, string, *models.User, error) {
+	access, err := s.GenerateToken(u)
+	if err != nil {
+		return "", "", nil, err
+	}
+	refresh, err := s.createRefreshToken(u.ID)
+	if err != nil {
+		return "", "", nil, err
+	}
+	return access, refresh, u, nil
+}
+
+// createRefreshToken génère un jeton opaque aléatoire, persiste son HASH
+// (SHA-256) en base et retourne la valeur EN CLAIR (à poser en cookie). Le
+// clair n'est jamais stocké : une fuite de la table ne livre aucun token
+// utilisable.
+func (s *AuthService) createRefreshToken(userID string) (string, error) {
+	raw, err := randomToken()
+	if err != nil {
+		return "", err
+	}
+
+	const q = `INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)`
+	expiresAt := time.Now().Add(s.refreshExpiry)
+	if _, err := s.db.Exec(q, userID, hashToken(raw), expiresAt); err != nil {
+		return "", fmt.Errorf("création refresh token : %w", err)
+	}
+	return raw, nil
 }
 
 // EnsureDefaultAdmin crée le compte admin par défaut (UUID figé) s'il
@@ -169,6 +255,21 @@ func (s *AuthService) ParseToken(tokenStr string) (*Claims, error) {
 		return nil, errors.New("token invalide")
 	}
 	return claims, nil
+}
+
+// randomToken produit un jeton opaque de 256 bits encodé en base64url.
+func randomToken() (string, error) {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		return "", fmt.Errorf("génération token aléatoire : %w", err)
+	}
+	return base64.RawURLEncoding.EncodeToString(b), nil
+}
+
+// hashToken hache un refresh token en clair (SHA-256 hex) pour stockage/lookup.
+func hashToken(raw string) string {
+	sum := sha256.Sum256([]byte(raw))
+	return hex.EncodeToString(sum[:])
 }
 
 // isUniqueViolation détecte l'erreur PostgreSQL 23505 (contrainte UNIQUE)

@@ -27,7 +27,7 @@ func main() {
 		log.Fatalf("[%s] schéma : %v", serviceName, err)
 	}
 
-	auth := services.New(conn, cfg.JWTSecret, cfg.JWTExpiry)
+	auth := services.New(conn, cfg.JWTSecret, cfg.JWTExpiry, cfg.RefreshExpiry)
 
 	if cfg.SeedAdmin {
 		if err := auth.EnsureDefaultAdmin(cfg.SeedAdminEmail, cfg.SeedAdminPassword); err != nil {

@@ -18,7 +18,7 @@ func (h *Handler) Login(c *gin.Context) {
 		return
 	}
 
-	token, user, err := h.auth.Login(req.Email, req.Password)
+	token, refresh, user, err := h.auth.Login(req.Email, req.Password)
 	if err != nil {
 		switch {
 		case errors.Is(err, services.ErrInvalidCredentials):
@@ -32,7 +32,8 @@ func (h *Handler) Login(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"data": gin.H{
-		"token": token,
-		"user":  models.NewAuthUser(user),
+		"token":         token,
+		"refresh_token": refresh,
+		"user":          models.NewAuthUser(user),
 	}})
 }

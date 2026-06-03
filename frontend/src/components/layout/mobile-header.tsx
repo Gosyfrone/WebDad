@@ -7,6 +7,7 @@ import { usePathname } from 'next/navigation'
 import { LogOut, Settings } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
+import { logout } from '@/lib/auth-client'
 import { ROUTES, navItemsForRole } from '@/lib/routes'
 import type { UserRole } from '@/types'
 import { ThemeToggle } from '@/components/theme-toggle'
@@ -150,11 +151,10 @@ export function MobileHeader({ role, username = 'Utilisateur' }: MobileHeaderPro
                 Paramètres
               </Link>
             </SheetClose>
-            {/* TODO (issue auth) : déconnexion réelle — effacer le JWT et rediriger vers /login */}
             <button
               type="button"
-              disabled
-              className="flex w-full items-center gap-3 rounded-md px-3 py-3 text-base text-muted-foreground"
+              onClick={() => void logout()}
+              className="flex w-full items-center gap-3 rounded-md px-3 py-3 text-base transition-colors hover:bg-accent"
             >
               <LogOut className="h-5 w-5" />
               Se déconnecter
