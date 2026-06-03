@@ -85,7 +85,7 @@ export function MobileHeader({ role, username = 'Utilisateur' }: MobileHeaderPro
   const navItems = navItemsForRole(role)
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center border-b bg-background/80 px-3 backdrop-blur lg:hidden">
+    <header className="sticky top-0 z-30 flex h-14 items-center border-b border-white/50 bg-white/72 px-3 shadow-sm backdrop-blur-2xl lg:hidden">
       {/* Photo de profil -> tiroir de navigation latéral gauche */}
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetTrigger asChild>
@@ -99,9 +99,9 @@ export function MobileHeader({ role, username = 'Utilisateur' }: MobileHeaderPro
           </button>
         </SheetTrigger>
 
-        <SheetContent side="left" className="flex w-72 flex-col p-0">
+        <SheetContent side="left" className="flex w-72 flex-col border-white/40 bg-white/85 p-0 backdrop-blur-2xl">
           {/* Identité */}
-          <SheetHeader className="border-b p-4 text-left">
+          <SheetHeader className="border-b border-white/50 p-4 text-left">
             <div className="flex items-center gap-3">
               <Avatar className="h-12 w-12">
                 <AvatarFallback className="text-lg">
@@ -126,8 +126,8 @@ export function MobileHeader({ role, username = 'Utilisateur' }: MobileHeaderPro
                   <Link
                     href={item.href}
                     className={cn(
-                      'rounded-md px-3 py-3 text-base transition-colors hover:bg-accent',
-                      active && 'bg-accent font-bold',
+                      'rounded-2xl px-3 py-3 text-base transition-colors hover:bg-white/70',
+                      active && 'bg-white/80 font-bold text-[#5B6CFF]',
                     )}
                   >
                     {item.label}
@@ -138,13 +138,13 @@ export function MobileHeader({ role, username = 'Utilisateur' }: MobileHeaderPro
           </nav>
 
           {/* Thème + Paramètres + déconnexion */}
-          <div className="border-t p-2">
+          <div className="border-t border-white/50 p-2">
             {/* Le sélecteur de thème ne ferme pas le tiroir (on garde le retour visuel) */}
             <ThemeToggle />
             <SheetClose asChild>
               <Link
                 href={ROUTES.parametres}
-                className="flex w-full items-center gap-3 rounded-md px-3 py-3 text-base transition-colors hover:bg-accent"
+                className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-base transition-colors hover:bg-white/70"
               >
                 <Settings className="h-5 w-5" />
                 Paramètres
@@ -170,11 +170,11 @@ export function MobileHeader({ role, username = 'Utilisateur' }: MobileHeaderPro
         className="absolute left-1/2 -translate-x-1/2"
       >
         <Image
-          src="/logo_breezy.png"
+          src="/logo_only.png"
           alt="Breezy"
-          width={1106}
-          height={336}
-          className="h-8 w-auto object-contain"
+          width={512}
+          height={512}
+          className="h-8 w-8 object-contain"
           priority
         />
       </Link>

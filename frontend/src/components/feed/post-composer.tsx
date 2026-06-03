@@ -65,9 +65,11 @@ export function PostComposer({
 
   return (
     <div className={cn('flex gap-3', className)}>
-      <Avatar className="mt-1 h-10 w-10 shrink-0">
+      <Avatar className="mt-1 h-10 w-10 shrink-0 shadow-[0_12px_30px_rgba(91,108,255,0.22)]">
         {/* TODO (issue auth) : avatar de l'utilisateur courant */}
-        <AvatarFallback>U</AvatarFallback>
+        <AvatarFallback className="bg-gradient-to-br from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] font-bold text-white">
+          U
+        </AvatarFallback>
       </Avatar>
 
       <div className="flex min-w-0 flex-1 flex-col gap-3">
@@ -78,14 +80,14 @@ export function PostComposer({
           placeholder="Quoi de neuf ?"
           rows={3}
           autoFocus={autoFocus}
-          className="w-full resize-none bg-transparent text-xl placeholder:text-muted-foreground focus:outline-none"
+          className="w-full resize-none bg-transparent text-xl text-slate-950 placeholder:text-slate-500 focus:outline-none"
         />
 
-        <Separator />
+        <Separator className="bg-white/45" />
 
         {/* Toolbar */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1 text-primary">
+          <div className="flex items-center gap-1 text-[#5B6CFF]">
             <ActionIcon icon={ImageIcon} label="Ajouter une image" />
             <EmojiPicker onSelect={insertEmoji}>
               <button
@@ -117,7 +119,7 @@ export function PostComposer({
 
             <Button
               size="sm"
-              className="rounded-full font-bold"
+              className="rounded-full bg-gradient-to-r from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] font-bold text-white shadow-[0_12px_30px_rgba(91,108,255,0.28)]"
               disabled={isEmpty || isOver}
               onClick={handleSubmit}
             >

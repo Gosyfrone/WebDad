@@ -39,16 +39,16 @@ export function ProfilView({ profil: initialProfil, posts, isOwner = true }: Pro
   return (
     <div className="flex flex-col">
       {/* En-tête sticky */}
-      <div className="sticky top-0 z-10 flex items-center gap-6 border-b bg-background/80 px-4 py-2 backdrop-blur">
+      <div className="sticky top-0 z-10 flex items-center gap-6 border-b border-white/50 bg-white/70 px-4 py-2 backdrop-blur-2xl">
         <Link
           href={ROUTES.feed}
           aria-label="Retour au fil"
-          className="rounded-full p-2 transition-colors hover:bg-accent"
+          className="rounded-full p-2 transition-colors hover:bg-white/70 hover:text-[#5B6CFF]"
         >
           <ArrowLeft className="h-5 w-5" />
         </Link>
         <div className="flex flex-col">
-          <span className="font-bold leading-tight">{profil.displayName}</span>
+          <span className="font-bold leading-tight text-slate-950">{profil.displayName}</span>
           <span className="text-xs text-muted-foreground">
             {profil.postsCount} post{profil.postsCount > 1 ? 's' : ''}
           </span>
@@ -58,7 +58,7 @@ export function ProfilView({ profil: initialProfil, posts, isOwner = true }: Pro
       <ProfilHeader profil={profil} isOwner={isOwner} onEdit={handleEdit} />
 
       {/* Onglets */}
-      <div className="flex border-b">
+      <div className="flex border-b border-white/50 bg-white/45 backdrop-blur">
         <TabButton active={tab === 'posts'} onClick={() => setTab('posts')}>
           Posts
         </TabButton>
@@ -73,7 +73,7 @@ export function ProfilView({ profil: initialProfil, posts, isOwner = true }: Pro
       {/* Contenu de l'onglet */}
       {tab === 'posts' ? (
         posts.length > 0 ? (
-          <div className="divide-y">
+          <div className="divide-y divide-white/50">
             {posts.map((post) => (
               <PostCard key={post.id} {...post} />
             ))}
@@ -107,9 +107,9 @@ function TabButton({
     <button
       onClick={onClick}
       className={cn(
-        'flex-1 py-3 text-sm transition-colors hover:bg-muted/30',
+        'flex-1 py-3 text-sm transition-colors hover:bg-white/45',
         active
-          ? 'border-b-2 border-primary font-bold'
+          ? 'border-b-2 border-[#5B6CFF] font-bold text-[#5B6CFF]'
           : 'font-normal text-muted-foreground',
       )}
     >
@@ -120,8 +120,8 @@ function TabButton({
 
 function EmptyTab({ message }: { message: string }) {
   return (
-    <div className="flex flex-col items-center gap-2 px-8 py-16 text-center">
-      <FileText className="h-10 w-10 text-muted-foreground" aria-hidden />
+    <div className="mx-4 mt-6 flex flex-col items-center gap-2 rounded-[26px] border border-white/55 bg-white/68 px-8 py-16 text-center shadow-[0_18px_54px_rgba(91,108,255,0.12)] backdrop-blur-xl">
+      <FileText className="h-10 w-10 text-[#5B6CFF]" aria-hidden />
       <p className="max-w-sm text-sm text-muted-foreground">{message}</p>
     </div>
   )

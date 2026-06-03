@@ -3,7 +3,21 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { CircleAlert, Lock, Mail, User } from 'lucide-react'
+import {
+  Bell,
+  CalendarDays,
+  CircleAlert,
+  Eye,
+  EyeOff,
+  Heart,
+  Lock,
+  Mail,
+  MessageCircle,
+  Search,
+  Sparkles,
+  User,
+  UserPlus,
+} from 'lucide-react'
 import * as React from 'react'
 
 import { Button } from '@/components/ui/button'
@@ -19,11 +33,15 @@ import { ROUTES } from '@/lib/routes'
 
 type FormErrors = Partial<{
   username: string
+  birthDate: string
+  gender: string
   email: string
   password: string
   passwordConfirmation: string
   form: string
 }>
+
+type Gender = 'male' | 'female' | ''
 
 type RegisterResponse = {
   token?: string
@@ -40,8 +58,10 @@ type RegisterResponse = {
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const passwordPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/
-// Aligné sur le user-service (^[a-zA-Z0-9_]{3,50}$ + mots réservés).
-const usernamePattern = /^[a-zA-Z0-9_]{3,50}$/
+const usernamePattern = /^[a-zA-Z0-9_]{3,24}$/
+const maxUsernameLength = 24
+const maxEmailLength = 50
+const maxPasswordLength = 250
 const reservedUsernames = new Set([
   'me',
   'admin',
@@ -89,34 +109,66 @@ function mapServerError(message: string): FormErrors {
 export default function RegisterPage() {
   const router = useRouter()
   const [username, setUsername] = React.useState('')
+  const [birthDate, setBirthDate] = React.useState('')
+  const [gender, setGender] = React.useState<Gender>('')
   const [email, setEmail] = React.useState('')
   const [password, setPassword] = React.useState('')
   const [passwordConfirmation, setPasswordConfirmation] = React.useState('')
+  const [showPassword, setShowPassword] = React.useState(false)
+  const [showPasswordConfirmation, setShowPasswordConfirmation] =
+    React.useState(false)
   const [errors, setErrors] = React.useState<FormErrors>({})
   const [isSubmitting, setIsSubmitting] = React.useState(false)
+  const maxBirthDate = React.useMemo(() => {
+    const date = new Date()
+    date.setFullYear(date.getFullYear() - 13)
+    return date.toISOString().split('T')[0]
+  }, [])
 
   const validate = React.useCallback((): FormErrors => {
     const nextErrors: FormErrors = {}
     const trimmedUsername = username.trim()
     const trimmedEmail = email.trim()
+    const selectedBirthDate = birthDate ? new Date(`${birthDate}T00:00:00`) : null
+    const minimumBirthDate = new Date(`${maxBirthDate}T23:59:59`)
 
     if (!trimmedUsername) {
       nextErrors.username = 'Le nom d’utilisateur est requis.'
     } else if (!usernamePattern.test(trimmedUsername)) {
       nextErrors.username =
-        '3 à 50 caractères : lettres, chiffres et tiret bas (_) uniquement.'
+        '3 à 24 caractères : lettres, chiffres et tiret bas (_) uniquement.'
+    } else if (trimmedUsername.length > maxUsernameLength) {
+      nextErrors.username = 'Le nom d’utilisateur est limité à 24 caractères.'
     } else if (reservedUsernames.has(trimmedUsername.toLowerCase())) {
       nextErrors.username = 'Ce nom d’utilisateur n’est pas autorisé.'
     }
 
+    if (!birthDate) {
+      nextErrors.birthDate = 'La date de naissance est requise.'
+    } else if (
+      !selectedBirthDate ||
+      Number.isNaN(selectedBirthDate.getTime()) ||
+      selectedBirthDate > minimumBirthDate
+    ) {
+      nextErrors.birthDate = 'Tu dois avoir au moins 13 ans pour t’inscrire.'
+    }
+
+    if (!gender) {
+      nextErrors.gender = 'Choisis un genre.'
+    }
+
     if (!trimmedEmail) {
       nextErrors.email = 'L’adresse e-mail est requise.'
+    } else if (trimmedEmail.length > maxEmailLength) {
+      nextErrors.email = 'L’adresse e-mail est limitée à 50 caractères.'
     } else if (!emailPattern.test(trimmedEmail)) {
       nextErrors.email = 'Saisis une adresse e-mail valide.'
     }
 
     if (!password) {
       nextErrors.password = 'Le mot de passe est requis.'
+    } else if (password.length > maxPasswordLength) {
+      nextErrors.password = 'Le mot de passe est limité à 250 caractères.'
     } else if (!passwordPattern.test(password)) {
       nextErrors.password =
         '8 caractères minimum, une majuscule, une minuscule, un chiffre et un caractère spécial.'
@@ -124,12 +176,15 @@ export default function RegisterPage() {
 
     if (!passwordConfirmation) {
       nextErrors.passwordConfirmation = 'Confirme ton mot de passe.'
+    } else if (passwordConfirmation.length > maxPasswordLength) {
+      nextErrors.passwordConfirmation =
+        'La confirmation est limitée à 250 caractères.'
     } else if (passwordConfirmation !== password) {
       nextErrors.passwordConfirmation = 'Les mots de passe ne correspondent pas.'
     }
 
     return nextErrors
-  }, [email, password, passwordConfirmation, username])
+  }, [birthDate, email, gender, maxBirthDate, password, passwordConfirmation, username])
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -167,6 +222,8 @@ export default function RegisterPage() {
         },
         body: JSON.stringify({
           username: username.trim(),
+          birthDate,
+          gender,
           email: email.trim(),
           password,
         }),
@@ -204,275 +261,556 @@ export default function RegisterPage() {
 
   return (
     <main
-      className="relative flex h-dvh w-full items-center justify-center overflow-hidden px-4 py-2 sm:px-6"
+      className="relative flex h-dvh w-full items-center justify-center overflow-hidden px-4 py-3 sm:px-6 lg:px-10"
       style={{
         background:
           'linear-gradient(140deg, #f8f3ff 0%, #eadcff 28%, #d9c6ff 62%, #ebe8ff 100%)',
       }}
     >
-      <div className="pointer-events-none absolute -left-28 top-[-80px] h-[560px] w-[560px] rounded-full bg-[#a855f7]/18 blur-[140px]" />
-      <div className="pointer-events-none absolute left-[18%] top-[10%] h-[340px] w-[340px] rounded-full bg-[#c084fc]/20 blur-[110px]" />
-      <div className="pointer-events-none absolute right-[-120px] top-[18%] h-[300px] w-[300px] rounded-full bg-[#47D9FF]/10 blur-[120px]" />
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.28),transparent_62%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(115deg,rgba(141,61,255,0.22)_0%,rgba(255,255,255,0.25)_34%,rgba(71,217,255,0.2)_100%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.42),transparent_34%),radial-gradient(circle_at_80%_35%,rgba(141,61,255,0.18),transparent_32%),radial-gradient(circle_at_50%_90%,rgba(71,217,255,0.16),transparent_36%)]" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/70" />
 
-      <Card className="relative w-full max-w-md overflow-hidden rounded-[24px] border border-white/25 bg-white/82 shadow-[0_28px_80px_rgba(0,0,0,0.22)] backdrop-blur-2xl">
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF]" />
-
-        <CardHeader className="space-y-2 px-5 pb-1 pt-4 sm:px-6">
+      <section className="relative grid w-full max-w-6xl items-center gap-6 lg:grid-cols-[1.08fr_0.92fr]">
+        <div className="hidden min-h-[560px] flex-col justify-between lg:flex">
           <Link
             href={ROUTES.home}
             className="group relative inline-flex w-fit items-center transition duration-300 hover:scale-[1.03]"
           >
-            <div className="absolute inset-0 rounded-full bg-gradient-to-r from-[#8D3DFF]/35 to-[#47D9FF]/30 blur-2xl" />
+            <span className="absolute inset-0 bg-gradient-to-r from-[#8D3DFF]/30 to-[#47D9FF]/25 blur-2xl" />
 
             <Image
               src="/logo_breezy.png"
               alt="Breezy"
               width={1106}
               height={336}
-              className="relative h-7 w-auto object-contain drop-shadow-sm sm:h-8"
+              className="relative h-16 w-auto object-contain drop-shadow-sm"
               priority
             />
           </Link>
 
-          <div className="space-y-1">
-            <CardTitle className="max-w-md bg-gradient-to-r from-slate-950 via-[#5B6CFF] to-[#8D3DFF] bg-clip-text text-[23px] font-semibold leading-tight tracking-[-0.04em] text-transparent sm:text-[26px]">
-              Rejoins Breezy et commence à publier.
-            </CardTitle>
+          <div className="relative mt-4 h-[450px]">
+            <div className="absolute left-8 top-0 w-[410px] overflow-hidden rounded-[30px] border border-white/35 bg-white/75 shadow-[0_30px_90px_rgba(91,108,255,0.28)] backdrop-blur-2xl">
+              <div className="flex items-center justify-between border-b border-white/60 px-5 py-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase text-[#5B6CFF]">
+                    Nouveau sur Breezy
+                  </p>
+                  <h1 className="text-2xl font-semibold text-slate-950">
+                    Crée ton espace.
+                  </h1>
+                </div>
 
-            <CardDescription className="max-w-sm text-xs leading-snug text-slate-500">
-              Crée ton compte avec un nom d’utilisateur, une adresse e-mail et un mot de passe sécurisé.
-            </CardDescription>
+                <button
+                  type="button"
+                  aria-label="Rechercher"
+                  className="grid h-10 w-10 place-items-center rounded-full bg-white/90 text-slate-700 shadow-sm transition hover:scale-105 hover:text-[#5B6CFF]"
+                >
+                  <Search className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="space-y-1 px-4 py-4">
+                <article className="rounded-[22px] border border-white/70 bg-white/85 p-4 shadow-sm">
+                  <div className="flex gap-3">
+                    <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#8D3DFF] to-[#47D9FF] text-sm font-bold text-white">
+                      TO
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1 text-sm">
+                        <span className="font-bold text-slate-950">Toi</span>
+                        <span className="truncate text-slate-500">@breezy_user</span>
+                        <span className="text-slate-400">·</span>
+                        <span className="text-slate-500">maintenant</span>
+                      </div>
+                      <p className="mt-1 text-sm leading-relaxed text-slate-700">
+                        Premier post, première vibe, et déjà toute une communauté à rencontrer.
+                      </p>
+                      <div className="mt-3 grid grid-cols-3 gap-2">
+                        <div className="h-16 rounded-[16px] bg-gradient-to-br from-[#8D3DFF] to-[#5B6CFF]" />
+                        <div className="h-16 rounded-[16px] bg-gradient-to-br from-[#47D9FF] to-[#5B6CFF]" />
+                        <div className="h-16 rounded-[16px] bg-gradient-to-br from-slate-950 to-[#8D3DFF]" />
+                      </div>
+                      <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
+                        <span className="inline-flex items-center gap-1">
+                          <MessageCircle className="h-4 w-4" />
+                          48
+                        </span>
+                        <span className="inline-flex items-center gap-1 text-red-500">
+                          <Heart className="h-4 w-4 fill-red-500" />
+                          1.2K
+                        </span>
+                        <span>Bienvenue</span>
+                      </div>
+                    </div>
+                  </div>
+                </article>
+
+                <article className="rounded-[22px] border border-white/70 bg-white/75 p-4 shadow-sm">
+                  <div className="flex items-center gap-3">
+                    <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-slate-950 text-sm font-bold text-white">
+                      BR
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-bold text-slate-950">
+                        Breezy t’ouvre le fil
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        Choisis ton pseudo et commence à publier.
+                      </p>
+                    </div>
+                    <UserPlus className="h-5 w-5 text-[#8D3DFF]" />
+                  </div>
+                </article>
+              </div>
+            </div>
+
+            <div className="absolute right-8 top-20 w-64 rounded-[28px] border border-white/40 bg-slate-950/90 p-4 text-white shadow-[0_28px_70px_rgba(15,23,42,0.32)] backdrop-blur-xl">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold">À rejoindre</span>
+                <Sparkles className="h-4 w-4 text-[#47D9FF]" />
+              </div>
+
+              <div className="mt-4 space-y-3">
+                {['Créateurs', 'Campus CESI', 'Dev Distribué'].map(
+                  (community, index) => (
+                    <div
+                      key={community}
+                      className="rounded-2xl bg-white/10 px-3 py-2"
+                    >
+                      <p className="text-xs text-white/50">
+                        Communauté #{index + 1}
+                      </p>
+                      <p className="text-sm font-semibold">{community}</p>
+                    </div>
+                  )
+                )}
+              </div>
+            </div>
+
+            <div className="absolute bottom-0 right-24 flex w-72 items-center gap-3 rounded-[24px] border border-white/50 bg-white/90 px-4 py-3 shadow-[0_24px_70px_rgba(141,61,255,0.22)] backdrop-blur-xl">
+              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#47D9FF]/20 text-[#5B6CFF]">
+                <Bell className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-slate-950">
+                  Ton compte prend vie
+                </p>
+                <p className="text-xs text-slate-500">
+                  Profil, posts et conversations en quelques secondes.
+                </p>
+              </div>
+            </div>
           </div>
-        </CardHeader>
+        </div>
 
-        <CardContent className="px-5 pb-4 sm:px-6">
-          <form className="space-y-2" onSubmit={handleSubmit} noValidate>
-            <div className="space-y-0.5">
-              <label htmlFor="username" className="text-xs font-medium text-slate-700">
-                Nom d’utilisateur
-              </label>
+        <Card className="relative w-full overflow-hidden rounded-[30px] border border-white/30 bg-white/80 shadow-[0_30px_90px_rgba(0,0,0,0.22)] backdrop-blur-2xl sm:max-w-md sm:justify-self-center lg:max-w-none">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF]" />
+          <div className="pointer-events-none absolute inset-x-8 top-1 h-24 bg-gradient-to-b from-white/70 to-transparent" />
 
-              <div className="group relative">
-                <User className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 transition group-focus-within:text-[#5B6CFF]" />
-
-                <Input
-                  id="username"
-                  name="username"
-                  type="text"
-                  autoComplete="username"
-                  placeholder="breezy_user"
-                  className="h-9 rounded-2xl border-white/70 bg-white/90 pl-11 text-sm shadow-sm shadow-slate-200/60 transition-all placeholder:text-slate-400 hover:border-[#47D9FF]/70 focus-visible:border-[#5B6CFF] focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15"
-                  value={username}
-                  onChange={(event) => {
-                    setUsername(event.target.value)
-                    if (errors.username) {
-                      setErrors((current) => ({ ...current, username: undefined }))
-                    }
-                  }}
-                  aria-invalid={Boolean(errors.username)}
-                  aria-describedby={errors.username ? 'username-error' : undefined}
-                />
-              </div>
-
-              {errors.username ? (
-                <p id="username-error" className="text-[11px] leading-4 text-red-600">
-                  {errors.username}
-                </p>
-              ) : null}
-            </div>
-
-            <div className="space-y-0.5">
-              <label htmlFor="email" className="text-xs font-medium text-slate-700">
-                Adresse e-mail
-              </label>
-
-              <div className="group relative">
-                <Mail className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 transition group-focus-within:text-[#5B6CFF]" />
-
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  inputMode="email"
-                  placeholder="toi@exemple.com"
-                  className="h-9 rounded-2xl border-white/70 bg-white/90 pl-11 text-sm shadow-sm shadow-slate-200/60 transition-all placeholder:text-slate-400 hover:border-[#47D9FF]/70 focus-visible:border-[#5B6CFF] focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15"
-                  value={email}
-                  onChange={(event) => {
-                    setEmail(event.target.value)
-                    if (errors.email) {
-                      setErrors((current) => ({ ...current, email: undefined }))
-                    }
-                  }}
-                  aria-invalid={Boolean(errors.email)}
-                  aria-describedby={errors.email ? 'email-error' : undefined}
-                />
-              </div>
-
-              {errors.email ? (
-                <p id="email-error" className="text-[11px] leading-4 text-red-600">
-                  {errors.email}
-                </p>
-              ) : null}
-            </div>
-
-            <div className="space-y-0.5">
-              <label htmlFor="password" className="text-xs font-medium text-slate-700">
-                Mot de passe
-              </label>
-
-              <div className="group relative">
-                <Lock className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 transition group-focus-within:text-[#5B6CFF]" />
-
-                <Input
-                  id="password"
-                  name="password"
-                  type="password"
-                  autoComplete="new-password"
-                  placeholder="••••••••"
-                  className="h-9 rounded-2xl border-white/70 bg-white/90 pl-11 text-sm shadow-sm shadow-slate-200/60 transition-all placeholder:text-slate-400 hover:border-[#47D9FF]/70 focus-visible:border-[#5B6CFF] focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15"
-                  value={password}
-                  onChange={(event) => {
-                    setPassword(event.target.value)
-                    if (errors.password) {
-                      setErrors((current) => ({ ...current, password: undefined }))
-                    }
-                  }}
-                  aria-invalid={Boolean(errors.password)}
-                  aria-describedby={errors.password ? 'password-error' : 'password-help'}
-                />
-              </div>
-
-              <p
-                id={errors.password ? 'password-error' : 'password-help'}
-                className={`text-[10px] leading-3 ${
-                  errors.password ? 'text-red-600' : 'text-slate-500'
-                }`}
-              >
-                {errors.password ??
-                  '8 caractères min., majuscule, minuscule, chiffre et caractère spécial.'}
-              </p>
-            </div>
-
-            <div className="space-y-0.5">
-              <label
-                htmlFor="passwordConfirmation"
-                className="text-xs font-medium text-slate-700"
-              >
-                Confirmation du mot de passe
-              </label>
-
-              <div className="group relative">
-                <Lock className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 transition group-focus-within:text-[#5B6CFF]" />
-
-                <Input
-                  id="passwordConfirmation"
-                  name="passwordConfirmation"
-                  type="password"
-                  autoComplete="new-password"
-                  placeholder="••••••••"
-                  className="h-9 rounded-2xl border-white/70 bg-white/90 pl-11 text-sm shadow-sm shadow-slate-200/60 transition-all placeholder:text-slate-400 hover:border-[#47D9FF]/70 focus-visible:border-[#5B6CFF] focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15"
-                  value={passwordConfirmation}
-                  onChange={(event) => {
-                    setPasswordConfirmation(event.target.value)
-                    if (errors.passwordConfirmation) {
-                      setErrors((current) => ({
-                        ...current,
-                        passwordConfirmation: undefined,
-                      }))
-                    }
-                  }}
-                  aria-invalid={Boolean(errors.passwordConfirmation)}
-                  aria-describedby={
-                    errors.passwordConfirmation
-                      ? 'password-confirmation-error'
-                      : undefined
-                  }
-                />
-              </div>
-
-              {errors.passwordConfirmation ? (
-                <p
-                  id="password-confirmation-error"
-                  className="text-[11px] leading-4 text-red-600"
-                >
-                  {errors.passwordConfirmation}
-                </p>
-              ) : null}
-            </div>
-
-            {errors.form ? (
-              <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50/90 px-4 py-2 text-xs text-red-700 shadow-sm">
-                <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" />
-                <p>{errors.form}</p>
-              </div>
-            ) : null}
-
-            <Button
-              type="submit"
-              className="h-9 w-full rounded-2xl bg-gradient-to-r from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] text-sm font-semibold text-white shadow-[0_18px_44px_rgba(91,108,255,0.34)] transition duration-300 hover:scale-[1.015] hover:shadow-[0_24px_56px_rgba(91,108,255,0.42)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70"
-              disabled={isSubmitting}
+          <CardHeader className="relative space-y-1.5 px-5 pb-1 pt-3 sm:px-7 sm:pt-4">
+            <Link
+              href={ROUTES.home}
+              className="group inline-flex w-fit items-center transition duration-300 hover:scale-[1.03] lg:hidden"
             >
-              {isSubmitting ? 'Création du compte…' : 'Créer mon compte'}
-            </Button>
+              <Image
+                src="/logo_breezy.png"
+                alt="Breezy"
+                width={1106}
+                height={336}
+                className="h-9 w-auto object-contain drop-shadow-sm"
+                priority
+              />
+            </Link>
 
-            <div className="space-y-2 pt-0.5">
-              <div className="flex items-center gap-3">
-                <div className="h-px flex-1 bg-gradient-to-r from-transparent via-slate-300 to-transparent" />
-
-                <span className="text-[11px] font-medium text-slate-500">
-                  Ou créer mon compte avec
-                </span>
-
-                <div className="h-px flex-1 bg-gradient-to-r from-transparent via-slate-300 to-transparent" />
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  className="flex h-9 items-center justify-center gap-2 rounded-2xl border border-white/70 bg-white/85 transition hover:scale-[1.01] hover:bg-white hover:shadow-md"
-                >
-                  <Image
-                    src="/google-logo.jpg"
-                    alt="Google"
-                    width={17}
-                    height={17}
-                  />
-                  <span className="text-sm font-medium text-slate-700">
-                    Google
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  className="flex h-9 items-center justify-center gap-2 rounded-2xl border border-white/70 bg-white/85 transition hover:scale-[1.01] hover:bg-white hover:shadow-md"
-                >
-                  <Image
-                    src="/microsoft-logo.png"
-                    alt="Microsoft"
-                    width={17}
-                    height={17}
-                  />
-                  <span className="text-sm font-medium text-slate-700">
-                    Microsoft
-                  </span>
-                </button>
-              </div>
+            <div className="inline-flex w-fit items-center gap-2 rounded-full border border-white/70 bg-white/80 px-3 py-1 text-xs font-semibold text-[#5B6CFF] shadow-sm">
+              <span className="h-2 w-2 rounded-full bg-[#47D9FF]" />
+              Nouveau profil Breezy
             </div>
 
-            <p className="text-center text-xs text-slate-500">
-              Tu as déjà un compte ?{' '}
-              <Link
-                href={ROUTES.login}
-                className="font-semibold text-[#5B6CFF] underline-offset-4 transition hover:text-[#8D3DFF] hover:underline"
+            <div className="space-y-1.5">
+              <CardTitle className="max-w-md bg-gradient-to-r from-slate-950 via-[#5B6CFF] to-[#8D3DFF] bg-clip-text text-[24px] font-semibold leading-tight text-transparent sm:text-[28px]">
+                Rejoins Breezy et commence à publier.
+              </CardTitle>
+
+              <CardDescription className="max-w-sm text-xs leading-relaxed text-slate-500">
+                Crée ton compte, choisis ton nom d’utilisateur et entre dans le fil.
+              </CardDescription>
+            </div>
+          </CardHeader>
+
+          <CardContent className="relative px-5 pb-3 sm:px-7 sm:pb-4">
+            <form className="space-y-1" onSubmit={handleSubmit} noValidate>
+              <div className="grid gap-1.5 sm:grid-cols-2">
+                <div className="space-y-0.5">
+                  <label htmlFor="username" className="text-xs font-medium text-slate-700">
+                    Nom d’utilisateur
+                  </label>
+
+                  <div className="group relative">
+                    <User className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 transition group-focus-within:text-[#5B6CFF]" />
+
+                    <Input
+                      id="username"
+                      name="username"
+                      type="text"
+                      autoComplete="username"
+                      placeholder="breezy_user"
+                      maxLength={maxUsernameLength}
+                      className="h-9 rounded-2xl border-white/70 bg-white/90 pl-11 text-sm shadow-sm shadow-slate-200/60 transition-all placeholder:text-slate-400 hover:border-[#47D9FF]/70 focus-visible:border-[#5B6CFF] focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15"
+                      value={username}
+                      onChange={(event) => {
+                        setUsername(event.target.value)
+                        if (errors.username) {
+                          setErrors((current) => ({ ...current, username: undefined }))
+                        }
+                      }}
+                      aria-invalid={Boolean(errors.username)}
+                      aria-describedby={errors.username ? 'username-error' : undefined}
+                    />
+                  </div>
+
+                  {errors.username ? (
+                    <p id="username-error" className="text-[11px] leading-4 text-red-600">
+                      {errors.username}
+                    </p>
+                  ) : null}
+                </div>
+
+                <div className="space-y-0.5">
+                  <label htmlFor="birthDate" className="text-xs font-medium text-slate-700">
+                    Date de naissance
+                  </label>
+
+                  <div className="group relative">
+                    <CalendarDays className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 transition group-focus-within:text-[#5B6CFF]" />
+
+                    <Input
+                      id="birthDate"
+                      name="birthDate"
+                      type="date"
+                      autoComplete="bday"
+                      min="1900-01-01"
+                      max={maxBirthDate}
+                      className="h-9 rounded-2xl border-white/70 bg-white/90 pl-11 text-sm shadow-sm shadow-slate-200/60 transition-all [color-scheme:light] hover:border-[#47D9FF]/70 focus-visible:border-[#5B6CFF] focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15"
+                      value={birthDate}
+                      onChange={(event) => {
+                        setBirthDate(event.target.value)
+                        if (errors.birthDate) {
+                          setErrors((current) => ({ ...current, birthDate: undefined }))
+                        }
+                      }}
+                      aria-invalid={Boolean(errors.birthDate)}
+                      aria-describedby={
+                        errors.birthDate ? 'birth-date-error' : undefined
+                      }
+                    />
+                  </div>
+
+                  {errors.birthDate ? (
+                    <p id="birth-date-error" className="text-[11px] leading-4 text-red-600">
+                      {errors.birthDate}
+                    </p>
+                  ) : null}
+                </div>
+
+                <fieldset className="space-y-0.5 sm:col-span-2">
+                  <legend className="text-xs font-medium text-slate-700">
+                    Genre
+                  </legend>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="group relative">
+                      <input
+                        type="radio"
+                        name="gender"
+                        value="male"
+                        checked={gender === 'male'}
+                        className="peer sr-only"
+                        onChange={() => {
+                          setGender('male')
+                          if (errors.gender) {
+                            setErrors((current) => ({
+                              ...current,
+                              gender: undefined,
+                            }))
+                          }
+                        }}
+                      />
+
+                      <span className="flex h-8 cursor-pointer items-center justify-center gap-2 rounded-2xl border border-white/70 bg-white/85 text-xs font-semibold text-slate-600 shadow-sm transition peer-checked:border-[#5B6CFF]/70 peer-checked:bg-[#5B6CFF]/10 peer-checked:text-[#5B6CFF] group-hover:bg-white">
+                        <User className="h-4 w-4" />
+                        Homme
+                      </span>
+                    </label>
+
+                    <label className="group relative">
+                      <input
+                        type="radio"
+                        name="gender"
+                        value="female"
+                        checked={gender === 'female'}
+                        className="peer sr-only"
+                        onChange={() => {
+                          setGender('female')
+                          if (errors.gender) {
+                            setErrors((current) => ({
+                              ...current,
+                              gender: undefined,
+                            }))
+                          }
+                        }}
+                      />
+
+                      <span className="flex h-8 cursor-pointer items-center justify-center gap-2 rounded-2xl border border-white/70 bg-white/85 text-xs font-semibold text-slate-600 shadow-sm transition peer-checked:border-[#8D3DFF]/70 peer-checked:bg-[#8D3DFF]/10 peer-checked:text-[#8D3DFF] group-hover:bg-white">
+                        <User className="h-4 w-4" />
+                        Femme
+                      </span>
+                    </label>
+                  </div>
+
+                  {errors.gender ? (
+                    <p id="gender-error" className="text-[11px] leading-4 text-red-600">
+                      {errors.gender}
+                    </p>
+                  ) : null}
+                </fieldset>
+              </div>
+
+              <div className="space-y-0.5">
+                <label htmlFor="email" className="text-xs font-medium text-slate-700">
+                  Adresse e-mail
+                </label>
+
+                <div className="group relative">
+                  <Mail className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 transition group-focus-within:text-[#5B6CFF]" />
+
+                  <Input
+                    id="email"
+                    name="email"
+                    type="email"
+                    autoComplete="email"
+                    inputMode="email"
+                    placeholder="toi@exemple.com"
+                    maxLength={maxEmailLength}
+                    className="h-9 rounded-2xl border-white/70 bg-white/90 pl-11 text-sm shadow-sm shadow-slate-200/60 transition-all placeholder:text-slate-400 hover:border-[#47D9FF]/70 focus-visible:border-[#5B6CFF] focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15"
+                    value={email}
+                    onChange={(event) => {
+                      setEmail(event.target.value)
+                      if (errors.email) {
+                        setErrors((current) => ({ ...current, email: undefined }))
+                      }
+                    }}
+                    aria-invalid={Boolean(errors.email)}
+                    aria-describedby={errors.email ? 'email-error' : undefined}
+                  />
+                </div>
+
+                {errors.email ? (
+                  <p id="email-error" className="text-[11px] leading-4 text-red-600">
+                    {errors.email}
+                  </p>
+                ) : null}
+              </div>
+
+              <div className="space-y-0.5">
+                <label htmlFor="password" className="text-xs font-medium text-slate-700">
+                  Mot de passe
+                </label>
+
+                <div className="group relative">
+                  <Lock className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 transition group-focus-within:text-[#5B6CFF]" />
+
+                  <Input
+                    id="password"
+                    name="password"
+                    type={showPassword ? 'text' : 'password'}
+                    autoComplete="new-password"
+                    placeholder="••••••••"
+                    maxLength={maxPasswordLength}
+                    className="h-9 rounded-2xl border-white/70 bg-white/90 pl-11 pr-12 text-sm shadow-sm shadow-slate-200/60 transition-all placeholder:text-slate-400 hover:border-[#47D9FF]/70 focus-visible:border-[#5B6CFF] focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15"
+                    value={password}
+                    onChange={(event) => {
+                      setPassword(event.target.value)
+                      if (errors.password) {
+                        setErrors((current) => ({ ...current, password: undefined }))
+                      }
+                    }}
+                    aria-invalid={Boolean(errors.password)}
+                    aria-describedby={errors.password ? 'password-error' : 'password-help'}
+                  />
+
+                  <button
+                    type="button"
+                    aria-label={
+                      showPassword
+                        ? 'Masquer le mot de passe'
+                        : 'Afficher le mot de passe'
+                    }
+                    aria-pressed={showPassword}
+                    className="absolute right-3 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-full text-slate-400 transition hover:bg-[#5B6CFF]/10 hover:text-[#5B6CFF] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15"
+                    onClick={() => setShowPassword((current) => !current)}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
+
+                <p
+                  id={errors.password ? 'password-error' : 'password-help'}
+                  className={`text-[10px] leading-3 ${
+                    errors.password ? 'text-red-600' : 'text-slate-500'
+                  }`}
+                >
+                  {errors.password ??
+                    '8 caractères min., majuscule, minuscule, chiffre et caractère spécial.'}
+                </p>
+              </div>
+
+              <div className="space-y-0.5">
+                <label
+                  htmlFor="passwordConfirmation"
+                  className="text-xs font-medium text-slate-700"
+                >
+                  Confirmation du mot de passe
+                </label>
+
+                <div className="group relative">
+                  <Lock className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 transition group-focus-within:text-[#5B6CFF]" />
+
+                  <Input
+                    id="passwordConfirmation"
+                    name="passwordConfirmation"
+                    type={showPasswordConfirmation ? 'text' : 'password'}
+                    autoComplete="new-password"
+                    placeholder="••••••••"
+                    maxLength={maxPasswordLength}
+                    className="h-9 rounded-2xl border-white/70 bg-white/90 pl-11 pr-12 text-sm shadow-sm shadow-slate-200/60 transition-all placeholder:text-slate-400 hover:border-[#47D9FF]/70 focus-visible:border-[#5B6CFF] focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15"
+                    value={passwordConfirmation}
+                    onChange={(event) => {
+                      setPasswordConfirmation(event.target.value)
+                      if (errors.passwordConfirmation) {
+                        setErrors((current) => ({
+                          ...current,
+                          passwordConfirmation: undefined,
+                        }))
+                      }
+                    }}
+                    aria-invalid={Boolean(errors.passwordConfirmation)}
+                    aria-describedby={
+                      errors.passwordConfirmation
+                        ? 'password-confirmation-error'
+                        : undefined
+                    }
+                  />
+
+                  <button
+                    type="button"
+                    aria-label={
+                      showPasswordConfirmation
+                        ? 'Masquer la confirmation du mot de passe'
+                        : 'Afficher la confirmation du mot de passe'
+                    }
+                    aria-pressed={showPasswordConfirmation}
+                    className="absolute right-3 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-full text-slate-400 transition hover:bg-[#5B6CFF]/10 hover:text-[#5B6CFF] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15"
+                    onClick={() =>
+                      setShowPasswordConfirmation((current) => !current)
+                    }
+                  >
+                    {showPasswordConfirmation ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
+
+                {errors.passwordConfirmation ? (
+                  <p
+                    id="password-confirmation-error"
+                    className="text-[11px] leading-4 text-red-600"
+                  >
+                    {errors.passwordConfirmation}
+                  </p>
+                ) : null}
+              </div>
+
+              {errors.form ? (
+                <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50/90 px-4 py-2 text-xs text-red-700 shadow-sm">
+                  <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" />
+                  <p>{errors.form}</p>
+                </div>
+              ) : null}
+
+              <Button
+                type="submit"
+                className="h-9 w-full rounded-2xl bg-gradient-to-r from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] text-sm font-semibold text-white shadow-[0_18px_44px_rgba(91,108,255,0.34)] transition duration-300 hover:scale-[1.015] hover:shadow-[0_24px_56px_rgba(91,108,255,0.42)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70"
+                disabled={isSubmitting}
               >
-                Se connecter
-              </Link>
-            </p>
-          </form>
-        </CardContent>
-      </Card>
+                {isSubmitting ? 'Création du compte…' : 'Créer mon compte'}
+              </Button>
+
+              <div className="space-y-2 pt-0.5">
+                <div className="flex items-center gap-3">
+                  <div className="h-px flex-1 bg-gradient-to-r from-transparent via-slate-300 to-transparent" />
+
+                  <span className="text-[11px] font-medium text-slate-500">
+                    Ou créer mon compte avec
+                  </span>
+
+                  <div className="h-px flex-1 bg-gradient-to-r from-transparent via-slate-300 to-transparent" />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    className="flex h-9 items-center justify-center gap-2 rounded-2xl border border-white/70 bg-white/85 transition hover:scale-[1.01] hover:bg-white hover:shadow-md"
+                  >
+                    <Image
+                      src="/google-logo.jpg"
+                      alt="Google"
+                      width={17}
+                      height={17}
+                    />
+                    <span className="text-sm font-medium text-slate-700">
+                      Google
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className="flex h-9 items-center justify-center gap-2 rounded-2xl border border-white/70 bg-white/85 transition hover:scale-[1.01] hover:bg-white hover:shadow-md"
+                  >
+                    <Image
+                      src="/microsoft-logo.png"
+                      alt="Microsoft"
+                      width={17}
+                      height={17}
+                    />
+                    <span className="text-sm font-medium text-slate-700">
+                      Microsoft
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              <p className="text-center text-xs text-slate-500">
+                Tu as déjà un compte ?{' '}
+                <Link
+                  href={ROUTES.login}
+                  className="font-semibold text-[#5B6CFF] underline-offset-4 transition hover:text-[#8D3DFF] hover:underline"
+                >
+                  Se connecter
+                </Link>
+              </p>
+            </form>
+          </CardContent>
+        </Card>
+      </section>
     </main>
   )
 }

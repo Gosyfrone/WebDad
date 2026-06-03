@@ -11,7 +11,7 @@ export function ComposeFab() {
     <CreatePostDialog>
       <button
         aria-label="Créer un post"
-        className="fixed bottom-20 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform hover:scale-105 active:scale-95 lg:hidden"
+        className="fixed bottom-20 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-r from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] text-white shadow-[0_18px_44px_rgba(91,108,255,0.35)] transition-transform hover:scale-105 active:scale-95 lg:hidden"
       >
         <Plus className="h-6 w-6" />
       </button>
