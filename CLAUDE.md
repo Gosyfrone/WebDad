@@ -116,7 +116,7 @@ Plus aucun conflit : le frontend (3000) et le backend (8080+) occupent des plage
 | Service | Status | DB | Notes |
 |---|---|---|---|
 | Auth Service | 🟡 WIP | PostgreSQL | Squelette fonctionnel (config/db/models/services/handlers/middleware/router). Routes `/auth/register`, `/auth/login`, `/auth/validate`, `/health` — testées de bout en bout. JWT HS256 (claims user_id/email/role), bcrypt. **Service autonome** : applique son propre schéma au boot (`internal/db/schema.sql` embarqué, idempotent) → plus de script init-db monté. Seed admin optionnel (`SEED_DEFAULT_ADMIN`). TODO : tests Go, refresh tokens |
-| User Service | 🟡 WIP | PostgreSQL | Squelette complet (config/db/models/repository/service/handlers/middleware/router) calqué sur auth. **Autonome** : applique son schéma au boot (`internal/db/schema.sql` embarqué, idempotent — tables `users`+`follows`, seed admin UUID figé) → plus de script init-db monté. **CRUD users réel et testé e2e** : `GET /users` (paginé), `GET /users/:id`, `POST /users` (id=claims), `GET/PATCH /users/me`, `DELETE /users/:id` (admin). **Provisioning paresseux** : `/users/me` crée la ligne à la volée depuis les claims JWT (relie register→user sans coupler auth↔user). Middleware JWT (validation locale, `JWT_SECRET` partagé). Graphe `follows` = **stubs** (501). TODO : implémenter follows, tests Go |
+| User Service | 🟢 OK (v1) | PostgreSQL | Service complet (config/db/models/repository/service/handlers/middleware/router) calqué sur auth. **Autonome** : schéma embarqué au boot (`users`+`follows`, seed admin UUID figé) → plus d'init-db monté. **CRUD users** : `GET /users` (paginé, masque les désactivés), `GET /users/:id` & `GET /users/by-username/:username` (+ compteurs followers/following), `POST /users`, `GET/PATCH /users/me`, `DELETE /users/:id` (admin). **Graphe social `follows`** : `POST/DELETE /users/:id/follow` (idempotents, anti-self-follow, 404 si cible absente), `GET /users/:id/followers|following` (paginés). **Provisioning paresseux** sur `/users/me` depuis les claims JWT (avec résolution de collision de username). Middleware JWT (validation locale, secret partagé) + contrôle de rôle admin. Validation username (regex + mots réservés). Tests Go (middleware JWT + validation). **Testé e2e** (Postgres jetable). Compteurs calculés (COUNT) — dénormalisation = perspective. TODO : tests d'intégration repo (DB) |
 | Post Service | 🟡 WIP | MongoDB | Connexion Mongo via `.env` (URI construite, plus rien en dur). **Autonome** : crée ses collections (posts/comments/likes/reports) + validateurs `$jsonSchema` + index au boot (`EnsureSchema`, idempotent) → `post-init.js` supprimé. Champs snake_case (`author_id`/`content`/`created_at`). Routes posts create/list OK (testées) ; comments/likes = stubs. `make dev` vérifié (air + Mongo) |
 | Profil Service | 🔴 TODO | MongoDB | User profiles |
 | API Gateway | 🟡 WIP | — | Reverse proxy (`httputil.ReverseProxy`) : préfixe `/auth`,`/users`,`/profils`,`/posts` → service cible (URLs via `.env`). Middleware CORS (origines via `CORS_ALLOWED_ORIGINS`). `/auth/*` proxifié vers auth-service. Middleware JWT à ajouter pour les routes protégées (login) |
@@ -130,6 +130,7 @@ Plus aucun conflit : le frontend (3000) et le backend (8080+) occupent des plage
 | Role management (User/Mod/Admin) | Primary | 🟡 Rôle porté par le JWT (auth) ; user-service garde l'enregistrement public et applique un contrôle de rôle (`DELETE /users/:id` réservé admin). UI nav par rôle déjà faite. TODO : généraliser côté autres services |
 | Post creation/reading | Primary | 🟡 UI faite (feed + composer 280 car. inline & popup sidebar), lecture/écriture API à brancher |
 | User profile | Primary | 🟡 UI faite (consultation : bannière/avatar/bio/compteurs/onglets + édition popup nom/bio + photo/bannière via sélecteur de fichier avec aperçu local). Upload réel + lecture/écriture API à brancher |
+| Social graph (follow/followers) | Secondary | 🟢 user-service : follow/unfollow + listes + compteurs. UI à brancher |
 | Moderation (moderate posts) | Secondary | 🔴 TODO |
 | Admin panel | Secondary | 🔴 TODO |
 | *(add features here)* | | |
@@ -202,6 +203,8 @@ project/
 | Schéma DB (user) | Même pattern autonome : `user-service/internal/db/schema.sql` embarqué + `EnsureSchema` au boot (tables `users`+`follows`, index, trigger `updated_at`, seed admin UUID figé). Mount `scripts/init-db/user-init.sql` retiré du compose, fichier supprimé. `users.id` = `credentials.id` (auth) | Cohérent avec auth/post (TODO §6 d'harmonisation traitée pour user). Reste profil |
 | Provisioning user (lazy) | La table `users` n'est PAS remplie par auth au register (bases séparées + règle « tout passe par la gateway »). À la place : `POST /users` exposé (CRUD/admin/tests) **+** provisioning paresseux sur `GET /users/me` (upsert depuis les claims JWT au 1er accès authentifié). Username dérivé de l'email (modifiable via PATCH) | Zéro couplage auth↔user, service autonome, robuste en démo. Laisse aussi la porte à un flow « première connexion » distinct plus tard. Alternative écartée : auth appelle user au register (couplage + incohérence transactionnelle inter-bases) |
 | Layering user-service | Couche `repository` (SQL pur) sous `service` (métier/erreurs) sous `handlers`, contrairement à auth (SQL inline dans le service) | Le CRUD users+follows a beaucoup plus de requêtes → couche repo dédiée justifiée (proche de post-service) |
+| Follows (user-service) | Table d'arêtes `follows` en Postgres (PK composite + index 2 sens), follow/unfollow **idempotents** (`ON CONFLICT DO NOTHING` / `DELETE`), anti-self-follow (check code + contrainte `no_self_follow`), follower auto-provisionné avant l'arête. Compteurs **calculés** (COUNT) sur les vues détail uniquement (pas sur `List`, évite le N+1) | Le graphe social est un many-to-many relationnel → Postgres est le bon moteur (≠ Mongo, qui serait un anti-pattern par embarquement). Idempotence = appels réseau rejouables sans erreur. Dénormalisation des compteurs reportée (perspective scale) |
+| Username (user-service) | Provisioning : username dérivé de l'email, **résolution de collision** par candidats successifs (`base` → `base_<8id>` → `user_<8id>`). User-supplied (Create/PATCH) : regex `^[a-zA-Z0-9_]{3,50}$` + liste de mots réservés (`me`, `admin`, `users`…) | Deux emails de même partie locale ne doivent pas planter le provisioning (bug corrigé) ; les handles structurants/sensibles sont protégés. Lecture par handle via `GET /users/by-username/:username` (route statique placée avant `/:id`) |
 
 ---
 
@@ -220,9 +223,15 @@ project/
   le script `scripts/init-db/profil-init.js` monté. **Quand on l'attaquera, on changera son init
   BDD** pour le même pattern autonome (et on supprimera `profil-init.js`).
 
-- **À FAIRE — implémenter le graphe `follows` du user-service.** Routes/handlers en place mais
-  en stub (501) : `POST/DELETE /users/:id/follow`, `GET /users/:id/followers|following`. La table
-  `follows` existe déjà dans le schéma. À brancher (repo + service) dans une issue dédiée.
+- **À FAIRE — tests d'intégration repo (user-service).** Les tests Go actuels couvrent le
+  middleware JWT et la validation (sans DB). Les requêtes SQL (CRUD + follows) sont validées par
+  un e2e manuel contre un Postgres jetable, mais pas par des tests automatisés. À ajouter (ex.
+  `dockertest` ou `testcontainers`) si on veut une couverture repo en CI.
+
+- **NOTE — compteurs followers/following calculés (COUNT).** `user-service` calcule les compteurs
+  par sous-requête à chaque lecture de profil. OK à l'échelle du projet ; à dénormaliser
+  (colonnes `follower_count`/`following_count` + triggers/incréments) si la charge l'exige
+  (cf. perspective §2 *Improvements & outlook*).
 
 ---
 
@@ -242,4 +251,4 @@ project/
 
 ---
 
-*Last updated: 03/06/2026 — feat(user-service) : squelette CRUD users (repository/service/handlers/middleware/router) calqué sur auth, schéma autonome embarqué (users+follows, init-db retiré), provisioning paresseux sur /users/me, contrôle de rôle admin, follows en stub. Testé e2e. (précédemment : feat(frontend) switch de thème clair/sombre/système animé)*
+*Last updated: 03/06/2026 — feat(user-service) : CRUD users complet + graphe social follows (follow/unfollow idempotents, listes paginées, compteurs), lecture par handle, provisioning paresseux avec résolution de collision, validation username (regex + mots réservés), tests Go (middleware JWT + validation). Testé e2e. (précédemment : squelette CRUD + schéma autonome ; feat(frontend) switch de thème)*

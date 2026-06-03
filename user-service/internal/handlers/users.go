@@ -37,11 +37,7 @@ func (h *Handler) Create(c *gin.Context) {
 
 	user, err := h.users.Create(claims.UserID, req.Username, req.DisplayName)
 	if err != nil {
-		if errors.Is(err, service.ErrUsernameTaken) {
-			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "création de l'utilisateur impossible"})
+		respondUserError(c, err)
 		return
 	}
 
@@ -50,15 +46,7 @@ func (h *Handler) Create(c *gin.Context) {
 
 // List : GET /users — liste paginée (?limit=&offset=).
 func (h *Handler) List(c *gin.Context) {
-	limit := parseQueryInt(c, "limit", defaultLimit)
-	if limit <= 0 || limit > maxLimit {
-		limit = defaultLimit
-	}
-	offset := parseQueryInt(c, "offset", 0)
-	if offset < 0 {
-		offset = 0
-	}
-
+	limit, offset := paginate(c)
 	users, err := h.users.List(limit, offset)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "liste des utilisateurs impossible"})
@@ -68,9 +56,19 @@ func (h *Handler) List(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": users})
 }
 
-// GetByID : GET /users/:id — détail d'un utilisateur (public).
+// GetByID : GET /users/:id — détail d'un utilisateur + compteurs (public).
 func (h *Handler) GetByID(c *gin.Context) {
-	user, err := h.users.GetByID(c.Param("id"))
+	user, err := h.users.GetDetailsByID(c.Param("id"))
+	if err != nil {
+		respondUserError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": user})
+}
+
+// GetByUsername : GET /users/by-username/:username — détail par handle (public).
+func (h *Handler) GetByUsername(c *gin.Context) {
+	user, err := h.users.GetDetailsByUsername(c.Param("username"))
 	if err != nil {
 		respondUserError(c, err)
 		return
@@ -147,9 +145,24 @@ func respondUserError(c *gin.Context, err error) {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 	case errors.Is(err, service.ErrUsernameTaken):
 		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+	case errors.Is(err, service.ErrInvalidUsername), errors.Is(err, service.ErrSelfFollow):
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 	default:
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "erreur interne"})
 	}
+}
+
+// paginate lit et borne les paramètres de pagination (?limit=&offset=).
+func paginate(c *gin.Context) (limit, offset int) {
+	limit = parseQueryInt(c, "limit", defaultLimit)
+	if limit <= 0 || limit > maxLimit {
+		limit = defaultLimit
+	}
+	offset = parseQueryInt(c, "offset", 0)
+	if offset < 0 {
+		offset = 0
+	}
+	return limit, offset
 }
 
 // parseQueryInt lit un paramètre de requête entier avec valeur par défaut.
