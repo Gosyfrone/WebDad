@@ -33,6 +33,6 @@ func (h *Handler) Login(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"data": gin.H{
 		"token": token,
-		"user":  user,
+		"user":  models.NewAuthUser(user),
 	}})
 }
