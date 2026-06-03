@@ -97,4 +97,16 @@ func (h *PostHandler) UpdatePost(c *gin.Context) {
     })
 }
 
-func (h *PostHandler) ListProfilePosts(c *gin.Context) {}
+func (h *PostHandler) ListProfilePosts(c *gin.Context) {
+	author := c.Param("id")
+	posts, err := h.service.GetByProfile(c.Request.Context(), author)
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(200, gin.H{
+		"status": "ok",
+		"posts":  posts,
+	})
+}

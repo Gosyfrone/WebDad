@@ -110,3 +110,18 @@ func (r *PostRepository) Update(ctx context.Context, id string, content string) 
 
     return &post, nil
 }
+
+func (r *PostRepository) GetByProfile(ctx context.Context, id string) ([]models.Post, error) {
+    cursor, err := r.collection.Find(ctx, bson.M{"author_id": id})
+    if err != nil {
+        return nil, err
+    }
+    defer cursor.Close(ctx)
+
+    var posts []models.Post
+    if err := cursor.All(ctx, &posts); err != nil {
+        return nil, err
+    }
+
+    return posts, nil
+}

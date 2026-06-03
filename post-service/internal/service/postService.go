@@ -41,3 +41,7 @@ func (s *PostService) DeletePost(ctx context.Context, id string) (error) {
 func (s *PostService) UpdatePost(ctx context.Context, id string, content string) (*models.Post, error) {
     return s.repo.Update(ctx, id, content)
 }
+
+func (s *PostService) GetByProfile(ctx context.Context, author_id string) ([]models.Post, error) {
+	return s.repo.GetByProfile(ctx, author_id)
+}
