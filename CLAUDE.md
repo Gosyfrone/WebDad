@@ -116,7 +116,7 @@ Plus aucun conflit : le frontend (3000) et le backend (8080+) occupent des plage
 | Service | Status | DB | Notes |
 |---|---|---|---|
 | Auth Service | 🟡 WIP | PostgreSQL | Squelette fonctionnel (config/db/models/services/handlers/middleware/router). Routes `/auth/register`, `/auth/login`, `/auth/validate`, `/health` — testées de bout en bout. JWT HS256 (claims user_id/email/role), bcrypt. **Service autonome** : applique son propre schéma au boot (`internal/db/schema.sql` embarqué, idempotent) → plus de script init-db monté. Seed admin optionnel (`SEED_DEFAULT_ADMIN`). TODO : tests Go, refresh tokens |
-| User Service | 🔴 TODO | PostgreSQL | CRUD users |
+| User Service | 🟡 WIP | PostgreSQL | Squelette complet (config/db/models/repository/service/handlers/middleware/router) calqué sur auth. **Autonome** : applique son schéma au boot (`internal/db/schema.sql` embarqué, idempotent — tables `users`+`follows`, seed admin UUID figé) → plus de script init-db monté. **CRUD users réel et testé e2e** : `GET /users` (paginé), `GET /users/:id`, `POST /users` (id=claims), `GET/PATCH /users/me`, `DELETE /users/:id` (admin). **Provisioning paresseux** : `/users/me` crée la ligne à la volée depuis les claims JWT (relie register→user sans coupler auth↔user). Middleware JWT (validation locale, `JWT_SECRET` partagé). Graphe `follows` = **stubs** (501). TODO : implémenter follows, tests Go |
 | Post Service | 🟡 WIP | MongoDB | Connexion Mongo via `.env` (URI construite, plus rien en dur). **Autonome** : crée ses collections (posts/comments/likes/reports) + validateurs `$jsonSchema` + index au boot (`EnsureSchema`, idempotent) → `post-init.js` supprimé. Champs snake_case (`author_id`/`content`/`created_at`). Routes posts create/list OK (testées) ; comments/likes = stubs. `make dev` vérifié (air + Mongo) |
 | Profil Service | 🔴 TODO | MongoDB | User profiles |
 | API Gateway | 🟡 WIP | — | Reverse proxy (`httputil.ReverseProxy`) : préfixe `/auth`,`/users`,`/profils`,`/posts` → service cible (URLs via `.env`). Middleware CORS (origines via `CORS_ALLOWED_ORIGINS`). `/auth/*` proxifié vers auth-service. Middleware JWT à ajouter pour les routes protégées (login) |
@@ -127,7 +127,7 @@ Plus aucun conflit : le frontend (3000) et le backend (8080+) occupent des plage
 |---|---|---|
 | Registration / Login | Primary | 🟡 Auth-service fait (register/login) + gateway proxy (`/auth/*`). UI à brancher |
 | JWT auth + protected routes | Primary | 🟡 Auth-service : génération + `/auth/validate` + middleware. Gateway à brancher |
-| Role management (User/Mod/Admin) | Primary | 🔴 TODO |
+| Role management (User/Mod/Admin) | Primary | 🟡 Rôle porté par le JWT (auth) ; user-service garde l'enregistrement public et applique un contrôle de rôle (`DELETE /users/:id` réservé admin). UI nav par rôle déjà faite. TODO : généraliser côté autres services |
 | Post creation/reading | Primary | 🟡 UI faite (feed + composer 280 car. inline & popup sidebar), lecture/écriture API à brancher |
 | User profile | Primary | 🟡 UI faite (consultation : bannière/avatar/bio/compteurs/onglets + édition popup nom/bio + photo/bannière via sélecteur de fichier avec aperçu local). Upload réel + lecture/écriture API à brancher |
 | Moderation (moderate posts) | Secondary | 🔴 TODO |
@@ -198,7 +198,10 @@ project/
 | Dev hot-reload | `make dev` = overlay `docker-compose.dev.yml` par-dessus la base. Go : stage `dev` du Dockerfile (`air` épinglé `air-verse/air@v1.52.3`) + `.air.toml` par service + bind-mount source ; caches Go partagés (volumes `go-mod-cache`/`go-build-cache`). Frontend : stage `deps` + `command: npm run dev` + bind-mount + volume anonyme `node_modules` + `WATCHPACK_POLLING=true`. Le `frontend` voit son `depends_on` effacé via `!reset`. `make up` reste les images de prod figées | Itérer sans rebuild. Stage `dev` placé AVANT le runtime → `make up`/`build` produisent toujours l'image de prod (dernier stage). `!reset` car un `depends_on: []` ne vide pas (compose fusionne les mappings). `start_period: 90s` sur les services Go pour laisser le 1er build `air` se faire |
 | Config `.env` | Racine = vars transverses (`JWT_SECRET`, `JWT_EXPIRY`, `NEXT_PUBLIC_API_URL`) ; `<service>/.env` = config propre, chargée par compose via `env_file:` ; `environment:` réservé aux overrides Docker (host = nom de conteneur) | Découplage : un service tourne seul (`make run`) avec son `.env`, et en stack via compose. ⚠️ Les vars d'un `env_file` ne sont PAS interpolables (`${...}`) dans le compose — seul le `.env` racine l'est. DB host surchargé via `DB_HOST`/`MONGO_HOST` |
 | Schéma DB (post) | Le service possède son schéma : `EnsureSchema` (post-service/internal/database/init.go) crée collections + validateurs `$jsonSchema` + index au démarrage, idempotent. Aucun script monté dans `mongo-post`. Config Mongo construite depuis le `.env` (`internal/config`), zéro creds en dur. `scripts/init-db/post-init.js` et le `post-service/docker-compose.yaml` parasite supprimés | Source de vérité unique + service autonome (`make run`/`make dev` contre un Mongo vierge). Même pattern que auth. ⚠️ user-service/profil-service restent sur init-db monté — à harmoniser quand on les traitera |
-| Schéma DB (auth) | Le service possède son schéma : `auth-service/internal/db/schema.sql` (embarqué `go:embed`), appliqué au boot de façon idempotente (`EnsureSchema`). Aucun script monté dans `postgres-auth`. Seed admin via `SEED_DEFAULT_ADMIN`+`SEED_ADMIN_PASSWORD` (idempotent, UUID figé). `scripts/init-db/auth-init.sql` supprimé | Source de vérité unique + service autonome (`make run` contre un Postgres nu). Même pattern que post. ⚠️ user-service/profil restent sur init-db monté — à harmoniser quand on les traitera |
+| Schéma DB (auth) | Le service possède son schéma : `auth-service/internal/db/schema.sql` (embarqué `go:embed`), appliqué au boot de façon idempotente (`EnsureSchema`). Aucun script monté dans `postgres-auth`. Seed admin via `SEED_DEFAULT_ADMIN`+`SEED_ADMIN_PASSWORD` (idempotent, UUID figé). `scripts/init-db/auth-init.sql` supprimé | Source de vérité unique + service autonome (`make run` contre un Postgres nu). Même pattern que post. ⚠️ profil-service reste sur init-db monté — à harmoniser quand on le traitera |
+| Schéma DB (user) | Même pattern autonome : `user-service/internal/db/schema.sql` embarqué + `EnsureSchema` au boot (tables `users`+`follows`, index, trigger `updated_at`, seed admin UUID figé). Mount `scripts/init-db/user-init.sql` retiré du compose, fichier supprimé. `users.id` = `credentials.id` (auth) | Cohérent avec auth/post (TODO §6 d'harmonisation traitée pour user). Reste profil |
+| Provisioning user (lazy) | La table `users` n'est PAS remplie par auth au register (bases séparées + règle « tout passe par la gateway »). À la place : `POST /users` exposé (CRUD/admin/tests) **+** provisioning paresseux sur `GET /users/me` (upsert depuis les claims JWT au 1er accès authentifié). Username dérivé de l'email (modifiable via PATCH) | Zéro couplage auth↔user, service autonome, robuste en démo. Laisse aussi la porte à un flow « première connexion » distinct plus tard. Alternative écartée : auth appelle user au register (couplage + incohérence transactionnelle inter-bases) |
+| Layering user-service | Couche `repository` (SQL pur) sous `service` (métier/erreurs) sous `handlers`, contrairement à auth (SQL inline dans le service) | Le CRUD users+follows a beaucoup plus de requêtes → couche repo dédiée justifiée (proche de post-service) |
 
 ---
 
@@ -211,12 +214,15 @@ project/
   build. `docker compose up` ne rebuild PAS sur changement de source → un changement de code
   n'apparaît qu'après `make build`. **Pour développer avec hot-reload, utiliser `make dev`** (voir §5).
 
-- **À FAIRE — harmoniser la gestion de schéma des autres services.** Seul `auth-service` est
-  passé au pattern « le service possède son schéma » (schéma embarqué + `EnsureSchema` au boot,
-  cf. §5). `user-service`, `profil-service`, `post-service` reposent encore sur les scripts
-  `scripts/init-db/*` montés. **Quand on attaquera chacun de ces services, on changera leur init
-  BDD** pour le même pattern autonome (et on supprimera le script init-db correspondant). À voir
-  d'abord dans la branche Mongo.
+- **À FAIRE — harmoniser la gestion de schéma du dernier service.** `auth-service`,
+  `post-service` et `user-service` sont passés au pattern « le service possède son schéma »
+  (schéma embarqué + `EnsureSchema` au boot, cf. §5). Il ne reste que **`profil-service`** sur
+  le script `scripts/init-db/profil-init.js` monté. **Quand on l'attaquera, on changera son init
+  BDD** pour le même pattern autonome (et on supprimera `profil-init.js`).
+
+- **À FAIRE — implémenter le graphe `follows` du user-service.** Routes/handlers en place mais
+  en stub (501) : `POST/DELETE /users/:id/follow`, `GET /users/:id/followers|following`. La table
+  `follows` existe déjà dans le schéma. À brancher (repo + service) dans une issue dédiée.
 
 ---
 
@@ -236,4 +242,4 @@ project/
 
 ---
 
-*Last updated: 02/06/2026 — feat(api-gateway) : reverse proxy vers les services + CORS ; feat(frontend) : switch de thème (clair/sombre/système) animé (keyframes, immunisé contre disableTransitionOnChange)*
+*Last updated: 03/06/2026 — feat(user-service) : squelette CRUD users (repository/service/handlers/middleware/router) calqué sur auth, schéma autonome embarqué (users+follows, init-db retiré), provisioning paresseux sur /users/me, contrôle de rôle admin, follows en stub. Testé e2e. (précédemment : feat(frontend) switch de thème clair/sombre/système animé)*

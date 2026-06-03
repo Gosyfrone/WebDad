@@ -51,8 +51,9 @@ services:
     env_file:
       - ./user-service/.env
     volumes:
+      # Schéma appliqué par le service lui-même au boot (EnsureSchema,
+      # embarqué) → plus de script init-db monté. Cf. user-service/internal/db.
       - postgres-user-data:/var/lib/postgresql/data
-      - ./scripts/init-db/user-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     ports:
       - "5433:5432"
     networks:
