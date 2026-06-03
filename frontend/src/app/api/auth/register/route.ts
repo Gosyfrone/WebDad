@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 import { apiUrl } from '@/lib/config'
+import { provisionUser } from '@/lib/provision'
 
 type RegisterResponse = {
   token?: string
@@ -115,6 +116,13 @@ export async function POST(request: NextRequest) {
       path: '/',
       maxAge: 60 * 60 * 24 * 7,
     })
+  }
+
+  // Provisioning : crée la ligne `users` avec le username CHOISI par l'utilisateur
+  // (POST /users). L'inscription auto-connecte (token renvoyé), d'où le provisioning ici.
+  // Best-effort + repli dérivé email si le handle est pris (cf. lib/provision).
+  if (token) {
+    await provisionUser(token, { username: body.username })
   }
 
   return nextResponse

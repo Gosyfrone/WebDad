@@ -40,6 +40,17 @@ type RegisterResponse = {
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const passwordPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/
+// Aligné sur le user-service (^[a-zA-Z0-9_]{3,50}$ + mots réservés).
+const usernamePattern = /^[a-zA-Z0-9_]{3,50}$/
+const reservedUsernames = new Set([
+  'me',
+  'admin',
+  'root',
+  'users',
+  'by-username',
+  'null',
+  'undefined',
+])
 
 function getMessage(error: unknown, fallback: string): string {
   if (typeof error === 'string' && error.trim()) return error
@@ -91,10 +102,11 @@ export default function RegisterPage() {
 
     if (!trimmedUsername) {
       nextErrors.username = 'Le nom d’utilisateur est requis.'
-    } else if (trimmedUsername.length < 3) {
-      nextErrors.username = 'Le nom d’utilisateur doit contenir au moins 3 caractères.'
-    } else if (trimmedUsername.length > 30) {
-      nextErrors.username = 'Le nom d’utilisateur ne doit pas dépasser 30 caractères.'
+    } else if (!usernamePattern.test(trimmedUsername)) {
+      nextErrors.username =
+        '3 à 50 caractères : lettres, chiffres et tiret bas (_) uniquement.'
+    } else if (reservedUsernames.has(trimmedUsername.toLowerCase())) {
+      nextErrors.username = 'Ce nom d’utilisateur n’est pas autorisé.'
     }
 
     if (!trimmedEmail) {
@@ -130,6 +142,24 @@ export default function RegisterPage() {
     setIsSubmitting(true)
 
     try {
+      // Pré-vérification de la disponibilité du nom d'utilisateur (avant de créer
+      // le compte), pour afficher l'erreur sur le champ plutôt qu'après coup.
+      const availabilityResponse = await fetch(
+        `/api/users/check-username?username=${encodeURIComponent(username.trim())}`
+      )
+      const availability = await availabilityResponse.json().catch(() => null)
+
+      if (!availabilityResponse.ok) {
+        setErrors({
+          form: 'Impossible de vérifier le nom d’utilisateur. Réessaie dans un instant.',
+        })
+        return
+      }
+      if (!availability?.available) {
+        setErrors({ username: 'Ce nom d’utilisateur est déjà pris.' })
+        return
+      }
+
       const response = await fetch('/api/auth/register', {
         method: 'POST',
         headers: {

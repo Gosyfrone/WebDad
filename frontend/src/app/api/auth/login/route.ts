@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 import { apiUrl } from '@/lib/config'
+import { provisionUser } from '@/lib/provision'
 
 type LoginResponse = {
   token?: string
@@ -112,6 +113,11 @@ export async function POST(request: NextRequest) {
       path: '/',
       maxAge: 60 * 60 * 24 * 7,
     })
+  }
+
+  // Provisioning paresseux : crée la ligne `users` à partir du JWT (best-effort).
+  if (token) {
+    await provisionUser(token)
   }
 
   return nextResponse
