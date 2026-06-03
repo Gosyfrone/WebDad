@@ -27,5 +27,17 @@ func (s *PostService) CreatePost(ctx context.Context, authorID, content string) 
 }
 
 func (s *PostService) GetPosts(ctx context.Context) ([]models.Post, error) {
-	return s.repo.GetAll(ctx)
+    return s.repo.GetAll(ctx)
+}
+
+func (s *PostService) GetPost(ctx context.Context, id string) (*models.Post, error) {
+    return s.repo.Get(ctx,id)
+}
+
+func (s *PostService) DeletePost(ctx context.Context, id string) (error) {
+    return s.repo.Delete(ctx,id)
+}
+
+func (s *PostService) UpdatePost(ctx context.Context, id string, content string) (*models.Post, error) {
+    return s.repo.Update(ctx, id, content)
 }

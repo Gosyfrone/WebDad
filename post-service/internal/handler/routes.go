@@ -23,7 +23,9 @@ func RegisterRoutes(r *gin.Engine, serviceName string, postService *service.Post
 			post := posts.Group("/:id")
 			{
 				post.GET("", PostHandler.GetPost)
+				post.PATCH("", PostHandler.UpdatePost)
 				post.DELETE("", PostHandler.DeletePost)
+			
 
 				post.GET("/likes", LikeHandler.ListPostLikes)
 				post.POST("/like", LikeHandler.LikePost)
