@@ -18,7 +18,7 @@ func (h *Handler) Register(c *gin.Context) {
 		return
 	}
 
-	token, user, err := h.auth.Register(req.Email, req.Password)
+	token, refresh, user, err := h.auth.Register(req.Email, req.Password)
 	if err != nil {
 		if errors.Is(err, services.ErrEmailTaken) {
 			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
@@ -29,7 +29,8 @@ func (h *Handler) Register(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, gin.H{"data": gin.H{
-		"token": token,
-		"user":  models.NewAuthUser(user),
+		"token":         token,
+		"refresh_token": refresh,
+		"user":          models.NewAuthUser(user),
 	}})
 }

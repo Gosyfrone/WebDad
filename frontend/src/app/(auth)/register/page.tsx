@@ -15,6 +15,7 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { setAccessToken } from '@/lib/auth-client'
 import { ROUTES } from '@/lib/routes'
 
 type FormErrors = Partial<{
@@ -187,6 +188,12 @@ export default function RegisterPage() {
       }
 
       const token = extractToken(payload as RegisterResponse | null)
+
+      // L'access token court (15 min) vit en localStorage ; le refresh token
+      // a été posé en cookie httpOnly par le BFF (/api/auth/register).
+      if (token) {
+        setAccessToken(token)
+      }
 
       router.replace(token ? ROUTES.feed : ROUTES.login)
       router.refresh()

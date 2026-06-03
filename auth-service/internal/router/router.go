@@ -26,6 +26,11 @@ func New(auth *services.AuthService) *gin.Engine {
 	{
 		authGroup.POST("/register", h.Register)
 		authGroup.POST("/login", h.Login)
+		// /auth/refresh : échange le refresh token (cookie httpOnly relayé par
+		// le BFF) contre une nouvelle paire access+refresh (rotation).
+		authGroup.POST("/refresh", h.Refresh)
+		// /auth/logout : révoque le refresh token (best-effort).
+		authGroup.POST("/logout", h.Logout)
 		// /auth/validate est protégée : le middleware valide le JWT et
 		// pose les claims avant que le handler ne les renvoie.
 		authGroup.GET("/validate", middleware.JWTAuth(auth), h.Validate)

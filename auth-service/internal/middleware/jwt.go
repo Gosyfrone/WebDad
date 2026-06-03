@@ -2,10 +2,12 @@
 package middleware
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 
 	"github.com/webdad/auth-service/internal/services"
 )
@@ -32,7 +34,17 @@ func JWTAuth(auth *services.AuthService) gin.HandlerFunc {
 
 		claims, err := auth.ParseToken(parts[1])
 		if err != nil {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "token invalide ou expiré"})
+			// On distingue l'expiration (cas nominal : le front déclenche un
+			// refresh) des autres erreurs (token malformé/signature invalide :
+			// pas de refresh, on reste en 401). Le `code` guide le front.
+			if errors.Is(err, jwt.ErrTokenExpired) {
+				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
+					"error": "token expiré",
+					"code":  "token_expired",
+				})
+				return
+			}
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "token invalide"})
 			return
 		}
 

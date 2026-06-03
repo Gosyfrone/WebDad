@@ -2,34 +2,16 @@ import { NextRequest, NextResponse } from 'next/server'
 
 import { apiUrl } from '@/lib/config'
 import { provisionUser } from '@/lib/provision'
+import { setRefreshCookie } from '@/lib/server/auth-cookie'
 
-type LoginResponse = {
-  token?: string
-  accessToken?: string
-  jwt?: string
+type AuthPayload = {
   data?: {
     token?: string
-    accessToken?: string
-    jwt?: string
+    refresh_token?: string
+    user?: unknown
   }
   message?: string
   error?: string
-}
-
-function extractToken(payload: LoginResponse | null): string | null {
-  if (!payload || typeof payload !== 'object') {
-    return null
-  }
-
-  return (
-    payload.token ??
-    payload.accessToken ??
-    payload.jwt ??
-    payload.data?.token ??
-    payload.data?.accessToken ??
-    payload.data?.jwt ??
-    null
-  )
 }
 
 export async function POST(request: NextRequest) {
@@ -56,13 +38,8 @@ export async function POST(request: NextRequest) {
   try {
     upstreamResponse = await fetch(apiUrl('/auth/login'), {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        email: body.email,
-        password: body.password,
-      }),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: body.email, password: body.password }),
     })
   } catch {
     return NextResponse.json(
@@ -74,50 +51,31 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const contentType = upstreamResponse.headers.get('content-type') ?? ''
-  const rawBody =
-    contentType.includes('application/json')
-      ? await upstreamResponse.json().catch(() => null)
-      : await upstreamResponse.text().catch(() => '')
+  const payload = (await upstreamResponse.json().catch(() => null)) as AuthPayload | null
 
   if (!upstreamResponse.ok) {
-    const payload = rawBody as Partial<LoginResponse> | string | null
     const message =
-      (payload && typeof payload === 'object' && (payload.error ?? payload.message)) ||
-      (typeof payload === 'string' && payload.trim()) ||
-      'Les identifiants fournis sont invalides.'
-
+      payload?.error ?? payload?.message ?? 'Les identifiants fournis sont invalides.'
     return NextResponse.json({ error: message }, { status: upstreamResponse.status })
   }
 
-  const payload = rawBody as LoginResponse | string | null
-  const responseBody =
-    payload && typeof payload === 'object' ? payload : { message: 'Connexion réussie.' }
+  const accessToken = payload?.data?.token ?? null
+  const refreshToken = payload?.data?.refresh_token ?? null
 
-  const nextResponse = NextResponse.json(responseBody, {
-    status: upstreamResponse.status,
-  })
+  // L'access token repart au client (→ localStorage) ; le refresh token reste
+  // dans un cookie httpOnly posé ici (jamais exposé au JS).
+  const nextResponse = NextResponse.json(
+    { accessToken, user: payload?.data?.user, message: 'Connexion réussie.' },
+    { status: upstreamResponse.status }
+  )
 
-  const setCookieHeader = upstreamResponse.headers.get('set-cookie')
-  const token = extractToken(payload && typeof payload === 'object' ? payload : null)
-
-  if (setCookieHeader) {
-    nextResponse.headers.set('set-cookie', setCookieHeader)
-  } else if (token) {
-    nextResponse.cookies.set({
-      name: 'breezy-token',
-      value: token,
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
-      path: '/',
-      maxAge: 60 * 60 * 24 * 7,
-    })
+  if (refreshToken) {
+    setRefreshCookie(nextResponse, refreshToken)
   }
 
   // Provisioning paresseux : crée la ligne `users` à partir du JWT (best-effort).
-  if (token) {
-    await provisionUser(token)
+  if (accessToken) {
+    await provisionUser(accessToken)
   }
 
   return nextResponse

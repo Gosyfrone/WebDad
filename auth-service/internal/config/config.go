@@ -16,9 +16,10 @@ import (
 type Config struct {
 	Port        string
 	GinMode     string
-	DatabaseURL string        // DSN PostgreSQL (lib/pq)
-	JWTSecret   string        // secret partagé (signature + validation)
-	JWTExpiry   time.Duration // durée de validité des tokens
+	DatabaseURL   string        // DSN PostgreSQL (lib/pq)
+	JWTSecret     string        // secret partagé (signature + validation)
+	JWTExpiry     time.Duration // durée de validité de l'access token (court)
+	RefreshExpiry time.Duration // durée de validité du refresh token (long)
 
 	// Seed admin (dev) : crée un compte admin au démarrage si activé.
 	SeedAdmin         bool
@@ -49,12 +50,8 @@ func Load() *Config {
 		log.Fatal("[config] JWT_SECRET manquant (à définir dans le .env racine)")
 	}
 
-	expiry := getEnv("JWT_EXPIRY", "24h")
-	d, err := time.ParseDuration(expiry)
-	if err != nil {
-		log.Fatalf("[config] JWT_EXPIRY invalide (%q) : %v", expiry, err)
-	}
-	cfg.JWTExpiry = d
+	cfg.JWTExpiry = mustParseDuration("JWT_EXPIRY", "15m")
+	cfg.RefreshExpiry = mustParseDuration("REFRESH_EXPIRY", "24h")
 
 	cfg.SeedAdmin = getEnv("SEED_DEFAULT_ADMIN", "false") == "true"
 	cfg.SeedAdminEmail = getEnv("SEED_ADMIN_EMAIL", "admin@webdad.local")
@@ -81,6 +78,17 @@ func buildDSN() string {
 		"host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
 		host, port, user, pass, name, sslmode,
 	)
+}
+
+// mustParseDuration lit une durée depuis l'env (avec repli) et arrête le
+// service si la valeur est mal formée (config invalide = échec au boot).
+func mustParseDuration(key, fallback string) time.Duration {
+	raw := getEnv(key, fallback)
+	d, err := time.ParseDuration(raw)
+	if err != nil {
+		log.Fatalf("[config] %s invalide (%q) : %v", key, raw, err)
+	}
+	return d
 }
 
 func getEnv(key, fallback string) string {

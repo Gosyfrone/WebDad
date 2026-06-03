@@ -2,34 +2,16 @@ import { NextRequest, NextResponse } from 'next/server'
 
 import { apiUrl } from '@/lib/config'
 import { provisionUser } from '@/lib/provision'
+import { setRefreshCookie } from '@/lib/server/auth-cookie'
 
-type RegisterResponse = {
-  token?: string
-  accessToken?: string
-  jwt?: string
+type AuthPayload = {
   data?: {
     token?: string
-    accessToken?: string
-    jwt?: string
+    refresh_token?: string
+    user?: unknown
   }
   message?: string
   error?: string
-}
-
-function extractToken(payload: RegisterResponse | null): string | null {
-  if (!payload || typeof payload !== 'object') {
-    return null
-  }
-
-  return (
-    payload.token ??
-    payload.accessToken ??
-    payload.jwt ??
-    payload.data?.token ??
-    payload.data?.accessToken ??
-    payload.data?.jwt ??
-    null
-  )
 }
 
 export async function POST(request: NextRequest) {
@@ -58,9 +40,7 @@ export async function POST(request: NextRequest) {
   try {
     upstreamResponse = await fetch(apiUrl('/auth/register'), {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         username: body.username,
         email: body.email,
@@ -77,52 +57,32 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const contentType = upstreamResponse.headers.get('content-type') ?? ''
-  const rawBody =
-    contentType.includes('application/json')
-      ? await upstreamResponse.json().catch(() => null)
-      : await upstreamResponse.text().catch(() => '')
+  const payload = (await upstreamResponse.json().catch(() => null)) as AuthPayload | null
 
   if (!upstreamResponse.ok) {
-    const payload = rawBody as Partial<RegisterResponse> | string | null
-    const message =
-      (payload && typeof payload === 'object' && (payload.error ?? payload.message)) ||
-      (typeof payload === 'string' && payload.trim()) ||
-      'L’inscription a échoué.'
-
+    const message = payload?.error ?? payload?.message ?? 'L’inscription a échoué.'
     return NextResponse.json({ error: message }, { status: upstreamResponse.status })
   }
 
-  const payload = rawBody as RegisterResponse | string | null
-  const responseBody =
-    payload && typeof payload === 'object' ? payload : { message: 'Inscription réussie.' }
+  const accessToken = payload?.data?.token ?? null
+  const refreshToken = payload?.data?.refresh_token ?? null
 
-  const nextResponse = NextResponse.json(responseBody, {
-    status: upstreamResponse.status,
-  })
+  // L'access token repart au client (→ localStorage) ; le refresh token reste
+  // dans un cookie httpOnly posé ici (jamais exposé au JS).
+  const nextResponse = NextResponse.json(
+    { accessToken, user: payload?.data?.user, message: 'Inscription réussie.' },
+    { status: upstreamResponse.status }
+  )
 
-  const setCookieHeader = upstreamResponse.headers.get('set-cookie')
-  const token = extractToken(payload && typeof payload === 'object' ? payload : null)
-
-  if (setCookieHeader) {
-    nextResponse.headers.set('set-cookie', setCookieHeader)
-  } else if (token) {
-    nextResponse.cookies.set({
-      name: 'breezy-token',
-      value: token,
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
-      path: '/',
-      maxAge: 60 * 60 * 24 * 7,
-    })
+  if (refreshToken) {
+    setRefreshCookie(nextResponse, refreshToken)
   }
 
   // Provisioning : crée la ligne `users` avec le username CHOISI par l'utilisateur
-  // (POST /users). L'inscription auto-connecte (token renvoyé), d'où le provisioning ici.
+  // (POST /users). L'inscription auto-connecte, d'où le provisioning ici.
   // Best-effort + repli dérivé email si le handle est pris (cf. lib/provision).
-  if (token) {
-    await provisionUser(token, { username: body.username })
+  if (accessToken) {
+    await provisionUser(accessToken, { username: body.username })
   }
 
   return nextResponse

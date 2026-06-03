@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
+import { logout } from '@/lib/auth-client'
 import { ROUTES } from '@/lib/routes'
 import type { UserRole } from '@/types'
 import { CreatePostDialog } from '@/components/feed/create-post-dialog'
@@ -145,8 +146,7 @@ export function SidebarLeft({ role, username = 'Utilisateur' }: SidebarLeftProps
             </span>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
-          {/* TODO (issue auth) : déconnexion réelle — effacer le JWT et rediriger vers /login */}
-          <DropdownMenuItem disabled>
+          <DropdownMenuItem onSelect={() => void logout()}>
             <LogOut className="mr-2 h-4 w-4" />
             Se déconnecter
           </DropdownMenuItem>
