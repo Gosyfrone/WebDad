@@ -120,12 +120,12 @@ Plus aucun conflit : le frontend (3000) et le backend (8080+) occupent des plage
 | Post Service | 🟡 WIP | MongoDB | Connexion Mongo via `.env` (URI construite, plus rien en dur). **Autonome** : crée ses collections (posts/comments/likes/reports) + validateurs `$jsonSchema` + index au boot (`EnsureSchema`, idempotent) → `post-init.js` supprimé. Champs snake_case (`author_id`/`content`/`created_at`). Routes posts create/list OK (testées) ; comments/likes = stubs. `make dev` vérifié (air + Mongo) |
 | Profil Service | 🔴 TODO | MongoDB | User profiles |
 | API Gateway | 🟡 WIP | — | Reverse proxy (`httputil.ReverseProxy`) : préfixe `/auth`,`/users`,`/profils`,`/posts` → service cible (URLs via `.env`). Middleware CORS (origines via `CORS_ALLOWED_ORIGINS`). `/auth/*` proxifié vers auth-service. Middleware JWT à ajouter pour les routes protégées (login) |
-| Frontend | 🟡 WIP | — | Next.js 14 : squelette + routing + layout responsive (style X). Pages feed + profil (consultation/édition) + placeholders explorer/notifications/messages. Mobile-first : en-tête mobile (avatar→menu + logo), barre d'onglets en bas, FAB « + », sélecteur de thème clair/sombre/système dans le tiroir. Données = stubs, API à brancher |
+| Frontend | 🟡 WIP | — | Next.js 14 : squelette + routing + layout responsive (style X). **Pages login/register branchées** (card glassmorphism, validation client) : POST vers route handlers Next `/api/auth/{login,register}` qui proxifient la gateway et posent un cookie **httpOnly `breezy-token`**, puis redirigent vers `/feed`. **Provisioning user au login/register** (appel serveur `GET /users/me` → crée la ligne `users`). Pages feed + profil + placeholders explorer/notifications/messages. Mobile-first (en-tête, tiroir, barre d'onglets, FAB, thème clair/sombre). Feed/profil = stubs, reste de l'API à brancher. TODO : garde de session (rediriger /login si pas de cookie), rôle réel (placeholder admin) |
 
 ### Features status
 | Feature | Type | Status |
 |---|---|---|
-| Registration / Login | Primary | 🟡 Auth-service fait (register/login) + gateway proxy (`/auth/*`). UI à brancher |
+| Registration / Login | Primary | 🟢 De bout en bout : UI login/register → route handlers Next (cookie httpOnly) → gateway → auth-service. **Provisioning user** : register → `POST /users {username}` (handle CHOISI persisté) ; login → `GET /users/me` (dérivé email). **Pré-vérification de disponibilité** du username (`/api/users/check-username` → `GET /users/by-username/:username`) avant l'inscription + validation alignée sur le back. Repli dérivé email si course (409). Testé via le front. TODO : déconnexion, garde de session |
 | JWT auth + protected routes | Primary | 🟡 Auth-service : génération + `/auth/validate` + middleware. Gateway à brancher |
 | Role management (User/Mod/Admin) | Primary | 🟡 Rôle porté par le JWT (auth) ; user-service garde l'enregistrement public et applique un contrôle de rôle (`DELETE /users/:id` réservé admin). UI nav par rôle déjà faite. TODO : généraliser côté autres services |
 | Post creation/reading | Primary | 🟡 UI faite (feed + composer 280 car. inline & popup sidebar), lecture/écriture API à brancher |
@@ -180,6 +180,10 @@ project/
 | Frontend | Next.js 14 (App Router) + TS + Tailwind/shadcn | Stack imposée (§1bis) |
 | Frontend routing | Route groups `(auth)` (public) et `(app)` (authentifié) | Sépare layouts publics/privés sans polluer l'URL |
 | Frontend config | `lib/config.ts` (API Gateway) + `lib/routes.ts` (constantes de routes) | Source de vérité unique, pas de chaînes en dur |
+| Auth front (login/register) | Route handlers Next `/api/auth/{login,register}` (BFF) : proxifient la gateway et posent un **cookie httpOnly `breezy-token`** (le JWT n'est jamais exposé au JS client). Les pages client POSTent en same-origin puis `router.replace('/feed')` | Cookie httpOnly = pas de vol de token via XSS. Le BFF Next centralise l'appel gateway et la pose du cookie. Déconnexion/garde de session = TODO |
+| URL gateway client vs serveur | `apiUrl()` choisit la base selon le contexte : **client** = `NEXT_PUBLIC_API_URL` (`localhost:8080`, port publié) ; **serveur** (route handlers, dans le conteneur) = `API_INTERNAL_URL` (`http://api-gateway:8080`, réseau Docker). `API_INTERNAL_URL` non préfixée `NEXT_PUBLIC_` → invisible client → repli sur `API_URL` | Dans le conteneur frontend, `localhost` = le conteneur lui-même, pas la gateway → les fetch serveur doivent viser le nom de service Docker. En local sans Docker, laisser les deux sur `localhost:8080` |
+| Provisioning user au login | Le BFF (`lib/provision.ts`) provisionne après l'auth, best-effort (n'échoue jamais l'auth). **Register** : `POST /users {username}` → persiste le handle CHOISI ; repli `GET /users/me` (dérivé email) si pris (409). **Login** : `GET /users/me` (l'utilisateur a déjà sa ligne). Dispo du username **pré-vérifiée** avant inscription (`/api/users/check-username` → `GET /users/by-username/:username`, 404=libre) + validation front alignée sur le back (`^[a-zA-Z0-9_]{3,50}$` + réservés) | Place le provisioning au point le plus robuste (serveur, à l'auth) : garanti, sans complexité client. Relie register→user sans coupler auth↔user. Le pré-check donne l'erreur sur le champ avant de créer le compte ; le repli couvre la course rarissime. Alternative écartée : provisioning au montage du feed (client) = moins garanti |
+| Gateway : pas de redirection slash | `RedirectTrailingSlash=false` + chaque service exposé via **2 routes** : préfixe nu (`/users`) ET sous-chemin (`/users/*path`) | Sans ça, un `POST /users` (endpoint collection) déclenchait un 307 vers `/users/` que le service (route `/users`) ne connaît pas → boucle de redirections → `fetch` échoue. Bug latent (on ne passait que par des sous-chemins comme `/users/me`). Touche tous les endpoints collection (liste + création) |
 | Frontend nav par rôle | `navItemsForRole()` filtre les liens (user/mod/admin) | Reflète les 3 rôles côté UI |
 | Nom du produit | **Breezy** (logo `frontend/public/logo_breezy.png`) | WebDad = nom du projet/repo, Breezy = nom du réseau social |
 | Layout feed | 3 colonnes style X.com : nav (gauche) / fil (centre) / suggestions (droite) | UX familière, démo lisible (critère « Interface » §2) |
@@ -217,6 +221,11 @@ project/
   build. `docker compose up` ne rebuild PAS sur changement de source → un changement de code
   n'apparaît qu'après `make build`. **Pour développer avec hot-reload, utiliser `make dev`** (voir §5).
 
+- **À FAIRE — déconnexion + garde de session (frontend).** Le cookie `breezy-token` est posé au
+  login mais : pas de route de logout (suppression du cookie), et le layout `(app)` utilise un
+  `PLACEHOLDER_ROLE = 'administrator'` au lieu de lire la session. À faire : middleware/garde qui
+  redirige vers `/login` sans cookie, et déduction du `role`/`username` réels (via `/users/me`).
+
 - **À FAIRE — harmoniser la gestion de schéma du dernier service.** `auth-service`,
   `post-service` et `user-service` sont passés au pattern « le service possède son schéma »
   (schéma embarqué + `EnsureSchema` au boot, cf. §5). Il ne reste que **`profil-service`** sur
@@ -251,4 +260,4 @@ project/
 
 ---
 
-*Last updated: 03/06/2026 — feat(user-service) : CRUD users complet + graphe social follows (follow/unfollow idempotents, listes paginées, compteurs), lecture par handle, provisioning paresseux avec résolution de collision, validation username (regex + mots réservés), tests Go (middleware JWT + validation). Testé e2e. (précédemment : squelette CRUD + schéma autonome ; feat(frontend) switch de thème)*
+*Last updated: 03/06/2026 — feat(frontend) : branchement auth (login/register → route handlers Next, cookie httpOnly, redirection feed), provisioning user (register = username CHOISI via POST /users + pré-check de dispo ; login = /users/me), fix URL gateway client vs serveur (API_INTERNAL_URL) ; fix(gateway) : proxy du préfixe nu + RedirectTrailingSlash=false (POST /users renvoyait un 307 en boucle). Testé de bout en bout via le front. (précédemment : user-service CRUD + follows)*

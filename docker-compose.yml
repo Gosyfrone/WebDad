@@ -243,7 +243,10 @@ services:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
     restart: unless-stopped
     environment:
+      # Client (navigateur) : gateway via le port publié sur l'hôte.
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
+      # Serveur (route handlers Next) : gateway via le réseau Docker.
+      API_INTERNAL_URL: http://api-gateway:8080
     ports:
       - "3000:3000"
     networks:
