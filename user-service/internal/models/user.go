@@ -20,6 +20,15 @@ type User struct {
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 
+// UserDetails enrichit User des compteurs du graphe social, pour les vues
+// « profil » (un seul utilisateur). Les compteurs sont calculés (COUNT) côté
+// repository ; à grande échelle on les dénormaliserait en colonnes dédiées.
+type UserDetails struct {
+	User
+	FollowerCount  int `json:"follower_count"`
+	FollowingCount int `json:"following_count"`
+}
+
 // CreateUserRequest : payload de POST /users.
 // L'id n'est pas dans le corps : il provient du JWT (claims) ou est généré.
 type CreateUserRequest struct {

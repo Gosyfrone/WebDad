@@ -29,17 +29,18 @@ func New(users *service.UserService, jwtSecret string) *gin.Engine {
 	{
 		// Lecture publique.
 		u.GET("", h.List)
+		u.GET("/by-username/:username", h.GetByUsername)
 		u.GET("/:id", h.GetByID)
-		u.GET("/:id/followers", h.Followers) // stub
-		u.GET("/:id/following", h.Following) // stub
+		u.GET("/:id/followers", h.Followers)
+		u.GET("/:id/following", h.Following)
 
 		// Routes authentifiées (JWT requis).
 		u.POST("", auth, h.Create)
 		u.GET("/me", auth, h.GetMe)
 		u.PATCH("/me", auth, h.UpdateMe)
-		u.DELETE("/:id", auth, h.Delete)          // admin (vérifié dans le handler)
-		u.POST("/:id/follow", auth, h.Follow)     // stub
-		u.DELETE("/:id/follow", auth, h.Unfollow) // stub
+		u.DELETE("/:id", auth, h.Delete) // admin (vérifié dans le handler)
+		u.POST("/:id/follow", auth, h.Follow)
+		u.DELETE("/:id/follow", auth, h.Unfollow)
 	}
 
 	return r

@@ -4,32 +4,58 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+
+	"github.com/webdad/user-service/internal/middleware"
 )
 
-// Le graphe social (follows) est volontairement laissé en STUB dans ce
-// squelette : routes + handlers en place (contrat figé), implémentation à
-// brancher dans une issue dédiée. Le schéma SQL (table `follows`) existe déjà.
-
-// Follow : POST /users/:id/follow — suivre un utilisateur (stub).
+// Follow : POST /users/:id/follow — l'utilisateur authentifié suit `:id`.
 func (h *Handler) Follow(c *gin.Context) {
-	notImplemented(c, "follow")
+	claims, ok := middleware.ClaimsFrom(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "claims absents"})
+		return
+	}
+
+	if err := h.users.Follow(claims.UserID, claims.Email, c.Param("id")); err != nil {
+		respondUserError(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
 }
 
-// Unfollow : DELETE /users/:id/follow — ne plus suivre (stub).
+// Unfollow : DELETE /users/:id/follow — l'utilisateur authentifié ne suit plus `:id`.
 func (h *Handler) Unfollow(c *gin.Context) {
-	notImplemented(c, "unfollow")
+	claims, ok := middleware.ClaimsFrom(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "claims absents"})
+		return
+	}
+
+	if err := h.users.Unfollow(claims.UserID, c.Param("id")); err != nil {
+		respondUserError(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
 }
 
-// Followers : GET /users/:id/followers — abonnés d'un utilisateur (stub).
+// Followers : GET /users/:id/followers — abonnés de `:id` (public, paginé).
 func (h *Handler) Followers(c *gin.Context) {
-	notImplemented(c, "followers")
+	limit, offset := paginate(c)
+	users, err := h.users.ListFollowers(c.Param("id"), limit, offset)
+	if err != nil {
+		respondUserError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": users})
 }
 
-// Following : GET /users/:id/following — abonnements d'un utilisateur (stub).
+// Following : GET /users/:id/following — abonnements de `:id` (public, paginé).
 func (h *Handler) Following(c *gin.Context) {
-	notImplemented(c, "following")
-}
-
-func notImplemented(c *gin.Context, feature string) {
-	c.JSON(http.StatusNotImplemented, gin.H{"error": feature + " : non implémenté (squelette)"})
+	limit, offset := paginate(c)
+	users, err := h.users.ListFollowing(c.Param("id"), limit, offset)
+	if err != nil {
+		respondUserError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": users})
 }
