@@ -11,13 +11,15 @@ const (
 )
 
 // User représente une ligne de la table `users` (identité publique).
+// Le nom affiché (display_name) et les autres champs décoratifs vivent dans
+// profil-service (Mongo) — user-service ne porte que l'identité immuable
+// (username) + l'état du compte.
 type User struct {
-	ID          string    `json:"id"`
-	Username    string    `json:"username"`
-	DisplayName string    `json:"display_name"`
-	IsActive    bool      `json:"is_active"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID        string    `json:"id"`
+	Username  string    `json:"username"`
+	IsActive  bool      `json:"is_active"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // UserDetails enrichit User des compteurs du graphe social, pour les vues
@@ -31,14 +33,14 @@ type UserDetails struct {
 
 // CreateUserRequest : payload de POST /users.
 // L'id n'est pas dans le corps : il provient du JWT (claims) ou est généré.
+// Le nom affiché n'est plus ici (→ profil-service).
 type CreateUserRequest struct {
-	Username    string `json:"username" binding:"required,min=3,max=50"`
-	DisplayName string `json:"display_name" binding:"max=100"`
+	Username string `json:"username" binding:"required,min=3,max=50"`
 }
 
 // UpdateUserRequest : payload de PATCH /users/me.
 // Champs optionnels (pointeurs) : seuls les champs fournis sont modifiés.
+// Le nom affiché se modifie via profil-service (PATCH /profils/me).
 type UpdateUserRequest struct {
-	Username    *string `json:"username" binding:"omitempty,min=3,max=50"`
-	DisplayName *string `json:"display_name" binding:"omitempty,max=100"`
+	Username *string `json:"username" binding:"omitempty,min=3,max=50"`
 }
