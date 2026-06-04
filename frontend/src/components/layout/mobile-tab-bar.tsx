@@ -32,7 +32,7 @@ export function MobileTabBar() {
   return (
     <nav
       aria-label="Navigation principale"
-      className="fixed inset-x-0 bottom-0 z-40 flex h-14 border-t bg-background/95 backdrop-blur lg:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 flex h-14 border-t border-white/50 bg-white/82 shadow-[0_-18px_44px_rgba(91,108,255,0.12)] backdrop-blur-2xl lg:hidden"
     >
       {TABS.map((tab) => {
         const active = pathname === tab.href
@@ -44,7 +44,7 @@ export function MobileTabBar() {
             href={tab.href}
             aria-label={tab.label}
             aria-current={active ? 'page' : undefined}
-            className="flex flex-1 items-center justify-center transition-colors hover:bg-muted/40"
+            className="flex flex-1 items-center justify-center transition-colors hover:bg-white/55"
           >
             {Icon ? (
               <Icon

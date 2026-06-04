@@ -76,14 +76,14 @@ export function SidebarLeft({ role, username = 'Utilisateur' }: SidebarLeftProps
       <div className="flex flex-col gap-1">
         <Link
           href={ROUTES.feed}
-          className="mb-2 flex w-fit items-center rounded-xl px-2 py-1 transition-colors hover:bg-accent"
+          className="mb-3 flex w-fit items-center rounded-2xl p-2 transition hover:scale-105"
         >
           <Image
-            src="/logo_breezy.png"
+            src="/logo_only.png"
             alt="Breezy"
-            width={1106}
-            height={336}
-            className="h-12 w-auto object-contain"
+            width={512}
+            height={512}
+            className="h-11 w-11 object-contain"
             priority
           />
         </Link>
@@ -98,8 +98,9 @@ export function SidebarLeft({ role, username = 'Utilisateur' }: SidebarLeftProps
               key={item.href}
               href={item.href}
               className={cn(
-                'flex w-fit items-center gap-4 rounded-full px-4 py-3 text-xl font-normal transition-colors hover:bg-accent',
-                active && 'font-bold',
+                'flex w-fit items-center gap-4 rounded-full px-4 py-3 text-xl font-normal text-slate-800 transition hover:bg-white/65 hover:text-[#5B6CFF] hover:shadow-sm',
+                active &&
+                  'bg-white/80 font-bold text-[#5B6CFF] shadow-[0_14px_34px_rgba(91,108,255,0.16)]',
               )}
             >
               <Icon
@@ -115,9 +116,9 @@ export function SidebarLeft({ role, username = 'Utilisateur' }: SidebarLeftProps
         <CreatePostDialog>
           <Button
             size="lg"
-            className="mt-4 w-[90%] rounded-full text-base font-bold"
+            className="mt-4 w-[90%] rounded-full bg-gradient-to-r from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] text-base font-bold text-white shadow-[0_18px_44px_rgba(91,108,255,0.3)] transition hover:scale-[1.015]"
           >
-            Poster
+            Breezer
           </Button>
         </CreatePostDialog>
       </div>
@@ -125,7 +126,7 @@ export function SidebarLeft({ role, username = 'Utilisateur' }: SidebarLeftProps
       {/* User menu at bottom */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button className="flex w-full items-center gap-3 rounded-full p-3 transition-colors hover:bg-accent">
+          <button className="flex w-full items-center gap-3 rounded-full border border-[#D9C6FF]/70 bg-gradient-to-r from-[#F8F3FF] via-[#EADCFF] to-[#EEF9FF] p-3 shadow-sm transition hover:shadow-[0_14px_34px_rgba(91,108,255,0.16)]">
             <Avatar className="h-10 w-10 shrink-0">
               <AvatarFallback>{username.charAt(0).toUpperCase()}</AvatarFallback>
             </Avatar>
@@ -138,7 +139,11 @@ export function SidebarLeft({ role, username = 'Utilisateur' }: SidebarLeftProps
             <MoreHorizontal className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden />
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" side="top" className="w-56">
+        <DropdownMenuContent
+          align="end"
+          side="top"
+          className="w-56 border-[#D9C6FF]/70 bg-gradient-to-r from-[#F8F3FF] via-[#EADCFF] to-[#EEF9FF] shadow-[0_18px_44px_rgba(91,108,255,0.18)]"
+        >
           <DropdownMenuLabel>
             <span className="block font-bold">{username}</span>
             <span className="block text-xs font-normal text-muted-foreground">

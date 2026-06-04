@@ -15,7 +15,13 @@ type AuthPayload = {
 }
 
 export async function POST(request: NextRequest) {
-  let body: { username?: string; email?: string; password?: string }
+  let body: {
+    username?: string
+    birthDate?: string
+    gender?: string
+    email?: string
+    password?: string
+  }
 
   try {
     body = await request.json()
