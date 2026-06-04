@@ -42,7 +42,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.22"
+          go-version: "1.25"
           cache-dependency-path: ${{ matrix.service }}/go.sum
 
       - name: Download modules
@@ -61,9 +61,9 @@ jobs:
         run: go vet ./...
 
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v9
         with:
-          version: v1.64.8
+          version: v2.12.2
           working-directory: ${{ matrix.service }}
           args: --timeout=5m
 
@@ -80,8 +80,10 @@ jobs:
             || { echo "::error::go.mod/go.sum pas à jour — lancer 'go mod tidy'"; exit 1; }
 
       # Scan de vulnérabilités des dépendances + stdlib. REPORT-ONLY : remonte
-      # les CVE en annotation mais ne bloque jamais la PR (pas de montée Go
-      # imposée). Pour le rendre bloquant : bumper x/net/jwt (→ go 1.25) + Go CI.
+      # les CVE en annotation mais ne bloque jamais la PR — une nouvelle CVE
+      # stdlib peut apparaître sans changement de code (dépend du cycle de
+      # patch Go). À ce jour : 0 vuln (stack alignée sur Go 1.25 + x/net + jwt
+      # à jour). Pour le rendre bloquant : retirer le `|| echo` ci-dessous.
       - name: govulncheck (report-only)
         run: |
           go install golang.org/x/vuln/cmd/govulncheck@latest

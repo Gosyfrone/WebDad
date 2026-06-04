@@ -30,7 +30,7 @@
 ## 1bis. STACK TECHNIQUE
 
 **Backend**
-- Langage : **Go 1.22**
+- Langage : **Go 1.25** (bumpé depuis 1.22, EOL : 1.22 ne recevait plus les patchs sécu stdlib → CVE govulncheck. Dockerfiles `golang:1.25-alpine`, `go 1.25.0` dans les 5 `go.mod`, CI `setup-go: 1.25`)
 - Framework HTTP : **Gin** (`github.com/gin-gonic/gin`)
 - Un service = **un module Go indépendant** (chacun a son propre `go.mod`)
 - Linter : **golangci-lint**
@@ -140,7 +140,7 @@ Plus aucun conflit : le frontend (3000) et le backend (8080+) occupent des plage
 - [x] Persistent volumes for DBs
 - [x] .env for secrets (never commit)
 - [x] README with setup instructions
-- [x] CI/CD : 3 workflows GitHub Actions (`ci-go` build+test -race **+ golangci-lint v1.64.8 (bloquant, config par défaut, vert sur les 5 modules) + govulncheck (report-only, n'échoue jamais la PR)**, `ci-frontend` lint+build, `ci-integration` stack docker + healthchecks BDD). Cf. décision §5. TODO (perspective) : gitleaks, Dependabot, CD (push images GHCR)
+- [x] CI/CD : 3 workflows GitHub Actions (`ci-go` build+test -race **+ golangci-lint v2.12.2 / action v9 (bloquant, config par défaut, vert sur les 5 modules) + govulncheck (report-only)**, `ci-frontend` lint+build, `ci-integration` stack docker + healthchecks BDD). Cf. décision §5. **govulncheck = 0 vuln** depuis le bump Go 1.25 + `x/net@v0.55.0` + `golang-jwt/jwt/v5@v5.3.1` (tooles en CI/Docker résolvent vers le dernier patch 1.25.x). TODO (perspective) : gitleaks, Dependabot, CD (push images GHCR)
 
 ---
 
