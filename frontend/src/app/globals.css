@@ -64,41 +64,98 @@
     --brand-pink: 289 100% 66%;
     --brand-blue: 223 85% 60%;
     --brand-cyan: 199 89% 48%;
+
+    /* =====================================================================
+     * SURFACES DE LA REFONTE GRAPHIQUE (glassmorphism)
+     * ---------------------------------------------------------------------
+     * Valeurs LIGHT = état exact post-refonte (#79) → le clair ne change pas.
+     * Le bloc .dark plus bas redéfinit ces mêmes variables en violet
+     * quasi-noir (calé sur le dégradé du logo : #8D3DFF → #5B6CFF → #47D9FF).
+     * Consommées par les classes utilitaires de @layer components.
+     * ===================================================================== */
+
+    /* Fond de page (gradient principal + 2 voiles superposés) */
+    --bg-page: linear-gradient(140deg, #f8f3ff 0%, #eadcff 28%, #d9c6ff 62%, #ebe8ff 100%);
+    --bg-glow-1: linear-gradient(115deg, rgba(141, 61, 255, 0.18) 0%, rgba(255, 255, 255, 0.28) 34%, rgba(71, 217, 255, 0.16) 100%);
+    --bg-glow-2: radial-gradient(circle at 15% 15%, rgba(255, 255, 255, 0.48), transparent 30%),
+      radial-gradient(circle at 82% 28%, rgba(141, 61, 255, 0.16), transparent 32%),
+      radial-gradient(circle at 48% 92%, rgba(71, 217, 255, 0.14), transparent 34%);
+
+    /* Panneau pastel (header feed, tiroir mobile, dropdown, carte utilisateur) */
+    --panel: linear-gradient(to right, #f8f3ff, #eadcff, #eef9ff);
+    --panel-y: linear-gradient(to bottom, #f8f3ff, #eadcff, #eef9ff);
+    --panel-border: rgba(217, 198, 255, 0.7);
+
+    /* Carte « verre » (post-card, colonne droite, placeholders) */
+    --glass: rgba(255, 255, 255, 0.72);
+    --glass-strong: rgba(255, 255, 255, 0.85);
+    --glass-border: rgba(255, 255, 255, 0.55);
+    --glass-shadow: 0 16px 48px rgba(91, 108, 255, 0.1);
+
+    /* Colonne centrale (verre principal de l'app) */
+    --column: rgba(255, 255, 255, 0.72);
+    --column-border: rgba(255, 255, 255, 0.45);
+    --column-shadow: 0 30px 90px rgba(91, 108, 255, 0.12);
+
+    /* Départ du texte en dégradé de marque (titres clip) */
+    --ink-strong: #0f172a;
   }
 
-  /* ===== Mode SOMBRE ===== */
+  /* ===== Mode SOMBRE (violet quasi-noir, calé sur le logo) ===== */
   .dark {
-    --background: 289 30% 6%;
-    --foreground: 289 20% 98%;
+    --background: 263 60% 6%;
+    --foreground: 264 30% 96%;
 
-    --card: 289 28% 8%;
-    --card-foreground: 289 20% 98%;
+    --card: 263 45% 9%;
+    --card-foreground: 264 30% 96%;
 
-    --popover: 289 30% 7%;
-    --popover-foreground: 289 20% 98%;
+    --popover: 263 50% 8%;
+    --popover-foreground: 264 30% 96%;
 
-    --primary: 289 100% 66%;
-    --primary-foreground: 289 100% 10%;
+    --primary: 266 100% 68%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 289 25% 15%;
-    --secondary-foreground: 289 20% 98%;
+    --secondary: 263 35% 16%;
+    --secondary-foreground: 264 30% 96%;
 
-    --muted: 289 22% 15%;
-    --muted-foreground: 289 10% 65%;
+    --muted: 263 30% 15%;
+    --muted-foreground: 264 14% 70%;
 
-    --accent: 289 40% 18%;
-    --accent-foreground: 289 20% 98%;
+    --accent: 263 45% 18%;
+    --accent-foreground: 264 30% 96%;
 
-    --destructive: 0 62% 45%;
+    --destructive: 0 62% 50%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 289 22% 18%;
-    --input: 289 22% 18%;
-    --ring: 289 100% 66%;
+    --border: 264 30% 18%;
+    --input: 264 30% 18%;
+    --ring: 266 100% 68%;
 
-    --brand-pink: 289 100% 66%;
-    --brand-blue: 223 88% 65%;
-    --brand-cyan: 199 89% 58%;
+    --brand-pink: 289 100% 72%;
+    --brand-blue: 223 88% 70%;
+    --brand-cyan: 199 89% 62%;
+
+    /* Surfaces refonte — déclinaison violet quasi-noir */
+    --bg-page: linear-gradient(140deg, #0b0712 0%, #140c24 30%, #1a1033 62%, #0e0a1c 100%);
+    --bg-glow-1: linear-gradient(115deg, rgba(141, 61, 255, 0.26) 0%, rgba(91, 108, 255, 0.08) 40%, rgba(71, 217, 255, 0.2) 100%);
+    --bg-glow-2: radial-gradient(circle at 15% 12%, rgba(141, 61, 255, 0.22), transparent 32%),
+      radial-gradient(circle at 84% 26%, rgba(91, 108, 255, 0.18), transparent 34%),
+      radial-gradient(circle at 48% 92%, rgba(71, 217, 255, 0.16), transparent 36%);
+
+    --panel: linear-gradient(to right, #171026, #1c1338, #141a2e);
+    --panel-y: linear-gradient(to bottom, #171026, #1c1338, #141a2e);
+    --panel-border: rgba(255, 255, 255, 0.08);
+
+    --glass: rgba(23, 17, 42, 0.72);
+    --glass-strong: rgba(28, 21, 50, 0.88);
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --glass-shadow: 0 16px 48px rgba(141, 61, 255, 0.22);
+
+    --column: rgba(14, 10, 26, 0.72);
+    --column-border: rgba(255, 255, 255, 0.06);
+    --column-shadow: 0 30px 90px rgba(0, 0, 0, 0.5);
+
+    --ink-strong: #f4f1fb;
   }
 
   /* ===== Accents custom (composent avec clair ET sombre) ===== */
@@ -137,6 +194,62 @@
    * Pour ajouter un nouvel accent : dupliquer un bloc ci-dessus avec un nouvel
    * identifiant, puis l'enregistrer dans src/lib/themes.ts (ACCENTS).
    */
+}
+
+/*
+ * Classes de surface (glassmorphism) pilotées par les variables ci-dessus.
+ * Une seule définition → fonctionne en clair ET en sombre automatiquement.
+ * Les utilitaires de couleur Tailwind (bg-*, border-*) ont priorité sur ces
+ * classes : il faut donc RETIRER l'utilitaire conflictuel quand on applique
+ * une de ces classes (mais conserver la largeur de bordure : border, border-b…).
+ */
+@layer components {
+  /* Fond de page : gradient + 2 voiles superposés */
+  .bg-page {
+    background: var(--bg-page);
+  }
+  .bg-page-glow-1 {
+    background: var(--bg-glow-1);
+  }
+  .bg-page-glow-2 {
+    background: var(--bg-glow-2);
+  }
+
+  /* Panneau pastel (dégradé horizontal ou vertical) + bordure lilas */
+  .panel {
+    background-image: var(--panel);
+    border-color: var(--panel-border);
+  }
+  .panel-y {
+    background-image: var(--panel-y);
+    border-color: var(--panel-border);
+  }
+
+  /* Carte « verre » */
+  .glass {
+    background-color: var(--glass);
+    border-color: var(--glass-border);
+    box-shadow: var(--glass-shadow);
+  }
+  .glass-strong {
+    background-color: var(--glass-strong);
+    border-color: var(--glass-border);
+  }
+
+  /* Colonne centrale (verre principal de l'app) */
+  .glass-column {
+    background-color: var(--column);
+    border-color: var(--column-border);
+    box-shadow: var(--column-shadow);
+  }
+
+  /* Titre en dégradé de marque (clip text : foncé → indigo → violet) */
+  .brand-text {
+    background-image: linear-gradient(to right, var(--ink-strong), #5b6cff, #8d3dff);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
 }
 
 @layer base {

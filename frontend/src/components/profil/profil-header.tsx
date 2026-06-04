@@ -33,13 +33,13 @@ export function ProfilHeader({ profil, isOwner, onEdit }: ProfilHeaderProps) {
   const initials = profil.displayName.charAt(0).toUpperCase()
 
   return (
-    <header className="bg-gradient-to-r from-[#F8F3FF] via-[#EADCFF] to-[#EEF9FF]">
+    <header className="panel">
       {/* Bannière */}
       <div
         className={cn(
           'h-36 w-full bg-cover bg-center sm:h-48',
           !profil.bannerUrl &&
-            'bg-gradient-to-r from-[#8D3DFF]/35 via-[#EADCFF] to-[#47D9FF]/25',
+            'bg-gradient-to-r from-[#8D3DFF]/35 via-[#EADCFF] to-[#47D9FF]/25 dark:from-[#8D3DFF]/45 dark:via-[#1c1338] dark:to-[#47D9FF]/35',
         )}
         style={profil.bannerUrl ? { backgroundImage: `url(${profil.bannerUrl})` } : undefined}
       />
@@ -47,7 +47,7 @@ export function ProfilHeader({ profil, isOwner, onEdit }: ProfilHeaderProps) {
       <div className="px-4 pb-3">
         {/* Avatar superposé + action */}
         <div className="flex items-end justify-between">
-          <Avatar className="-mt-12 h-24 w-24 border-4 border-white shadow-[0_18px_44px_rgba(91,108,255,0.26)] sm:-mt-16 sm:h-32 sm:w-32">
+          <Avatar className="-mt-12 h-24 w-24 border-4 border-white shadow-[0_18px_44px_rgba(91,108,255,0.26)] dark:border-[#140c24] sm:-mt-16 sm:h-32 sm:w-32">
             {profil.avatarUrl && (
               <AvatarImage src={profil.avatarUrl} alt={profil.displayName} />
             )}
@@ -67,7 +67,7 @@ export function ProfilHeader({ profil, isOwner, onEdit }: ProfilHeaderProps) {
               >
                 <Button
                   variant="outline"
-                  className="rounded-full border-white/70 bg-white/80 font-bold shadow-sm backdrop-blur hover:bg-white"
+                  className="rounded-full border-white/70 bg-white/80 font-bold shadow-sm backdrop-blur hover:bg-white dark:border-white/15 dark:bg-white/10 dark:hover:bg-white/20"
                 >
                   Éditer le profil
                 </Button>
@@ -87,7 +87,7 @@ export function ProfilHeader({ profil, isOwner, onEdit }: ProfilHeaderProps) {
         {/* Identité */}
         <div className="mt-3 flex flex-col gap-0.5">
           <div className="flex items-center gap-2">
-            <h1 className="text-xl font-extrabold text-slate-950">{profil.displayName}</h1>
+            <h1 className="text-xl font-extrabold text-foreground">{profil.displayName}</h1>
             <Badge variant="secondary">{ROLE_LABELS[profil.role]}</Badge>
           </div>
           <span className="text-sm text-muted-foreground">@{profil.username}</span>

@@ -26,8 +26,8 @@ export function FeedView({ posts }: FeedViewProps) {
   return (
     <div className="flex flex-col">
       {/* En-tête : sticky sur desktop ; sur mobile l'en-tête global (logo) prend le relais */}
-      <div className="z-10 border-b border-[#D9C6FF]/70 bg-gradient-to-r from-[#F8F3FF] via-[#EADCFF] to-[#EEF9FF] lg:sticky lg:top-0">
-        <h1 className="hidden bg-gradient-to-r from-slate-950 via-[#5B6CFF] to-[#8D3DFF] bg-clip-text px-4 py-3 text-xl font-bold text-transparent lg:block">
+      <div className="panel z-10 border-b lg:sticky lg:top-0">
+        <h1 className="brand-text hidden px-4 py-3 text-xl font-bold lg:block">
           Fil d&apos;actualité
         </h1>
         {/* Onglets Pour toi / Abonnements */}
@@ -48,7 +48,7 @@ export function FeedView({ posts }: FeedViewProps) {
 
       {/* Contenu selon l'onglet actif */}
       {tab === 'for-you' ? (
-        <div className="divide-y divide-white/50">
+        <div className="divide-y divide-border">
           {posts.map((post) => (
             <PostCard key={post.id} {...post} />
           ))}
@@ -73,9 +73,9 @@ function TabButton({
     <button
       onClick={onClick}
       className={cn(
-        'flex-1 py-3 text-sm transition-colors hover:bg-white/45',
+        'flex-1 py-3 text-sm transition-colors hover:bg-accent',
         active
-          ? 'border-b-2 border-[#5B6CFF] font-bold text-[#5B6CFF]'
+          ? 'border-b-2 border-[#5B6CFF] font-bold text-[#5B6CFF] dark:border-[#9aa6ff] dark:text-[#9aa6ff]'
           : 'font-normal text-muted-foreground',
       )}
     >
@@ -87,8 +87,8 @@ function TabButton({
 /** État vide de l'onglet « Abonnements » (en attendant l'API). */
 function FollowingPlaceholder() {
   return (
-    <div className="mx-4 mt-6 flex flex-col items-center gap-2 rounded-[26px] border border-white/55 bg-white/68 px-8 py-16 text-center shadow-[0_18px_54px_rgba(91,108,255,0.12)] backdrop-blur-xl">
-      <Users className="h-10 w-10 text-[#5B6CFF]" aria-hidden />
+    <div className="glass mx-4 mt-6 flex flex-col items-center gap-2 rounded-[26px] border px-8 py-16 text-center backdrop-blur-xl">
+      <Users className="h-10 w-10 text-[#5B6CFF] dark:text-[#9aa6ff]" aria-hidden />
       <h2 className="text-lg font-bold">Aucun post pour le moment</h2>
       <p className="max-w-sm text-sm text-muted-foreground">
         Les posts des comptes que vous suivez apparaîtront ici. Abonnez-vous à

@@ -6,6 +6,6 @@ import { PostComposer } from '@/components/feed/post-composer'
  */
 export function CreatePost() {
   return (
-    <PostComposer className="border-b border-[#D9C6FF]/70 bg-gradient-to-r from-[#F8F3FF] via-[#EADCFF] to-[#EEF9FF] px-4 py-3" />
+    <PostComposer className="panel border-b px-4 py-3" />
   )
 }

@@ -112,3 +112,64 @@ export function ThemeToggle() {
     </div>
   )
 }
+
+/**
+ * Interrupteur clair/sombre COMPACT et FLOTTANT, pour les pages publiques
+ * (login / register) qui n'ont pas de menu. Posé en bas à gauche, **translucide**
+ * (`backdrop-blur` + fond très léger) pour laisser le dégradé de fond visible.
+ *
+ * Contrairement à {@link ThemeToggle}, pas d'option « système » : un clic bascule
+ * simplement clair ↔ sombre (si le thème courant est « système », on part de
+ * l'apparence effective `resolvedTheme` et on fige un choix manuel).
+ */
+export function FloatingThemeToggle() {
+  const { theme, resolvedTheme, setTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
+
+  const [slide, setSlide] = useState<'left' | 'right' | null>(null)
+
+  const isDark =
+    mounted && (theme === 'system' ? resolvedTheme === 'dark' : theme === 'dark')
+
+  function toggle() {
+    const goingDark = !isDark
+    setSlide(goingDark ? 'right' : 'left')
+    setTheme(goingDark ? 'dark' : 'light')
+  }
+
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={isDark}
+      aria-label="Basculer entre le mode clair et sombre"
+      onClick={toggle}
+      className="fixed bottom-4 left-4 z-50 inline-flex h-9 w-16 items-center rounded-full border border-white/40 bg-white/20 shadow-lg backdrop-blur-md transition-colors hover:bg-white/30 dark:border-white/15 dark:bg-white/10 dark:hover:bg-white/20"
+    >
+      {/* Curseur qui glisse (animation directionnelle au clic) */}
+      <span
+        className={cn(
+          'absolute left-1 z-0 h-7 w-7 rounded-full bg-background shadow',
+          isDark ? 'translate-x-7' : 'translate-x-0',
+          slide === 'right' && 'animate-theme-thumb-right',
+          slide === 'left' && 'animate-theme-thumb-left',
+        )}
+      />
+      <Sun
+        className={cn(
+          'absolute left-2 z-10 h-4 w-4 transition-colors',
+          !isDark ? 'text-amber-500' : 'text-white/50',
+        )}
+        aria-hidden
+      />
+      <Moon
+        className={cn(
+          'absolute right-2 z-10 h-4 w-4 transition-colors',
+          isDark ? 'text-white' : 'text-slate-500/60',
+        )}
+        aria-hidden
+      />
+    </button>
+  )
+}

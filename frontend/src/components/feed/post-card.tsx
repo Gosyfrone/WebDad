@@ -46,7 +46,7 @@ export function PostCard({
   }
 
   return (
-    <article className="mx-3 my-3 flex gap-3 rounded-[24px] border border-white/55 bg-white/72 px-4 py-3 shadow-[0_16px_48px_rgba(91,108,255,0.10)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-white/85 hover:shadow-[0_20px_56px_rgba(91,108,255,0.16)]">
+    <article className="glass mx-3 my-3 flex gap-3 rounded-[24px] border px-4 py-3 backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-white/85 hover:shadow-[0_20px_56px_rgba(91,108,255,0.16)] dark:hover:bg-[#1f1633]/80">
       <Avatar className="mt-0.5 h-10 w-10 shrink-0">
         <AvatarFallback>{initials}</AvatarFallback>
       </Avatar>
@@ -55,7 +55,7 @@ export function PostCard({
         {/* Header */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-1.5 text-sm">
-            <span className="truncate font-bold text-slate-950">{name}</span>
+            <span className="truncate font-bold text-foreground">{name}</span>
             <span className="shrink-0 text-muted-foreground">{handle}</span>
             <span className="shrink-0 text-muted-foreground">·</span>
             <span className="shrink-0 text-muted-foreground">{timestamp}</span>
@@ -69,7 +69,7 @@ export function PostCard({
         </div>
 
         {/* Content */}
-        <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{content}</p>
+        <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground/80">{content}</p>
 
         {/* Actions */}
         <div className="-ml-2 mt-1 flex items-center justify-between text-muted-foreground">

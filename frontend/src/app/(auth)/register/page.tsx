@@ -268,16 +268,10 @@ export default function RegisterPage() {
   }
 
   return (
-    <main
-      className="relative flex h-dvh w-full items-center justify-center overflow-hidden px-4 py-3 sm:px-6 lg:px-10"
-      style={{
-        background:
-          'linear-gradient(140deg, #f8f3ff 0%, #eadcff 28%, #d9c6ff 62%, #ebe8ff 100%)',
-      }}
-    >
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(115deg,rgba(141,61,255,0.22)_0%,rgba(255,255,255,0.25)_34%,rgba(71,217,255,0.2)_100%)]" />
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.42),transparent_34%),radial-gradient(circle_at_80%_35%,rgba(141,61,255,0.18),transparent_32%),radial-gradient(circle_at_50%_90%,rgba(71,217,255,0.16),transparent_36%)]" />
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/70" />
+    <main className="bg-page relative flex h-dvh w-full items-center justify-center overflow-hidden px-4 py-3 sm:px-6 lg:px-10">
+      <div className="bg-page-glow-1 pointer-events-none absolute inset-0" />
+      <div className="bg-page-glow-2 pointer-events-none absolute inset-0" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/70 dark:bg-white/10" />
 
       <section className="relative grid w-full max-w-6xl items-center gap-6 lg:grid-cols-[1.08fr_0.92fr]">
         <div className="hidden min-h-[560px] flex-col justify-between lg:flex">
@@ -298,13 +292,13 @@ export default function RegisterPage() {
           </Link>
 
           <div className="relative mt-4 h-[450px]">
-            <div className="absolute left-8 top-0 w-[410px] overflow-hidden rounded-[30px] border border-white/35 bg-white/75 shadow-[0_30px_90px_rgba(91,108,255,0.28)] backdrop-blur-2xl">
-              <div className="flex items-center justify-between border-b border-white/60 px-5 py-3">
+            <div className="glass absolute left-8 top-0 w-[410px] overflow-hidden rounded-[30px] border shadow-[0_30px_90px_rgba(91,108,255,0.28)] backdrop-blur-2xl">
+              <div className="flex items-center justify-between border-b border-white/60 px-5 py-3 dark:border-white/10">
                 <div>
                   <p className="text-xs font-semibold uppercase text-[#5B6CFF]">
                     Nouveau sur Breezy
                   </p>
-                  <h1 className="text-2xl font-semibold text-slate-950">
+                  <h1 className="text-2xl font-semibold text-foreground">
                     Crée ton espace.
                   </h1>
                 </div>
@@ -312,14 +306,14 @@ export default function RegisterPage() {
                 <button
                   type="button"
                   aria-label="Rechercher"
-                  className="grid h-10 w-10 place-items-center rounded-full bg-white/90 text-slate-700 shadow-sm transition hover:scale-105 hover:text-[#5B6CFF]"
+                  className="grid h-10 w-10 place-items-center rounded-full bg-white/90 text-foreground/80 shadow-sm transition hover:scale-105 hover:text-[#5B6CFF] dark:bg-white/10"
                 >
                   <Search className="h-5 w-5" />
                 </button>
               </div>
 
               <div className="space-y-1 px-4 py-4">
-                <article className="rounded-[22px] border border-white/70 bg-white/85 p-4 shadow-sm">
+                <article className="glass rounded-[22px] border p-4 shadow-sm">
                   <div className="flex gap-3">
                     <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#8D3DFF] to-[#47D9FF] text-sm font-bold text-white">
                       TO
@@ -327,12 +321,12 @@ export default function RegisterPage() {
 
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1 text-sm">
-                        <span className="font-bold text-slate-950">Toi</span>
-                        <span className="truncate text-slate-500">@breezy_user</span>
-                        <span className="text-slate-400">·</span>
-                        <span className="text-slate-500">maintenant</span>
+                        <span className="font-bold text-foreground">Toi</span>
+                        <span className="truncate text-muted-foreground">@breezy_user</span>
+                        <span className="text-muted-foreground">·</span>
+                        <span className="text-muted-foreground">maintenant</span>
                       </div>
-                      <p className="mt-1 text-sm leading-relaxed text-slate-700">
+                      <p className="mt-1 text-sm leading-relaxed text-foreground/80">
                         Premier post, première vibe, et déjà toute une communauté à rencontrer.
                       </p>
                       <div className="mt-3 grid grid-cols-3 gap-2">
@@ -340,7 +334,7 @@ export default function RegisterPage() {
                         <div className="h-16 rounded-[16px] bg-gradient-to-br from-[#47D9FF] to-[#5B6CFF]" />
                         <div className="h-16 rounded-[16px] bg-gradient-to-br from-slate-950 to-[#8D3DFF]" />
                       </div>
-                      <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
+                      <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
                         <span className="inline-flex items-center gap-1">
                           <MessageCircle className="h-4 w-4" />
                           48
@@ -355,16 +349,16 @@ export default function RegisterPage() {
                   </div>
                 </article>
 
-                <article className="rounded-[22px] border border-white/70 bg-white/75 p-4 shadow-sm">
+                <article className="glass rounded-[22px] border p-4 shadow-sm">
                   <div className="flex items-center gap-3">
-                    <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-slate-950 text-sm font-bold text-white">
+                    <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-slate-950 text-sm font-bold text-white dark:bg-white/15">
                       BR
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-bold text-slate-950">
+                      <p className="truncate text-sm font-bold text-foreground">
                         Breezy t’ouvre le fil
                       </p>
-                      <p className="text-xs text-slate-500">
+                      <p className="text-xs text-muted-foreground">
                         Choisis ton pseudo et commence à publier.
                       </p>
                     </div>
@@ -374,7 +368,7 @@ export default function RegisterPage() {
               </div>
             </div>
 
-            <div className="absolute right-8 top-20 w-64 rounded-[28px] border border-white/40 bg-slate-950/90 p-4 text-white shadow-[0_28px_70px_rgba(15,23,42,0.32)] backdrop-blur-xl">
+            <div className="absolute right-8 top-20 w-64 rounded-[28px] border border-white/40 bg-slate-950/90 p-4 text-white shadow-[0_28px_70px_rgba(15,23,42,0.32)] backdrop-blur-xl dark:border-white/10">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-semibold">À rejoindre</span>
                 <Sparkles className="h-4 w-4 text-[#47D9FF]" />
@@ -397,15 +391,15 @@ export default function RegisterPage() {
               </div>
             </div>
 
-            <div className="absolute bottom-0 right-24 flex w-72 items-center gap-3 rounded-[24px] border border-white/50 bg-white/90 px-4 py-3 shadow-[0_24px_70px_rgba(141,61,255,0.22)] backdrop-blur-xl">
+            <div className="glass absolute bottom-0 right-24 flex w-72 items-center gap-3 rounded-[24px] border px-4 py-3 shadow-[0_24px_70px_rgba(141,61,255,0.22)] backdrop-blur-xl">
               <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#47D9FF]/20 text-[#5B6CFF]">
                 <Bell className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-sm font-bold text-slate-950">
+                <p className="text-sm font-bold text-foreground">
                   Ton compte prend vie
                 </p>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-muted-foreground">
                   Profil, posts et conversations en quelques secondes.
                 </p>
               </div>
@@ -413,9 +407,9 @@ export default function RegisterPage() {
           </div>
         </div>
 
-        <Card className="relative w-full overflow-hidden rounded-[30px] border border-white/30 bg-white/80 shadow-[0_30px_90px_rgba(0,0,0,0.22)] backdrop-blur-2xl sm:max-w-md sm:justify-self-center lg:max-w-none">
+        <Card className="glass-strong relative w-full overflow-hidden rounded-[30px] border shadow-[0_30px_90px_rgba(0,0,0,0.22)] backdrop-blur-2xl sm:max-w-md sm:justify-self-center lg:max-w-none">
           <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF]" />
-          <div className="pointer-events-none absolute inset-x-8 top-1 h-24 bg-gradient-to-b from-white/70 to-transparent" />
+          <div className="pointer-events-none absolute inset-x-8 top-1 h-24 bg-gradient-to-b from-white/70 to-transparent dark:from-white/10" />
 
           <CardHeader className="relative space-y-1.5 px-5 pb-1 pt-3 sm:px-7 sm:pt-4">
             <Link
@@ -432,17 +426,17 @@ export default function RegisterPage() {
               />
             </Link>
 
-            <div className="inline-flex w-fit items-center gap-2 rounded-full border border-white/70 bg-white/80 px-3 py-1 text-xs font-semibold text-[#5B6CFF] shadow-sm">
+            <div className="inline-flex w-fit items-center gap-2 rounded-full border border-white/70 bg-white/80 px-3 py-1 text-xs font-semibold text-[#5B6CFF] shadow-sm dark:border-white/15 dark:bg-white/10">
               <span className="h-2 w-2 rounded-full bg-[#47D9FF]" />
               Nouveau profil Breezy
             </div>
 
             <div className="space-y-1.5">
-              <CardTitle className="max-w-md bg-gradient-to-r from-slate-950 via-[#5B6CFF] to-[#8D3DFF] bg-clip-text text-[24px] font-semibold leading-tight text-transparent sm:text-[28px]">
+              <CardTitle className="brand-text max-w-md text-[24px] font-semibold leading-tight sm:text-[28px]">
                 Rejoins Breezy et commence à publier.
               </CardTitle>
 
-              <CardDescription className="max-w-sm text-xs leading-relaxed text-slate-500">
+              <CardDescription className="max-w-sm text-xs leading-relaxed text-muted-foreground">
                 Crée ton compte, choisis ton nom d’utilisateur et entre dans le fil.
               </CardDescription>
             </div>
@@ -453,7 +447,7 @@ export default function RegisterPage() {
               <div className="grid gap-1.5 sm:grid-cols-2">
                 <div className="space-y-0.5">
                   <div className="flex min-h-5 items-center gap-1.5">
-                    <label htmlFor="username" className="text-xs font-medium text-slate-700">
+                    <label htmlFor="username" className="text-xs font-medium text-foreground/80">
                       Nom d’utilisateur
                     </label>
 
@@ -461,14 +455,14 @@ export default function RegisterPage() {
                       <button
                         type="button"
                         aria-describedby="username-tooltip"
-                        className="grid h-4 w-4 place-items-center rounded-full text-slate-400 transition hover:text-[#5B6CFF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFF]/30"
+                        className="grid h-4 w-4 place-items-center rounded-full text-muted-foreground transition hover:text-[#5B6CFF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFF]/30"
                       >
                         <CircleHelp className="h-3.5 w-3.5" />
                       </button>
                       <span
                         id="username-tooltip"
                         role="tooltip"
-                        className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 w-56 -translate-x-1/2 rounded-2xl border border-white/70 bg-slate-950 px-3 py-2 text-[11px] font-medium leading-4 text-white opacity-0 shadow-[0_16px_40px_rgba(15,23,42,0.25)] transition group-hover/help:opacity-100 group-focus-within/help:opacity-100"
+                        className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 w-56 -translate-x-1/2 rounded-2xl border border-white/70 bg-slate-950 px-3 py-2 text-[11px] font-medium leading-4 text-white opacity-0 shadow-[0_16px_40px_rgba(15,23,42,0.25)] transition group-hover/help:opacity-100 group-focus-within/help:opacity-100 dark:border-white/10"
                       >
                         Le nom d’utilisateur pourra être changé après la création du compte, puis une fois tous les 14 jours.
                       </span>
@@ -476,7 +470,7 @@ export default function RegisterPage() {
                   </div>
 
                   <div className="group relative">
-                    <User className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 transition group-focus-within:text-[#5B6CFF]" />
+                    <User className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground transition group-focus-within:text-[#5B6CFF]" />
 
                     <Input
                       id="username"
@@ -485,7 +479,7 @@ export default function RegisterPage() {
                       autoComplete="username"
                       placeholder="breezy_user"
                       maxLength={maxUsernameLength}
-                      className="h-9 rounded-2xl border-white/70 bg-white/90 pl-11 text-sm shadow-sm shadow-slate-200/60 transition-all placeholder:text-slate-400 hover:border-[#47D9FF]/70 focus-visible:border-[#5B6CFF] focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15"
+                      className="h-9 rounded-2xl border-white/70 bg-white/90 pl-11 text-sm shadow-sm shadow-slate-200/60 transition-all placeholder:text-muted-foreground hover:border-[#47D9FF]/70 focus-visible:border-[#5B6CFF] focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15 dark:border-white/15 dark:bg-white/5"
                       value={username}
                       onChange={(event) => {
                         setUsername(event.target.value)
@@ -507,7 +501,7 @@ export default function RegisterPage() {
 
                 <div className="space-y-0.5">
                   <div className="flex min-h-5 items-center gap-1.5">
-                    <label htmlFor="birthDate" className="text-xs font-medium text-slate-700">
+                    <label htmlFor="birthDate" className="text-xs font-medium text-foreground/80">
                       Date de naissance
                     </label>
 
@@ -515,14 +509,14 @@ export default function RegisterPage() {
                       <button
                         type="button"
                         aria-describedby="birth-date-tooltip"
-                        className="grid h-4 w-4 place-items-center rounded-full text-slate-400 transition hover:text-[#5B6CFF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFF]/30"
+                        className="grid h-4 w-4 place-items-center rounded-full text-muted-foreground transition hover:text-[#5B6CFF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFF]/30"
                       >
                         <CircleHelp className="h-3.5 w-3.5" />
                       </button>
                       <span
                         id="birth-date-tooltip"
                         role="tooltip"
-                        className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 w-56 -translate-x-1/2 rounded-2xl border border-white/70 bg-slate-950 px-3 py-2 text-[11px] font-medium leading-4 text-white opacity-0 shadow-[0_16px_40px_rgba(15,23,42,0.25)] transition group-hover/help:opacity-100 group-focus-within/help:opacity-100"
+                        className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 w-56 -translate-x-1/2 rounded-2xl border border-white/70 bg-slate-950 px-3 py-2 text-[11px] font-medium leading-4 text-white opacity-0 shadow-[0_16px_40px_rgba(15,23,42,0.25)] transition group-hover/help:opacity-100 group-focus-within/help:opacity-100 dark:border-white/10"
                       >
                         La date de naissance ne pourra plus être changée une fois le compte créé.
                       </span>
@@ -530,7 +524,7 @@ export default function RegisterPage() {
                   </div>
 
                   <div className="group relative">
-                    <CalendarDays className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 transition group-focus-within:text-[#5B6CFF]" />
+                    <CalendarDays className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground transition group-focus-within:text-[#5B6CFF]" />
 
                     <Input
                       id="birthDate"
@@ -539,7 +533,7 @@ export default function RegisterPage() {
                       autoComplete="bday"
                       min="1900-01-01"
                       max={maxBirthDate}
-                      className="h-9 rounded-2xl border-white/70 bg-white/90 pl-11 text-sm shadow-sm shadow-slate-200/60 transition-all [color-scheme:light] hover:border-[#47D9FF]/70 focus-visible:border-[#5B6CFF] focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15"
+                      className="h-9 rounded-2xl border-white/70 bg-white/90 pl-11 text-sm shadow-sm shadow-slate-200/60 transition-all [color-scheme:light] hover:border-[#47D9FF]/70 focus-visible:border-[#5B6CFF] focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15 dark:border-white/15 dark:bg-white/5 dark:[color-scheme:dark]"
                       value={birthDate}
                       onChange={(event) => {
                         setBirthDate(event.target.value)
@@ -562,7 +556,7 @@ export default function RegisterPage() {
                 </div>
 
                 <fieldset className="space-y-0.5 sm:col-span-2">
-                  <legend className="text-xs font-medium text-slate-700">
+                  <legend className="text-xs font-medium text-foreground/80">
                     Genre
                   </legend>
 
@@ -585,7 +579,7 @@ export default function RegisterPage() {
                         }}
                       />
 
-                      <span className="flex h-8 cursor-pointer items-center justify-center gap-2 rounded-2xl border border-white/70 bg-white/85 text-xs font-semibold text-slate-600 shadow-sm transition peer-checked:border-[#5B6CFF]/70 peer-checked:bg-[#5B6CFF]/10 peer-checked:text-[#5B6CFF] group-hover:bg-white">
+                      <span className="flex h-8 cursor-pointer items-center justify-center gap-2 rounded-2xl border border-white/70 bg-white/85 text-xs font-semibold text-foreground/80 shadow-sm transition peer-checked:border-[#5B6CFF]/70 peer-checked:bg-[#5B6CFF]/10 peer-checked:text-[#5B6CFF] group-hover:bg-white dark:border-white/15 dark:bg-white/10 dark:peer-checked:bg-[#5B6CFF]/20 dark:group-hover:bg-white/20">
                         <User className="h-4 w-4" />
                         Homme
                       </span>
@@ -609,7 +603,7 @@ export default function RegisterPage() {
                         }}
                       />
 
-                      <span className="flex h-8 cursor-pointer items-center justify-center gap-2 rounded-2xl border border-white/70 bg-white/85 text-xs font-semibold text-slate-600 shadow-sm transition peer-checked:border-[#8D3DFF]/70 peer-checked:bg-[#8D3DFF]/10 peer-checked:text-[#8D3DFF] group-hover:bg-white">
+                      <span className="flex h-8 cursor-pointer items-center justify-center gap-2 rounded-2xl border border-white/70 bg-white/85 text-xs font-semibold text-foreground/80 shadow-sm transition peer-checked:border-[#8D3DFF]/70 peer-checked:bg-[#8D3DFF]/10 peer-checked:text-[#8D3DFF] group-hover:bg-white dark:border-white/15 dark:bg-white/10 dark:peer-checked:bg-[#8D3DFF]/25 dark:group-hover:bg-white/20">
                         <User className="h-4 w-4" />
                         Femme
                       </span>
@@ -625,12 +619,12 @@ export default function RegisterPage() {
               </div>
 
               <div className="space-y-0.5">
-                <label htmlFor="email" className="text-xs font-medium text-slate-700">
+                <label htmlFor="email" className="text-xs font-medium text-foreground/80">
                   Adresse e-mail
                 </label>
 
                 <div className="group relative">
-                  <Mail className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 transition group-focus-within:text-[#5B6CFF]" />
+                  <Mail className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground transition group-focus-within:text-[#5B6CFF]" />
 
                   <Input
                     id="email"
@@ -640,7 +634,7 @@ export default function RegisterPage() {
                     inputMode="email"
                     placeholder="toi@exemple.com"
                     maxLength={maxEmailLength}
-                    className="h-9 rounded-2xl border-white/70 bg-white/90 pl-11 text-sm shadow-sm shadow-slate-200/60 transition-all placeholder:text-slate-400 hover:border-[#47D9FF]/70 focus-visible:border-[#5B6CFF] focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15"
+                    className="h-9 rounded-2xl border-white/70 bg-white/90 pl-11 text-sm shadow-sm shadow-slate-200/60 transition-all placeholder:text-muted-foreground hover:border-[#47D9FF]/70 focus-visible:border-[#5B6CFF] focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15 dark:border-white/15 dark:bg-white/5"
                     value={email}
                     onChange={(event) => {
                       setEmail(event.target.value)
@@ -661,12 +655,12 @@ export default function RegisterPage() {
               </div>
 
               <div className="space-y-0.5">
-                <label htmlFor="password" className="text-xs font-medium text-slate-700">
+                <label htmlFor="password" className="text-xs font-medium text-foreground/80">
                   Mot de passe
                 </label>
 
                 <div className="group relative">
-                  <Lock className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 transition group-focus-within:text-[#5B6CFF]" />
+                  <Lock className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground transition group-focus-within:text-[#5B6CFF]" />
 
                   <Input
                     id="password"
@@ -675,7 +669,7 @@ export default function RegisterPage() {
                     autoComplete="new-password"
                     placeholder="••••••••"
                     maxLength={maxPasswordLength}
-                    className="h-9 rounded-2xl border-white/70 bg-white/90 pl-11 pr-12 text-sm shadow-sm shadow-slate-200/60 transition-all placeholder:text-slate-400 hover:border-[#47D9FF]/70 focus-visible:border-[#5B6CFF] focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15"
+                    className="h-9 rounded-2xl border-white/70 bg-white/90 pl-11 pr-12 text-sm shadow-sm shadow-slate-200/60 transition-all placeholder:text-muted-foreground hover:border-[#47D9FF]/70 focus-visible:border-[#5B6CFF] focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15 dark:border-white/15 dark:bg-white/5"
                     value={password}
                     onChange={(event) => {
                       setPassword(event.target.value)
@@ -695,7 +689,7 @@ export default function RegisterPage() {
                         : 'Afficher le mot de passe'
                     }
                     aria-pressed={showPassword}
-                    className="absolute right-3 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-full text-slate-400 transition hover:bg-[#5B6CFF]/10 hover:text-[#5B6CFF] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15"
+                    className="absolute right-3 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-full text-muted-foreground transition hover:bg-[#5B6CFF]/10 hover:text-[#5B6CFF] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15"
                     onClick={() => setShowPassword((current) => !current)}
                   >
                     {showPassword ? (
@@ -709,7 +703,7 @@ export default function RegisterPage() {
                 <p
                   id={errors.password ? 'password-error' : 'password-help'}
                   className={`text-[10px] leading-3 ${
-                    errors.password ? 'text-red-600' : 'text-slate-500'
+                    errors.password ? 'text-red-600' : 'text-muted-foreground'
                   }`}
                 >
                   {errors.password ??
@@ -720,13 +714,13 @@ export default function RegisterPage() {
               <div className="space-y-0.5">
                 <label
                   htmlFor="passwordConfirmation"
-                  className="text-xs font-medium text-slate-700"
+                  className="text-xs font-medium text-foreground/80"
                 >
                   Confirmation du mot de passe
                 </label>
 
                 <div className="group relative">
-                  <Lock className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 transition group-focus-within:text-[#5B6CFF]" />
+                  <Lock className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground transition group-focus-within:text-[#5B6CFF]" />
 
                   <Input
                     id="passwordConfirmation"
@@ -735,7 +729,7 @@ export default function RegisterPage() {
                     autoComplete="new-password"
                     placeholder="••••••••"
                     maxLength={maxPasswordLength}
-                    className="h-9 rounded-2xl border-white/70 bg-white/90 pl-11 pr-12 text-sm shadow-sm shadow-slate-200/60 transition-all placeholder:text-slate-400 hover:border-[#47D9FF]/70 focus-visible:border-[#5B6CFF] focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15"
+                    className="h-9 rounded-2xl border-white/70 bg-white/90 pl-11 pr-12 text-sm shadow-sm shadow-slate-200/60 transition-all placeholder:text-muted-foreground hover:border-[#47D9FF]/70 focus-visible:border-[#5B6CFF] focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15 dark:border-white/15 dark:bg-white/5"
                     value={passwordConfirmation}
                     onChange={(event) => {
                       setPasswordConfirmation(event.target.value)
@@ -762,7 +756,7 @@ export default function RegisterPage() {
                         : 'Afficher la confirmation du mot de passe'
                     }
                     aria-pressed={showPasswordConfirmation}
-                    className="absolute right-3 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-full text-slate-400 transition hover:bg-[#5B6CFF]/10 hover:text-[#5B6CFF] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15"
+                    className="absolute right-3 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-full text-muted-foreground transition hover:bg-[#5B6CFF]/10 hover:text-[#5B6CFF] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15"
                     onClick={() =>
                       setShowPasswordConfirmation((current) => !current)
                     }
@@ -786,7 +780,7 @@ export default function RegisterPage() {
               </div>
 
               {errors.form ? (
-                <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50/90 px-4 py-2 text-xs text-red-700 shadow-sm">
+                <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50/90 px-4 py-2 text-xs text-red-700 shadow-sm dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
                   <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" />
                   <p>{errors.form}</p>
                 </div>
@@ -802,19 +796,19 @@ export default function RegisterPage() {
 
               <div className="space-y-2 pt-0.5">
                 <div className="flex items-center gap-3">
-                  <div className="h-px flex-1 bg-gradient-to-r from-transparent via-slate-300 to-transparent" />
+                  <div className="h-px flex-1 bg-gradient-to-r from-transparent via-border to-transparent" />
 
-                  <span className="text-[11px] font-medium text-slate-500">
+                  <span className="text-[11px] font-medium text-muted-foreground">
                     Ou créer mon compte avec
                   </span>
 
-                  <div className="h-px flex-1 bg-gradient-to-r from-transparent via-slate-300 to-transparent" />
+                  <div className="h-px flex-1 bg-gradient-to-r from-transparent via-border to-transparent" />
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
-                    className="flex h-9 items-center justify-center gap-2 rounded-2xl border border-white/70 bg-white/85 transition hover:scale-[1.01] hover:bg-white hover:shadow-md"
+                    className="flex h-9 items-center justify-center gap-2 rounded-2xl border border-white/70 bg-white/85 transition hover:scale-[1.01] hover:bg-white hover:shadow-md dark:border-white/15 dark:bg-white/10 dark:hover:bg-white/20"
                   >
                     <Image
                       src="/google-logo.jpg"
@@ -822,14 +816,14 @@ export default function RegisterPage() {
                       width={17}
                       height={17}
                     />
-                    <span className="text-sm font-medium text-slate-700">
+                    <span className="text-sm font-medium text-foreground/80">
                       Google
                     </span>
                   </button>
 
                   <button
                     type="button"
-                    className="flex h-9 items-center justify-center gap-2 rounded-2xl border border-white/70 bg-white/85 transition hover:scale-[1.01] hover:bg-white hover:shadow-md"
+                    className="flex h-9 items-center justify-center gap-2 rounded-2xl border border-white/70 bg-white/85 transition hover:scale-[1.01] hover:bg-white hover:shadow-md dark:border-white/15 dark:bg-white/10 dark:hover:bg-white/20"
                   >
                     <Image
                       src="/microsoft-logo.png"
@@ -837,14 +831,14 @@ export default function RegisterPage() {
                       width={17}
                       height={17}
                     />
-                    <span className="text-sm font-medium text-slate-700">
+                    <span className="text-sm font-medium text-foreground/80">
                       Microsoft
                     </span>
                   </button>
                 </div>
               </div>
 
-              <p className="text-center text-xs text-slate-500">
+              <p className="text-center text-xs text-muted-foreground">
                 Tu as déjà un compte ?{' '}
                 <Link
                   href={ROUTES.login}
