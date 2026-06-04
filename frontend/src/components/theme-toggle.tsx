@@ -123,14 +123,23 @@ export function ThemeToggle() {
  * l'apparence effective `resolvedTheme` et on fige un choix manuel).
  */
 export function FloatingThemeToggle() {
-  const { theme, resolvedTheme, setTheme } = useTheme()
+  const { resolvedTheme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
+  const [slide, setSlide] = useState<'left' | 'right' | null>(null)
   useEffect(() => setMounted(true), [])
 
-  const [slide, setSlide] = useState<'left' | 'right' | null>(null)
+  // Tant que le thème n'est pas connu côté client, on ne rend RIEN : évite
+  // d'afficher un état erroné (curseur côté Soleil alors qu'on est en sombre)
+  // au chargement complet de la page — cas typique de l'arrivée sur /login
+  // après déconnexion (window.location.assign) — et tout mismatch d'hydratation.
+  if (!mounted) return null
 
-  const isDark =
-    mounted && (theme === 'system' ? resolvedTheme === 'dark' : theme === 'dark')
+  // Source de vérité : le thème EFFECTIF (`resolvedTheme`, qui résout aussi
+  // « système »). Repli sur la classe `.dark` réellement posée sur <html> par
+  // next-themes (avant le paint) si `resolvedTheme` n'est pas encore défini.
+  const isDark = resolvedTheme
+    ? resolvedTheme === 'dark'
+    : document.documentElement.classList.contains('dark')
 
   function toggle() {
     const goingDark = !isDark
@@ -145,7 +154,7 @@ export function FloatingThemeToggle() {
       aria-checked={isDark}
       aria-label="Basculer entre le mode clair et sombre"
       onClick={toggle}
-      className="fixed bottom-4 left-4 z-50 inline-flex h-9 w-16 items-center rounded-full border border-white/40 bg-white/20 shadow-lg backdrop-blur-md transition-colors hover:bg-white/30 dark:border-white/15 dark:bg-white/10 dark:hover:bg-white/20"
+      className="fixed bottom-4 left-4 z-50 inline-flex h-9 w-16 animate-in items-center rounded-full border border-white/40 bg-white/20 shadow-lg backdrop-blur-md transition-colors fade-in hover:bg-white/30 dark:border-white/15 dark:bg-white/10 dark:hover:bg-white/20"
     >
       {/* Curseur qui glisse (animation directionnelle au clic) */}
       <span
