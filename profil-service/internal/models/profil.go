@@ -27,10 +27,28 @@ type Profil struct {
 	Gender      string     `json:"gender,omitempty"      bson:"gender,omitempty"` // "male" | "female"
 	CreatedAt   time.Time  `json:"created_at"            bson:"created_at"`
 	UpdatedAt   time.Time  `json:"updated_at"            bson:"updated_at"`
+
+	// DisplayNameChangedAt : date du dernier changement EFFECTIF de display_name
+	// (nil = jamais changé depuis le provisioning). Enregistrée dès aujourd'hui
+	// pour servir de base à un cooldown « X jours entre deux changements de nom »
+	// (cf. config DisplayNameCooldown ; enforcement désactivé par défaut). On la
+	// capture maintenant pour ne pas avoir de profils sans baseline le jour où
+	// le cooldown est activé. Symétrique de users.username_changed_at.
+	DisplayNameChangedAt *time.Time `json:"display_name_changed_at,omitempty" bson:"display_name_changed_at,omitempty"`
+}
+
+// CreateProfilRequest : payload de POST /profils. L'id provient TOUJOURS du
+// JWT, jamais du corps. display_name est OBLIGATOIRE : le BFF y met le username
+// choisi à l'inscription. On ne dérive jamais de nom depuis l'email (le
+// provisioning paresseux crée un profil à display_name vide, cf. service).
+type CreateProfilRequest struct {
+	DisplayName string `json:"display_name" binding:"required,max=100"`
 }
 
 // UpdateProfilRequest : payload de PATCH /profils/me. Champs optionnels
 // (pointeurs) : seuls les champs fournis sont modifiés (nil = inchangé).
+// birth_date est settable UNE SEULE FOIS : une fois posée, toute tentative de
+// la changer est refusée (cf. service).
 type UpdateProfilRequest struct {
 	DisplayName *string    `json:"display_name" binding:"omitempty,max=100"`
 	Bio         *string    `json:"bio"          binding:"omitempty,max=160"`

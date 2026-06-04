@@ -41,7 +41,7 @@ func main() {
 		log.Fatalf("[%s] schéma : %v", serviceName, err)
 	}
 
-	profils := service.New(repository.NewProfilRepository(db))
+	profils := service.New(repository.NewProfilRepository(db), cfg.DisplayNameCooldown)
 
 	r := gin.Default()
 	handler.RegisterRoutes(r, serviceName, profils, cfg.JWTSecret)

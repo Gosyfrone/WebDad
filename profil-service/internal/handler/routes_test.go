@@ -13,10 +13,11 @@ import (
 	"github.com/webdad/profil-service/internal/service"
 )
 
-// newTestRouter construit un routeur câblé sur un client Mongo NON connecté
-// (mongo.Connect ne dialogue pas avec le serveur tant qu'aucune requête n'est
-// émise). Les handlers du squelette renvoient 501 sans toucher la collection,
-// donc aucune connexion réelle n'est nécessaire.
+// newTestRouter construit un routeur câblé sur un client Mongo NON connecté.
+// On ne teste ici que l'enregistrement des routes et le middleware JWT : les
+// routes protégées sont rejetées (401) AVANT d'atteindre la collection, donc
+// aucune connexion réelle n'est nécessaire. (La logique métier est couverte
+// par les tests unitaires purs du package service.)
 func newTestRouter(t *testing.T) *gin.Engine {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
@@ -26,7 +27,7 @@ func newTestRouter(t *testing.T) *gin.Engine {
 	}
 	db := client.Database("webdad_profil_test")
 	r := gin.New()
-	svc := service.New(repository.NewProfilRepository(db))
+	svc := service.New(repository.NewProfilRepository(db), 0)
 	RegisterRoutes(r, "profil-service", svc, "test-secret")
 	return r
 }
@@ -50,25 +51,24 @@ func TestHealthOK(t *testing.T) {
 	}
 }
 
-// TestPublicProfilStub : GET /profils/:userId (public) renvoie 501 au stade
-// squelette (chaîne handler→service→repository câblée, corps non implémenté).
-func TestPublicProfilStub(t *testing.T) {
-	r := newTestRouter(t)
-	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/profils/abc", nil)
-	r.ServeHTTP(w, req)
-	if w.Code != http.StatusNotImplemented {
-		t.Fatalf("GET /profils/:userId = %d, attendu 501", w.Code)
-	}
-}
-
-// TestProtectedRequiresToken : /profils/me sans token = 401 (middleware JWT).
+// TestProtectedRequiresToken : les routes personnelles/mutables exigent un JWT
+// (le middleware abort en 401 sans toucher la base).
 func TestProtectedRequiresToken(t *testing.T) {
+	cases := []struct {
+		method, path string
+	}{
+		{http.MethodGet, "/profils/me"},
+		{http.MethodPatch, "/profils/me"},
+		{http.MethodPost, "/profils"},
+		{http.MethodDelete, "/profils/abc"},
+	}
 	r := newTestRouter(t)
-	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/profils/me", nil)
-	r.ServeHTTP(w, req)
-	if w.Code != http.StatusUnauthorized {
-		t.Fatalf("GET /profils/me sans token = %d, attendu 401", w.Code)
+	for _, tc := range cases {
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(tc.method, tc.path, nil)
+		r.ServeHTTP(w, req)
+		if w.Code != http.StatusUnauthorized {
+			t.Fatalf("%s %s sans token = %d, attendu 401", tc.method, tc.path, w.Code)
+		}
 	}
 }

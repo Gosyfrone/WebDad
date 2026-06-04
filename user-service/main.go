@@ -28,7 +28,7 @@ func main() {
 		log.Fatalf("[%s] schéma : %v", serviceName, err)
 	}
 
-	users := service.New(repository.New(conn))
+	users := service.New(repository.New(conn), cfg.UsernameCooldown)
 	r := router.New(users, cfg.JWTSecret)
 
 	log.Printf("[%s] en écoute sur le port %s", serviceName, cfg.Port)

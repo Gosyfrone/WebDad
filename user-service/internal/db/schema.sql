@@ -12,12 +12,22 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- display_name et les autres champs décoratifs vivent dans profil-service
 -- (Mongo) : user-service ne porte que l'identité immuable + l'état du compte.
 CREATE TABLE IF NOT EXISTS users (
-    id           UUID PRIMARY KEY,             -- même UUID que credentials.id
-    username     VARCHAR(50) NOT NULL UNIQUE,
-    is_active    BOOLEAN NOT NULL DEFAULT true,
-    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    id                  UUID PRIMARY KEY,        -- même UUID que credentials.id
+    username            VARCHAR(50) NOT NULL UNIQUE,
+    is_active           BOOLEAN NOT NULL DEFAULT true,
+    -- Date du dernier changement EFFECTIF de username (NULL = jamais changé
+    -- depuis le provisioning). Base d'un cooldown « X jours entre deux
+    -- changements de handle » (cf. config UsernameCooldown ; enforcement
+    -- désactivé par défaut). Capturée dès maintenant pour avoir une baseline.
+    -- Symétrique de profiles.display_name_changed_at (profil-service).
+    username_changed_at TIMESTAMPTZ,
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Ajout idempotent de la colonne pour les bases déjà créées (avant cette
+-- migration) : CREATE TABLE IF NOT EXISTS ne modifie pas une table existante.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS username_changed_at TIMESTAMPTZ;
 
 -- Graphe de follows (relations entre utilisateurs).
 CREATE TABLE IF NOT EXISTS follows (

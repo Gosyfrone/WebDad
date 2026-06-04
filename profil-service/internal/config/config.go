@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"github.com/joho/godotenv"
 )
@@ -19,6 +20,12 @@ type Config struct {
 	MongoURI  string
 	MongoDB   string
 	JWTSecret string // secret partagé (validation des tokens émis par auth)
+
+	// DisplayNameCooldown : délai minimal imposé entre deux changements de
+	// display_name. 0 = désactivé (défaut) — le timestamp est tout de même
+	// enregistré, seul le refus est inactif. Env DISPLAY_NAME_CHANGE_COOLDOWN
+	// au format durée Go (ex. "168h" = 7 jours).
+	DisplayNameCooldown time.Duration
 }
 
 // Load construit la config. Charge les .env best-effort (ignorés s'ils
@@ -33,11 +40,12 @@ func Load() *Config {
 	_ = godotenv.Load("../.env")
 
 	cfg := &Config{
-		Port:      getEnv("PORT", "8083"),
-		GinMode:   getEnv("GIN_MODE", "debug"),
-		MongoURI:  buildMongoURI(),
-		MongoDB:   getEnv("MONGO_INITDB_DATABASE", "webdad_profil"),
-		JWTSecret: os.Getenv("JWT_SECRET"),
+		Port:                getEnv("PORT", "8083"),
+		GinMode:             getEnv("GIN_MODE", "debug"),
+		MongoURI:            buildMongoURI(),
+		MongoDB:             getEnv("MONGO_INITDB_DATABASE", "webdad_profil"),
+		JWTSecret:           os.Getenv("JWT_SECRET"),
+		DisplayNameCooldown: parseDuration("DISPLAY_NAME_CHANGE_COOLDOWN", 0),
 	}
 
 	if cfg.JWTSecret == "" {
@@ -60,6 +68,21 @@ func buildMongoURI() string {
 		return fmt.Sprintf("mongodb://%s:%s", host, port)
 	}
 	return fmt.Sprintf("mongodb://%s:%s@%s:%s/?authSource=admin", user, pass, host, port)
+}
+
+// parseDuration lit une durée Go depuis l'env (ex. "168h"). Valeur invalide
+// ou absente → fallback (pas de fatal : la config reste tolérante).
+func parseDuration(key string, fallback time.Duration) time.Duration {
+	raw := os.Getenv(key)
+	if raw == "" {
+		return fallback
+	}
+	d, err := time.ParseDuration(raw)
+	if err != nil {
+		log.Printf("[config] %s invalide (%q) : %v — valeur par défaut %s", key, raw, err, fallback)
+		return fallback
+	}
+	return d
 }
 
 func getEnv(key, fallback string) string {
