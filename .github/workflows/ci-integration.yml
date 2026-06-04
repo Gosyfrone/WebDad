@@ -63,7 +63,7 @@ jobs:
               [ "$status" = "healthy" ] || all_ok=false
             done
             if $all_ok; then
-              echo "✅ Tous les conteneurs sont healthy"
+              echo "Tous les conteneurs sont healthy"
               break
             fi
             if [ $SECONDS -ge $deadline ]; then
