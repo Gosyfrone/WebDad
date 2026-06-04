@@ -32,14 +32,15 @@ func (h *ProfilHandler) GetByUserID(c *gin.Context) {
 }
 
 // GetMe : GET /profils/me — profil de l'utilisateur courant (protégé).
-// Provisioning paresseux depuis les claims du JWT.
+// Lecture seule : ne crée RIEN. 404 si le profil n'existe pas encore (le front
+// le crée alors via POST /profils). La création est l'apanage exclusif du POST.
 func (h *ProfilHandler) GetMe(c *gin.Context) {
 	claims, ok := middleware.ClaimsFrom(c)
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "claims absents"})
 		return
 	}
-	profil, err := h.profils.ProvisionFromClaims(c.Request.Context(), claims.UserID, claims.Email)
+	profil, err := h.profils.GetByUserID(c.Request.Context(), claims.UserID)
 	if err != nil {
 		respondProfilError(c, err)
 		return
@@ -76,7 +77,13 @@ func (h *ProfilHandler) Create(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "claims absents"})
 		return
 	}
-	profil, err := h.profils.Create(c.Request.Context(), claims.UserID)
+	// display_name obligatoire (= username au register, posé par le BFF).
+	var req models.CreateProfilRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "payload invalide : " + err.Error()})
+		return
+	}
+	profil, err := h.profils.Create(c.Request.Context(), claims.UserID, req.DisplayName)
 	if err != nil {
 		respondProfilError(c, err)
 		return
@@ -105,10 +112,12 @@ func (h *ProfilHandler) Delete(c *gin.Context) {
 // respondProfilError mappe les erreurs métier vers des codes HTTP.
 func respondProfilError(c *gin.Context, err error) {
 	switch {
-	case errors.Is(err, service.ErrNotImplemented):
-		c.JSON(http.StatusNotImplemented, gin.H{"error": "non implémenté (squelette)"})
 	case errors.Is(err, service.ErrProfilNotFound):
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+	case errors.Is(err, service.ErrProfilExists), errors.Is(err, service.ErrBirthDateLocked):
+		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+	case errors.Is(err, service.ErrDisplayNameCooldown):
+		c.JSON(http.StatusTooManyRequests, gin.H{"error": err.Error()})
 	default:
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "erreur interne"})
 	}

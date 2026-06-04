@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/webdad/user-service/internal/models"
 	"github.com/webdad/user-service/internal/repository"
@@ -16,10 +17,11 @@ import (
 
 // Erreurs métier (mappées vers des codes HTTP par les handlers).
 var (
-	ErrUserNotFound    = errors.New("utilisateur introuvable")
-	ErrUsernameTaken   = errors.New("nom d'utilisateur déjà utilisé")
-	ErrInvalidUsername = errors.New("nom d'utilisateur invalide (3-50 caractères : lettres, chiffres, _)")
-	ErrSelfFollow      = errors.New("impossible de se suivre soi-même")
+	ErrUserNotFound     = errors.New("utilisateur introuvable")
+	ErrUsernameTaken    = errors.New("nom d'utilisateur déjà utilisé")
+	ErrInvalidUsername  = errors.New("nom d'utilisateur invalide (3-50 caractères : lettres, chiffres, _)")
+	ErrSelfFollow       = errors.New("impossible de se suivre soi-même")
+	ErrUsernameCooldown = errors.New("nom d'utilisateur modifié trop récemment")
 )
 
 // usernamePattern : charset autorisé pour un username (3-50, alphanum + _).
@@ -31,14 +33,16 @@ var reservedUsernames = map[string]bool{
 	"by-username": true, "null": true, "undefined": true,
 }
 
-// UserService regroupe les dépendances.
+// UserService regroupe les dépendances et la config métier.
 type UserService struct {
-	repo *repository.UserRepository
+	repo             *repository.UserRepository
+	usernameCooldown time.Duration
 }
 
-// New construit le service.
-func New(repo *repository.UserRepository) *UserService {
-	return &UserService{repo: repo}
+// New construit le service. usernameCooldown=0 désactive l'enforcement du
+// cooldown (le timestamp de changement reste enregistré dans tous les cas).
+func New(repo *repository.UserRepository, usernameCooldown time.Duration) *UserService {
+	return &UserService{repo: repo, usernameCooldown: usernameCooldown}
 }
 
 // Create crée un utilisateur avec l'id fourni (= credentials.id du JWT).
@@ -83,6 +87,22 @@ func (s *UserService) Update(id string, username *string) (*models.User, error) 
 	if username != nil {
 		if err := validateUsername(*username); err != nil {
 			return nil, err
+		}
+		// Cooldown : refuse un changement effectif trop rapproché du précédent.
+		// Désactivé si usernameCooldown=0 (le timestamp reste enregistré côté
+		// repo dans tous les cas, pour servir de baseline future).
+		if s.usernameCooldown > 0 {
+			current, err := s.repo.GetByID(id)
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil, ErrUserNotFound
+			}
+			if err != nil {
+				return nil, fmt.Errorf("lecture utilisateur : %w", err)
+			}
+			if *username != current.Username && current.UsernameChangedAt != nil &&
+				time.Since(*current.UsernameChangedAt) < s.usernameCooldown {
+				return nil, ErrUsernameCooldown
+			}
 		}
 	}
 	u, err := s.repo.Update(id, username)

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"github.com/joho/godotenv"
 )
@@ -17,6 +18,12 @@ type Config struct {
 	GinMode     string
 	DatabaseURL string // DSN PostgreSQL (lib/pq)
 	JWTSecret   string // secret partagé (validation des tokens émis par auth)
+
+	// UsernameCooldown : délai minimal imposé entre deux changements de
+	// username. 0 = désactivé (défaut) — le timestamp est tout de même
+	// enregistré, seul le refus est inactif. Env USERNAME_CHANGE_COOLDOWN
+	// au format durée Go (ex. "168h" = 7 jours).
+	UsernameCooldown time.Duration
 }
 
 // Load construit la config. Charge les .env best-effort (ignorés s'ils
@@ -32,10 +39,11 @@ func Load() *Config {
 	_ = godotenv.Load("../.env")
 
 	cfg := &Config{
-		Port:        getEnv("PORT", "8082"),
-		GinMode:     getEnv("GIN_MODE", "debug"),
-		DatabaseURL: buildDSN(),
-		JWTSecret:   os.Getenv("JWT_SECRET"),
+		Port:             getEnv("PORT", "8082"),
+		GinMode:          getEnv("GIN_MODE", "debug"),
+		DatabaseURL:      buildDSN(),
+		JWTSecret:        os.Getenv("JWT_SECRET"),
+		UsernameCooldown: parseDuration("USERNAME_CHANGE_COOLDOWN", 0),
 	}
 
 	if cfg.JWTSecret == "" {
@@ -60,6 +68,21 @@ func buildDSN() string {
 		"host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
 		host, port, user, pass, name, sslmode,
 	)
+}
+
+// parseDuration lit une durée Go depuis l'env (ex. "168h"). Valeur invalide
+// ou absente → fallback (config tolérante, pas de fatal).
+func parseDuration(key string, fallback time.Duration) time.Duration {
+	raw := os.Getenv(key)
+	if raw == "" {
+		return fallback
+	}
+	d, err := time.ParseDuration(raw)
+	if err != nil {
+		log.Printf("[config] %s invalide (%q) : %v — valeur par défaut %s", key, raw, err, fallback)
+		return fallback
+	}
+	return d
 }
 
 func getEnv(key, fallback string) string {

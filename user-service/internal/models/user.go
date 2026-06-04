@@ -20,6 +20,11 @@ type User struct {
 	IsActive  bool      `json:"is_active"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
+
+	// UsernameChangedAt : date du dernier changement effectif du handle
+	// (nil = jamais changé). Sert de base au cooldown de changement de
+	// username (cf. service). Symétrique de display_name_changed_at (profil).
+	UsernameChangedAt *time.Time `json:"username_changed_at,omitempty"`
 }
 
 // UserDetails enrichit User des compteurs du graphe social, pour les vues

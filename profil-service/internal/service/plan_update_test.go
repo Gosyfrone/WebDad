@@ -1,0 +1,102 @@
+package service
+
+import (
+	"errors"
+	"testing"
+	"time"
+
+	"github.com/webdad/profil-service/internal/models"
+)
+
+func ptr[T any](v T) *T { return &v }
+
+// TestPlanUpdate_DisplayNameChange : un changement effectif de display_name
+// pose la valeur ET display_name_changed_at ; une valeur identique = no-op.
+func TestPlanUpdate_DisplayNameChange(t *testing.T) {
+	now := time.Date(2026, 6, 4, 12, 0, 0, 0, time.UTC)
+	current := &models.Profil{DisplayName: "bob"}
+
+	set, err := planUpdate(current, models.UpdateProfilRequest{DisplayName: ptr("bobby")}, now, 0)
+	if err != nil {
+		t.Fatalf("err inattendue : %v", err)
+	}
+	if set["display_name"] != "bobby" {
+		t.Fatalf("display_name = %v, attendu bobby", set["display_name"])
+	}
+	if set["display_name_changed_at"] != now {
+		t.Fatalf("display_name_changed_at = %v, attendu %v", set["display_name_changed_at"], now)
+	}
+
+	// Valeur identique → ni display_name ni timestamp dans le set.
+	set, err = planUpdate(current, models.UpdateProfilRequest{DisplayName: ptr("bob")}, now, 0)
+	if err != nil {
+		t.Fatalf("err inattendue : %v", err)
+	}
+	if _, ok := set["display_name"]; ok {
+		t.Fatal("display_name ne devrait pas être dans le set (valeur identique)")
+	}
+	if _, ok := set["display_name_changed_at"]; ok {
+		t.Fatal("display_name_changed_at ne devrait pas être posé (no-op)")
+	}
+}
+
+// TestPlanUpdate_Cooldown : avec un cooldown actif, un changement trop proche
+// du précédent est refusé ; passé le délai il est autorisé ; cooldown=0 ne
+// refuse jamais.
+func TestPlanUpdate_Cooldown(t *testing.T) {
+	now := time.Date(2026, 6, 4, 12, 0, 0, 0, time.UTC)
+	cooldown := 168 * time.Hour // 7 jours
+	changed := now.Add(-24 * time.Hour)
+	current := &models.Profil{DisplayName: "bob", DisplayNameChangedAt: &changed}
+	req := models.UpdateProfilRequest{DisplayName: ptr("bobby")}
+
+	if _, err := planUpdate(current, req, now, cooldown); !errors.Is(err, ErrDisplayNameCooldown) {
+		t.Fatalf("attendu ErrDisplayNameCooldown, obtenu %v", err)
+	}
+
+	// Hors fenêtre de cooldown → autorisé.
+	old := now.Add(-8 * 24 * time.Hour)
+	current.DisplayNameChangedAt = &old
+	if _, err := planUpdate(current, req, now, cooldown); err != nil {
+		t.Fatalf("changement hors cooldown refusé : %v", err)
+	}
+
+	// Cooldown désactivé (0) → jamais refusé même juste après un changement.
+	current.DisplayNameChangedAt = &changed
+	if _, err := planUpdate(current, req, now, 0); err != nil {
+		t.Fatalf("cooldown=0 ne doit jamais refuser : %v", err)
+	}
+}
+
+// TestPlanUpdate_BirthDateSetOnce : settable tant que vide ; une fois posée,
+// la rejouer à l'identique est tolérée mais la changer est refusée.
+func TestPlanUpdate_BirthDateSetOnce(t *testing.T) {
+	now := time.Now().UTC()
+	bd := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	// Vide → premier renseignement autorisé.
+	set, err := planUpdate(&models.Profil{}, models.UpdateProfilRequest{BirthDate: &bd}, now, 0)
+	if err != nil {
+		t.Fatalf("1er renseignement refusé : %v", err)
+	}
+	if set["birth_date"] != bd {
+		t.Fatalf("birth_date = %v, attendu %v", set["birth_date"], bd)
+	}
+
+	current := &models.Profil{BirthDate: &bd}
+
+	// Même valeur → toléré (no-op, pas dans le set).
+	set, err = planUpdate(current, models.UpdateProfilRequest{BirthDate: &bd}, now, 0)
+	if err != nil {
+		t.Fatalf("rejeu identique refusé : %v", err)
+	}
+	if _, ok := set["birth_date"]; ok {
+		t.Fatal("birth_date ne devrait pas être réécrit (valeur identique)")
+	}
+
+	// Valeur différente → refus (set-once).
+	other := time.Date(1999, 12, 31, 0, 0, 0, 0, time.UTC)
+	if _, err := planUpdate(current, models.UpdateProfilRequest{BirthDate: &other}, now, 0); !errors.Is(err, ErrBirthDateLocked) {
+		t.Fatalf("attendu ErrBirthDateLocked, obtenu %v", err)
+	}
+}

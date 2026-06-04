@@ -147,6 +147,8 @@ func respondUserError(c *gin.Context, err error) {
 		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
 	case errors.Is(err, service.ErrInvalidUsername), errors.Is(err, service.ErrSelfFollow):
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	case errors.Is(err, service.ErrUsernameCooldown):
+		c.JSON(http.StatusTooManyRequests, gin.H{"error": err.Error()})
 	default:
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "erreur interne"})
 	}
