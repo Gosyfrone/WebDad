@@ -35,7 +35,7 @@ func (h *Handler) Create(c *gin.Context) {
 		return
 	}
 
-	user, err := h.users.Create(claims.UserID, req.Username, req.DisplayName)
+	user, err := h.users.Create(claims.UserID, req.Username)
 	if err != nil {
 		respondUserError(c, err)
 		return
@@ -109,7 +109,7 @@ func (h *Handler) UpdateMe(c *gin.Context) {
 		return
 	}
 
-	user, err := h.users.Update(claims.UserID, req.Username, req.DisplayName)
+	user, err := h.users.Update(claims.UserID, req.Username)
 	if err != nil {
 		respondUserError(c, err)
 		return

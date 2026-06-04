@@ -18,10 +18,10 @@ func New(db *sql.DB) *UserRepository {
 	return &UserRepository{db: db}
 }
 
-const userColumns = `id, username, display_name, is_active, created_at, updated_at`
+const userColumns = `id, username, is_active, created_at, updated_at`
 
 // userColumnsU : mêmes colonnes préfixées par l'alias `u` (jointures follows).
-const userColumnsU = `u.id, u.username, u.display_name, u.is_active, u.created_at, u.updated_at`
+const userColumnsU = `u.id, u.username, u.is_active, u.created_at, u.updated_at`
 
 // detailColumns : userColumns + compteurs du graphe social (sous-requêtes
 // corrélées). Réservé aux vues « profil » (un seul utilisateur).
@@ -31,38 +31,34 @@ const detailColumns = userColumns + `,
 
 type scanner interface{ Scan(...any) error }
 
-// scanUser projette une ligne (display_name nullable) vers un *User.
+// scanUser projette une ligne vers un *User.
 func scanUser(row scanner) (*models.User, error) {
 	u := &models.User{}
-	var displayName sql.NullString
-	if err := row.Scan(&u.ID, &u.Username, &displayName, &u.IsActive, &u.CreatedAt, &u.UpdatedAt); err != nil {
+	if err := row.Scan(&u.ID, &u.Username, &u.IsActive, &u.CreatedAt, &u.UpdatedAt); err != nil {
 		return nil, err
 	}
-	u.DisplayName = displayName.String
 	return u, nil
 }
 
 // scanDetails projette une ligne userColumns + compteurs vers *UserDetails.
 func scanDetails(row scanner) (*models.UserDetails, error) {
 	d := &models.UserDetails{}
-	var displayName sql.NullString
 	if err := row.Scan(
-		&d.ID, &d.Username, &displayName, &d.IsActive, &d.CreatedAt, &d.UpdatedAt,
+		&d.ID, &d.Username, &d.IsActive, &d.CreatedAt, &d.UpdatedAt,
 		&d.FollowerCount, &d.FollowingCount,
 	); err != nil {
 		return nil, err
 	}
-	d.DisplayName = displayName.String
 	return d, nil
 }
 
 // Create insère un nouvel utilisateur avec un id imposé (= credentials.id).
-func (r *UserRepository) Create(id, username, displayName string) (*models.User, error) {
+func (r *UserRepository) Create(id, username string) (*models.User, error) {
 	const q = `
-		INSERT INTO users (id, username, display_name)
-		VALUES ($1, $2, NULLIF($3, ''))
+		INSERT INTO users (id, username)
+		VALUES ($1, $2)
 		RETURNING ` + userColumns
-	return scanUser(r.db.QueryRow(q, id, username, displayName))
+	return scanUser(r.db.QueryRow(q, id, username))
 }
 
 // ExistsByID indique si un utilisateur existe (sans charger la ligne).
@@ -102,16 +98,15 @@ func (r *UserRepository) List(limit, offset int) ([]models.User, error) {
 	return r.queryUsers(q, limit, offset)
 }
 
-// Update modifie username et/ou display_name (COALESCE : nil = inchangé ;
-// chaîne vide sur display_name = vidage volontaire).
-func (r *UserRepository) Update(id string, username, displayName *string) (*models.User, error) {
+// Update modifie le username (COALESCE : nil = inchangé). Le nom affiché et
+// les autres champs décoratifs se modifient via profil-service.
+func (r *UserRepository) Update(id string, username *string) (*models.User, error) {
 	const q = `
 		UPDATE users
-		SET username     = COALESCE($2, username),
-		    display_name = COALESCE($3, display_name)
+		SET username = COALESCE($2, username)
 		WHERE id = $1
 		RETURNING ` + userColumns
-	return scanUser(r.db.QueryRow(q, id, username, displayName))
+	return scanUser(r.db.QueryRow(q, id, username))
 }
 
 // SoftDelete désactive un compte (is_active=false) sans le supprimer.

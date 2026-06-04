@@ -71,7 +71,6 @@ services:
       - ./profil-service/.env        # MONGO_INITDB_ROOT_* / DATABASE
     volumes:
       - mongo-profil-data:/data/db
-      - ./scripts/init-db/profil-init.js:/docker-entrypoint-initdb.d/init.js:ro
     ports:
       - "27017:27017"
     networks:

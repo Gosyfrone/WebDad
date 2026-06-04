@@ -9,10 +9,11 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- Table des utilisateurs (identité publique, PAS les credentials).
 -- id = même UUID que credentials.id (auth-service), porté par le JWT.
+-- display_name et les autres champs décoratifs vivent dans profil-service
+-- (Mongo) : user-service ne porte que l'identité immuable + l'état du compte.
 CREATE TABLE IF NOT EXISTS users (
     id           UUID PRIMARY KEY,             -- même UUID que credentials.id
     username     VARCHAR(50) NOT NULL UNIQUE,
-    display_name VARCHAR(100),
     is_active    BOOLEAN NOT NULL DEFAULT true,
     created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -46,9 +47,8 @@ CREATE OR REPLACE TRIGGER trg_users_updated_at
 
 -- Utilisateur admin par défaut (UUID figé, partagé avec auth-service via
 -- SEED_DEFAULT_ADMIN). Idempotent : sans effet aux boots suivants.
-INSERT INTO users (id, username, display_name)
+INSERT INTO users (id, username)
 VALUES (
     '00000000-0000-0000-0000-000000000001',
-    'admin',
-    'Administrateur Breezy'
+    'admin'
 ) ON CONFLICT (id) DO NOTHING;

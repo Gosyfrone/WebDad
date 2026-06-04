@@ -42,11 +42,11 @@ func New(repo *repository.UserRepository) *UserService {
 }
 
 // Create crée un utilisateur avec l'id fourni (= credentials.id du JWT).
-func (s *UserService) Create(id, username, displayName string) (*models.User, error) {
+func (s *UserService) Create(id, username string) (*models.User, error) {
 	if err := validateUsername(username); err != nil {
 		return nil, err
 	}
-	u, err := s.repo.Create(id, username, displayName)
+	u, err := s.repo.Create(id, username)
 	if err != nil {
 		if isUniqueViolation(err) {
 			return nil, ErrUsernameTaken
@@ -79,13 +79,13 @@ func (s *UserService) List(limit, offset int) ([]models.User, error) {
 
 // Update modifie l'utilisateur (champs nil = inchangés). Valide le username
 // s'il est fourni.
-func (s *UserService) Update(id string, username, displayName *string) (*models.User, error) {
+func (s *UserService) Update(id string, username *string) (*models.User, error) {
 	if username != nil {
 		if err := validateUsername(*username); err != nil {
 			return nil, err
 		}
 	}
-	u, err := s.repo.Update(id, username, displayName)
+	u, err := s.repo.Update(id, username)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrUserNotFound
 	}
@@ -142,7 +142,7 @@ func (s *UserService) provision(id, email string) error {
 
 	var lastErr error
 	for _, c := range candidates {
-		_, err := s.repo.Create(id, c, "")
+		_, err := s.repo.Create(id, c)
 		if err == nil {
 			return nil
 		}
