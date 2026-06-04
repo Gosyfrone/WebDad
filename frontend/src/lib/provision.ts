@@ -5,8 +5,7 @@ import { apiUrl } from '@/lib/config'
  * `users` (handle dérivé de l'email). Sert de repli (connexion, ou course au
  * register). NB : le profil (profil-service) n'a PAS de provisioning paresseux
  * — sa seule création est `POST /profils` (cf. provisionProfil), appelé au
- * register. Pour un compte sans profil, GET /profils/me renvoie 404 et le front
- * crée le profil via POST depuis la popup d'édition.
+ * register avec display_name=username, birth_date et gender.
  */
 async function provisionFromEmail(token: string): Promise<void> {
   try {
@@ -19,18 +18,26 @@ async function provisionFromEmail(token: string): Promise<void> {
   }
 }
 
-/** POST /profils { display_name } : pose le nom affiché = username au register. */
-async function provisionProfil(token: string, displayName: string): Promise<void> {
+/** POST /profils : pose le profil initial issu du formulaire register. */
+async function provisionProfil(
+  token: string,
+  options: { displayName: string; birthDate?: string; gender?: string }
+): Promise<void> {
   await fetch(apiUrl('/profils'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ display_name: displayName }),
+    body: JSON.stringify({
+      display_name: options.displayName,
+      birth_date: options.birthDate
+        ? new Date(options.birthDate).toISOString()
+        : undefined,
+      gender: options.gender || undefined,
+    }),
     cache: 'no-store',
   })
-  // 409 (profil déjà créé) est sans gravité : best-effort, on n'agit pas dessus.
 }
 
 /**
@@ -38,18 +45,19 @@ async function provisionProfil(token: string, displayName: string): Promise<void
  * profil-service (un compte = une identité + un profil).
  *
  *   - Avec `username` (inscription) : `POST /users { username }` (handle choisi)
- *     puis `POST /profils { display_name: username }` (nom affiché = handle).
+ *     puis `POST /profils` avec display_name=username, birth_date et gender.
  *     La disponibilité du username est pré-vérifiée côté page register ; en cas
  *     de course rarissime, on retombe sur les valeurs dérivées de l'email.
- *   - Sans `username` (connexion) : `GET /users/me` + `GET /profils/me`
- *     (dérivés email / idempotents).
+ *   - Sans `username` (connexion) : `GET /users/me` provisionne seulement
+ *     l'identité dérivée de l'email. La création du profil complet passe par
+ *     le register, car birth_date/gender viennent du formulaire.
  *
  * Best-effort : une erreur ici ne doit JAMAIS casser l'authentification.
  * À usage serveur uniquement (route handlers) : le token n'est pas exposé au client.
  */
 export async function provisionUser(
   token: string,
-  options?: { username?: string }
+  options?: { username?: string; birthDate?: string; gender?: string }
 ): Promise<void> {
   const username = options?.username?.trim()
   if (!username) {
@@ -75,7 +83,11 @@ export async function provisionUser(
     }
 
     // user OK → on pose le profil avec display_name = username choisi.
-    await provisionProfil(token, username)
+    await provisionProfil(token, {
+      displayName: username,
+      birthDate: options?.birthDate,
+      gender: options?.gender,
+    })
   } catch {
     await provisionFromEmail(token)
   }

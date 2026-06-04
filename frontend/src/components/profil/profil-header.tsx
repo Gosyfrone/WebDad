@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { CalendarDays } from 'lucide-react'
+import { CalendarDays, LinkIcon, MapPin } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import type { RelationKind } from '@/lib/api'
@@ -16,8 +16,9 @@ interface ProfilHeaderProps {
   profil: ProfilDetails
   /** Vrai si le profil affiché est celui de l'utilisateur courant. */
   isOwner: boolean
+  saving?: boolean
   /** Remontée des champs édités (consommée par le parent pour l'affichage live). */
-  onEdit: (fields: ProfilEditableFields) => void
+  onEdit: (fields: ProfilEditableFields) => Promise<void>
 }
 
 /** Libellé lisible pour chaque rôle. */
@@ -32,7 +33,7 @@ const ROLE_LABELS: Record<ProfilDetails['role'], string> = {
  * date d'inscription et compteurs d'abonnés. Le propriétaire voit le bouton
  * « Éditer le profil » ; un visiteur verrait « Suivre » (à brancher).
  */
-export function ProfilHeader({ profil, isOwner, onEdit }: ProfilHeaderProps) {
+export function ProfilHeader({ profil, isOwner, saving = false, onEdit }: ProfilHeaderProps) {
   const initials = profil.displayName.charAt(0).toUpperCase()
   const [relationsOpen, setRelationsOpen] = useState(false)
   const [relationsTab, setRelationsTab] = useState<RelationKind>('followers')
@@ -72,7 +73,15 @@ export function ProfilHeader({ profil, isOwner, onEdit }: ProfilHeaderProps) {
                   bio: profil.bio,
                   avatarUrl: profil.avatarUrl,
                   bannerUrl: profil.bannerUrl,
+                  website: profil.website,
+                  location: profil.location,
+                  birthDate: toDateInputValue(profil.birthDate),
+                  gender: profil.gender,
                 }}
+                birthDateLocked={Boolean(profil.birthDate)}
+                genderLocked={Boolean(profil.gender)}
+                displayNameChangedAt={profil.displayNameChangedAt}
+                saving={saving}
                 onSave={onEdit}
               >
                 <Button
@@ -108,10 +117,34 @@ export function ProfilHeader({ profil, isOwner, onEdit }: ProfilHeaderProps) {
           <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed">{profil.bio}</p>
         )}
 
-        {/* Date d'inscription */}
-        <div className="mt-3 flex items-center gap-1.5 text-sm text-muted-foreground">
-          <CalendarDays className="h-4 w-4" aria-hidden />
-          <span>A rejoint en {formatJoinedAt(profil.joinedAt)}</span>
+        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm text-muted-foreground">
+          {profil.location && (
+            <span className="flex items-center gap-1.5">
+              <MapPin className="h-4 w-4" aria-hidden />
+              {profil.location}
+            </span>
+          )}
+          {profil.website && (
+            <a
+              href={toExternalUrl(profil.website)}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-1.5 text-[#5B6CFF] hover:underline"
+            >
+              <LinkIcon className="h-4 w-4" aria-hidden />
+              {profil.website}
+            </a>
+          )}
+          {profil.birthDate && (
+            <span className="flex items-center gap-1.5">
+              <CalendarDays className="h-4 w-4" aria-hidden />
+              Né(e) le {formatFullDate(profil.birthDate)}
+            </span>
+          )}
+          <span className="flex items-center gap-1.5">
+            <CalendarDays className="h-4 w-4" aria-hidden />
+            A rejoint en {formatJoinedAt(profil.joinedAt)}
+          </span>
         </div>
 
         {/* Compteurs (cliquables → modale des relations) — même ordre que la modale */}
@@ -141,6 +174,13 @@ export function ProfilHeader({ profil, isOwner, onEdit }: ProfilHeaderProps) {
   )
 }
 
+function toDateInputValue(iso: string): string {
+  if (!iso) return ''
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toISOString().slice(0, 10)
+}
+
 function Count({
   value,
   label,
@@ -167,6 +207,21 @@ function formatJoinedAt(iso: string): string {
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) return '—'
   return new Intl.DateTimeFormat('fr-FR', { month: 'long', year: 'numeric' }).format(date)
+}
+
+function formatFullDate(iso: string): string {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return '—'
+  return new Intl.DateTimeFormat('fr-FR', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(date)
+}
+
+function toExternalUrl(url: string): string {
+  if (/^https?:\/\//i.test(url)) return url
+  return `https://${url}`
 }
 
 function formatCount(n: number): string {

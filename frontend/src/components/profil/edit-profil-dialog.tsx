@@ -5,7 +5,6 @@ import { Camera } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import type { ProfilEditableFields } from '@/types'
-import { useToast } from '@/hooks/use-toast'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -29,8 +28,12 @@ interface EditProfilDialogProps {
   children: React.ReactNode
   /** Valeurs initiales du formulaire. */
   initial: ProfilEditableFields
+  birthDateLocked: boolean
+  genderLocked: boolean
+  displayNameChangedAt: string
+  saving?: boolean
   /** Appelé avec les valeurs validées après enregistrement. */
-  onSave: (fields: ProfilEditableFields) => void
+  onSave: (fields: ProfilEditableFields) => Promise<void>
 }
 
 /**
@@ -41,13 +44,24 @@ interface EditProfilDialogProps {
  * n'existe pas, l'aperçu est local : il ne survit pas à un rechargement.
  * Le formulaire est réinitialisé aux valeurs courantes à chaque ouverture.
  */
-export function EditProfilDialog({ children, initial, onSave }: EditProfilDialogProps) {
-  const { toast } = useToast()
+export function EditProfilDialog({
+  children,
+  initial,
+  birthDateLocked,
+  genderLocked,
+  displayNameChangedAt,
+  saving = false,
+  onSave,
+}: EditProfilDialogProps) {
   const [open, setOpen] = useState(false)
   const [displayName, setDisplayName] = useState(initial.displayName)
   const [bio, setBio] = useState(initial.bio)
   const [avatarUrl, setAvatarUrl] = useState(initial.avatarUrl)
   const [bannerUrl, setBannerUrl] = useState(initial.bannerUrl)
+  const [website, setWebsite] = useState(initial.website)
+  const [location, setLocation] = useState(initial.location)
+  const [birthDate, setBirthDate] = useState(initial.birthDate)
+  const [gender, setGender] = useState<ProfilEditableFields['gender']>(initial.gender)
 
   /** Recharge le formulaire avec les valeurs courantes à chaque ouverture. */
   function handleOpenChange(next: boolean) {
@@ -56,6 +70,10 @@ export function EditProfilDialog({ children, initial, onSave }: EditProfilDialog
       setBio(initial.bio)
       setAvatarUrl(initial.avatarUrl)
       setBannerUrl(initial.bannerUrl)
+      setWebsite(initial.website)
+      setLocation(initial.location)
+      setBirthDate(initial.birthDate)
+      setGender(initial.gender)
     }
     setOpen(next)
   }
@@ -64,20 +82,28 @@ export function EditProfilDialog({ children, initial, onSave }: EditProfilDialog
   const bioRemaining = MAX_BIO - bio.length
   const nameTooLong = displayName.length > MAX_NAME
   const bioTooLong = bioRemaining < 0
-  const canSave = trimmedName.length > 0 && !nameTooLong && !bioTooLong
+  const displayNameChanged = trimmedName !== initial.displayName
+  const nextDisplayNameDate = getNextDisplayNameDate(displayNameChangedAt)
+  const displayNameLocked = displayNameChanged && nextDisplayNameDate > new Date()
+  const canSave = trimmedName.length > 0 && !nameTooLong && !bioTooLong && !displayNameLocked
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!canSave) return
-    // TODO (issue profil) : uploader les fichiers image vers le stockage via
-    // l'API Gateway, puis envoyer les URLs persistées avec PATCH /profils/me.
-    onSave({
-      displayName: trimmedName,
-      bio: bio.trim(),
-      avatarUrl,
-      bannerUrl,
-    })
-    setOpen(false)
-    toast({ title: 'Profil mis à jour' })
+    try {
+      await onSave({
+        displayName: trimmedName,
+        bio: bio.trim(),
+        avatarUrl,
+        bannerUrl,
+        website: website.trim(),
+        location: location.trim(),
+        birthDate: birthDateLocked ? '' : birthDate,
+        gender: genderLocked ? '' : gender,
+      })
+      setOpen(false)
+    } catch {
+      // Le parent affiche déjà le toast d'erreur ; on garde la popup ouverte.
+    }
   }
 
   return (
@@ -137,6 +163,11 @@ export function EditProfilDialog({ children, initial, onSave }: EditProfilDialog
             {nameTooLong && (
               <p className="text-xs text-destructive">{MAX_NAME} caractères maximum.</p>
             )}
+            {displayNameLocked && (
+              <p className="text-xs text-destructive">
+                Le pseudo pourra être changé le {formatDate(nextDisplayNameDate)}.
+              </p>
+            )}
           </Field>
 
           <Field label="Bio" htmlFor="profil-bio">
@@ -157,15 +188,82 @@ export function EditProfilDialog({ children, initial, onSave }: EditProfilDialog
               {bioRemaining}
             </span>
           </Field>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Localisation" htmlFor="profil-location">
+              <Input
+                id="profil-location"
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                placeholder="Ville, pays"
+                className="rounded-2xl border-white/70 bg-white/82 shadow-sm shadow-slate-200/50 transition-all placeholder:text-slate-400 hover:border-[#47D9FF]/70 focus-visible:border-[#5B6CFF] focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15"
+              />
+            </Field>
+
+            <Field label="Site web" htmlFor="profil-website">
+              <Input
+                id="profil-website"
+                value={website}
+                onChange={(e) => setWebsite(e.target.value)}
+                placeholder="https://..."
+                className="rounded-2xl border-white/70 bg-white/82 shadow-sm shadow-slate-200/50 transition-all placeholder:text-slate-400 hover:border-[#47D9FF]/70 focus-visible:border-[#5B6CFF] focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15"
+              />
+            </Field>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Date de naissance" htmlFor="profil-birth-date">
+              <Input
+                id="profil-birth-date"
+                type="date"
+                value={birthDate}
+                onChange={(e) => setBirthDate(e.target.value)}
+                disabled={birthDateLocked}
+                title={
+                  birthDateLocked
+                    ? "La date de naissance ne peut pas être changée une fois renseignée."
+                    : undefined
+                }
+                className={cn(
+                  'rounded-2xl border-white/70 bg-white/82 shadow-sm shadow-slate-200/50 transition-all hover:border-[#47D9FF]/70 focus-visible:border-[#5B6CFF] focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15',
+                  birthDateLocked &&
+                    'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-500 hover:border-slate-200',
+                )}
+              />
+            </Field>
+
+            <Field label="Genre" htmlFor="profil-gender">
+              <select
+                id="profil-gender"
+                value={gender}
+                onChange={(e) => setGender(e.target.value as ProfilEditableFields['gender'])}
+                disabled={genderLocked}
+                title={
+                  genderLocked
+                    ? "Le genre ne peut pas être changé une fois renseigné."
+                    : undefined
+                }
+                className={cn(
+                  'flex h-10 w-full rounded-2xl border border-white/70 bg-white/82 px-3 py-2 text-sm shadow-sm shadow-slate-200/50 transition-all hover:border-[#47D9FF]/70 focus-visible:border-[#5B6CFF] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15',
+                  genderLocked &&
+                    'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-500 hover:border-slate-200',
+                )}
+              >
+                <option value="">Non renseigné</option>
+                <option value="female">Femme</option>
+                <option value="male">Homme</option>
+              </select>
+            </Field>
+          </div>
         </div>
 
         <DialogFooter className="border-t p-4">
           <Button
             className="w-full rounded-full bg-gradient-to-r from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] font-bold text-white shadow-[0_18px_44px_rgba(91,108,255,0.3)] transition hover:scale-[1.01] sm:w-auto"
-            disabled={!canSave}
+            disabled={!canSave || saving}
             onClick={handleSubmit}
           >
-            Enregistrer
+            {saving ? 'Enregistrement...' : 'Enregistrer'}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -243,4 +341,20 @@ function Field({
       {children}
     </div>
   )
+}
+
+function getNextDisplayNameDate(changedAt: string): Date {
+  if (!changedAt) return new Date(0)
+  const date = new Date(changedAt)
+  if (Number.isNaN(date.getTime())) return new Date(0)
+  date.setDate(date.getDate() + 7)
+  return date
+}
+
+function formatDate(date: Date): string {
+  return new Intl.DateTimeFormat('fr-FR', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(date)
 }

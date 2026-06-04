@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -22,6 +23,9 @@ var collectionOrder = []string{"profiles"}
 // externe, en local comme en stack Docker (même pattern qu'auth/user/post).
 func EnsureSchema(ctx context.Context, db *mongo.Database) error {
 	if err := ensureCollections(ctx, db); err != nil {
+		return err
+	}
+	if err := dropLegacyIndexes(ctx, db); err != nil {
 		return err
 	}
 	if err := ensureIndexes(ctx, db); err != nil {
@@ -51,12 +55,8 @@ func ensureCollections(ctx context.Context, db *mongo.Database) error {
 
 	for _, name := range collectionOrder {
 		if have[name] {
-			cmd := bson.D{
-				{Key: "collMod", Value: name},
-				{Key: "validator", Value: validators[name]},
-			}
-			if err := db.RunCommand(ctx, cmd).Err(); err != nil {
-				return fmt.Errorf("maj validateur %q : %w", name, err)
+			if err := updateValidator(ctx, db, name); err != nil {
+				return err
 			}
 			continue
 		}
@@ -66,6 +66,38 @@ func ensureCollections(ctx context.Context, db *mongo.Database) error {
 		}
 	}
 	return nil
+}
+
+// updateValidator aligne le validateur d'une collection existante avec le
+// schéma courant. Sans ça, les volumes Mongo de dev gardent les anciens
+// validateurs et peuvent refuser des documents pourtant valides côté code.
+func updateValidator(ctx context.Context, db *mongo.Database, name string) error {
+	if _, err := db.RunCommand(ctx, bson.D{
+		{Key: "collMod", Value: name},
+		{Key: "validator", Value: validators[name]},
+	}).Raw(); err != nil {
+		return fmt.Errorf("mise à jour validateur %q : %w", name, err)
+	}
+	return nil
+}
+
+// dropLegacyIndexes retire les index d'anciennes versions du schéma qui ne
+// correspondent plus au modèle actuel. username vit maintenant dans
+// user-service ; garder cet index unique dans profiles bloque tous les profils
+// sans username après le premier document.
+func dropLegacyIndexes(ctx context.Context, db *mongo.Database) error {
+	if err := db.Collection("profiles").Indexes().DropOne(ctx, "username_1"); err != nil {
+		if isIndexNotFound(err) {
+			return nil
+		}
+		return fmt.Errorf("suppression index legacy profiles.username_1 : %w", err)
+	}
+	return nil
+}
+
+func isIndexNotFound(err error) bool {
+	var commandErr mongo.CommandError
+	return errors.As(err, &commandErr) && commandErr.Code == 27
 }
 
 // ensureIndexes crée les index (CreateMany est idempotent pour un index de

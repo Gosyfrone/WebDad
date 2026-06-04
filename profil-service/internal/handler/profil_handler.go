@@ -112,7 +112,7 @@ func (h *ProfilHandler) Create(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "payload invalide : " + err.Error()})
 		return
 	}
-	profil, err := h.profils.Create(c.Request.Context(), claims.UserID, req.DisplayName)
+	profil, err := h.profils.Create(c.Request.Context(), claims.UserID, req)
 	if err != nil {
 		respondProfilError(c, err)
 		return

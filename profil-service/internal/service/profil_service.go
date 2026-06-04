@@ -62,16 +62,21 @@ func (s *ProfilService) Search(ctx context.Context, term string, limit int64) ([
 
 // Create est l'UNIQUE voie de création d'un profil (POST /profils). L'id vient
 // du JWT ; display_name est obligatoire (le BFF y met le username au register).
-// Aucune valeur n'est dérivée de l'email, et la lecture (GET /profils/me) ne
-// crée RIEN : un profil n'existe que parce qu'il a été explicitement créé ici
-// (ou par le seed admin). 409 si le profil existe déjà.
-func (s *ProfilService) Create(ctx context.Context, userID, displayName string) (*models.Profil, error) {
+// birth_date et gender peuvent être posés dès l'inscription. Aucune valeur n'est
+// dérivée de l'email, et la lecture (GET /profils/me) ne crée RIEN : un profil
+// n'existe que parce qu'il a été explicitement créé ici (ou par le seed admin).
+// 409 si le profil existe déjà.
+func (s *ProfilService) Create(ctx context.Context, userID string, req models.CreateProfilRequest) (*models.Profil, error) {
 	now := time.Now().UTC()
 	p := &models.Profil{
 		UserID:      userID,
-		DisplayName: strings.TrimSpace(displayName),
+		DisplayName: strings.TrimSpace(req.DisplayName),
+		BirthDate:   req.BirthDate,
 		CreatedAt:   now,
 		UpdatedAt:   now,
+	}
+	if req.Gender != nil {
+		p.Gender = *req.Gender
 	}
 	err := s.repo.Insert(ctx, p)
 	if err == nil {
