@@ -85,7 +85,7 @@ export function MobileHeader({ role, username = 'Utilisateur' }: MobileHeaderPro
   const navItems = navItemsForRole(role)
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center border-b border-white/50 bg-white/72 px-3 shadow-sm backdrop-blur-2xl lg:hidden">
+    <header className="sticky top-0 z-30 flex h-14 items-center border-b border-[#DDE5FF] bg-gradient-to-r from-[#F5F0FF] via-[#FFFFFF] to-[#EEF9FF] px-3 shadow-sm lg:hidden">
       {/* Photo de profil -> tiroir de navigation latéral gauche */}
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetTrigger asChild>

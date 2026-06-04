@@ -41,8 +41,8 @@ export function FeedView({ posts }: FeedViewProps) {
         </div>
       </div>
 
-      {/* Zone de création de post inline (desktop) ; sur mobile, c'est le bouton « + » flottant */}
-      <div className="hidden lg:block">
+      {/* Zone de création de post inline ; le FAB mobile prend le relais quand ce bloc sort de l'écran. */}
+      <div id="feed-composer">
         <CreatePost />
       </div>
 

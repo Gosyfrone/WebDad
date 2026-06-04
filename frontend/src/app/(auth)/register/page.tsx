@@ -7,6 +7,7 @@ import {
   Bell,
   CalendarDays,
   CircleAlert,
+  CircleHelp,
   Eye,
   EyeOff,
   Heart,
@@ -444,9 +445,28 @@ export default function RegisterPage() {
             <form className="space-y-1" onSubmit={handleSubmit} noValidate>
               <div className="grid gap-1.5 sm:grid-cols-2">
                 <div className="space-y-0.5">
-                  <label htmlFor="username" className="text-xs font-medium text-slate-700">
-                    Nom d’utilisateur
-                  </label>
+                  <div className="flex min-h-5 items-center gap-1.5">
+                    <label htmlFor="username" className="text-xs font-medium text-slate-700">
+                      Nom d’utilisateur
+                    </label>
+
+                    <span className="group/help relative inline-flex">
+                      <button
+                        type="button"
+                        aria-describedby="username-tooltip"
+                        className="grid h-4 w-4 place-items-center rounded-full text-slate-400 transition hover:text-[#5B6CFF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFF]/30"
+                      >
+                        <CircleHelp className="h-3.5 w-3.5" />
+                      </button>
+                      <span
+                        id="username-tooltip"
+                        role="tooltip"
+                        className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 w-56 -translate-x-1/2 rounded-2xl border border-white/70 bg-slate-950 px-3 py-2 text-[11px] font-medium leading-4 text-white opacity-0 shadow-[0_16px_40px_rgba(15,23,42,0.25)] transition group-hover/help:opacity-100 group-focus-within/help:opacity-100"
+                      >
+                        Le nom d’utilisateur pourra être changé après la création du compte, puis une fois tous les 14 jours.
+                      </span>
+                    </span>
+                  </div>
 
                   <div className="group relative">
                     <User className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 transition group-focus-within:text-[#5B6CFF]" />
@@ -479,9 +499,28 @@ export default function RegisterPage() {
                 </div>
 
                 <div className="space-y-0.5">
-                  <label htmlFor="birthDate" className="text-xs font-medium text-slate-700">
-                    Date de naissance
-                  </label>
+                  <div className="flex min-h-5 items-center gap-1.5">
+                    <label htmlFor="birthDate" className="text-xs font-medium text-slate-700">
+                      Date de naissance
+                    </label>
+
+                    <span className="group/help relative inline-flex">
+                      <button
+                        type="button"
+                        aria-describedby="birth-date-tooltip"
+                        className="grid h-4 w-4 place-items-center rounded-full text-slate-400 transition hover:text-[#5B6CFF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFF]/30"
+                      >
+                        <CircleHelp className="h-3.5 w-3.5" />
+                      </button>
+                      <span
+                        id="birth-date-tooltip"
+                        role="tooltip"
+                        className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 w-56 -translate-x-1/2 rounded-2xl border border-white/70 bg-slate-950 px-3 py-2 text-[11px] font-medium leading-4 text-white opacity-0 shadow-[0_16px_40px_rgba(15,23,42,0.25)] transition group-hover/help:opacity-100 group-focus-within/help:opacity-100"
+                      >
+                        La date de naissance ne pourra plus être changée une fois le compte créé.
+                      </span>
+                    </span>
+                  </div>
 
                   <div className="group relative">
                     <CalendarDays className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 transition group-focus-within:text-[#5B6CFF]" />

@@ -9,7 +9,7 @@ import type { UserRole } from '@/types'
  * Layout de l'espace authentifié, responsive (mobile-first).
  *
  *   - < lg (téléphones, iPad portrait) : en-tête mobile (avatar + logo) +
- *     barre d'onglets fixe en bas + bouton « + » flottant. Sidebars masquées.
+ *     barre d'onglets fixe en bas + bouton « + » flottant sur le feed.
  *   - ≥ lg (iPad paysage, desktop) : colonne de navigation à gauche + contenu.
  *   - ≥ xl : ajout de la colonne de droite (suggestions / tendances).
  *
