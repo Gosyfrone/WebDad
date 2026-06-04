@@ -39,7 +39,7 @@ export function ProfilView({ profil: initialProfil, posts, isOwner = true }: Pro
   return (
     <div className="flex flex-col">
       {/* En-tête sticky */}
-      <div className="sticky top-0 z-10 flex items-center gap-6 border-b border-white/50 bg-white/70 px-4 py-2 backdrop-blur-2xl">
+      <div className="sticky top-0 z-10 flex items-center gap-6 border-b border-[#D9C6FF]/70 bg-gradient-to-r from-[#F8F3FF] via-[#EADCFF] to-[#EEF9FF] px-4 py-2">
         <Link
           href={ROUTES.feed}
           aria-label="Retour au fil"
@@ -58,7 +58,7 @@ export function ProfilView({ profil: initialProfil, posts, isOwner = true }: Pro
       <ProfilHeader profil={profil} isOwner={isOwner} onEdit={handleEdit} />
 
       {/* Onglets */}
-      <div className="flex border-b border-white/50 bg-white/45 backdrop-blur">
+      <div className="flex border-b border-[#D9C6FF]/70 bg-gradient-to-r from-[#F8F3FF] via-[#EADCFF] to-[#EEF9FF]">
         <TabButton active={tab === 'posts'} onClick={() => setTab('posts')}>
           Posts
         </TabButton>

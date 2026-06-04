@@ -7,7 +7,7 @@ import { Settings2 } from 'lucide-react'
 export default function AdminPage() {
   return (
     <div className="flex flex-col">
-      <div className="z-10 hidden border-b border-white/50 bg-white/70 px-4 py-3 backdrop-blur-2xl lg:sticky lg:top-0 lg:block">
+      <div className="z-10 hidden border-b border-[#D9C6FF]/70 bg-gradient-to-r from-[#F8F3FF] via-[#EADCFF] to-[#EEF9FF] px-4 py-3 lg:sticky lg:top-0 lg:block">
         <h1 className="bg-gradient-to-r from-slate-950 via-[#5B6CFF] to-[#8D3DFF] bg-clip-text text-xl font-bold text-transparent">
           Administration
         </h1>

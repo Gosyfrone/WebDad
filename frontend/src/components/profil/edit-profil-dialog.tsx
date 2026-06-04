@@ -83,10 +83,12 @@ export function EditProfilDialog({ children, initial, onSave }: EditProfilDialog
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="gap-0 p-0 sm:max-w-lg">
-        <DialogHeader className="border-b p-4">
-          <DialogTitle>Éditer le profil</DialogTitle>
-          <DialogDescription>
+      <DialogContent className="gap-0 overflow-hidden border-[#D9C6FF]/70 bg-gradient-to-br from-[#F8F3FF] via-[#EADCFF] to-[#EEF9FF] p-0 shadow-[0_28px_80px_rgba(91,108,255,0.24)] sm:max-w-lg">
+        <DialogHeader className="border-b border-[#D9C6FF]/70 bg-gradient-to-r from-[#F8F3FF] via-[#EADCFF] to-[#EEF9FF] p-4">
+          <DialogTitle className="bg-gradient-to-r from-slate-950 via-[#5B6CFF] to-[#8D3DFF] bg-clip-text text-transparent">
+            Éditer le profil
+          </DialogTitle>
+          <DialogDescription className="text-slate-600">
             Mettez à jour les informations visibles sur votre profil public.
           </DialogDescription>
         </DialogHeader>
@@ -97,7 +99,8 @@ export function EditProfilDialog({ children, initial, onSave }: EditProfilDialog
           onPick={setBannerUrl}
           className={cn(
             'relative flex h-36 w-full items-center justify-center overflow-hidden bg-cover bg-center',
-            !bannerUrl && 'bg-gradient-to-r from-primary/40 to-primary/10',
+            !bannerUrl &&
+              'bg-gradient-to-r from-[#8D3DFF]/35 via-[#EADCFF] to-[#47D9FF]/25',
           )}
           style={bannerUrl ? { backgroundImage: `url(${bannerUrl})` } : undefined}
         />
@@ -110,9 +113,9 @@ export function EditProfilDialog({ children, initial, onSave }: EditProfilDialog
               onPick={setAvatarUrl}
               className="relative rounded-full"
             >
-              <Avatar className="h-24 w-24 border-4 border-background">
+              <Avatar className="h-24 w-24 border-4 border-[#F8F3FF] shadow-[0_18px_44px_rgba(91,108,255,0.22)]">
                 {avatarUrl && <AvatarImage src={avatarUrl} alt="" />}
-                <AvatarFallback className="text-2xl">
+                <AvatarFallback className="bg-gradient-to-br from-[#F8F3FF] via-white to-[#EEF9FF] text-2xl text-slate-950">
                   {trimmedName.charAt(0).toUpperCase() || '?'}
                 </AvatarFallback>
               </Avatar>
@@ -129,6 +132,7 @@ export function EditProfilDialog({ children, initial, onSave }: EditProfilDialog
               onChange={(e) => setDisplayName(e.target.value)}
               placeholder="Votre nom"
               aria-invalid={nameTooLong}
+              className="rounded-2xl border-white/70 bg-white/82 shadow-sm shadow-slate-200/50 transition-all placeholder:text-slate-400 hover:border-[#47D9FF]/70 focus-visible:border-[#5B6CFF] focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15"
             />
             {nameTooLong && (
               <p className="text-xs text-destructive">{MAX_NAME} caractères maximum.</p>
@@ -142,7 +146,7 @@ export function EditProfilDialog({ children, initial, onSave }: EditProfilDialog
               onChange={(e) => setBio(e.target.value)}
               placeholder="Parlez de vous en quelques mots…"
               rows={3}
-              className="flex w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              className="flex w-full resize-none rounded-2xl border border-white/70 bg-white/82 px-3 py-2 text-sm shadow-sm shadow-slate-200/50 transition-all placeholder:text-slate-400 hover:border-[#47D9FF]/70 focus-visible:border-[#5B6CFF] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15"
             />
             <span
               className={cn(
@@ -155,8 +159,12 @@ export function EditProfilDialog({ children, initial, onSave }: EditProfilDialog
           </Field>
         </div>
 
-        <DialogFooter className="border-t p-4">
-          <Button className="rounded-full font-bold" disabled={!canSave} onClick={handleSubmit}>
+        <DialogFooter className="border-t border-[#D9C6FF]/70 bg-gradient-to-r from-[#F8F3FF] via-[#EADCFF] to-[#EEF9FF] p-4">
+          <Button
+            className="w-full rounded-full bg-gradient-to-r from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] font-bold text-white shadow-[0_18px_44px_rgba(91,108,255,0.3)] transition hover:scale-[1.01] sm:w-auto"
+            disabled={!canSave}
+            onClick={handleSubmit}
+          >
             Enregistrer
           </Button>
         </DialogFooter>

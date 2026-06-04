@@ -26,7 +26,7 @@ export function FeedView({ posts }: FeedViewProps) {
   return (
     <div className="flex flex-col">
       {/* En-tête : sticky sur desktop ; sur mobile l'en-tête global (logo) prend le relais */}
-      <div className="z-10 border-b border-white/30 bg-gradient-to-r from-[#8D3DFF]/10 via-white/20 to-[#47D9FF]/10 backdrop-blur-2xl lg:sticky lg:top-0">
+      <div className="z-10 border-b border-[#D9C6FF]/70 bg-gradient-to-r from-[#F8F3FF] via-[#EADCFF] to-[#EEF9FF] lg:sticky lg:top-0">
         <h1 className="hidden bg-gradient-to-r from-slate-950 via-[#5B6CFF] to-[#8D3DFF] bg-clip-text px-4 py-3 text-xl font-bold text-transparent lg:block">
           Fil d&apos;actualité
         </h1>

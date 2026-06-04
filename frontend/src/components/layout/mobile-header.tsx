@@ -85,7 +85,7 @@ export function MobileHeader({ role, username = 'Utilisateur' }: MobileHeaderPro
   const navItems = navItemsForRole(role)
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center border-b border-[#DDE5FF] bg-gradient-to-r from-[#F5F0FF] via-[#FFFFFF] to-[#EEF9FF] px-3 shadow-sm lg:hidden">
+    <header className="sticky top-0 z-30 flex h-14 items-center border-b border-[#D9C6FF]/70 bg-gradient-to-r from-[#F8F3FF] via-[#EADCFF] to-[#EEF9FF] px-3 shadow-sm lg:hidden">
       {/* Photo de profil -> tiroir de navigation latéral gauche */}
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetTrigger asChild>
@@ -99,9 +99,9 @@ export function MobileHeader({ role, username = 'Utilisateur' }: MobileHeaderPro
           </button>
         </SheetTrigger>
 
-        <SheetContent side="left" className="flex w-72 flex-col border-white/40 bg-white/85 p-0 backdrop-blur-2xl">
+        <SheetContent side="left" className="flex w-72 flex-col border-[#D9C6FF]/70 bg-gradient-to-b from-[#F8F3FF] via-[#EADCFF] to-[#EEF9FF] p-0 shadow-[0_24px_70px_rgba(91,108,255,0.22)]">
           {/* Identité */}
-          <SheetHeader className="border-b border-white/50 p-4 text-left">
+          <SheetHeader className="border-b border-[#D9C6FF]/70 p-4 text-left">
             <div className="flex items-center gap-3">
               <Avatar className="h-12 w-12">
                 <AvatarFallback className="text-lg">
@@ -126,8 +126,8 @@ export function MobileHeader({ role, username = 'Utilisateur' }: MobileHeaderPro
                   <Link
                     href={item.href}
                     className={cn(
-                      'rounded-2xl px-3 py-3 text-base transition-colors hover:bg-white/70',
-                      active && 'bg-white/80 font-bold text-[#5B6CFF]',
+                      'rounded-2xl px-3 py-3 text-base transition-colors hover:bg-white/55',
+                      active && 'bg-white/70 font-bold text-[#5B6CFF] shadow-sm',
                     )}
                   >
                     {item.label}
@@ -138,13 +138,13 @@ export function MobileHeader({ role, username = 'Utilisateur' }: MobileHeaderPro
           </nav>
 
           {/* Thème + Paramètres + déconnexion */}
-          <div className="border-t border-white/50 p-2">
+          <div className="border-t border-[#D9C6FF]/70 p-2">
             {/* Le sélecteur de thème ne ferme pas le tiroir (on garde le retour visuel) */}
             <ThemeToggle />
             <SheetClose asChild>
               <Link
                 href={ROUTES.parametres}
-                className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-base transition-colors hover:bg-white/70"
+                className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-base transition-colors hover:bg-white/55"
               >
                 <Settings className="h-5 w-5" />
                 Paramètres

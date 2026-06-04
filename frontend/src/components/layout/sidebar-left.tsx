@@ -117,7 +117,7 @@ export function SidebarLeft({ role, username = 'Utilisateur' }: SidebarLeftProps
             size="lg"
             className="mt-4 w-[90%] rounded-full bg-gradient-to-r from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] text-base font-bold text-white shadow-[0_18px_44px_rgba(91,108,255,0.3)] transition hover:scale-[1.015]"
           >
-            Poster
+            Breezer
           </Button>
         </CreatePostDialog>
       </div>
@@ -125,7 +125,7 @@ export function SidebarLeft({ role, username = 'Utilisateur' }: SidebarLeftProps
       {/* User menu at bottom */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button className="flex w-full items-center gap-3 rounded-full border border-white/45 bg-white/55 p-3 shadow-sm backdrop-blur transition hover:bg-white/80">
+          <button className="flex w-full items-center gap-3 rounded-full border border-[#D9C6FF]/70 bg-gradient-to-r from-[#F8F3FF] via-[#EADCFF] to-[#EEF9FF] p-3 shadow-sm transition hover:shadow-[0_14px_34px_rgba(91,108,255,0.16)]">
             <Avatar className="h-10 w-10 shrink-0">
               <AvatarFallback>{username.charAt(0).toUpperCase()}</AvatarFallback>
             </Avatar>
@@ -138,7 +138,11 @@ export function SidebarLeft({ role, username = 'Utilisateur' }: SidebarLeftProps
             <MoreHorizontal className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden />
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" side="top" className="w-56">
+        <DropdownMenuContent
+          align="end"
+          side="top"
+          className="w-56 border-[#D9C6FF]/70 bg-gradient-to-r from-[#F8F3FF] via-[#EADCFF] to-[#EEF9FF] shadow-[0_18px_44px_rgba(91,108,255,0.18)]"
+        >
           <DropdownMenuLabel>
             <span className="block font-bold">{username}</span>
             <span className="block text-xs font-normal text-muted-foreground">

@@ -33,13 +33,13 @@ export function ProfilHeader({ profil, isOwner, onEdit }: ProfilHeaderProps) {
   const initials = profil.displayName.charAt(0).toUpperCase()
 
   return (
-    <header className="bg-white/40 backdrop-blur">
+    <header className="bg-gradient-to-r from-[#F8F3FF] via-[#EADCFF] to-[#EEF9FF]">
       {/* Bannière */}
       <div
         className={cn(
           'h-36 w-full bg-cover bg-center sm:h-48',
           !profil.bannerUrl &&
-            'bg-gradient-to-br from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF]',
+            'bg-gradient-to-r from-[#8D3DFF]/35 via-[#EADCFF] to-[#47D9FF]/25',
         )}
         style={profil.bannerUrl ? { backgroundImage: `url(${profil.bannerUrl})` } : undefined}
       />

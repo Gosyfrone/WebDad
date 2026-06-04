@@ -32,7 +32,7 @@ interface PostComposerProps {
 export function PostComposer({
   className,
   autoFocus = false,
-  submitLabel = 'Poster',
+  submitLabel = 'Breezer',
   onPosted,
 }: PostComposerProps) {
   const [content, setContent] = useState('')
@@ -77,10 +77,10 @@ export function PostComposer({
           ref={textareaRef}
           value={content}
           onChange={(e) => setContent(e.target.value)}
-          placeholder="Quoi de neuf ?"
+          placeholder="Ça breez ? 🌴"
           rows={3}
           autoFocus={autoFocus}
-          className="w-full resize-none bg-transparent text-xl text-slate-950 placeholder:text-slate-500 focus:outline-none"
+          className="w-full cursor-text resize-none bg-transparent text-xl text-slate-950 caret-[#5B6CFF] placeholder:text-slate-500 focus:outline-none"
         />
 
         <Separator className="bg-white/45" />
