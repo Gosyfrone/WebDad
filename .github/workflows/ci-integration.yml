@@ -1,0 +1,82 @@
+name: CI Integration
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    paths:
+      - "auth-service/**"
+      - "user-service/**"
+      - "profil-service/**"
+      - "post-service/**"
+      - "api-gateway/**"
+      - "docker-compose.yml"
+      - "**/Dockerfile"
+      - ".github/workflows/ci-integration.yml"
+
+concurrency:
+  group: ci-integration-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+# Services démarrés (tout sauf le frontend, déjà couvert par ci-frontend).
+env:
+  STACK_SERVICES: >-
+    postgres-auth postgres-user mongo-profil mongo-post
+    auth-service user-service profil-service post-service api-gateway
+
+jobs:
+  stack-health:
+    name: docker compose up + healthchecks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Générer les .env depuis les .example
+        run: |
+          cp .env.example .env
+          for svc in auth-service user-service profil-service post-service api-gateway; do
+            cp "$svc/.env.example" "$svc/.env"
+          done
+
+      - name: Build + démarrage de la stack
+        run: docker compose up -d --build $STACK_SERVICES
+
+      - name: Attente « all healthy »
+        run: |
+          deadline=$((SECONDS + 240))
+          while true; do
+            all_ok=true
+            echo "---- $(date -u +%H:%M:%S) ----"
+            for svc in $STACK_SERVICES; do
+              cid=$(docker compose ps -q "$svc")
+              if [ -z "$cid" ]; then
+                status="absent"
+              else
+                status=$(docker inspect -f \
+                  '{{if .State.Health}}{{.State.Health.Status}}{{else}}sans-healthcheck{{end}}' \
+                  "$cid")
+              fi
+              printf '  %-16s %s\n' "$svc" "$status"
+              [ "$status" = "healthy" ] || all_ok=false
+            done
+            if $all_ok; then
+              echo "✅ Tous les conteneurs sont healthy"
+              break
+            fi
+            if [ $SECONDS -ge $deadline ]; then
+              echo "::error::Timeout — un ou plusieurs conteneurs ne sont jamais devenus healthy"
+              exit 1
+            fi
+            sleep 5
+          done
+
+      - name: Logs de la stack (si échec)
+        if: failure()
+        run: docker compose logs --no-color
+
+      - name: Teardown
+        if: always()
+        run: docker compose down -v

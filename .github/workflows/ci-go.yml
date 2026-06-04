@@ -1,0 +1,73 @@
+name: CI Go
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    paths:
+      - "auth-service/**"
+      - "user-service/**"
+      - "profil-service/**"
+      - "post-service/**"
+      - "api-gateway/**"
+      - ".github/workflows/ci-go.yml"
+
+# Annule les runs obsolètes d'une même PR / branche.
+concurrency:
+  group: ci-go-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    name: ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - auth-service
+          - user-service
+          - profil-service
+          - post-service
+          - api-gateway
+    defaults:
+      run:
+        working-directory: ${{ matrix.service }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache-dependency-path: ${{ matrix.service }}/go.sum
+
+      - name: Download modules
+        run: go mod download
+
+      - name: gofmt
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "::error::Fichiers non formatés (lancer 'gofmt -w .') :"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: Build
+        run: go build ./...
+
+      - name: Test (race detector)
+        run: go test -race ./...
+
+      - name: go.mod / go.sum à jour
+        run: |
+          go mod tidy
+          git diff --exit-code go.mod go.sum \
+            || { echo "::error::go.mod/go.sum pas à jour — lancer 'go mod tidy'"; exit 1; }

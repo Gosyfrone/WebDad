@@ -14,8 +14,8 @@ import (
 
 // Config regroupe toute la configuration runtime du service.
 type Config struct {
-	Port        string
-	GinMode     string
+	Port          string
+	GinMode       string
 	DatabaseURL   string        // DSN PostgreSQL (lib/pq)
 	JWTSecret     string        // secret partagé (signature + validation)
 	JWTExpiry     time.Duration // durée de validité de l'access token (court)
