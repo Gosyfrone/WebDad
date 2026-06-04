@@ -140,7 +140,7 @@ Plus aucun conflit : le frontend (3000) et le backend (8080+) occupent des plage
 - [x] Persistent volumes for DBs
 - [x] .env for secrets (never commit)
 - [x] README with setup instructions
-- [x] CI/CD : 3 workflows GitHub Actions (`ci-go` build+test -race, `ci-frontend` lint+build, `ci-integration` stack docker + healthchecks BDD). Cf. décision §5. TODO (perspective) : golangci-lint, govulncheck, gitleaks, Dependabot, CD (push images GHCR)
+- [x] CI/CD : 3 workflows GitHub Actions (`ci-go` build+test -race **+ golangci-lint v1.64.8 (bloquant, config par défaut, vert sur les 5 modules) + govulncheck (report-only, n'échoue jamais la PR)**, `ci-frontend` lint+build, `ci-integration` stack docker + healthchecks BDD). Cf. décision §5. TODO (perspective) : gitleaks, Dependabot, CD (push images GHCR)
 
 ---
 

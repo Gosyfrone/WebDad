@@ -60,6 +60,13 @@ jobs:
       - name: go vet
         run: go vet ./...
 
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v1.64.8
+          working-directory: ${{ matrix.service }}
+          args: --timeout=5m
+
       - name: Build
         run: go build ./...
 
@@ -71,3 +78,12 @@ jobs:
           go mod tidy
           git diff --exit-code go.mod go.sum \
             || { echo "::error::go.mod/go.sum pas à jour — lancer 'go mod tidy'"; exit 1; }
+
+      # Scan de vulnérabilités des dépendances + stdlib. REPORT-ONLY : remonte
+      # les CVE en annotation mais ne bloque jamais la PR (pas de montée Go
+      # imposée). Pour le rendre bloquant : bumper x/net/jwt (→ go 1.25) + Go CI.
+      - name: govulncheck (report-only)
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          "$(go env GOPATH)/bin/govulncheck" ./... \
+            || echo "::warning::govulncheck a trouvé des vulnérabilités (report-only, non bloquant) — voir le log ci-dessus"
