@@ -80,10 +80,10 @@ export function PostComposer({
           placeholder="Ça breez ? 🌴"
           rows={3}
           autoFocus={autoFocus}
-          className="w-full cursor-text resize-none bg-transparent text-xl text-slate-950 caret-[#5B6CFF] placeholder:text-slate-500 focus:outline-none"
+          className="w-full cursor-text resize-none bg-transparent text-xl text-foreground caret-[#5B6CFF] placeholder:text-muted-foreground focus:outline-none"
         />
 
-        <Separator className="bg-white/45" />
+        <Separator className="bg-border" />
 
         {/* Toolbar */}
         <div className="flex items-center justify-between">

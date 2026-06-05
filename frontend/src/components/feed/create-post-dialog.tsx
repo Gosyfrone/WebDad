@@ -29,7 +29,7 @@ export function CreatePostDialog({ children }: CreatePostDialogProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="top-24 translate-y-0 border-[#D9C6FF]/70 bg-gradient-to-br from-[#F8F3FF] via-[#EADCFF] to-[#EEF9FF] p-4 shadow-[0_28px_80px_rgba(91,108,255,0.24)] sm:max-w-xl">
+      <DialogContent className="panel top-24 translate-y-0 border p-4 shadow-[0_28px_80px_rgba(91,108,255,0.24)] sm:max-w-xl">
         <DialogHeader className="sr-only">
           <DialogTitle>Créer un post</DialogTitle>
           <DialogDescription>

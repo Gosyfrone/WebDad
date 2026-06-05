@@ -126,16 +126,10 @@ export default function LoginPage() {
   }
 
   return (
-    <main
-      className="relative flex min-h-dvh w-full items-center justify-center overflow-hidden px-4 py-5 sm:px-6 lg:px-10"
-      style={{
-        background:
-          'linear-gradient(140deg, #f8f3ff 0%, #eadcff 28%, #d9c6ff 62%, #ebe8ff 100%)',
-      }}
-    >
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(115deg,rgba(141,61,255,0.22)_0%,rgba(255,255,255,0.25)_34%,rgba(71,217,255,0.2)_100%)]" />
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.42),transparent_34%),radial-gradient(circle_at_80%_35%,rgba(141,61,255,0.18),transparent_32%),radial-gradient(circle_at_50%_90%,rgba(71,217,255,0.16),transparent_36%)]" />
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/70" />
+    <main className="bg-page relative flex min-h-dvh w-full items-center justify-center overflow-hidden px-4 py-5 sm:px-6 lg:px-10">
+      <div className="bg-page-glow-1 pointer-events-none absolute inset-0" />
+      <div className="bg-page-glow-2 pointer-events-none absolute inset-0" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/70 dark:bg-white/10" />
 
       <section className="relative grid w-full max-w-6xl items-center gap-6 lg:grid-cols-[1.08fr_0.92fr]">
         <div className="hidden min-h-[620px] flex-col justify-between lg:flex">
@@ -156,13 +150,13 @@ export default function LoginPage() {
           </Link>
 
           <div className="relative mt-8 h-[500px]">
-            <div className="absolute left-8 top-0 w-[410px] overflow-hidden rounded-[30px] border border-white/35 bg-white/75 shadow-[0_30px_90px_rgba(91,108,255,0.28)] backdrop-blur-2xl">
-              <div className="flex items-center justify-between border-b border-white/60 px-5 py-4">
+            <div className="glass absolute left-8 top-0 w-[410px] overflow-hidden rounded-[30px] border shadow-[0_30px_90px_rgba(91,108,255,0.28)] backdrop-blur-2xl">
+              <div className="flex items-center justify-between border-b border-white/60 px-5 py-4 dark:border-white/10">
                 <div>
                   <p className="text-xs font-semibold uppercase text-[#5B6CFF]">
                     Fil en direct
                   </p>
-                  <h1 className="text-2xl font-semibold text-slate-950">
+                  <h1 className="text-2xl font-semibold text-foreground">
                     Retrouve ton monde.
                   </h1>
                 </div>
@@ -170,14 +164,14 @@ export default function LoginPage() {
                 <button
                   type="button"
                   aria-label="Rechercher"
-                  className="grid h-10 w-10 place-items-center rounded-full bg-white/90 text-slate-700 shadow-sm transition hover:scale-105 hover:text-[#5B6CFF]"
+                  className="grid h-10 w-10 place-items-center rounded-full bg-white/90 text-foreground/80 shadow-sm transition hover:scale-105 hover:text-[#5B6CFF] dark:bg-white/10"
                 >
                   <Search className="h-5 w-5" />
                 </button>
               </div>
 
               <div className="space-y-1 px-4 py-4">
-                <article className="rounded-[22px] border border-white/70 bg-white/85 p-4 shadow-sm">
+                <article className="glass rounded-[22px] border p-4 shadow-sm">
                   <div className="flex gap-3">
                     <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#8D3DFF] to-[#47D9FF] text-sm font-bold text-white">
                       ML
@@ -185,12 +179,12 @@ export default function LoginPage() {
 
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1 text-sm">
-                        <span className="font-bold text-slate-950">Mila</span>
-                        <span className="truncate text-slate-500">@mila</span>
-                        <span className="text-slate-400">·</span>
-                        <span className="text-slate-500">2 min</span>
+                        <span className="font-bold text-foreground">Mila</span>
+                        <span className="truncate text-muted-foreground">@mila</span>
+                        <span className="text-muted-foreground">·</span>
+                        <span className="text-muted-foreground">2 min</span>
                       </div>
-                      <p className="mt-1 text-sm leading-relaxed text-slate-700">
+                      <p className="mt-1 text-sm leading-relaxed text-foreground/80">
                         Nouvelle playlist, nouveaux débats, même énergie Breezy.
                       </p>
                       <div className="mt-3 h-28 rounded-[18px] bg-gradient-to-br from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] p-px">
@@ -198,7 +192,7 @@ export default function LoginPage() {
                           <div className="h-full rounded-[14px] bg-white/25" />
                         </div>
                       </div>
-                      <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
+                      <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
                         <span className="inline-flex items-center gap-1">
                           <MessageCircle className="h-4 w-4" />
                           124
@@ -213,16 +207,16 @@ export default function LoginPage() {
                   </div>
                 </article>
 
-                <article className="rounded-[22px] border border-white/70 bg-white/75 p-4 shadow-sm">
+                <article className="glass rounded-[22px] border p-4 shadow-sm">
                   <div className="flex items-center gap-3">
-                    <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-slate-950 text-sm font-bold text-white">
+                    <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-slate-950 text-sm font-bold text-white dark:bg-white/15">
                       NO
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-bold text-slate-950">
+                      <p className="truncate text-sm font-bold text-foreground">
                         Noa a rejoint la conversation
                       </p>
-                      <p className="text-xs text-slate-500">
+                      <p className="text-xs text-muted-foreground">
                         Découvre les sujets qui montent ce soir.
                       </p>
                     </div>
@@ -232,7 +226,7 @@ export default function LoginPage() {
               </div>
             </div>
 
-            <div className="absolute right-8 top-20 w-64 rounded-[28px] border border-white/40 bg-slate-950/90 p-4 text-white shadow-[0_28px_70px_rgba(15,23,42,0.32)] backdrop-blur-xl">
+            <div className="absolute right-8 top-20 w-64 rounded-[28px] border border-white/40 bg-slate-950/90 p-4 text-white shadow-[0_28px_70px_rgba(15,23,42,0.32)] backdrop-blur-xl dark:border-white/10">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-semibold">Tendances</span>
                 <Sparkles className="h-4 w-4 text-[#47D9FF]" />
@@ -250,15 +244,15 @@ export default function LoginPage() {
               </div>
             </div>
 
-            <div className="absolute bottom-0 right-24 flex w-72 items-center gap-3 rounded-[24px] border border-white/50 bg-white/90 px-4 py-3 shadow-[0_24px_70px_rgba(141,61,255,0.22)] backdrop-blur-xl">
+            <div className="glass absolute bottom-0 right-24 flex w-72 items-center gap-3 rounded-[24px] border px-4 py-3 shadow-[0_24px_70px_rgba(141,61,255,0.22)] backdrop-blur-xl">
               <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#47D9FF]/20 text-[#5B6CFF]">
                 <Bell className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-sm font-bold text-slate-950">
+                <p className="text-sm font-bold text-foreground">
                   17 nouvelles interactions
                 </p>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-muted-foreground">
                   Ton fil t’attend, frais et vivant.
                 </p>
               </div>
@@ -266,9 +260,9 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <Card className="relative w-full overflow-hidden rounded-[30px] border border-white/30 bg-white/80 shadow-[0_30px_90px_rgba(0,0,0,0.22)] backdrop-blur-2xl sm:max-w-md sm:justify-self-center lg:max-w-none">
+        <Card className="glass-strong relative w-full overflow-hidden rounded-[30px] border shadow-[0_30px_90px_rgba(0,0,0,0.22)] backdrop-blur-2xl sm:max-w-md sm:justify-self-center lg:max-w-none">
           <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF]" />
-          <div className="pointer-events-none absolute inset-x-8 top-1 h-24 bg-gradient-to-b from-white/70 to-transparent" />
+          <div className="pointer-events-none absolute inset-x-8 top-1 h-24 bg-gradient-to-b from-white/70 to-transparent dark:hidden" />
 
           <CardHeader className="relative space-y-4 px-5 pb-2 pt-5 sm:px-8 sm:pt-7">
             <Link
@@ -285,17 +279,17 @@ export default function LoginPage() {
               />
             </Link>
 
-            <div className="inline-flex w-fit items-center gap-2 rounded-full border border-white/70 bg-white/80 px-3 py-1 text-xs font-semibold text-[#5B6CFF] shadow-sm">
+            <div className="inline-flex w-fit items-center gap-2 rounded-full border border-white/70 bg-white/80 px-3 py-1 text-xs font-semibold text-[#5B6CFF] shadow-sm dark:border-white/15 dark:bg-white/10">
               <span className="h-2 w-2 rounded-full bg-[#47D9FF]" />
               Connexion au réseau
             </div>
 
             <div className="space-y-2">
-              <CardTitle className="max-w-md bg-gradient-to-r from-slate-950 via-[#5B6CFF] to-[#8D3DFF] bg-clip-text text-[31px] font-semibold leading-tight text-transparent sm:text-[38px]">
+              <CardTitle className="brand-text max-w-md text-[31px] font-semibold leading-tight sm:text-[38px]">
                 Reprends ton fil là où tu l’as laissé.
               </CardTitle>
 
-              <CardDescription className="max-w-sm text-sm leading-relaxed text-slate-500">
+              <CardDescription className="max-w-sm text-sm leading-relaxed text-muted-foreground">
                 Connecte-toi à Breezy, retrouve tes messages, tes posts et les conversations qui bougent.
               </CardDescription>
             </div>
@@ -304,12 +298,12 @@ export default function LoginPage() {
           <CardContent className="relative px-5 pb-5 sm:px-8 sm:pb-7">
             <form className="space-y-3.5" onSubmit={handleSubmit} noValidate>
               <div className="space-y-1.5">
-                <label htmlFor="email" className="text-sm font-medium text-slate-700">
+                <label htmlFor="email" className="text-sm font-medium text-foreground/80">
                   Adresse e-mail
                 </label>
 
                 <div className="group relative">
-                  <Mail className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 transition group-focus-within:text-[#5B6CFF]" />
+                  <Mail className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground transition group-focus-within:text-[#5B6CFF]" />
 
                   <Input
                     id="email"
@@ -318,7 +312,7 @@ export default function LoginPage() {
                     autoComplete="email"
                     inputMode="email"
                     placeholder="toi@exemple.com"
-                    className="h-12 rounded-2xl border-white/70 bg-white/90 pl-11 text-[15px] shadow-sm shadow-slate-200/60 transition-all placeholder:text-slate-400 hover:border-[#47D9FF]/70 focus-visible:border-[#5B6CFF] focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15"
+                    className="h-12 rounded-2xl border-white/70 bg-white/90 pl-11 text-[15px] shadow-sm shadow-slate-200/60 transition-all placeholder:text-muted-foreground hover:border-[#47D9FF]/70 focus-visible:border-[#5B6CFF] focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15 dark:border-white/15 dark:bg-white/5"
                     value={email}
                     onChange={(event) => {
                       setEmail(event.target.value)
@@ -339,12 +333,12 @@ export default function LoginPage() {
               </div>
 
               <div className="space-y-1.5">
-                <label htmlFor="password" className="text-sm font-medium text-slate-700">
+                <label htmlFor="password" className="text-sm font-medium text-foreground/80">
                   Mot de passe
                 </label>
 
                 <div className="group relative">
-                  <Lock className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 transition group-focus-within:text-[#5B6CFF]" />
+                  <Lock className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground transition group-focus-within:text-[#5B6CFF]" />
 
                   <Input
                     id="password"
@@ -352,7 +346,7 @@ export default function LoginPage() {
                     type={showPassword ? 'text' : 'password'}
                     autoComplete="current-password"
                     placeholder="••••••••"
-                    className="h-12 rounded-2xl border-white/70 bg-white/90 pl-11 pr-12 text-[15px] shadow-sm shadow-slate-200/60 transition-all placeholder:text-slate-400 hover:border-[#47D9FF]/70 focus-visible:border-[#5B6CFF] focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15"
+                    className="h-12 rounded-2xl border-white/70 bg-white/90 pl-11 pr-12 text-[15px] shadow-sm shadow-slate-200/60 transition-all placeholder:text-muted-foreground hover:border-[#47D9FF]/70 focus-visible:border-[#5B6CFF] focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15 dark:border-white/15 dark:bg-white/5"
                     value={password}
                     onChange={(event) => {
                       setPassword(event.target.value)
@@ -375,7 +369,7 @@ export default function LoginPage() {
                         : 'Afficher le mot de passe'
                     }
                     aria-pressed={showPassword}
-                    className="absolute right-3 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full text-slate-400 transition hover:bg-[#5B6CFF]/10 hover:text-[#5B6CFF] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15"
+                    className="absolute right-3 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full text-muted-foreground transition hover:bg-[#5B6CFF]/10 hover:text-[#5B6CFF] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15"
                     onClick={() => setShowPassword((current) => !current)}
                   >
                     {showPassword ? (
@@ -403,7 +397,7 @@ export default function LoginPage() {
               </div>
 
               {errors.form ? (
-                <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50/90 px-4 py-2.5 text-sm text-red-700 shadow-sm">
+                <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50/90 px-4 py-2.5 text-sm text-red-700 shadow-sm dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
                   <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" />
                   <p>{errors.form}</p>
                 </div>
@@ -419,19 +413,19 @@ export default function LoginPage() {
 
               <div className="space-y-3 pt-1">
                 <div className="flex items-center gap-3">
-                  <div className="h-px flex-1 bg-gradient-to-r from-transparent via-slate-300 to-transparent" />
+                  <div className="h-px flex-1 bg-gradient-to-r from-transparent via-border to-transparent" />
 
-                  <span className="text-xs font-medium text-slate-500">
+                  <span className="text-xs font-medium text-muted-foreground">
                     Ou se connecter avec
                   </span>
 
-                  <div className="h-px flex-1 bg-gradient-to-r from-transparent via-slate-300 to-transparent" />
+                  <div className="h-px flex-1 bg-gradient-to-r from-transparent via-border to-transparent" />
                 </div>
 
                 <div className="grid grid-cols-2 gap-2.5">
                   <button
                     type="button"
-                    className="flex h-11 items-center justify-center gap-2 rounded-2xl border border-white/70 bg-white/85 transition hover:scale-[1.01] hover:bg-white hover:shadow-md"
+                    className="flex h-11 items-center justify-center gap-2 rounded-2xl border border-white/70 bg-white/85 transition hover:scale-[1.01] hover:bg-white hover:shadow-md dark:border-white/15 dark:bg-white/10 dark:hover:bg-white/20"
                   >
                     <Image
                       src="/google-logo.jpg"
@@ -439,14 +433,14 @@ export default function LoginPage() {
                       width={18}
                       height={18}
                     />
-                    <span className="text-sm font-medium text-slate-700">
+                    <span className="text-sm font-medium text-foreground/80">
                       Google
                     </span>
                   </button>
 
                   <button
                     type="button"
-                    className="flex h-11 items-center justify-center gap-2 rounded-2xl border border-white/70 bg-white/85 transition hover:scale-[1.01] hover:bg-white hover:shadow-md"
+                    className="flex h-11 items-center justify-center gap-2 rounded-2xl border border-white/70 bg-white/85 transition hover:scale-[1.01] hover:bg-white hover:shadow-md dark:border-white/15 dark:bg-white/10 dark:hover:bg-white/20"
                   >
                     <Image
                       src="/microsoft-logo.png"
@@ -454,14 +448,14 @@ export default function LoginPage() {
                       width={18}
                       height={18}
                     />
-                    <span className="text-sm font-medium text-slate-700">
+                    <span className="text-sm font-medium text-foreground/80">
                       Microsoft
                     </span>
                   </button>
                 </div>
               </div>
 
-              <p className="text-center text-sm text-slate-500">
+              <p className="text-center text-sm text-muted-foreground">
                 Pas encore de compte ?{' '}
                 <Link
                   href={ROUTES.register}
