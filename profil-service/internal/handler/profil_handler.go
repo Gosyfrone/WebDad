@@ -3,12 +3,19 @@ package handler
 import (
 	"errors"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 
 	"github.com/webdad/profil-service/internal/middleware"
 	"github.com/webdad/profil-service/internal/models"
 	"github.com/webdad/profil-service/internal/service"
+)
+
+// Bornes de pagination de la recherche de profils.
+const (
+	defaultSearchLimit = 20
+	maxSearchLimit     = 50
 )
 
 // ProfilHandler regroupe les handlers HTTP du profil.
@@ -19,6 +26,28 @@ type ProfilHandler struct {
 // NewProfilHandler construit le handler.
 func NewProfilHandler(profils *service.ProfilService) *ProfilHandler {
 	return &ProfilHandler{profils: profils}
+}
+
+// Search : GET /profils/search?q=&limit= — recherche par display_name (public).
+func (h *ProfilHandler) Search(c *gin.Context) {
+	profils, err := h.profils.Search(c.Request.Context(), c.Query("q"), searchLimit(c))
+	if err != nil {
+		respondProfilError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": profils})
+}
+
+// searchLimit lit ?limit (défaut 20, borné à 50).
+func searchLimit(c *gin.Context) int64 {
+	n, err := strconv.Atoi(c.Query("limit"))
+	if err != nil || n <= 0 {
+		return defaultSearchLimit
+	}
+	if n > maxSearchLimit {
+		return maxSearchLimit
+	}
+	return int64(n)
 }
 
 // GetByUserID : GET /profils/:userId — profil public d'un utilisateur.

@@ -18,7 +18,8 @@ func RegisterRoutes(r *gin.Engine, serviceName string, profils *service.ProfilSe
 
 	p := r.Group("/profils")
 	{
-		// Lecture publique du profil d'un utilisateur.
+		// Lecture publique.
+		p.GET("/search", h.Search) // ?q= : recherche par display_name
 		p.GET("/:userId", h.GetByUserID)
 
 		// Routes authentifiées (JWT requis).

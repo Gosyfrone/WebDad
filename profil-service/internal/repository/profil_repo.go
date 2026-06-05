@@ -42,6 +42,29 @@ func (r *ProfilRepository) Insert(ctx context.Context, p *models.Profil) error {
 	return err
 }
 
+// SearchByDisplayName retourne les profils dont le display_name matche le motif
+// `pattern` (déjà échappé par le service), insensible à la casse, triés par nom.
+// ⚠️ Regex non ancrée = balayage de collection (acceptable à l'échelle du
+// projet ; perspective : index `$text` ou collation pour passer à l'échelle).
+func (r *ProfilRepository) SearchByDisplayName(ctx context.Context, pattern string, limit int64) ([]models.Profil, error) {
+	filter := bson.M{"display_name": bson.M{"$regex": pattern, "$options": "i"}}
+	opts := options.Find().
+		SetLimit(limit).
+		SetSort(bson.D{{Key: "display_name", Value: 1}})
+
+	cur, err := r.collection.Find(ctx, filter, opts)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = cur.Close(ctx) }()
+
+	profils := make([]models.Profil, 0)
+	if err := cur.All(ctx, &profils); err != nil {
+		return nil, err
+	}
+	return profils, nil
+}
+
 // Update applique un $set au profil et retourne le document à jour.
 // mongo.ErrNoDocuments si le profil n'existe pas. set ne doit contenir que
 // des champs déjà résolus par le service (validés, règles appliquées).

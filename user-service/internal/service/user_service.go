@@ -31,6 +31,7 @@ var usernamePattern = regexp.MustCompile(`^[a-zA-Z0-9_]{3,50}$`)
 var reservedUsernames = map[string]bool{
 	"me": true, "admin": true, "root": true, "users": true,
 	"by-username": true, "null": true, "undefined": true,
+	"search": true, "suggestions": true,
 }
 
 // UserService regroupe les dépendances et la config métier.
@@ -77,6 +78,29 @@ func (s *UserService) List(limit, offset int) ([]models.User, error) {
 	users, err := s.repo.List(limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("liste utilisateurs : %w", err)
+	}
+	return users, nil
+}
+
+// Search retourne les utilisateurs dont le username contient `term`. Un terme
+// vide renvoie une liste vide (pas de balayage complet de la table).
+func (s *UserService) Search(term string, limit, offset int) ([]models.User, error) {
+	term = strings.TrimSpace(term)
+	if term == "" {
+		return []models.User{}, nil
+	}
+	users, err := s.repo.Search(term, limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("recherche utilisateurs : %w", err)
+	}
+	return users, nil
+}
+
+// Suggestions retourne les utilisateurs les plus suivis (« Qui suivre »).
+func (s *UserService) Suggestions(limit, offset int) ([]models.User, error) {
+	users, err := s.repo.ListByFollowers(limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("suggestions utilisateurs : %w", err)
 	}
 	return users, nil
 }

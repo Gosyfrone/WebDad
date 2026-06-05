@@ -56,3 +56,17 @@ export interface ProfilEditableFields {
   avatarUrl: string
   bannerUrl: string
 }
+
+/**
+ * Utilisateur affiché dans une liste d'abonnés / d'abonnements (modale des
+ * relations) ou dans les suggestions. L'identité (id, username) vient du
+ * user-service ; le décoratif (displayName, bio, avatar) est enrichi depuis
+ * profil-service à la lecture (repli sur le username si absent).
+ */
+export interface RelationUser {
+  id: string
+  username: string
+  displayName: string
+  bio: string
+  avatarUrl: string
+}
