@@ -1,11 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ArrowLeft, FileText } from 'lucide-react'
 import Link from 'next/link'
 
 import { cn } from '@/lib/utils'
 import { ROUTES } from '@/lib/routes'
+import { getMe, getProfilMe } from '@/lib/api'
 import type { ProfilDetails, ProfilEditableFields } from '@/types'
 import { PostCard, type PostCardProps } from '@/components/feed/post-card'
 import { ProfilHeader } from '@/components/profil/profil-header'
@@ -31,6 +32,37 @@ interface ProfilViewProps {
 export function ProfilView({ profil: initialProfil, posts, isOwner = true }: ProfilViewProps) {
   const [profil, setProfil] = useState(initialProfil)
   const [tab, setTab] = useState<ProfilTab>('posts')
+
+  // Hydratation côté client (apiFetch est client-only) : on remplace les
+  // données stub par le vrai utilisateur courant (identité + compteurs via
+  // user-service, décoratif via profil-service). Repli silencieux sur le stub
+  // en cas d'échec (apiFetch gère déjà la redirection /login sur 401).
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const [me, myProfil] = await Promise.all([getMe(), getProfilMe()])
+        if (cancelled) return
+        setProfil((prev) => ({
+          ...prev,
+          userId: me.id,
+          username: me.username,
+          joinedAt: me.joinedAt,
+          followersCount: me.followersCount,
+          followingCount: me.followingCount,
+          displayName: myProfil?.displayName?.trim() || me.username,
+          bio: myProfil?.bio ?? prev.bio,
+          avatarUrl: myProfil?.avatarUrl ?? prev.avatarUrl,
+          bannerUrl: myProfil?.bannerUrl ?? prev.bannerUrl,
+        }))
+      } catch {
+        /* repli sur les données stub */
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   function handleEdit(fields: ProfilEditableFields) {
     setProfil((prev) => ({ ...prev, ...fields }))

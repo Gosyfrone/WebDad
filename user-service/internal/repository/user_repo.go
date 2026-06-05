@@ -4,6 +4,7 @@ package repository
 
 import (
 	"database/sql"
+	"strings"
 
 	"github.com/webdad/user-service/internal/models"
 )
@@ -179,6 +180,39 @@ func (r *UserRepository) ListFollowing(id string, limit, offset int) ([]models.U
 		ORDER BY f.created_at DESC
 		LIMIT $2 OFFSET $3`
 	return r.queryUsers(q, id, limit, offset)
+}
+
+// Search retourne les utilisateurs actifs dont le username contient `term`
+// (insensible à la casse), triés par handle. Les wildcards LIKE de `term` sont
+// échappés (recherche littérale, pas d'injection de motif).
+func (r *UserRepository) Search(term string, limit, offset int) ([]models.User, error) {
+	const q = `
+		SELECT ` + userColumns + `
+		FROM users
+		WHERE is_active = true AND username ILIKE $1
+		ORDER BY username ASC
+		LIMIT $2 OFFSET $3`
+	return r.queryUsers(q, "%"+escapeLike(term)+"%", limit, offset)
+}
+
+// ListByFollowers retourne les utilisateurs actifs triés par nombre d'abonnés
+// décroissant (« Qui suivre »). Le tri réutilise la sous-requête corrélée des
+// compteurs (non sélectionnée ici : seules les colonnes user suffisent).
+func (r *UserRepository) ListByFollowers(limit, offset int) ([]models.User, error) {
+	const q = `
+		SELECT ` + userColumns + `
+		FROM users
+		WHERE is_active = true
+		ORDER BY (SELECT COUNT(*) FROM follows WHERE following_id = users.id) DESC,
+		         created_at DESC
+		LIMIT $1 OFFSET $2`
+	return r.queryUsers(q, limit, offset)
+}
+
+// escapeLike neutralise les métacaractères LIKE (`%`, `_`, `\`) pour que la
+// saisie utilisateur soit traitée littéralement dans un motif ILIKE.
+func escapeLike(s string) string {
+	return strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(s)
 }
 
 // queryUsers exécute une requête renvoyant des lignes userColumns.

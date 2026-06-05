@@ -6,6 +6,7 @@ package service
 import (
 	"context"
 	"errors"
+	"regexp"
 	"strings"
 	"time"
 
@@ -46,6 +47,17 @@ func New(repo *repository.ProfilRepository, displayNameCooldown time.Duration) *
 func (s *ProfilService) GetByUserID(ctx context.Context, userID string) (*models.Profil, error) {
 	p, err := s.repo.GetByUserID(ctx, userID)
 	return mapGet(p, err)
+}
+
+// Search retourne les profils dont le display_name contient `term` (insensible
+// à la casse). Un terme vide renvoie une liste vide (pas de balayage complet).
+// Les métacaractères regex de `term` sont neutralisés (recherche littérale).
+func (s *ProfilService) Search(ctx context.Context, term string, limit int64) ([]models.Profil, error) {
+	term = strings.TrimSpace(term)
+	if term == "" {
+		return []models.Profil{}, nil
+	}
+	return s.repo.SearchByDisplayName(ctx, regexp.QuoteMeta(term), limit)
 }
 
 // Create est l'UNIQUE voie de création d'un profil (POST /profils). L'id vient

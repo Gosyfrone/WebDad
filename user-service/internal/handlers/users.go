@@ -56,6 +56,28 @@ func (h *Handler) List(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": users})
 }
 
+// Search : GET /users/search?q= — recherche d'utilisateurs par username (public).
+func (h *Handler) Search(c *gin.Context) {
+	limit, offset := paginate(c)
+	users, err := h.users.Search(c.Query("q"), limit, offset)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "recherche impossible"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": users})
+}
+
+// Suggestions : GET /users/suggestions — comptes les plus suivis (public).
+func (h *Handler) Suggestions(c *gin.Context) {
+	limit, offset := paginate(c)
+	users, err := h.users.Suggestions(limit, offset)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "suggestions impossibles"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": users})
+}
+
 // GetByID : GET /users/:id — détail d'un utilisateur + compteurs (public).
 func (h *Handler) GetByID(c *gin.Context) {
 	user, err := h.users.GetDetailsByID(c.Param("id"))

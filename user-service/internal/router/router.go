@@ -29,6 +29,8 @@ func New(users *service.UserService, jwtSecret string) *gin.Engine {
 	{
 		// Lecture publique.
 		u.GET("", h.List)
+		u.GET("/search", h.Search)           // ?q= : recherche par username
+		u.GET("/suggestions", h.Suggestions) // comptes les plus suivis
 		u.GET("/by-username/:username", h.GetByUsername)
 		u.GET("/:id", h.GetByID)
 		u.GET("/:id/followers", h.Followers)

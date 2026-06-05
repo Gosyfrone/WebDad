@@ -1,20 +1,6 @@
 import { Search } from 'lucide-react'
 
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Button } from '@/components/ui/button'
-
-interface SuggestedUser {
-  name: string
-  handle: string
-  initials: string
-}
-
-const SUGGESTED_USERS: SuggestedUser[] = [
-  { name: 'Zaid', handle: '@zaid_dev', initials: 'Z' },
-  { name: 'Perujan', handle: '@perujan', initials: 'P' },
-  { name: 'Candis', handle: '@candis', initials: 'C' },
-  { name: 'Théo', handle: '@theo_tech', initials: 'T' },
-]
+import { WhoToFollow } from '@/components/layout/who-to-follow'
 
 const TRENDS = [
   { category: 'Technologie', topic: '#Microservices', posts: '12,4 K posts' },
@@ -54,34 +40,7 @@ export function SidebarRight() {
       </div>
 
       {/* Qui suivre */}
-      <div className="glass overflow-hidden rounded-[24px] border backdrop-blur-xl">
-        <h2 className="brand-text px-4 py-3 text-xl font-bold">
-          Qui suivre
-        </h2>
-        {SUGGESTED_USERS.map((user) => (
-          <div
-            key={user.handle}
-            className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-accent"
-          >
-            <Avatar className="h-10 w-10 shrink-0">
-              <AvatarFallback>{user.initials}</AvatarFallback>
-            </Avatar>
-            <div className="flex min-w-0 flex-1 flex-col">
-              <span className="truncate text-sm font-bold">{user.name}</span>
-              <span className="truncate text-sm text-muted-foreground">{user.handle}</span>
-            </div>
-            {/* TODO (issue profil) : brancher l'action "suivre" */}
-            <Button
-              variant="default"
-              size="sm"
-              className="rounded-full bg-slate-950 font-bold text-white dark:bg-white dark:text-slate-950"
-              disabled
-            >
-              Suivre
-            </Button>
-          </div>
-        ))}
-      </div>
+      <WhoToFollow />
     </aside>
   )
 }

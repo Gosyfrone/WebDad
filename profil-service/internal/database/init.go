@@ -30,8 +30,15 @@ func EnsureSchema(ctx context.Context, db *mongo.Database) error {
 	return ensureSeed(ctx, db)
 }
 
-// ensureCollections crée les collections manquantes avec leur validateur.
-// (Une collection déjà présente est laissée telle quelle.)
+// ensureCollections crée les collections manquantes avec leur validateur, et
+// resynchronise le validateur des collections déjà présentes (`collMod`).
+//
+// Le service possède son schéma : il ne se contente pas de le poser à la
+// création, il le MAINTIENT à chaque démarrage. Sans le `collMod`, un volume
+// créé par une version antérieure conserverait indéfiniment son ancien
+// validateur (ex. un schéma qui exigeait encore `username`, supprimé depuis du
+// profil) → les écritures conformes au schéma courant échoueraient. `collMod`
+// avec le validateur courant est idempotent (no-op s'il est déjà à jour).
 func ensureCollections(ctx context.Context, db *mongo.Database) error {
 	existing, err := db.ListCollectionNames(ctx, bson.M{})
 	if err != nil {
@@ -44,6 +51,13 @@ func ensureCollections(ctx context.Context, db *mongo.Database) error {
 
 	for _, name := range collectionOrder {
 		if have[name] {
+			cmd := bson.D{
+				{Key: "collMod", Value: name},
+				{Key: "validator", Value: validators[name]},
+			}
+			if err := db.RunCommand(ctx, cmd).Err(); err != nil {
+				return fmt.Errorf("maj validateur %q : %w", name, err)
+			}
 			continue
 		}
 		opts := options.CreateCollection().SetValidator(validators[name])

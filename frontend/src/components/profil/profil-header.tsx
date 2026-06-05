@@ -1,13 +1,16 @@
 'use client'
 
+import { useState } from 'react'
 import { CalendarDays } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
+import type { RelationKind } from '@/lib/api'
 import type { ProfilDetails, ProfilEditableFields } from '@/types'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { EditProfilDialog } from '@/components/profil/edit-profil-dialog'
+import { RelationsDialog } from '@/components/profil/relations-dialog'
 
 interface ProfilHeaderProps {
   profil: ProfilDetails
@@ -31,6 +34,13 @@ const ROLE_LABELS: Record<ProfilDetails['role'], string> = {
  */
 export function ProfilHeader({ profil, isOwner, onEdit }: ProfilHeaderProps) {
   const initials = profil.displayName.charAt(0).toUpperCase()
+  const [relationsOpen, setRelationsOpen] = useState(false)
+  const [relationsTab, setRelationsTab] = useState<RelationKind>('followers')
+
+  function openRelations(tab: RelationKind) {
+    setRelationsTab(tab)
+    setRelationsOpen(true)
+  }
 
   return (
     <header className="panel">
@@ -104,22 +114,51 @@ export function ProfilHeader({ profil, isOwner, onEdit }: ProfilHeaderProps) {
           <span>A rejoint en {formatJoinedAt(profil.joinedAt)}</span>
         </div>
 
-        {/* Compteurs */}
+        {/* Compteurs (cliquables → modale des relations) — même ordre que la modale */}
         <div className="mt-3 flex gap-5 text-sm">
-          <Count value={profil.followingCount} label="Abonnements" />
-          <Count value={profil.followersCount} label="Abonnés" />
+          <Count
+            value={profil.followersCount}
+            label="Abonnés"
+            onClick={() => openRelations('followers')}
+          />
+          <Count
+            value={profil.followingCount}
+            label="Abonnements"
+            onClick={() => openRelations('following')}
+          />
         </div>
       </div>
+
+      <RelationsDialog
+        open={relationsOpen}
+        onOpenChange={setRelationsOpen}
+        userId={profil.userId}
+        initialTab={relationsTab}
+        followersCount={profil.followersCount}
+        followingCount={profil.followingCount}
+      />
     </header>
   )
 }
 
-function Count({ value, label }: { value: number; label: string }) {
+function Count({
+  value,
+  label,
+  onClick,
+}: {
+  value: number
+  label: string
+  onClick: () => void
+}) {
   return (
-    <span className="flex gap-1">
-      <span className="font-bold">{formatCount(value)}</span>
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex gap-1 rounded-md transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFF]/40"
+    >
+      <span className="font-bold text-foreground">{formatCount(value)}</span>
       <span className="text-muted-foreground">{label}</span>
-    </span>
+    </button>
   )
 }
 
