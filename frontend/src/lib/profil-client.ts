@@ -34,6 +34,8 @@ type JwtClaims = {
   role?: string
 }
 
+const PROFIL_UPDATED_EVENT = 'breezy:profil-updated'
+
 export async function getMyProfil(): Promise<ProfilDetails> {
   const [user, profil] = await Promise.all([
     fetchApiData<ApiUser>('/users/me'),
@@ -73,7 +75,26 @@ export async function saveMyProfil(
     body: JSON.stringify(toUpdatePayload(fields)),
   })
 
-  return getMyProfil()
+  const updated = await getMyProfil()
+  notifyProfilUpdated(updated)
+  return updated
+}
+
+export function subscribeProfilUpdated(
+  onUpdate: (profil: ProfilDetails) => void
+): () => void {
+  function handleUpdate(event: Event) {
+    onUpdate((event as CustomEvent<ProfilDetails>).detail)
+  }
+
+  window.addEventListener(PROFIL_UPDATED_EVENT, handleUpdate)
+  return () => window.removeEventListener(PROFIL_UPDATED_EVENT, handleUpdate)
+}
+
+function notifyProfilUpdated(profil: ProfilDetails): void {
+  window.dispatchEvent(
+    new CustomEvent<ProfilDetails>(PROFIL_UPDATED_EVENT, { detail: profil })
+  )
 }
 
 function mergeProfil(

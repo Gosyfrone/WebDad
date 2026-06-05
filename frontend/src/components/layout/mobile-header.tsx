@@ -8,10 +8,11 @@ import { LogOut, Settings } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import { logout } from '@/lib/auth-client'
+import { getMyProfil, subscribeProfilUpdated } from '@/lib/profil-client'
 import { ROUTES, navItemsForRole } from '@/lib/routes'
-import type { UserRole } from '@/types'
+import type { ProfilDetails, UserRole } from '@/types'
 import { ThemeToggle } from '@/components/theme-toggle'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
   Sheet,
   SheetClose,
@@ -47,6 +48,47 @@ export function MobileHeader({ role, username = 'Utilisateur' }: MobileHeaderPro
   const pathname = usePathname()
   const hidden = pathname?.startsWith(ROUTES.profil) ?? false
   const [open, setOpen] = useState(false)
+  const [account, setAccount] = useState({
+    displayName: username,
+    username: username === 'Utilisateur' ? '' : username,
+    avatarUrl: '',
+    role,
+  })
+
+  const fallbackInitial = (account.displayName || account.username || 'U')
+    .charAt(0)
+    .toUpperCase()
+  const handle = account.username ? `@${account.username}` : '@utilisateur'
+  const displayedRole = account.role ?? role
+
+  useEffect(() => {
+    let cancelled = false
+
+    function applyProfil(profil: ProfilDetails) {
+      setAccount({
+        displayName: profil.displayName,
+        username: profil.username,
+        avatarUrl: profil.avatarUrl,
+        role: profil.role,
+      })
+    }
+
+    async function loadAccount() {
+      try {
+        const profil = await getMyProfil()
+        if (!cancelled) applyProfil(profil)
+      } catch {
+        // Le header conserve le fallback si la session est expirée.
+      }
+    }
+
+    const unsubscribe = subscribeProfilUpdated(applyProfil)
+    void loadAccount()
+    return () => {
+      cancelled = true
+      unsubscribe()
+    }
+  }, [role, username])
 
   // Ouverture par swipe depuis le bord gauche (→ droite).
   useEffect(() => {
@@ -95,7 +137,10 @@ export function MobileHeader({ role, username = 'Utilisateur' }: MobileHeaderPro
             className="rounded-full ring-offset-background transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
             <Avatar className="h-8 w-8">
-              <AvatarFallback>{username.charAt(0).toUpperCase()}</AvatarFallback>
+              {account.avatarUrl && (
+                <AvatarImage src={account.avatarUrl} alt={account.displayName} />
+              )}
+              <AvatarFallback>{fallbackInitial}</AvatarFallback>
             </Avatar>
           </button>
         </SheetTrigger>
@@ -105,14 +150,15 @@ export function MobileHeader({ role, username = 'Utilisateur' }: MobileHeaderPro
           <SheetHeader className="border-b p-4 text-left">
             <div className="flex items-center gap-3">
               <Avatar className="h-12 w-12">
-                <AvatarFallback className="text-lg">
-                  {username.charAt(0).toUpperCase()}
-                </AvatarFallback>
+                {account.avatarUrl && (
+                  <AvatarImage src={account.avatarUrl} alt={account.displayName} />
+                )}
+                <AvatarFallback className="text-lg">{fallbackInitial}</AvatarFallback>
               </Avatar>
               <div className="flex min-w-0 flex-col">
-                <SheetTitle className="truncate">{username}</SheetTitle>
+                <SheetTitle className="truncate">{account.displayName}</SheetTitle>
                 <SheetDescription className="truncate">
-                  @{username.toLowerCase()} · {role ?? 'non connecté'}
+                  {handle} · {displayedRole ?? 'non connecté'}
                 </SheetDescription>
               </div>
             </div>

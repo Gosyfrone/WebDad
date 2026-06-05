@@ -18,9 +18,9 @@ import {
 
 import { cn } from '@/lib/utils'
 import { logout } from '@/lib/auth-client'
-import { getMyProfil } from '@/lib/profil-client'
+import { getMyProfil, subscribeProfilUpdated } from '@/lib/profil-client'
 import { ROUTES } from '@/lib/routes'
-import type { UserRole } from '@/types'
+import type { ProfilDetails, UserRole } from '@/types'
 import { CreatePostDialog } from '@/components/feed/create-post-dialog'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -87,25 +87,31 @@ export function SidebarLeft({ role, username = 'Utilisateur' }: SidebarLeftProps
   useEffect(() => {
     let cancelled = false
 
+    function applyProfil(profil: ProfilDetails) {
+      setAccount({
+        displayName: profil.displayName,
+        username: profil.username,
+        avatarUrl: profil.avatarUrl,
+        role: profil.role,
+      })
+    }
+
     async function loadAccount() {
       try {
         const profil = await getMyProfil()
         if (!cancelled) {
-          setAccount({
-            displayName: profil.displayName,
-            username: profil.username,
-            avatarUrl: profil.avatarUrl,
-            role: profil.role,
-          })
+          applyProfil(profil)
         }
       } catch {
         // Le layout reste utilisable avec le fallback pendant une session expirée.
       }
     }
 
+    const unsubscribe = subscribeProfilUpdated(applyProfil)
     void loadAccount()
     return () => {
       cancelled = true
+      unsubscribe()
     }
   }, [role, username])
 
