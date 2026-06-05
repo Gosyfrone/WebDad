@@ -230,27 +230,28 @@ CMD ["node","server.js"]
 
 ```yaml
 services:
+  api:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      MONGO_URL: mongodb://mongo:27017/posts
+    depends_on:
+      mongo:
+        condition: service_healthy
 
- api:
-
-  build: .
-
-  ports:
-   - "3000:3000"
-
-  environment:
-   MONGO_URL: mongodb://mongo:27017/posts
-
-  depends_on:
-   - mongo
-
- mongo:
-
-  image: mongo
+  mongo:
+    image: mongo
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
-
- mongo-data:
+  mongo-data:
 ```
 
 ### 5.7 Validation des propriétés non fonctionnelles (1.5h)
