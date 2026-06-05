@@ -1,10 +1,11 @@
 'use client'
 
-import { Languages, Palette, Settings } from 'lucide-react'
+import { Languages, Palette, Scale, Settings } from 'lucide-react'
 
 import { useT } from '@/components/language-provider'
 import { LanguageSelector } from '@/components/language-selector'
 import { ThemeToggle } from '@/components/theme-toggle'
+import { LegalLinks } from '@/components/legal/legal-links'
 
 export default function ParametresPage() {
   const t = useT()
@@ -69,6 +70,15 @@ export default function ParametresPage() {
             </div>
           </div>
         </section>
+      </div>
+
+      {/* Section Légal (point d'accès principal aux pages légales sur mobile) */}
+      <div className="glass mx-4 mb-6 mt-4 flex flex-col gap-3 rounded-[26px] border px-6 py-6 backdrop-blur-xl">
+        <h2 className="flex items-center gap-2 text-base font-bold text-foreground">
+          <Scale className="h-4 w-4 text-[#5B6CFF] dark:text-[#9aa6ff]" aria-hidden />
+          Légal
+        </h2>
+        <LegalLinks className="text-sm" />
       </div>
     </div>
   )
