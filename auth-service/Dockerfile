@@ -1,5 +1,5 @@
 # ─── Stage 1 : Build ─────────────────────────────────────────────
-FROM golang:1.22-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 RUN apk add --no-cache git ca-certificates tzdata
 
@@ -21,7 +21,7 @@ RUN CGO_ENABLED=0 GOOS=linux \
 # toujours l'image de prod (dernier stage). Sélectionné en dev via
 # `target: dev` dans docker-compose.dev.yml. Le code source est monté
 # en bind mount par compose ; air recompile à chaud à chaque save.
-FROM golang:1.22-alpine AS dev
+FROM golang:1.25-alpine AS dev
 RUN apk add --no-cache git wget ca-certificates tzdata && \
     go install github.com/air-verse/air@v1.52.3
 WORKDIR /app
