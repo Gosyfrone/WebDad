@@ -1,9 +1,9 @@
 # PROSIT API
 
 Groupe :
-STOFFEL Maxime – Scribe
-LUU Philippe – Secrétaire
-RIVET Alexandre – Animateur
+STOFFEL Maxime - Scribe |
+LUU Philippe - Secrétaire |
+RIVET Alexandre - Animateur |
 TOUZE Romain - Gestionnaire du temps
 
 # Sommaire
