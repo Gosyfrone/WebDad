@@ -1,10 +1,12 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Image as ImageIcon, Smile, BarChart2 } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { getMyProfil, subscribeProfilUpdated } from '@/lib/profil-client'
+import type { ProfilDetails } from '@/types'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { EmojiPicker } from '@/components/feed/emoji-picker'
@@ -36,10 +38,29 @@ export function PostComposer({
   onPosted,
 }: PostComposerProps) {
   const [content, setContent] = useState('')
+  const [avatarUrl, setAvatarUrl] = useState('')
+  const [initial, setInitial] = useState('U')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const remaining = MAX_CHARS - content.length
   const isEmpty = content.trim().length === 0
   const isOver = remaining < 0
+
+  // Avatar de l'utilisateur courant (resync sur édition du profil, comme la
+  // sidebar). Repli silencieux sur l'initiale si la session/le profil manque.
+  useEffect(() => {
+    let cancelled = false
+    function apply(profil: ProfilDetails) {
+      if (cancelled) return
+      setAvatarUrl(profil.avatarUrl)
+      setInitial((profil.displayName || profil.username || 'U').charAt(0).toUpperCase())
+    }
+    getMyProfil().then(apply).catch(() => {})
+    const unsubscribe = subscribeProfilUpdated(apply)
+    return () => {
+      cancelled = true
+      unsubscribe()
+    }
+  }, [])
 
   function handleSubmit() {
     if (isEmpty || isOver) return
@@ -66,9 +87,9 @@ export function PostComposer({
   return (
     <div className={cn('flex gap-3', className)}>
       <Avatar className="mt-1 h-10 w-10 shrink-0 shadow-[0_12px_30px_rgba(91,108,255,0.22)]">
-        {/* TODO (issue auth) : avatar de l'utilisateur courant */}
+        {avatarUrl && <AvatarImage src={avatarUrl} alt="" />}
         <AvatarFallback className="bg-gradient-to-br from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] font-bold text-white">
-          U
+          {initial}
         </AvatarFallback>
       </Avatar>
 
