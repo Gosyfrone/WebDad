@@ -23,6 +23,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { CommentSection } from '@/components/feed/comment-section'
+import { ProfilLink } from '@/components/profil/profil-link'
 
 interface PostCardProps {
   post: FeedPost
@@ -85,20 +86,32 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
 
   return (
     <article className="glass mx-3 my-3 flex gap-3 rounded-[24px] border px-4 py-3 backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-white/85 hover:shadow-[0_20px_56px_rgba(91,108,255,0.16)] dark:hover:bg-[#1f1633]/80">
-      <Avatar className="mt-0.5 h-10 w-10 shrink-0">
-        {post.author.avatarUrl && <AvatarImage src={post.author.avatarUrl} alt="" />}
-        <AvatarFallback className="bg-gradient-to-br from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] font-bold text-white">
-          {initialOf(post.author.displayName)}
-        </AvatarFallback>
-      </Avatar>
+      <ProfilLink author={post.author} className="mt-0.5 shrink-0 transition hover:opacity-90">
+        <Avatar className="h-10 w-10">
+          {post.author.avatarUrl && <AvatarImage src={post.author.avatarUrl} alt="" />}
+          <AvatarFallback className="bg-gradient-to-br from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] font-bold text-white">
+            {initialOf(post.author.displayName)}
+          </AvatarFallback>
+        </Avatar>
+      </ProfilLink>
 
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         {/* Header */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-1.5 text-sm">
-            <span className="truncate font-bold text-foreground">{post.author.displayName}</span>
+            <ProfilLink
+              author={post.author}
+              className="truncate font-bold text-foreground hover:underline"
+            >
+              {post.author.displayName}
+            </ProfilLink>
             {post.author.username && (
-              <span className="shrink-0 text-muted-foreground">@{post.author.username}</span>
+              <ProfilLink
+                author={post.author}
+                className="shrink-0 text-muted-foreground hover:underline"
+              >
+                @{post.author.username}
+              </ProfilLink>
             )}
             <span className="shrink-0 text-muted-foreground">·</span>
             <span className="shrink-0 text-muted-foreground">{timeAgo(post.createdAt)}</span>

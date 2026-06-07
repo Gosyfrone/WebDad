@@ -25,6 +25,11 @@ export const ROUTES = {
 
 export type Route = (typeof ROUTES)[keyof typeof ROUTES]
 
+/** Lien vers le profil public d'un utilisateur (`/profil/<username>`). */
+export function profilHref(username: string): string {
+  return `${ROUTES.profil}/${encodeURIComponent(username)}`
+}
+
 /** Un lien de navigation affiché dans la barre de navigation. */
 export interface NavItem {
   label: string

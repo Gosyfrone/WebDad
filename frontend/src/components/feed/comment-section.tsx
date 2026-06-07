@@ -13,6 +13,7 @@ import {
 import { useToast } from '@/hooks/use-toast'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
+import { ProfilLink } from '@/components/profil/profil-link'
 
 const MAX_CHARS = 280
 
@@ -143,18 +144,30 @@ function CommentRow({
 }) {
   return (
     <div className="group flex gap-2">
-      <Avatar className="h-8 w-8 shrink-0">
-        {comment.author.avatarUrl && <AvatarImage src={comment.author.avatarUrl} alt="" />}
-        <AvatarFallback className="bg-gradient-to-br from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] text-xs font-bold text-white">
-          {initialOf(comment.author.displayName)}
-        </AvatarFallback>
-      </Avatar>
+      <ProfilLink author={comment.author} className="shrink-0 transition hover:opacity-90">
+        <Avatar className="h-8 w-8">
+          {comment.author.avatarUrl && <AvatarImage src={comment.author.avatarUrl} alt="" />}
+          <AvatarFallback className="bg-gradient-to-br from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] text-xs font-bold text-white">
+            {initialOf(comment.author.displayName)}
+          </AvatarFallback>
+        </Avatar>
+      </ProfilLink>
 
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex items-center gap-1.5 text-xs">
-          <span className="truncate font-bold text-foreground">{comment.author.displayName}</span>
+          <ProfilLink
+            author={comment.author}
+            className="truncate font-bold text-foreground hover:underline"
+          >
+            {comment.author.displayName}
+          </ProfilLink>
           {comment.author.username && (
-            <span className="shrink-0 text-muted-foreground">@{comment.author.username}</span>
+            <ProfilLink
+              author={comment.author}
+              className="shrink-0 text-muted-foreground hover:underline"
+            >
+              @{comment.author.username}
+            </ProfilLink>
           )}
           <span className="shrink-0 text-muted-foreground">·</span>
           <span className="shrink-0 text-muted-foreground">{timeAgo(comment.createdAt)}</span>
