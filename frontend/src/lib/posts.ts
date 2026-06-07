@@ -37,8 +37,10 @@ interface ApiPost {
 interface ApiComment {
   id: string
   post_id: string
+  parent_id?: string
   author_id: string
   content: string
+  reply_count?: number
   created_at: string
 }
 
@@ -81,8 +83,12 @@ export interface FeedPost {
 export interface PostComment {
   id: string
   postId: string
+  /** Vide = commentaire racine ; sinon id du commentaire racine (réponse). */
+  parentId: string
   author: PostAuthor
   content: string
+  /** Nombre de réponses (pertinent pour un commentaire racine). */
+  replyCount: number
   createdAt: string
   canDelete: boolean
 }
@@ -194,8 +200,10 @@ async function toComment(c: ApiComment): Promise<PostComment> {
   return {
     id: c.id,
     postId: c.post_id,
+    parentId: c.parent_id ?? '',
     author: await resolveAuthor(c.author_id),
     content: c.content,
+    replyCount: c.reply_count ?? 0,
     createdAt: c.created_at,
     canDelete: canDelete(c.author_id),
   }
@@ -281,21 +289,41 @@ export async function unlikePost(id: string): Promise<number> {
 
 // --- Commentaires ------------------------------------------------------------
 
-/** Commentaires d'un post (chronologiques). */
-export async function listComments(postId: string, limit = 50, offset = 0): Promise<PostComment[]> {
+/** Commentaires RACINE d'un post (chronologiques, paginés). */
+export async function listComments(postId: string, limit = 10, offset = 0): Promise<PostComment[]> {
   const raw = await unwrap<ApiComment[]>(
     await apiFetch(`/posts/${postId}/comments?limit=${limit}&offset=${offset}`),
   )
   return Promise.all((raw ?? []).map(toComment))
 }
 
-/** Ajoute un commentaire (auteur dérivé du JWT côté back). */
-export async function createComment(postId: string, content: string): Promise<PostComment> {
+/** Réponses d'un commentaire racine (chronologiques, paginées). */
+export async function listReplies(
+  postId: string,
+  commentId: string,
+  limit = 10,
+  offset = 0,
+): Promise<PostComment[]> {
+  const raw = await unwrap<ApiComment[]>(
+    await apiFetch(`/posts/${postId}/comments/${commentId}/replies?limit=${limit}&offset=${offset}`),
+  )
+  return Promise.all((raw ?? []).map(toComment))
+}
+
+/**
+ * Ajoute un commentaire (auteur dérivé du JWT côté back). `parentId` fourni →
+ * c'est une réponse (rattachée à plat à la racine côté back).
+ */
+export async function createComment(
+  postId: string,
+  content: string,
+  parentId?: string,
+): Promise<PostComment> {
   const created = await unwrap<ApiComment>(
     await apiFetch(`/posts/${postId}/comments`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content }),
+      body: JSON.stringify(parentId ? { content, parent_id: parentId } : { content }),
     }),
   )
   return toComment(created)

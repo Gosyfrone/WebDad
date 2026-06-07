@@ -1,9 +1,10 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Loader2, Users } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
+import { useInfiniteScroll } from '@/lib/use-infinite-scroll'
 import {
   listFeed,
   listFollowingFeed,
@@ -15,28 +16,52 @@ import { PostCard } from '@/components/feed/post-card'
 
 type FeedTab = 'for-you' | 'following'
 
+const FEED_PAGE = 10
+
+/** Concatène une page en dédupliquant par id (un post prépendu peut revenir). */
+function mergeUnique(current: FeedPost[], incoming: FeedPost[]): FeedPost[] {
+  const seen = new Set(current.map((p) => p.id))
+  return [...current, ...incoming.filter((p) => !seen.has(p.id))]
+}
+
 /**
  * Corps du fil d'actualité : en-tête sticky, onglets « Pour toi » /
  * « Abonnements », zone de composition, puis la liste de l'onglet actif.
  *
- * Les données sont chargées via le post-service (`listFeed` / `listFollowingFeed`).
- * Un post fraîchement publié est prépendu sans refetch (event `post-created`).
+ * Les pages sont chargées au défilement (`useInfiniteScroll`). Un post
+ * fraîchement publié est prépendu sans refetch (event `post-created`).
  */
 export function FeedView() {
   const [tab, setTab] = useState<FeedTab>('for-you')
   const [posts, setPosts] = useState<FeedPost[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(false)
   const [error, setError] = useState('')
+  // Nombre d'éléments réellement chargés depuis le serveur (offset de pagination,
+  // indépendant des insertions/suppressions locales).
+  const offsetRef = useRef(0)
 
+  const fetchPage = useCallback(
+    (t: FeedTab, offset: number) =>
+      t === 'for-you' ? listFeed(FEED_PAGE, offset) : listFollowingFeed(FEED_PAGE, offset),
+    [],
+  )
+
+  // Chargement initial / changement d'onglet.
   useEffect(() => {
     let cancelled = false
     setLoading(true)
     setError('')
+    setPosts([])
+    offsetRef.current = 0
 
-    const load = tab === 'for-you' ? listFeed() : listFollowingFeed()
-    load
+    fetchPage(tab, 0)
       .then((list) => {
-        if (!cancelled) setPosts(list)
+        if (cancelled) return
+        setPosts(list)
+        offsetRef.current = list.length
+        setHasMore(list.length === FEED_PAGE)
       })
       .catch(() => {
         if (!cancelled) setError('Impossible de charger le fil.')
@@ -48,7 +73,26 @@ export function FeedView() {
     return () => {
       cancelled = true
     }
-  }, [tab])
+  }, [tab, fetchPage])
+
+  const loadMore = useCallback(async () => {
+    setLoadingMore(true)
+    try {
+      const next = await fetchPage(tab, offsetRef.current)
+      offsetRef.current += next.length
+      setPosts((prev) => mergeUnique(prev, next))
+      setHasMore(next.length === FEED_PAGE)
+    } catch {
+      setHasMore(false)
+    } finally {
+      setLoadingMore(false)
+    }
+  }, [tab, fetchPage])
+
+  const sentinelRef = useInfiniteScroll(loadMore, {
+    hasMore,
+    loading: loading || loadingMore,
+  })
 
   // Un nouveau post (composer inline ou popup sidebar) est prépendu au fil.
   useEffect(() => subscribePostCreated((post) => setPosts((prev) => [post, ...prev])), [])
@@ -85,10 +129,7 @@ export function FeedView() {
           <Loader2 className="h-6 w-6 animate-spin text-[#5B6CFF]" aria-hidden />
         </div>
       ) : error ? (
-        <EmptyState
-          title="Fil indisponible"
-          message={error}
-        />
+        <EmptyState title="Fil indisponible" message={error} />
       ) : posts.length === 0 ? (
         tab === 'for-you' ? (
           <EmptyState
@@ -102,11 +143,21 @@ export function FeedView() {
           />
         )
       ) : (
-        <div className="divide-y divide-border">
-          {posts.map((post) => (
-            <PostCard key={post.id} post={post} onDeleted={handleDeleted} />
-          ))}
-        </div>
+        <>
+          <div className="divide-y divide-border">
+            {posts.map((post) => (
+              <PostCard key={post.id} post={post} onDeleted={handleDeleted} />
+            ))}
+          </div>
+          {/* Sentinelle de défilement infini + indicateur de chargement. */}
+          {hasMore && (
+            <div ref={sentinelRef} className="flex justify-center py-6">
+              {loadingMore && (
+                <Loader2 className="h-5 w-5 animate-spin text-[#5B6CFF]" aria-hidden />
+              )}
+            </div>
+          )}
+        </>
       )}
     </div>
   )

@@ -22,7 +22,8 @@ func NewCommentHandler(svc *service.PostService, serviceName string) *CommentHan
 	}
 }
 
-// ListPostComments : GET /posts/:id/comments (public) — fil chronologique paginé.
+// ListPostComments : GET /posts/:id/comments (public) — commentaires RACINE,
+// chronologiques, paginés (les réponses sont chargées via ListCommentReplies).
 func (h *CommentHandler) ListPostComments(c *gin.Context) {
 	comments, err := h.service.ListComments(c.Request.Context(), c.Param("id"), pageLimit(c), pageOffset(c))
 	if err != nil {
@@ -30,6 +31,17 @@ func (h *CommentHandler) ListPostComments(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"data": comments})
+}
+
+// ListCommentReplies : GET /posts/:id/comments/:commentId/replies (public) —
+// réponses d'un commentaire, chronologiques, paginées.
+func (h *CommentHandler) ListCommentReplies(c *gin.Context) {
+	replies, err := h.service.ListReplies(c.Request.Context(), c.Param("commentId"), pageLimit(c), pageOffset(c))
+	if err != nil {
+		respondPostError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": replies})
 }
 
 // CreatPostComment : POST /posts/:id/comments — l'auteur est dérivé du JWT.
@@ -46,7 +58,7 @@ func (h *CommentHandler) CreatPostComment(c *gin.Context) {
 		return
 	}
 
-	comment, err := h.service.CreateComment(c.Request.Context(), c.Param("id"), claims.UserID, req.Content)
+	comment, err := h.service.CreateComment(c.Request.Context(), c.Param("id"), claims.UserID, req.Content, req.ParentID)
 	if err != nil {
 		respondPostError(c, err)
 		return

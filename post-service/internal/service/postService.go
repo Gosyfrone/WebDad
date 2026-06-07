@@ -192,8 +192,10 @@ func (s *PostService) PostLikers(ctx context.Context, id string) ([]string, erro
 }
 
 // CreateComment ajoute un commentaire (auteur dérivé du JWT) sur un post
-// existant et incrémente son compteur.
-func (s *PostService) CreateComment(ctx context.Context, postID, authorID, content string) (*models.Comment, error) {
+// existant et incrémente son compteur. Si `parentID` est fourni, c'est une
+// réponse : elle est rattachée à plat au commentaire RACINE (cf. resolveParentID,
+// threading à 2 niveaux) et incrémente le `reply_count` de cette racine.
+func (s *PostService) CreateComment(ctx context.Context, postID, authorID, content, parentID string) (*models.Comment, error) {
 	oid, err := parseID(postID)
 	if err != nil {
 		return nil, err
@@ -201,9 +203,27 @@ func (s *PostService) CreateComment(ctx context.Context, postID, authorID, conte
 	if _, err := s.repo.Get(ctx, oid); err != nil {
 		return nil, translateNotFound(err)
 	}
+
+	rootID := ""
+	if parentID != "" {
+		pcoid, err := parseID(parentID)
+		if err != nil {
+			return nil, err
+		}
+		parent, err := s.repo.GetComment(ctx, pcoid)
+		if err != nil {
+			return nil, translateNotFound(err)
+		}
+		if parent.PostID != postID {
+			return nil, ErrPostNotFound // parent rattaché à un autre post
+		}
+		rootID = resolveParentID(parent, parentID)
+	}
+
 	now := time.Now()
 	comment := &models.Comment{
 		PostID:    postID,
+		ParentID:  rootID,
 		AuthorID:  authorID,
 		Content:   content,
 		CreatedAt: now,
@@ -215,10 +235,15 @@ func (s *PostService) CreateComment(ctx context.Context, postID, authorID, conte
 	if _, err := s.repo.IncCounter(ctx, oid, "comments_count", 1); err != nil {
 		return nil, err
 	}
+	if rootID != "" {
+		if rcoid, err := parseID(rootID); err == nil {
+			_ = s.repo.IncReplyCount(ctx, rcoid, 1)
+		}
+	}
 	return comment, nil
 }
 
-// ListComments renvoie les commentaires d'un post (chronologiques, paginés).
+// ListComments renvoie les commentaires RACINE d'un post (chronologiques, paginés).
 func (s *PostService) ListComments(ctx context.Context, postID string, limit, offset int64) ([]models.Comment, error) {
 	if _, err := parseID(postID); err != nil {
 		return nil, err
@@ -226,8 +251,17 @@ func (s *PostService) ListComments(ctx context.Context, postID string, limit, of
 	return s.repo.ListComments(ctx, postID, clampLimit(limit), clampOffset(offset))
 }
 
+// ListReplies renvoie les réponses d'un commentaire (chronologiques, paginées).
+func (s *PostService) ListReplies(ctx context.Context, commentID string, limit, offset int64) ([]models.Comment, error) {
+	if _, err := parseID(commentID); err != nil {
+		return nil, err
+	}
+	return s.repo.ListReplies(ctx, commentID, clampLimit(limit), clampOffset(offset))
+}
+
 // DeleteComment supprime un commentaire si l'acteur en a le droit (auteur du
-// commentaire ou modérateur/admin) et décrémente le compteur du post.
+// commentaire ou modérateur/admin), ajuste les compteurs et, pour un
+// commentaire racine, supprime ses réponses en cascade.
 func (s *PostService) DeleteComment(ctx context.Context, commentID, actorID, actorRole string) error {
 	coid, err := parseID(commentID)
 	if err != nil {
@@ -243,12 +277,33 @@ func (s *PostService) DeleteComment(ctx context.Context, commentID, actorID, act
 	if err := s.repo.DeleteComment(ctx, coid); err != nil {
 		return translateNotFound(err)
 	}
-	// Décrémente le compteur du post visé (id pris sur le commentaire, source
-	// de vérité). Best-effort : un post déjà supprimé n'a plus de compteur.
+
+	removed := int32(1)
+	if comment.ParentID == "" {
+		// Commentaire racine : cascade des réponses.
+		n, _ := s.repo.DeleteRepliesByParent(ctx, commentID)
+		removed += int32(n)
+	} else if rcoid, err := parseID(comment.ParentID); err == nil {
+		// Réponse : décrémente le compteur de réponses de la racine.
+		_ = s.repo.IncReplyCount(ctx, rcoid, -1)
+	}
+
+	// Décrémente le compteur du post (id pris sur le commentaire, source de
+	// vérité). Best-effort : un post déjà supprimé n'a plus de compteur.
 	if poid, err := parseID(comment.PostID); err == nil {
-		_, _ = s.repo.IncCounter(ctx, poid, "comments_count", -1)
+		_, _ = s.repo.IncCounter(ctx, poid, "comments_count", -removed)
 	}
 	return nil
+}
+
+// resolveParentID : threading à 2 niveaux — répondre à une réponse rattache la
+// nouvelle réponse à la RACINE (parent.ParentID), pas à la réponse elle-même.
+// Répondre à un commentaire racine garde son id. Fonction PURE (testée).
+func resolveParentID(parent *models.Comment, requestedID string) string {
+	if parent.ParentID != "" {
+		return parent.ParentID
+	}
+	return requestedID
 }
 
 // canModify : un post n'est modifiable/supprimable que par son auteur ou par un

@@ -5,7 +5,8 @@ import { CalendarDays, LinkIcon, MapPin } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import type { RelationKind } from '@/lib/api'
-import type { ProfilDetails, ProfilEditableFields } from '@/types'
+import { useFollow } from '@/lib/use-follow'
+import type { ProfilDetails, ProfilEditableFields, RelationUser } from '@/types'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -37,6 +38,11 @@ export function ProfilHeader({ profil, isOwner, saving = false, onEdit }: Profil
   const initials = profil.displayName.charAt(0).toUpperCase()
   const [relationsOpen, setRelationsOpen] = useState(false)
   const [relationsTab, setRelationsTab] = useState<RelationKind>('followers')
+
+  // État de suivi (même hook que la recherche / les suggestions). Différé pour
+  // le propriétaire (pas de bouton « Suivre » sur son propre profil).
+  const { currentUserId, isFollowing, isPending, toggle } = useFollow(!isOwner)
+  const canFollow = !isOwner && currentUserId !== null && currentUserId !== profil.userId
 
   function openRelations(tab: RelationKind) {
     setRelationsTab(tab)
@@ -91,15 +97,13 @@ export function ProfilHeader({ profil, isOwner, saving = false, onEdit }: Profil
                   Éditer le profil
                 </Button>
               </EditProfilDialog>
-            ) : (
-              // TODO (issue profil) : brancher l'action « suivre »
-              <Button
-                className="rounded-full bg-gradient-to-r from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] font-bold text-white"
-                disabled
-              >
-                Suivre
-              </Button>
-            )}
+            ) : canFollow ? (
+              <FollowButton
+                following={isFollowing(profil.userId)}
+                pending={isPending(profil.userId)}
+                onToggle={(next) => toggle(toRelationUser(profil), next)}
+              />
+            ) : null}
           </div>
         </div>
 
@@ -171,6 +175,54 @@ export function ProfilHeader({ profil, isOwner, saving = false, onEdit }: Profil
         followingCount={profil.followingCount}
       />
     </header>
+  )
+}
+
+/** Adapte un ProfilDetails vers le RelationUser attendu par `useFollow`. */
+function toRelationUser(profil: ProfilDetails): RelationUser {
+  return {
+    id: profil.userId,
+    username: profil.username,
+    displayName: profil.displayName,
+    bio: profil.bio,
+    avatarUrl: profil.avatarUrl,
+  }
+}
+
+/**
+ * Bouton Suivre⇄Abonné du profil — même comportement que `UserListItem`
+ * (recherche / suggestions) : « Abonné » bascule en « Ne plus suivre » au survol.
+ */
+function FollowButton({
+  following,
+  pending,
+  onToggle,
+}: {
+  following: boolean
+  pending: boolean
+  onToggle: (next: boolean) => void
+}) {
+  return (
+    <Button
+      disabled={pending}
+      onClick={() => onToggle(!following)}
+      variant={following ? 'outline' : 'default'}
+      className={cn(
+        'group/btn rounded-full font-bold',
+        following
+          ? 'border-white/70 bg-white/80 backdrop-blur hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive dark:border-white/15 dark:bg-white/10 dark:hover:bg-destructive/20'
+          : 'bg-gradient-to-r from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] text-white',
+      )}
+    >
+      {following ? (
+        <>
+          <span className="group-hover/btn:hidden">Abonné</span>
+          <span className="hidden group-hover/btn:inline">Ne plus suivre</span>
+        </>
+      ) : (
+        'Suivre'
+      )}
+    </Button>
   )
 }
 

@@ -49,6 +49,7 @@ func RegisterRoutes(r *gin.Engine, serviceName string, postService *service.Post
 			{
 				comment.GET("", CommentHandler.ListPostComments)
 				comment.POST("", auth, CommentHandler.CreatPostComment)
+				comment.GET("/:commentId/replies", CommentHandler.ListCommentReplies)
 				comment.DELETE("/:commentId", auth, CommentHandler.DeletePostComment)
 			}
 		}

@@ -197,15 +197,26 @@ func (r *PostRepository) AddComment(ctx context.Context, comment *models.Comment
 	return nil
 }
 
-// ListComments renvoie les commentaires d'un post, du plus ancien au plus
-// récent (lecture chronologique d'un fil), paginés.
+// ListComments renvoie les commentaires RACINE d'un post (parent_id absent/null),
+// du plus ancien au plus récent, paginés. Les réponses sont chargées à part
+// (ListReplies).
 func (r *PostRepository) ListComments(ctx context.Context, postID string, limit, skip int64) ([]models.Comment, error) {
+	return r.findComments(ctx, bson.M{"post_id": postID, "parent_id": nil}, limit, skip)
+}
+
+// ListReplies renvoie les réponses d'un commentaire racine, chronologiques, paginées.
+func (r *PostRepository) ListReplies(ctx context.Context, parentID string, limit, skip int64) ([]models.Comment, error) {
+	return r.findComments(ctx, bson.M{"parent_id": parentID}, limit, skip)
+}
+
+// findComments factorise la lecture paginée + triée (asc) des commentaires.
+func (r *PostRepository) findComments(ctx context.Context, filter bson.M, limit, skip int64) ([]models.Comment, error) {
 	opts := options.Find().
 		SetSort(bson.D{{Key: "created_at", Value: 1}}).
 		SetLimit(limit).
 		SetSkip(skip)
 
-	cursor, err := r.comments.Find(ctx, bson.M{"post_id": postID}, opts)
+	cursor, err := r.comments.Find(ctx, filter, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -216,6 +227,22 @@ func (r *PostRepository) ListComments(ctx context.Context, postID string, limit,
 		return nil, err
 	}
 	return comments, nil
+}
+
+// IncReplyCount applique `$inc` sur le compteur de réponses d'un commentaire racine.
+func (r *PostRepository) IncReplyCount(ctx context.Context, id bson.ObjectID, delta int32) error {
+	_, err := r.comments.UpdateOne(ctx, bson.M{"_id": id}, bson.M{"$inc": bson.M{"reply_count": delta}})
+	return err
+}
+
+// DeleteRepliesByParent supprime toutes les réponses d'un commentaire racine
+// (cascade à la suppression). Renvoie le nombre de réponses supprimées.
+func (r *PostRepository) DeleteRepliesByParent(ctx context.Context, parentID string) (int64, error) {
+	res, err := r.comments.DeleteMany(ctx, bson.M{"parent_id": parentID})
+	if err != nil {
+		return 0, err
+	}
+	return res.DeletedCount, nil
 }
 
 // GetComment renvoie un commentaire par son ObjectID (mongo.ErrNoDocuments si absent).

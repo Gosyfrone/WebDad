@@ -64,6 +64,20 @@ func TestCanAct(t *testing.T) {
 	}
 }
 
+// TestResolveParentID : threading 2 niveaux — répondre à une racine garde son
+// id, répondre à une réponse rattache à la racine de cette réponse. PURE.
+func TestResolveParentID(t *testing.T) {
+	root := &models.Comment{} // parent_id vide = racine
+	if got := resolveParentID(root, "root-id"); got != "root-id" {
+		t.Fatalf("réponse à une racine = %q, attendu \"root-id\"", got)
+	}
+
+	reply := &models.Comment{ParentID: "root-id"} // une réponse
+	if got := resolveParentID(reply, "reply-id"); got != "root-id" {
+		t.Fatalf("réponse à une réponse = %q, attendu \"root-id\" (rattachement racine)", got)
+	}
+}
+
 // TestGetFeedEmpty : sans aucun id suivi, GetFeed renvoie une liste vide SANS
 // toucher au dépôt (court-circuit) — d'où le repo nil sans panic.
 func TestGetFeedEmpty(t *testing.T) {
