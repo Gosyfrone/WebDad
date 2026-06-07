@@ -63,6 +63,8 @@ func TestProtectedRequiresToken(t *testing.T) {
 		{http.MethodPost, "/posts/507f1f77bcf86cd799439011/like"},
 		{http.MethodDelete, "/posts/507f1f77bcf86cd799439011/like"},
 		{http.MethodPost, "/posts/507f1f77bcf86cd799439011/comments"},
+		{http.MethodDelete, "/posts/507f1f77bcf86cd799439011/comments/507f1f77bcf86cd799439012"},
+		{http.MethodGet, "/posts/me/liked-ids"},
 	}
 	r := newTestRouter(t)
 	for _, tc := range cases {
@@ -71,6 +73,25 @@ func TestProtectedRequiresToken(t *testing.T) {
 		r.ServeHTTP(w, req)
 		if w.Code != http.StatusUnauthorized {
 			t.Fatalf("%s %s sans token = %d, attendu 401", tc.method, tc.path, w.Code)
+		}
+	}
+}
+
+// TestSplitIDs : découpe une liste d'ids, ignore les segments vides/espaces.
+func TestSplitIDs(t *testing.T) {
+	cases := []struct {
+		in   string
+		want int
+	}{
+		{"", 0},
+		{"a", 1},
+		{"a,b,c", 3},
+		{"a,,b, ,c", 3},
+		{" a , b ", 2},
+	}
+	for _, tc := range cases {
+		if got := len(splitIDs(tc.in)); got != tc.want {
+			t.Fatalf("splitIDs(%q) = %d ids, attendu %d", tc.in, got, tc.want)
 		}
 	}
 }

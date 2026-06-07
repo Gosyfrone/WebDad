@@ -1,10 +1,12 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Image as ImageIcon, Smile, BarChart2 } from 'lucide-react'
+import { Image as ImageIcon, Smile, BarChart2, Loader2 } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import { getMyProfil, subscribeProfilUpdated } from '@/lib/profil-client'
+import { createPost, notifyPostCreated } from '@/lib/posts'
+import { useToast } from '@/hooks/use-toast'
 import type { ProfilDetails } from '@/types'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -37,9 +39,11 @@ export function PostComposer({
   submitLabel = 'Breezer',
   onPosted,
 }: PostComposerProps) {
+  const { toast } = useToast()
   const [content, setContent] = useState('')
   const [avatarUrl, setAvatarUrl] = useState('')
   const [initial, setInitial] = useState('U')
+  const [submitting, setSubmitting] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const remaining = MAX_CHARS - content.length
   const isEmpty = content.trim().length === 0
@@ -62,11 +66,19 @@ export function PostComposer({
     }
   }, [])
 
-  function handleSubmit() {
-    if (isEmpty || isOver) return
-    // TODO (issue post) : brancher l'envoi vers POST /posts via l'API Gateway
-    onPosted?.(content)
-    setContent('')
+  async function handleSubmit() {
+    if (isEmpty || isOver || submitting) return
+    setSubmitting(true)
+    try {
+      const post = await createPost(content.trim())
+      notifyPostCreated(post) // le fil prépend sans refetch
+      onPosted?.(content)
+      setContent('')
+    } catch {
+      toast({ title: 'Publication impossible', variant: 'destructive' })
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   /** Insère l'emoji à la position du curseur (ou à la fin) et restaure le focus. */
@@ -141,10 +153,10 @@ export function PostComposer({
             <Button
               size="sm"
               className="rounded-full bg-gradient-to-r from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] font-bold text-white shadow-[0_12px_30px_rgba(91,108,255,0.28)]"
-              disabled={isEmpty || isOver}
+              disabled={isEmpty || isOver || submitting}
               onClick={handleSubmit}
             >
-              {submitLabel}
+              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : submitLabel}
             </Button>
           </div>
         </div>

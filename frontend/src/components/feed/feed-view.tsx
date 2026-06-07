@@ -1,27 +1,61 @@
 'use client'
 
-import { useState } from 'react'
-import { Users } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { Loader2, Users } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
+import {
+  listFeed,
+  listFollowingFeed,
+  subscribePostCreated,
+  type FeedPost,
+} from '@/lib/posts'
 import { CreatePost } from '@/components/feed/create-post'
-import { PostCard, type PostCardProps } from '@/components/feed/post-card'
+import { PostCard } from '@/components/feed/post-card'
 
 type FeedTab = 'for-you' | 'following'
 
-interface FeedViewProps {
-  posts: PostCardProps[]
-}
-
 /**
- * Corps du fil d'actualité : en-tête sticky, onglets « Pour toi » / « Abonnements »,
- * zone de composition, puis la liste correspondant à l'onglet actif.
+ * Corps du fil d'actualité : en-tête sticky, onglets « Pour toi » /
+ * « Abonnements », zone de composition, puis la liste de l'onglet actif.
  *
- * L'onglet « Abonnements » est un placeholder : il sera alimenté par
- * l'API (posts des comptes suivis) dans l'issue post/profil.
+ * Les données sont chargées via le post-service (`listFeed` / `listFollowingFeed`).
+ * Un post fraîchement publié est prépendu sans refetch (event `post-created`).
  */
-export function FeedView({ posts }: FeedViewProps) {
+export function FeedView() {
   const [tab, setTab] = useState<FeedTab>('for-you')
+  const [posts, setPosts] = useState<FeedPost[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    setError('')
+
+    const load = tab === 'for-you' ? listFeed() : listFollowingFeed()
+    load
+      .then((list) => {
+        if (!cancelled) setPosts(list)
+      })
+      .catch(() => {
+        if (!cancelled) setError('Impossible de charger le fil.')
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [tab])
+
+  // Un nouveau post (composer inline ou popup sidebar) est prépendu au fil.
+  useEffect(() => subscribePostCreated((post) => setPosts((prev) => [post, ...prev])), [])
+
+  const handleDeleted = useCallback((id: string) => {
+    setPosts((prev) => prev.filter((p) => p.id !== id))
+  }, [])
 
   return (
     <div className="flex flex-col">
@@ -46,15 +80,33 @@ export function FeedView({ posts }: FeedViewProps) {
         <CreatePost />
       </div>
 
-      {/* Contenu selon l'onglet actif */}
-      {tab === 'for-you' ? (
+      {loading ? (
+        <div className="flex justify-center py-12">
+          <Loader2 className="h-6 w-6 animate-spin text-[#5B6CFF]" aria-hidden />
+        </div>
+      ) : error ? (
+        <EmptyState
+          title="Fil indisponible"
+          message={error}
+        />
+      ) : posts.length === 0 ? (
+        tab === 'for-you' ? (
+          <EmptyState
+            title="Aucun post pour le moment"
+            message="Soyez le premier à publier quelque chose sur Breezy."
+          />
+        ) : (
+          <EmptyState
+            title="Aucun post pour le moment"
+            message="Les posts des comptes que vous suivez apparaîtront ici. Abonnez-vous à des profils pour personnaliser ce fil."
+          />
+        )
+      ) : (
         <div className="divide-y divide-border">
           {posts.map((post) => (
-            <PostCard key={post.id} {...post} />
+            <PostCard key={post.id} post={post} onDeleted={handleDeleted} />
           ))}
         </div>
-      ) : (
-        <FollowingPlaceholder />
       )}
     </div>
   )
@@ -84,16 +136,12 @@ function TabButton({
   )
 }
 
-/** État vide de l'onglet « Abonnements » (en attendant l'API). */
-function FollowingPlaceholder() {
+function EmptyState({ title, message }: { title: string; message: string }) {
   return (
     <div className="glass mx-4 mt-6 flex flex-col items-center gap-2 rounded-[26px] border px-8 py-16 text-center backdrop-blur-xl">
       <Users className="h-10 w-10 text-[#5B6CFF] dark:text-[#9aa6ff]" aria-hidden />
-      <h2 className="text-lg font-bold">Aucun post pour le moment</h2>
-      <p className="max-w-sm text-sm text-muted-foreground">
-        Les posts des comptes que vous suivez apparaîtront ici. Abonnez-vous à
-        des profils pour personnaliser ce fil.
-      </p>
+      <h2 className="text-lg font-bold">{title}</h2>
+      <p className="max-w-sm text-sm text-muted-foreground">{message}</p>
     </div>
   )
 }
