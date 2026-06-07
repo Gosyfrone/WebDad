@@ -40,14 +40,16 @@ func NewPostService(r *repository.PostRepository) *PostService {
 }
 
 // CreatePost crée un post pour authorID (dérivé du JWT) et renvoie le document
-// créé (avec son id généré).
+// créé (avec son id généré). Les compteurs sont posés à 0 explicitement.
 func (s *PostService) CreatePost(ctx context.Context, authorID, content string) (*models.Post, error) {
 	now := time.Now()
 	post := &models.Post{
-		AuthorID:  authorID,
-		Content:   content,
-		CreatedAt: now,
-		UpdatedAt: now,
+		AuthorID:      authorID,
+		Content:       content,
+		LikesCount:    0,
+		CommentsCount: 0,
+		CreatedAt:     now,
+		UpdatedAt:     now,
 	}
 	if err := s.repo.Create(ctx, post); err != nil {
 		return nil, err
@@ -88,7 +90,8 @@ func (s *PostService) UpdatePost(ctx context.Context, id, content, actorID, acto
 	return updated, translateNotFound(err)
 }
 
-// DeletePost supprime un post si l'acteur en a le droit.
+// DeletePost supprime un post si l'acteur en a le droit, puis purge ses likes
+// et commentaires (best-effort, pour ne pas laisser d'orphelins).
 func (s *PostService) DeletePost(ctx context.Context, id, actorID, actorRole string) error {
 	oid, err := parseID(id)
 	if err != nil {
@@ -101,12 +104,206 @@ func (s *PostService) DeletePost(ctx context.Context, id, actorID, actorRole str
 	if !canModify(post, actorID, actorRole) {
 		return ErrForbidden
 	}
-	return translateNotFound(s.repo.Delete(ctx, oid))
+	if err := s.repo.Delete(ctx, oid); err != nil {
+		return translateNotFound(err)
+	}
+	_ = s.repo.DeleteLikesByPost(ctx, id)
+	_ = s.repo.DeleteCommentsByPost(ctx, id)
+	return nil
 }
 
 // GetByProfile renvoie les posts d'un auteur, du plus récent au plus ancien.
 func (s *PostService) GetByProfile(ctx context.Context, authorID string, limit, offset int64) ([]models.Post, error) {
 	return s.repo.GetByProfile(ctx, authorID, clampLimit(limit), clampOffset(offset))
+}
+
+// GetFeed renvoie les posts d'un ensemble d'auteurs (fil « Abonnements »). Le
+// front fournit les ids suivis (seul le user-service connaît le graphe) ; la
+// sélection + le tri + la pagination sont faits côté DB ($in indexé). Liste
+// vide → aucun post (pas de requête inutile).
+func (s *PostService) GetFeed(ctx context.Context, authorIDs []string, limit, offset int64) ([]models.Post, error) {
+	if len(authorIDs) == 0 {
+		return []models.Post{}, nil
+	}
+	return s.repo.GetByAuthors(ctx, authorIDs, clampLimit(limit), clampOffset(offset))
+}
+
+// LikePost enregistre un like de actorID sur un post et renvoie le nombre de
+// likes à jour. Idempotent : reliker ne double pas le compteur.
+func (s *PostService) LikePost(ctx context.Context, id, actorID string) (int32, error) {
+	oid, err := parseID(id)
+	if err != nil {
+		return 0, err
+	}
+	post, err := s.repo.Get(ctx, oid)
+	if err != nil {
+		return 0, translateNotFound(err)
+	}
+	created, err := s.repo.AddLike(ctx, id, actorID)
+	if err != nil {
+		return 0, err
+	}
+	if !created {
+		return post.LikesCount, nil
+	}
+	updated, err := s.repo.IncCounter(ctx, oid, "likes_count", 1)
+	if err != nil {
+		return 0, err
+	}
+	return updated.LikesCount, nil
+}
+
+// UnlikePost retire le like de actorID et renvoie le nombre de likes à jour.
+// Idempotent : déliker un post non liké ne décrémente pas.
+func (s *PostService) UnlikePost(ctx context.Context, id, actorID string) (int32, error) {
+	oid, err := parseID(id)
+	if err != nil {
+		return 0, err
+	}
+	post, err := s.repo.Get(ctx, oid)
+	if err != nil {
+		return 0, translateNotFound(err)
+	}
+	removed, err := s.repo.RemoveLike(ctx, id, actorID)
+	if err != nil {
+		return 0, err
+	}
+	if !removed {
+		return post.LikesCount, nil
+	}
+	updated, err := s.repo.IncCounter(ctx, oid, "likes_count", -1)
+	if err != nil {
+		return 0, err
+	}
+	return updated.LikesCount, nil
+}
+
+// LikedPostIDs renvoie les ids des posts likés par actorID.
+func (s *PostService) LikedPostIDs(ctx context.Context, actorID string) ([]string, error) {
+	return s.repo.LikedPostIDs(ctx, actorID)
+}
+
+// PostLikers renvoie les ids des utilisateurs ayant liké un post.
+func (s *PostService) PostLikers(ctx context.Context, id string) ([]string, error) {
+	if _, err := parseID(id); err != nil {
+		return nil, err
+	}
+	return s.repo.LikersByPost(ctx, id)
+}
+
+// CreateComment ajoute un commentaire (auteur dérivé du JWT) sur un post
+// existant et incrémente son compteur. Si `parentID` est fourni, c'est une
+// réponse : elle est rattachée à plat au commentaire RACINE (cf. resolveParentID,
+// threading à 2 niveaux) et incrémente le `reply_count` de cette racine.
+func (s *PostService) CreateComment(ctx context.Context, postID, authorID, content, parentID string) (*models.Comment, error) {
+	oid, err := parseID(postID)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := s.repo.Get(ctx, oid); err != nil {
+		return nil, translateNotFound(err)
+	}
+
+	rootID := ""
+	if parentID != "" {
+		pcoid, err := parseID(parentID)
+		if err != nil {
+			return nil, err
+		}
+		parent, err := s.repo.GetComment(ctx, pcoid)
+		if err != nil {
+			return nil, translateNotFound(err)
+		}
+		if parent.PostID != postID {
+			return nil, ErrPostNotFound // parent rattaché à un autre post
+		}
+		rootID = resolveParentID(parent, parentID)
+	}
+
+	now := time.Now()
+	comment := &models.Comment{
+		PostID:    postID,
+		ParentID:  rootID,
+		AuthorID:  authorID,
+		Content:   content,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	if err := s.repo.AddComment(ctx, comment); err != nil {
+		return nil, err
+	}
+	if _, err := s.repo.IncCounter(ctx, oid, "comments_count", 1); err != nil {
+		return nil, err
+	}
+	if rootID != "" {
+		if rcoid, err := parseID(rootID); err == nil {
+			_ = s.repo.IncReplyCount(ctx, rcoid, 1)
+		}
+	}
+	return comment, nil
+}
+
+// ListComments renvoie les commentaires RACINE d'un post (chronologiques, paginés).
+func (s *PostService) ListComments(ctx context.Context, postID string, limit, offset int64) ([]models.Comment, error) {
+	if _, err := parseID(postID); err != nil {
+		return nil, err
+	}
+	return s.repo.ListComments(ctx, postID, clampLimit(limit), clampOffset(offset))
+}
+
+// ListReplies renvoie les réponses d'un commentaire (chronologiques, paginées).
+func (s *PostService) ListReplies(ctx context.Context, commentID string, limit, offset int64) ([]models.Comment, error) {
+	if _, err := parseID(commentID); err != nil {
+		return nil, err
+	}
+	return s.repo.ListReplies(ctx, commentID, clampLimit(limit), clampOffset(offset))
+}
+
+// DeleteComment supprime un commentaire si l'acteur en a le droit (auteur du
+// commentaire ou modérateur/admin), ajuste les compteurs et, pour un
+// commentaire racine, supprime ses réponses en cascade.
+func (s *PostService) DeleteComment(ctx context.Context, commentID, actorID, actorRole string) error {
+	coid, err := parseID(commentID)
+	if err != nil {
+		return err
+	}
+	comment, err := s.repo.GetComment(ctx, coid)
+	if err != nil {
+		return translateNotFound(err)
+	}
+	if !canAct(comment.AuthorID, actorID, actorRole) {
+		return ErrForbidden
+	}
+	if err := s.repo.DeleteComment(ctx, coid); err != nil {
+		return translateNotFound(err)
+	}
+
+	removed := int32(1)
+	if comment.ParentID == "" {
+		// Commentaire racine : cascade des réponses.
+		n, _ := s.repo.DeleteRepliesByParent(ctx, commentID)
+		removed += int32(n)
+	} else if rcoid, err := parseID(comment.ParentID); err == nil {
+		// Réponse : décrémente le compteur de réponses de la racine.
+		_ = s.repo.IncReplyCount(ctx, rcoid, -1)
+	}
+
+	// Décrémente le compteur du post (id pris sur le commentaire, source de
+	// vérité). Best-effort : un post déjà supprimé n'a plus de compteur.
+	if poid, err := parseID(comment.PostID); err == nil {
+		_, _ = s.repo.IncCounter(ctx, poid, "comments_count", -removed)
+	}
+	return nil
+}
+
+// resolveParentID : threading à 2 niveaux — répondre à une réponse rattache la
+// nouvelle réponse à la RACINE (parent.ParentID), pas à la réponse elle-même.
+// Répondre à un commentaire racine garde son id. Fonction PURE (testée).
+func resolveParentID(parent *models.Comment, requestedID string) string {
+	if parent.ParentID != "" {
+		return parent.ParentID
+	}
+	return requestedID
 }
 
 // canModify : un post n'est modifiable/supprimable que par son auteur ou par un
@@ -115,7 +312,13 @@ func canModify(post *models.Post, actorID, actorRole string) bool {
 	if post == nil {
 		return false
 	}
-	return post.AuthorID == actorID ||
+	return canAct(post.AuthorID, actorID, actorRole)
+}
+
+// canAct : règle d'autorisation commune (posts ET commentaires) — l'auteur, un
+// modérateur ou un admin peut agir. Fonction PURE.
+func canAct(authorID, actorID, actorRole string) bool {
+	return authorID == actorID ||
 		actorRole == models.RoleModerator ||
 		actorRole == models.RoleAdmin
 }

@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -38,6 +39,55 @@ func TestCanModify(t *testing.T) {
 func TestCanModifyNilPost(t *testing.T) {
 	if canModify(nil, "anyone", models.RoleAdmin) {
 		t.Fatal("canModify(nil, …) doit être false")
+	}
+}
+
+// TestCanAct : règle commune posts/commentaires — auteur ou mod/admin. PURE.
+func TestCanAct(t *testing.T) {
+	cases := []struct {
+		name              string
+		authorID, actorID string
+		actorRole         string
+		want              bool
+	}{
+		{"auteur du commentaire", "a1", "a1", models.RoleUser, true},
+		{"tiers sans rôle", "a1", "a2", models.RoleUser, false},
+		{"modérateur tiers", "a1", "mod", models.RoleModerator, true},
+		{"admin tiers", "a1", "adm", models.RoleAdmin, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := canAct(tc.authorID, tc.actorID, tc.actorRole); got != tc.want {
+				t.Fatalf("canAct(%s,%s,%s) = %v, attendu %v", tc.authorID, tc.actorID, tc.actorRole, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestResolveParentID : threading 2 niveaux — répondre à une racine garde son
+// id, répondre à une réponse rattache à la racine de cette réponse. PURE.
+func TestResolveParentID(t *testing.T) {
+	root := &models.Comment{} // parent_id vide = racine
+	if got := resolveParentID(root, "root-id"); got != "root-id" {
+		t.Fatalf("réponse à une racine = %q, attendu \"root-id\"", got)
+	}
+
+	reply := &models.Comment{ParentID: "root-id"} // une réponse
+	if got := resolveParentID(reply, "reply-id"); got != "root-id" {
+		t.Fatalf("réponse à une réponse = %q, attendu \"root-id\" (rattachement racine)", got)
+	}
+}
+
+// TestGetFeedEmpty : sans aucun id suivi, GetFeed renvoie une liste vide SANS
+// toucher au dépôt (court-circuit) — d'où le repo nil sans panic.
+func TestGetFeedEmpty(t *testing.T) {
+	s := NewPostService(nil)
+	posts, err := s.GetFeed(context.Background(), nil, 20, 0)
+	if err != nil {
+		t.Fatalf("GetFeed(nil) erreur inattendue : %v", err)
+	}
+	if len(posts) != 0 {
+		t.Fatalf("GetFeed(nil) = %d posts, attendu 0", len(posts))
 	}
 }
 

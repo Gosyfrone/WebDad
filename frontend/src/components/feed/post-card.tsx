@@ -1,43 +1,70 @@
 'use client'
 
 import { useState } from 'react'
-import { BarChart2, Heart, MessageCircle, MoreHorizontal, Repeat2, Share } from 'lucide-react'
+import {
+  BarChart2,
+  Heart,
+  Loader2,
+  MessageCircle,
+  MoreHorizontal,
+  Repeat2,
+  Share,
+  Trash2,
+} from 'lucide-react'
 
-import { cn } from '@/lib/utils'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { cn, initialOf, timeAgo } from '@/lib/utils'
+import { deletePost, likePost, unlikePost, type FeedPost } from '@/lib/posts'
+import { useToast } from '@/hooks/use-toast'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { CommentSection } from '@/components/feed/comment-section'
+import { ProfilLink } from '@/components/profil/profil-link'
 
-export interface PostCardProps {
-  id: string
-  name: string
-  handle: string
-  initials: string
-  timestamp: string
-  content: string
-  likes: number
-  comments: number
-  reposts: number
-  views: number
+interface PostCardProps {
+  post: FeedPost
+  /** Appelé après une suppression réussie (le parent retire le post du fil). */
+  onDeleted?: (id: string) => void
 }
 
-export function PostCard({
-  name,
-  handle,
-  initials,
-  timestamp,
-  content,
-  likes,
-  comments,
-  reposts,
-  views,
-}: PostCardProps) {
-  const [liked, setLiked] = useState(false)
-  const [likeCount, setLikeCount] = useState(likes)
-  const [reposted, setReposted] = useState(false)
-  const [repostCount, setRepostCount] = useState(reposts)
+/**
+ * Carte d'un post : en-tête (auteur + horodatage + menu), contenu, barre
+ * d'actions (commenter / liker / partager) et section commentaires repliable.
+ *
+ * Like et suppression sont câblés sur le post-service (optimistes + rollback).
+ * Repost et vues restent décoratifs (pas d'API back).
+ */
+export function PostCard({ post, onDeleted }: PostCardProps) {
+  const { toast } = useToast()
 
-  function toggleLike() {
-    setLiked((prev) => !prev)
-    setLikeCount((prev) => (liked ? prev - 1 : prev + 1))
+  const [liked, setLiked] = useState(post.liked)
+  const [likeCount, setLikeCount] = useState(post.likesCount)
+  const [commentCount, setCommentCount] = useState(post.commentsCount)
+  const [showComments, setShowComments] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+
+  // Décoratifs (pas de backend) : état purement local.
+  const [reposted, setReposted] = useState(false)
+  const [repostCount, setRepostCount] = useState(0)
+
+  async function toggleLike() {
+    const next = !liked
+    // Optimiste.
+    setLiked(next)
+    setLikeCount((n) => n + (next ? 1 : -1))
+    try {
+      const count = next ? await likePost(post.id) : await unlikePost(post.id)
+      setLikeCount(count) // reconcilie avec le compteur serveur
+    } catch {
+      // Rollback.
+      setLiked(!next)
+      setLikeCount((n) => n + (next ? -1 : 1))
+      toast({ title: 'Action impossible', variant: 'destructive' })
+    }
   }
 
   function toggleRepost() {
@@ -45,39 +72,92 @@ export function PostCard({
     setRepostCount((prev) => (reposted ? prev - 1 : prev + 1))
   }
 
+  async function handleDelete() {
+    setDeleting(true)
+    try {
+      await deletePost(post.id)
+      toast({ title: 'Post supprimé' })
+      onDeleted?.(post.id)
+    } catch {
+      setDeleting(false)
+      toast({ title: 'Suppression impossible', variant: 'destructive' })
+    }
+  }
+
   return (
     <article className="glass mx-3 my-3 flex gap-3 rounded-[24px] border px-4 py-3 backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-white/85 hover:shadow-[0_20px_56px_rgba(91,108,255,0.16)] dark:hover:bg-[#1f1633]/80">
-      <Avatar className="mt-0.5 h-10 w-10 shrink-0">
-        <AvatarFallback>{initials}</AvatarFallback>
-      </Avatar>
+      <ProfilLink author={post.author} className="mt-0.5 shrink-0 transition hover:opacity-90">
+        <Avatar className="h-10 w-10">
+          {post.author.avatarUrl && <AvatarImage src={post.author.avatarUrl} alt="" />}
+          <AvatarFallback className="bg-gradient-to-br from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] font-bold text-white">
+            {initialOf(post.author.displayName)}
+          </AvatarFallback>
+        </Avatar>
+      </ProfilLink>
 
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         {/* Header */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-1.5 text-sm">
-            <span className="truncate font-bold text-foreground">{name}</span>
-            <span className="shrink-0 text-muted-foreground">{handle}</span>
+            <ProfilLink
+              author={post.author}
+              className="truncate font-bold text-foreground hover:underline"
+            >
+              {post.author.displayName}
+            </ProfilLink>
+            {post.author.username && (
+              <ProfilLink
+                author={post.author}
+                className="shrink-0 text-muted-foreground hover:underline"
+              >
+                @{post.author.username}
+              </ProfilLink>
+            )}
             <span className="shrink-0 text-muted-foreground">·</span>
-            <span className="shrink-0 text-muted-foreground">{timestamp}</span>
+            <span className="shrink-0 text-muted-foreground">{timeAgo(post.createdAt)}</span>
           </div>
-          <button
-            aria-label="Plus d'options"
-            className="shrink-0 rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
-          >
-            <MoreHorizontal className="h-4 w-4" />
-          </button>
+
+          {post.canDelete && (
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                aria-label="Plus d'options"
+                disabled={deleting}
+                className="shrink-0 rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary focus:outline-none"
+              >
+                {deleting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <MoreHorizontal className="h-4 w-4" />
+                )}
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onClick={handleDelete}
+                  className="cursor-pointer text-red-500 focus:text-red-500"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Supprimer
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
 
         {/* Content */}
-        <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground/80">{content}</p>
+        <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/80">
+          {post.content}
+        </p>
 
         {/* Actions */}
         <div className="-ml-2 mt-1 flex items-center justify-between text-muted-foreground">
           <ActionButton
             icon={MessageCircle}
-            count={comments}
+            count={commentCount}
             label="Commenter"
+            active={showComments}
+            onClick={() => setShowComments((v) => !v)}
             className="hover:text-primary hover:bg-primary/10"
+            activeClassName="text-primary"
           />
           <ActionButton
             icon={Repeat2}
@@ -99,7 +179,7 @@ export function PostCard({
           />
           <ActionButton
             icon={BarChart2}
-            count={views}
+            count={0}
             label="Vues"
             className="hover:text-primary hover:bg-primary/10"
           />
@@ -110,6 +190,14 @@ export function PostCard({
             <Share className="h-4 w-4" />
           </button>
         </div>
+
+        {/* Commentaires (repliable) */}
+        {showComments && (
+          <CommentSection
+            postId={post.id}
+            onCountChange={(delta) => setCommentCount((n) => Math.max(0, n + delta))}
+          />
+        )}
       </div>
     </article>
   )
@@ -145,7 +233,7 @@ function ActionButton({
       )}
     >
       <Icon className={cn('h-4 w-4', active && activeClassName)} />
-      <span>{formatCount(count)}</span>
+      {count > 0 && <span>{formatCount(count)}</span>}
     </button>
   )
 }

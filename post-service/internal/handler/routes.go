@@ -30,6 +30,10 @@ func RegisterRoutes(r *gin.Engine, serviceName string, postService *service.Post
 		// Création authentifiée (auteur dérivé du JWT).
 		posts.POST("", auth, PostHandler.CreatePost)
 
+		// Posts likés par l'utilisateur courant — route STATIQUE placée avant
+		// le groupe `/:id` (sinon « me » serait capturé comme un id).
+		posts.GET("/me/liked-ids", auth, LikeHandler.LikedByMe)
+
 		post := posts.Group("/:id")
 		{
 			post.GET("", PostHandler.GetPost)
@@ -45,6 +49,7 @@ func RegisterRoutes(r *gin.Engine, serviceName string, postService *service.Post
 			{
 				comment.GET("", CommentHandler.ListPostComments)
 				comment.POST("", auth, CommentHandler.CreatPostComment)
+				comment.GET("/:commentId/replies", CommentHandler.ListCommentReplies)
 				comment.DELETE("/:commentId", auth, CommentHandler.DeletePostComment)
 			}
 		}

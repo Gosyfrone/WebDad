@@ -88,12 +88,14 @@ var validators = map[string]bson.M{
 			"bsonType": "object",
 			"required": bson.A{"post_id", "author_id", "content", "created_at"},
 			"properties": bson.M{
-				"post_id":    bson.M{"bsonType": "string"},
-				"author_id":  bson.M{"bsonType": "string"},
-				"content":    bson.M{"bsonType": "string", "maxLength": 280},
-				"is_hidden":  bson.M{"bsonType": "bool"},
-				"created_at": bson.M{"bsonType": "date"},
-				"updated_at": bson.M{"bsonType": "date"},
+				"post_id":     bson.M{"bsonType": "string"},
+				"parent_id":   bson.M{"bsonType": bson.A{"string", "null"}},
+				"author_id":   bson.M{"bsonType": "string"},
+				"content":     bson.M{"bsonType": "string", "maxLength": 280},
+				"reply_count": bson.M{"bsonType": "int", "minimum": 0},
+				"is_hidden":   bson.M{"bsonType": "bool"},
+				"created_at":  bson.M{"bsonType": "date"},
+				"updated_at":  bson.M{"bsonType": "date"},
 			},
 		},
 	},
@@ -131,8 +133,11 @@ var indexes = map[string][]mongo.IndexModel{
 		{Keys: bson.D{{Key: "is_hidden", Value: 1}}},
 	},
 	"comments": {
-		{Keys: bson.D{{Key: "post_id", Value: 1}}},
 		{Keys: bson.D{{Key: "author_id", Value: 1}}},
+		// Commentaires racine d'un post (parent_id null), triés chronologiquement.
+		{Keys: bson.D{{Key: "post_id", Value: 1}, {Key: "parent_id", Value: 1}, {Key: "created_at", Value: 1}}},
+		// Réponses d'un commentaire (parent_id = id racine), chronologiques.
+		{Keys: bson.D{{Key: "parent_id", Value: 1}, {Key: "created_at", Value: 1}}},
 	},
 	"likes": {
 		{Keys: bson.D{{Key: "post_id", Value: 1}, {Key: "user_id", Value: 1}}, Options: options.Index().SetUnique(true)},

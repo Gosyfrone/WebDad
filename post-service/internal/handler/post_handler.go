@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -46,16 +47,22 @@ func (h *PostHandler) CreatePost(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"data": post})
 }
 
-// ListPosts : GET /posts — fil paginé (public). Avec ?author_id=<id>, renvoie
-// le fil d'un auteur précis (onglet « Posts » d'un profil) ; sans, le fil global.
+// ListPosts : GET /posts — fil paginé (public). Trois modes :
+//   - ?author_id=<id>        : fil d'un auteur (onglet « Posts » d'un profil) ;
+//   - ?author_ids=<id,id,…>  : fil « Abonnements » (posts des comptes suivis,
+//     le front fournit les ids — seul user-service connaît le graphe) ;
+//   - sans paramètre         : fil global.
 func (h *PostHandler) ListPosts(c *gin.Context) {
 	var (
 		posts []models.Post
 		err   error
 	)
-	if authorID := c.Query("author_id"); authorID != "" {
-		posts, err = h.service.GetByProfile(c.Request.Context(), authorID, pageLimit(c), pageOffset(c))
-	} else {
+	switch {
+	case c.Query("author_ids") != "":
+		posts, err = h.service.GetFeed(c.Request.Context(), splitIDs(c.Query("author_ids")), pageLimit(c), pageOffset(c))
+	case c.Query("author_id") != "":
+		posts, err = h.service.GetByProfile(c.Request.Context(), c.Query("author_id"), pageLimit(c), pageOffset(c))
+	default:
 		posts, err = h.service.GetPosts(c.Request.Context(), pageLimit(c), pageOffset(c))
 	}
 	if err != nil {
@@ -142,4 +149,17 @@ func pageOffset(c *gin.Context) int64 {
 		return 0
 	}
 	return n
+}
+
+// splitIDs découpe une liste d'ids séparés par des virgules, en ignorant les
+// segments vides (ex. « a,,b, » → ["a","b"]).
+func splitIDs(raw string) []string {
+	parts := strings.Split(raw, ",")
+	ids := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if p = strings.TrimSpace(p); p != "" {
+			ids = append(ids, p)
+		}
+	}
+	return ids
 }

@@ -7,9 +7,10 @@ import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { ROUTES } from '@/lib/routes'
 import { getMyProfil, getPublicProfil, saveMyProfil } from '@/lib/profil-client'
+import { listByAuthor, type FeedPost } from '@/lib/posts'
 import { useToast } from '@/hooks/use-toast'
 import type { ProfilDetails, ProfilEditableFields } from '@/types'
-import { PostCard, type PostCardProps } from '@/components/feed/post-card'
+import { PostCard } from '@/components/feed/post-card'
 import { ProfilHeader } from '@/components/profil/profil-header'
 
 type ProfilTab = 'posts' | 'replies' | 'likes'
@@ -17,8 +18,6 @@ type ProfilTab = 'posts' | 'replies' | 'likes'
 interface ProfilViewProps {
   /** Absent ou vide : profil courant. Présent : profil public par username. */
   username?: string
-  /** Posts de l'utilisateur (onglet « Posts »). */
-  posts?: PostCardProps[]
 }
 
 /**
@@ -28,9 +27,10 @@ interface ProfilViewProps {
  * Le profil est chargé via l'API Gateway. Les onglets « Réponses » et
  * « J'aime » restent des placeholders tant que l'API n'expose pas ces flux.
  */
-export function ProfilView({ username, posts = [] }: ProfilViewProps) {
+export function ProfilView({ username }: ProfilViewProps) {
   const { toast } = useToast()
   const [profil, setProfil] = useState<ProfilDetails | null>(null)
+  const [posts, setPosts] = useState<FeedPost[]>([])
   const [tab, setTab] = useState<ProfilTab>('posts')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -64,6 +64,26 @@ export function ProfilView({ username, posts = [] }: ProfilViewProps) {
       cancelled = true
     }
   }, [username])
+
+  // Posts de l'auteur (onglet « Posts »), chargés une fois le profil connu.
+  useEffect(() => {
+    if (!profil?.userId) return
+    let cancelled = false
+    listByAuthor(profil.userId)
+      .then((list) => {
+        if (!cancelled) setPosts(list)
+      })
+      .catch(() => {
+        if (!cancelled) setPosts([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [profil?.userId])
+
+  function handleDeleted(id: string) {
+    setPosts((prev) => prev.filter((p) => p.id !== id))
+  }
 
   async function handleEdit(fields: ProfilEditableFields) {
     if (!profil) return
@@ -117,7 +137,7 @@ export function ProfilView({ username, posts = [] }: ProfilViewProps) {
         <div className="flex flex-col">
           <span className="font-bold leading-tight text-foreground">{profil.displayName}</span>
           <span className="text-xs text-muted-foreground">
-            {profil.postsCount} post{profil.postsCount > 1 ? 's' : ''}
+            {posts.length} post{posts.length > 1 ? 's' : ''}
           </span>
         </div>
       </div>
@@ -142,7 +162,7 @@ export function ProfilView({ username, posts = [] }: ProfilViewProps) {
         posts.length > 0 ? (
           <div className="divide-y divide-border">
             {posts.map((post) => (
-              <PostCard key={post.id} {...post} />
+              <PostCard key={post.id} post={post} onDeleted={handleDeleted} />
             ))}
           </div>
         ) : (
