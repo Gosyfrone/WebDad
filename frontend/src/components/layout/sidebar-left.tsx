@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -17,11 +18,12 @@ import {
 
 import { cn } from '@/lib/utils'
 import { logout } from '@/lib/auth-client'
+import { getMyProfil, subscribeProfilUpdated } from '@/lib/profil-client'
 import { ROUTES } from '@/lib/routes'
-import type { UserRole } from '@/types'
+import type { ProfilDetails, UserRole } from '@/types'
 import { CreatePostDialog } from '@/components/feed/create-post-dialog'
 import { ThemeToggle } from '@/components/theme-toggle'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -66,10 +68,52 @@ interface SidebarLeftProps {
 
 export function SidebarLeft({ role, username = 'Utilisateur' }: SidebarLeftProps) {
   const pathname = usePathname()
+  const [account, setAccount] = useState({
+    displayName: username,
+    username: username === 'Utilisateur' ? '' : username,
+    avatarUrl: '',
+    role,
+  })
 
   const visibleItems = NAV_ITEMS.filter(
     (item) => !item.roles || (role !== null && item.roles.includes(role)),
   )
+  const fallbackInitial = (account.displayName || account.username || 'U')
+    .charAt(0)
+    .toUpperCase()
+  const handle = account.username ? `@${account.username}` : '@utilisateur'
+  const displayedRole = account.role ?? role
+
+  useEffect(() => {
+    let cancelled = false
+
+    function applyProfil(profil: ProfilDetails) {
+      setAccount({
+        displayName: profil.displayName,
+        username: profil.username,
+        avatarUrl: profil.avatarUrl,
+        role: profil.role,
+      })
+    }
+
+    async function loadAccount() {
+      try {
+        const profil = await getMyProfil()
+        if (!cancelled) {
+          applyProfil(profil)
+        }
+      } catch {
+        // Le layout reste utilisable avec le fallback pendant une session expirée.
+      }
+    }
+
+    const unsubscribe = subscribeProfilUpdated(applyProfil)
+    void loadAccount()
+    return () => {
+      cancelled = true
+      unsubscribe()
+    }
+  }, [role, username])
 
   return (
     <aside className="sticky top-0 hidden h-screen w-[275px] flex-col justify-between overflow-y-auto px-3 py-4 lg:flex">
@@ -132,18 +176,19 @@ export function SidebarLeft({ role, username = 'Utilisateur' }: SidebarLeftProps
           <ThemeToggle />
         </div>
 
-        {/* User menu */}
+        {/* User menu : identité réelle chargée via profil-service */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="panel flex w-full items-center gap-3 rounded-full border p-3 shadow-sm transition hover:shadow-[0_14px_34px_rgba(91,108,255,0.16)]">
               <Avatar className="h-10 w-10 shrink-0">
-                <AvatarFallback>{username.charAt(0).toUpperCase()}</AvatarFallback>
+                {account.avatarUrl && (
+                  <AvatarImage src={account.avatarUrl} alt={account.displayName} />
+                )}
+                <AvatarFallback>{fallbackInitial}</AvatarFallback>
               </Avatar>
               <div className="flex min-w-0 flex-1 flex-col text-left">
-                <span className="truncate text-sm font-bold">{username}</span>
-                <span className="truncate text-sm text-muted-foreground">
-                  @{username.toLowerCase()}
-                </span>
+                <span className="truncate text-sm font-bold">{account.displayName}</span>
+                <span className="truncate text-sm text-muted-foreground">{handle}</span>
               </div>
               <MoreHorizontal className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden />
             </button>
@@ -154,9 +199,9 @@ export function SidebarLeft({ role, username = 'Utilisateur' }: SidebarLeftProps
             className="panel w-56 border shadow-[0_18px_44px_rgba(91,108,255,0.18)]"
           >
             <DropdownMenuLabel>
-              <span className="block font-bold">{username}</span>
+              <span className="block font-bold">{account.displayName}</span>
               <span className="block text-xs font-normal text-muted-foreground">
-                {role ?? 'non connecté'}
+                {displayedRole ?? 'non connecté'}
               </span>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />

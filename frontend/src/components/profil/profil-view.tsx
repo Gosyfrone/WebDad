@@ -1,12 +1,13 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { ArrowLeft, FileText } from 'lucide-react'
+import { ArrowLeft, FileText, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 
 import { cn } from '@/lib/utils'
 import { ROUTES } from '@/lib/routes'
-import { getMe, getProfilMe } from '@/lib/api'
+import { getMyProfil, getPublicProfil, saveMyProfil } from '@/lib/profil-client'
+import { useToast } from '@/hooks/use-toast'
 import type { ProfilDetails, ProfilEditableFields } from '@/types'
 import { PostCard, type PostCardProps } from '@/components/feed/post-card'
 import { ProfilHeader } from '@/components/profil/profil-header'
@@ -14,58 +15,92 @@ import { ProfilHeader } from '@/components/profil/profil-header'
 type ProfilTab = 'posts' | 'replies' | 'likes'
 
 interface ProfilViewProps {
-  profil: ProfilDetails
+  /** Absent ou vide : profil courant. Présent : profil public par username. */
+  username?: string
   /** Posts de l'utilisateur (onglet « Posts »). */
-  posts: PostCardProps[]
-  /** Vrai si le profil affiché est celui de l'utilisateur courant. */
-  isOwner?: boolean
+  posts?: PostCardProps[]
 }
 
 /**
  * Corps de la page profil : en-tête sticky (retour + nb de posts), en-tête de
  * profil éditable, onglets, puis la liste de posts de l'onglet actif.
  *
- * L'état du profil est local : l'édition met l'en-tête à jour immédiatement
- * (optimiste) en attendant le câblage réseau. Les onglets « Réponses » et
- * « J'aime » sont des placeholders tant que l'API n'expose pas ces flux.
+ * Le profil est chargé via l'API Gateway. Les onglets « Réponses » et
+ * « J'aime » restent des placeholders tant que l'API n'expose pas ces flux.
  */
-export function ProfilView({ profil: initialProfil, posts, isOwner = true }: ProfilViewProps) {
-  const [profil, setProfil] = useState(initialProfil)
+export function ProfilView({ username, posts = [] }: ProfilViewProps) {
+  const { toast } = useToast()
+  const [profil, setProfil] = useState<ProfilDetails | null>(null)
   const [tab, setTab] = useState<ProfilTab>('posts')
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
 
-  // Hydratation côté client (apiFetch est client-only) : on remplace les
-  // données stub par le vrai utilisateur courant (identité + compteurs via
-  // user-service, décoratif via profil-service). Repli silencieux sur le stub
-  // en cas d'échec (apiFetch gère déjà la redirection /login sur 401).
+  const isOwner = !username
+
   useEffect(() => {
     let cancelled = false
-    ;(async () => {
+
+    async function loadProfil() {
+      setLoading(true)
+      setError('')
       try {
-        const [me, myProfil] = await Promise.all([getMe(), getProfilMe()])
-        if (cancelled) return
-        setProfil((prev) => ({
-          ...prev,
-          userId: me.id,
-          username: me.username,
-          joinedAt: me.joinedAt,
-          followersCount: me.followersCount,
-          followingCount: me.followingCount,
-          displayName: myProfil?.displayName?.trim() || me.username,
-          bio: myProfil?.bio ?? prev.bio,
-          avatarUrl: myProfil?.avatarUrl ?? prev.avatarUrl,
-          bannerUrl: myProfil?.bannerUrl ?? prev.bannerUrl,
-        }))
-      } catch {
-        /* repli sur les données stub */
+        const nextProfil = username
+          ? await getPublicProfil(username)
+          : await getMyProfil()
+        if (!cancelled) setProfil(nextProfil)
+      } catch (err) {
+        if (!cancelled) {
+          setProfil(null)
+          setError(err instanceof Error ? err.message : 'Profil introuvable.')
+        }
+      } finally {
+        if (!cancelled) setLoading(false)
       }
-    })()
+    }
+
+    void loadProfil()
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [username])
 
-  function handleEdit(fields: ProfilEditableFields) {
-    setProfil((prev) => ({ ...prev, ...fields }))
+  async function handleEdit(fields: ProfilEditableFields) {
+    if (!profil) return
+
+    setSaving(true)
+    try {
+      const updated = await saveMyProfil(fields, profil.profileExists)
+      setProfil(updated)
+      toast({ title: 'Profil mis à jour' })
+    } catch (err) {
+      toast({
+        title: 'Mise à jour impossible',
+        description:
+          err instanceof Error ? err.message : 'Le profil n’a pas pu être enregistré.',
+        variant: 'destructive',
+      })
+      throw err
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex min-h-[45vh] items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-[#5B6CFF]" aria-hidden />
+      </div>
+    )
+  }
+
+  if (error || !profil) {
+    return (
+      <div className="mx-4 mt-6 rounded-[24px] border border-white/55 bg-white/72 px-5 py-8 text-center shadow-[0_18px_54px_rgba(91,108,255,0.12)] backdrop-blur-xl">
+        <h1 className="text-lg font-bold text-slate-950">Profil indisponible</h1>
+        <p className="mt-2 text-sm text-muted-foreground">{error}</p>
+      </div>
+    )
   }
 
   return (
@@ -87,7 +122,7 @@ export function ProfilView({ profil: initialProfil, posts, isOwner = true }: Pro
         </div>
       </div>
 
-      <ProfilHeader profil={profil} isOwner={isOwner} onEdit={handleEdit} />
+      <ProfilHeader profil={profil} isOwner={isOwner} saving={saving} onEdit={handleEdit} />
 
       {/* Onglets */}
       <div className="panel flex border-b">
@@ -111,7 +146,7 @@ export function ProfilView({ profil: initialProfil, posts, isOwner = true }: Pro
             ))}
           </div>
         ) : (
-          <EmptyTab message="Vous n'avez pas encore publié de post." />
+          <EmptyTab message="Aucun post publié pour le moment." />
         )
       ) : (
         <EmptyTab

@@ -42,7 +42,9 @@ type Profil struct {
 // choisi à l'inscription. On ne dérive jamais de nom depuis l'email (le
 // provisioning paresseux crée un profil à display_name vide, cf. service).
 type CreateProfilRequest struct {
-	DisplayName string `json:"display_name" binding:"required,max=100"`
+	DisplayName string     `json:"display_name" binding:"required,max=100"`
+	BirthDate   *time.Time `json:"birth_date"   binding:"omitempty"`
+	Gender      *string    `json:"gender"       binding:"omitempty,oneof=male female"`
 }
 
 // UpdateProfilRequest : payload de PATCH /profils/me. Champs optionnels

@@ -88,7 +88,11 @@ export async function POST(request: NextRequest) {
   // (POST /users). L'inscription auto-connecte, d'où le provisioning ici.
   // Best-effort + repli dérivé email si le handle est pris (cf. lib/provision).
   if (accessToken) {
-    await provisionUser(accessToken, { username: body.username })
+    await provisionUser(accessToken, {
+      username: body.username,
+      birthDate: body.birthDate,
+      gender: body.gender,
+    })
   }
 
   return nextResponse

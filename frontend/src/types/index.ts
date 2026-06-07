@@ -42,11 +42,18 @@ export interface ProfilDetails {
   avatarUrl: string
   /** Image de bannière (en-tête du profil). */
   bannerUrl: string
+  website: string
+  location: string
+  birthDate: string
+  gender: 'male' | 'female' | ''
   /** Date d'inscription (ISO 8601). */
   joinedAt: string
+  updatedAt: string
+  displayNameChangedAt: string
   followersCount: number
   followingCount: number
   postsCount: number
+  profileExists: boolean
 }
 
 /** Champs modifiables d'un profil (formulaire d'édition). */
@@ -55,6 +62,10 @@ export interface ProfilEditableFields {
   bio: string
   avatarUrl: string
   bannerUrl: string
+  website: string
+  location: string
+  birthDate: string
+  gender: 'male' | 'female' | ''
 }
 
 /**
