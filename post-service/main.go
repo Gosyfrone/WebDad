@@ -45,7 +45,7 @@ func main() {
 	postService := service.NewPostService(postRepo)
 
 	r := gin.Default()
-	handler.RegisterRoutes(r, serviceName, postService)
+	handler.RegisterRoutes(r, serviceName, postService, cfg.JWTSecret)
 
 	log.Printf("[%s] en écoute sur le port %s", serviceName, cfg.Port)
 	if err := r.Run(":" + cfg.Port); err != nil {
