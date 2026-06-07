@@ -5,6 +5,7 @@ package config
 
 import (
 	"fmt"
+	"log"
 	"os"
 
 	"github.com/joho/godotenv"
@@ -12,10 +13,11 @@ import (
 
 // Config regroupe la configuration runtime du service.
 type Config struct {
-	Port     string
-	GinMode  string
-	MongoURI string
-	MongoDB  string
+	Port      string
+	GinMode   string
+	MongoURI  string
+	MongoDB   string
+	JWTSecret string // secret partagé (validation des tokens émis par auth)
 }
 
 // Load construit la config. Charge les .env best-effort (ignorés s'ils
@@ -29,12 +31,19 @@ func Load() *Config {
 	_ = godotenv.Load(".env")
 	_ = godotenv.Load("../.env")
 
-	return &Config{
-		Port:     getEnv("PORT", "8084"),
-		GinMode:  getEnv("GIN_MODE", "debug"),
-		MongoURI: buildMongoURI(),
-		MongoDB:  getEnv("MONGO_INITDB_DATABASE", "webdad_post"),
+	cfg := &Config{
+		Port:      getEnv("PORT", "8084"),
+		GinMode:   getEnv("GIN_MODE", "debug"),
+		MongoURI:  buildMongoURI(),
+		MongoDB:   getEnv("MONGO_INITDB_DATABASE", "webdad_post"),
+		JWTSecret: os.Getenv("JWT_SECRET"),
 	}
+
+	if cfg.JWTSecret == "" {
+		log.Fatal("[config] JWT_SECRET manquant (à définir dans le .env racine)")
+	}
+
+	return cfg
 }
 
 // buildMongoURI assemble l'URI à partir des variables d'env. MONGO_HOST est
