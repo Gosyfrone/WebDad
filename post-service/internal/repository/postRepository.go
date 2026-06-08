@@ -53,7 +53,22 @@ func (r *PostRepository) GetAll(ctx context.Context, limit, skip int64) ([]model
 
 // GetByProfile renvoie les posts d'un auteur, triés du plus récent au plus ancien.
 func (r *PostRepository) GetByProfile(ctx context.Context, authorID string, limit, skip int64) ([]models.Post, error) {
-	return r.find(ctx, bson.M{"author_id": authorID}, limit, skip)
+	opts := options.Find().
+		SetSort(bson.D{{Key: "pinned_at", Value: -1}, {Key: "created_at", Value: -1}}).
+		SetLimit(limit).
+		SetSkip(skip)
+
+	cursor, err := r.posts.Find(ctx, bson.M{"author_id": authorID}, opts)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = cursor.Close(ctx) }()
+
+	posts := []models.Post{}
+	if err := cursor.All(ctx, &posts); err != nil {
+		return nil, err
+	}
+	return posts, nil
 }
 
 // GetByAuthors renvoie les posts d'un ensemble d'auteurs (fil « Abonnements »),
@@ -112,6 +127,49 @@ func (r *PostRepository) Update(ctx context.Context, id bson.ObjectID, content s
 			"content":    content,
 			"updated_at": time.Now(),
 		},
+	}
+	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
+
+	var post models.Post
+	if err := r.posts.FindOneAndUpdate(ctx, bson.M{"_id": id}, update, opts).Decode(&post); err != nil {
+		return nil, err
+	}
+	return &post, nil
+}
+
+// UnpinByAuthor retire l'épinglage de tous les posts d'un auteur. Appelé avant
+// Pin pour garantir un seul post épinglé par profil.
+func (r *PostRepository) UnpinByAuthor(ctx context.Context, authorID string) error {
+	_, err := r.posts.UpdateMany(
+		ctx,
+		bson.M{"author_id": authorID, "pinned_at": bson.M{"$exists": true}},
+		bson.M{"$unset": bson.M{"pinned_at": ""}, "$set": bson.M{"updated_at": time.Now()}},
+	)
+	return err
+}
+
+// Pin pose pinned_at sur un post et renvoie le document à jour.
+func (r *PostRepository) Pin(ctx context.Context, id bson.ObjectID, pinnedAt time.Time) (*models.Post, error) {
+	update := bson.M{
+		"$set": bson.M{
+			"pinned_at":  pinnedAt,
+			"updated_at": pinnedAt,
+		},
+	}
+	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
+
+	var post models.Post
+	if err := r.posts.FindOneAndUpdate(ctx, bson.M{"_id": id}, update, opts).Decode(&post); err != nil {
+		return nil, err
+	}
+	return &post, nil
+}
+
+// Unpin retire pinned_at d'un post et renvoie le document à jour.
+func (r *PostRepository) Unpin(ctx context.Context, id bson.ObjectID) (*models.Post, error) {
+	update := bson.M{
+		"$unset": bson.M{"pinned_at": ""},
+		"$set":   bson.M{"updated_at": time.Now()},
 	}
 	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
 

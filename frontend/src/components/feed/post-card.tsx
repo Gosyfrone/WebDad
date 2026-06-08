@@ -1,19 +1,21 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   BarChart2,
   Heart,
   Loader2,
   MessageCircle,
   MoreHorizontal,
+  Pin,
+  PinOff,
   Repeat2,
   Share,
   Trash2,
 } from 'lucide-react'
 
 import { cn, initialOf, timeAgo } from '@/lib/utils'
-import { deletePost, likePost, unlikePost, type FeedPost } from '@/lib/posts'
+import { deletePost, likePost, pinPost, unlikePost, unpinPost, type FeedPost } from '@/lib/posts'
 import { useToast } from '@/hooks/use-toast'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
@@ -30,6 +32,8 @@ interface PostCardProps {
   post: FeedPost
   /** Appelé après une suppression réussie (le parent retire le post du fil). */
   onDeleted?: (id: string) => void
+  /** Appelé après une mise à jour réussie (pin/unpin, etc.). */
+  onUpdated?: (post: FeedPost) => void
 }
 
 /**
@@ -39,12 +43,15 @@ interface PostCardProps {
  * Like et suppression sont câblés sur le post-service (optimistes + rollback).
  * Repost et vues restent décoratifs (pas d'API back).
  */
-export function PostCard({ post, onDeleted }: PostCardProps) {
+export function PostCard({ post, onDeleted, onUpdated }: PostCardProps) {
   const { toast } = useToast()
 
   const [liked, setLiked] = useState(post.liked)
   const [likeCount, setLikeCount] = useState(post.likesCount)
   const [commentCount, setCommentCount] = useState(post.commentsCount)
+  const [isPinned, setIsPinned] = useState(post.isPinned)
+  const [pinning, setPinning] = useState(false)
+  const [likeBurst, setLikeBurst] = useState(0)
   const [showComments, setShowComments] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
@@ -52,10 +59,15 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
   const [reposted, setReposted] = useState(false)
   const [repostCount, setRepostCount] = useState(0)
 
+  useEffect(() => {
+    setIsPinned(post.isPinned)
+  }, [post.isPinned])
+
   async function toggleLike() {
     const next = !liked
     // Optimiste.
     setLiked(next)
+    if (next) setLikeBurst((n) => n + 1)
     setLikeCount((n) => n + (next ? 1 : -1))
     try {
       const count = next ? await likePost(post.id) : await unlikePost(post.id)
@@ -82,6 +94,24 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
     } catch {
       setDeleting(false)
       toast({ title: 'Suppression impossible', variant: 'destructive' })
+    }
+  }
+
+  async function togglePin() {
+    if (pinning) return
+    const next = !isPinned
+    setPinning(true)
+    setIsPinned(next)
+    try {
+      const updated = next ? await pinPost(post.id) : await unpinPost(post.id)
+      setIsPinned(updated.isPinned)
+      onUpdated?.(updated)
+      toast({ title: next ? 'Post épinglé sur le profil' : 'Post désépinglé' })
+    } catch {
+      setIsPinned(!next)
+      toast({ title: 'Épinglage impossible', variant: 'destructive' })
+    } finally {
+      setPinning(false)
     }
   }
 
@@ -132,6 +162,16 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
                 )}
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                {post.canPin && (
+                  <DropdownMenuItem onClick={togglePin} disabled={pinning} className="cursor-pointer">
+                    {isPinned ? (
+                      <PinOff className="mr-2 h-4 w-4" />
+                    ) : (
+                      <Pin className="mr-2 h-4 w-4" />
+                    )}
+                    {isPinned ? 'Désépingler du profil' : 'Épingler sur le profil'}
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem
                   onClick={handleDelete}
                   className="cursor-pointer text-red-500 focus:text-red-500"
@@ -143,6 +183,13 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
             </DropdownMenu>
           )}
         </div>
+
+        {isPinned && (
+          <div className="mb-0.5 flex items-center gap-1 text-xs font-semibold text-primary">
+            <Pin className="h-3.5 w-3.5 fill-current" />
+            <span>Épinglé</span>
+          </div>
+        )}
 
         {/* Content */}
         <TranslatedContent
@@ -177,6 +224,7 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
             label="Aimer"
             active={liked}
             onClick={toggleLike}
+            burstKey={likeBurst}
             className="hover:text-red-500 hover:bg-red-500/10"
             activeClassName="text-red-500 fill-red-500"
           />
@@ -214,6 +262,7 @@ interface ActionButtonProps {
   onClick?: () => void
   className?: string
   activeClassName?: string
+  burstKey?: number
 }
 
 function ActionButton({
@@ -224,6 +273,7 @@ function ActionButton({
   onClick,
   className,
   activeClassName,
+  burstKey = 0,
 }: ActionButtonProps) {
   return (
     <button
@@ -235,7 +285,22 @@ function ActionButton({
         active && activeClassName,
       )}
     >
-      <Icon className={cn('h-4 w-4', active && activeClassName)} />
+      <span className="relative grid h-4 w-4 place-items-center">
+        {burstKey > 0 && (
+          <span
+            key={burstKey}
+            aria-hidden
+            className="pointer-events-none absolute inset-[-8px] rounded-full border border-red-400/70 animate-like-burst"
+          />
+        )}
+        <Icon
+          className={cn(
+            'h-4 w-4 transition-transform',
+            active && 'animate-heart-pop',
+            active && activeClassName,
+          )}
+        />
+      </span>
       {count > 0 && <span>{formatCount(count)}</span>}
     </button>
   )

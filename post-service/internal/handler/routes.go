@@ -40,6 +40,8 @@ func RegisterRoutes(r *gin.Engine, serviceName string, postService *service.Post
 			// Édition / suppression : authentifiées (auteur ou modérateur/admin).
 			post.PATCH("", auth, PostHandler.UpdatePost)
 			post.DELETE("", auth, PostHandler.DeletePost)
+			post.PATCH("/pin", auth, PostHandler.PinPost)
+			post.DELETE("/pin", auth, PostHandler.UnpinPost)
 
 			post.GET("/likes", LikeHandler.ListPostLikes)
 			post.POST("/like", auth, LikeHandler.LikePost)

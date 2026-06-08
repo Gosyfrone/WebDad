@@ -60,6 +60,8 @@ func TestProtectedRequiresToken(t *testing.T) {
 		{http.MethodPost, "/posts"},
 		{http.MethodPatch, "/posts/507f1f77bcf86cd799439011"},
 		{http.MethodDelete, "/posts/507f1f77bcf86cd799439011"},
+		{http.MethodPatch, "/posts/507f1f77bcf86cd799439011/pin"},
+		{http.MethodDelete, "/posts/507f1f77bcf86cd799439011/pin"},
 		{http.MethodPost, "/posts/507f1f77bcf86cd799439011/like"},
 		{http.MethodDelete, "/posts/507f1f77bcf86cd799439011/like"},
 		{http.MethodPost, "/posts/507f1f77bcf86cd799439011/comments"},
