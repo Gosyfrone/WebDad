@@ -246,6 +246,9 @@ services:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
       # Serveur (route handlers Next) : gateway via le réseau Docker.
       API_INTERNAL_URL: http://api-gateway:8080
+      # Serveur (route handlers Next) : fournisseur de traduction automatique.
+      TRANSLATION_API_URL: ${TRANSLATION_API_URL:-https://libretranslate.de/translate}
+      TRANSLATION_API_KEY: ${TRANSLATION_API_KEY:-}
     ports:
       - "3000:3000"
     networks:

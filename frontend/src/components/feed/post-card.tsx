@@ -23,6 +23,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { CommentSection } from '@/components/feed/comment-section'
+import { TranslatedContent } from '@/components/feed/translated-content'
 import { ProfilLink } from '@/components/profil/profil-link'
 
 interface PostCardProps {
@@ -144,9 +145,11 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
         </div>
 
         {/* Content */}
-        <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/80">
-          {post.content}
-        </p>
+        <TranslatedContent
+          contentId={`post:${post.id}`}
+          content={post.content}
+          className="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/80"
+        />
 
         {/* Actions */}
         <div className="-ml-2 mt-1 flex items-center justify-between text-muted-foreground">
