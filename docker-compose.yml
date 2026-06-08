@@ -8,6 +8,7 @@ volumes:
   mongo-profil-data:
   mongo-post-data:
   mongo-message-data:
+  mongo-notification-data:
 
 # ────────────────────────────────────────────────────────────────────
 # Convention de config :
@@ -121,6 +122,25 @@ services:
       timeout: 5s
       retries: 10
 
+  mongo-notification:
+    image: mongo:7
+    restart: unless-stopped
+    env_file:
+      - ./notification-service/.env  # MONGO_INITDB_ROOT_* / DATABASE
+    # Pas de script d'init monté : notification-service crée lui-même sa
+    # collection, son validateur et ses index au démarrage (EnsureSchema).
+    volumes:
+      - mongo-notification-data:/data/db
+    ports:
+      - "27020:27017"
+    networks:
+      - webdad-net
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   # ─── Services Go ─────────────────────────────────────────────────
   auth-service:
     build:
@@ -205,6 +225,9 @@ services:
     environment:
       MONGO_HOST: mongo-post         # override : nom du conteneur dans le réseau
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET requis}
+      # Émission des événements de notification (serveur-à-serveur, best-effort).
+      NOTIFICATION_SERVICE_URL: http://notification-service:8086
+      INTERNAL_EVENT_SECRET: ${INTERNAL_EVENT_SECRET:?INTERNAL_EVENT_SECRET requis}
     ports:
       - "8084:8084"
     networks:
@@ -243,6 +266,33 @@ services:
       retries: 5
       start_period: 5s
 
+  notification-service:
+    build:
+      context: ./notification-service
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./notification-service/.env
+    environment:
+      MONGO_HOST: mongo-notification  # override : nom du conteneur dans le réseau
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET requis}
+      INTERNAL_EVENT_SECRET: ${INTERNAL_EVENT_SECRET:?INTERNAL_EVENT_SECRET requis}
+      # Résolution des mentions (@handle → user_id) via le user-service.
+      USER_SERVICE_URL: http://user-service:8082
+    ports:
+      - "8086:8086"
+    networks:
+      - webdad-net
+    depends_on:
+      mongo-notification:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8086/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
   api-gateway:
     build:
       context: ./api-gateway
@@ -257,6 +307,7 @@ services:
       PROFIL_SERVICE_URL: http://profil-service:8083
       POST_SERVICE_URL: http://post-service:8084
       MESSAGE_SERVICE_URL: http://message-service:8085
+      NOTIFICATION_SERVICE_URL: http://notification-service:8086
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET requis}
     ports:
       - "8080:8080"
@@ -272,6 +323,8 @@ services:
       post-service:
         condition: service_healthy
       message-service:
+        condition: service_healthy
+      notification-service:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]

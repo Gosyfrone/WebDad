@@ -7,6 +7,7 @@ import { Bell, Mail, Search } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import { ROUTES } from '@/lib/routes'
+import { useNotifications } from '@/components/notifications-provider'
 import { useT } from '@/components/language-provider'
 
 interface TabItem {
@@ -31,6 +32,7 @@ const TABS: TabItem[] = [
 export function MobileTabBar() {
   const t = useT()
   const pathname = usePathname()
+  const { unreadCount } = useNotifications()
 
   return (
     <nav
@@ -40,6 +42,7 @@ export function MobileTabBar() {
       {TABS.map((tab) => {
         const active = pathname === tab.href
         const Icon = tab.icon
+        const showBadge = tab.href === ROUTES.notifications && unreadCount > 0
 
         return (
           <Link
@@ -50,10 +53,20 @@ export function MobileTabBar() {
             className="flex flex-1 items-center justify-center transition-colors hover:bg-accent"
           >
             {Icon ? (
-              <Icon
-                className={cn('h-6 w-6', active ? 'text-primary' : 'text-muted-foreground')}
-                aria-hidden
-              />
+              <span className="relative">
+                <Icon
+                  className={cn('h-6 w-6', active ? 'text-primary' : 'text-muted-foreground')}
+                  aria-hidden
+                />
+                {showBadge && (
+                  <span
+                    aria-label={t('notifications.unread_aria', { count: unreadCount })}
+                    className="absolute -right-2 -top-1.5 flex h-[16px] min-w-[16px] items-center justify-center rounded-full bg-gradient-to-r from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] px-1 text-[10px] font-bold leading-none text-white shadow"
+                  >
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
+              </span>
             ) : (
               <Image
                 src="/logo_only.png"

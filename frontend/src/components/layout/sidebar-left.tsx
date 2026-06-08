@@ -21,6 +21,7 @@ import { cn } from '@/lib/utils'
 import { logout } from '@/lib/auth-client'
 import { getMyProfil, subscribeProfilUpdated } from '@/lib/profil-client'
 import { ROUTES } from '@/lib/routes'
+import { useNotifications } from '@/components/notifications-provider'
 import { useT } from '@/components/language-provider'
 import type { ProfilDetails, UserRole } from '@/types'
 import { CreatePostDialog } from '@/components/feed/create-post-dialog'
@@ -71,6 +72,7 @@ interface SidebarLeftProps {
 export function SidebarLeft({ role, username = 'Utilisateur' }: SidebarLeftProps) {
   const t = useT()
   const pathname = usePathname()
+  const { unreadCount } = useNotifications()
   const [account, setAccount] = useState({
     displayName: username,
     username: username === 'Utilisateur' ? '' : username,
@@ -142,6 +144,7 @@ export function SidebarLeft({ role, username = 'Utilisateur' }: SidebarLeftProps
         {visibleItems.map((item) => {
           const Icon = item.icon
           const active = pathname === item.href
+          const showBadge = item.href === ROUTES.notifications && unreadCount > 0
 
           return (
             <Link
@@ -153,10 +156,20 @@ export function SidebarLeft({ role, username = 'Utilisateur' }: SidebarLeftProps
                   'bg-accent font-bold text-[#5B6CFF] shadow-[0_14px_34px_rgba(91,108,255,0.16)] dark:text-[#9aa6ff]',
               )}
             >
-              <Icon
-                className={cn('h-6 w-6 shrink-0', active && 'stroke-[2.5]')}
-                aria-hidden
-              />
+              <span className="relative shrink-0">
+                <Icon
+                  className={cn('h-6 w-6', active && 'stroke-[2.5]')}
+                  aria-hidden
+                />
+                {showBadge && (
+                  <span
+                    aria-label={t('notifications.unread_aria', { count: unreadCount })}
+                    className="absolute -right-2 -top-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-gradient-to-r from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] px-1 text-[11px] font-bold leading-none text-white shadow"
+                  >
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
+              </span>
               <span>{t(item.labelKey)}</span>
             </Link>
           )

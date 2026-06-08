@@ -10,6 +10,7 @@ on:
       - "profil-service/**"
       - "post-service/**"
       - "message-service/**"
+      - "notification-service/**"
       - "api-gateway/**"
       - ".github/workflows/ci-go.yml"
 
@@ -34,6 +35,7 @@ jobs:
           - profil-service
           - post-service
           - message-service
+          - notification-service
           - api-gateway
     defaults:
       run:

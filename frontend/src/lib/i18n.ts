@@ -119,6 +119,30 @@ export const messages: Record<Locale, Messages> = {
     'legal.cgu': 'CGU',
     'legal.confidentialite': 'Confidentialité',
 
+    // — Notifications —
+    'notifications.title': 'Notifications',
+    'notifications.unread_aria': '{count} notifications non lues',
+    'notifications.empty': 'Aucune notification pour le moment.',
+    'notifications.load_more': 'Voir plus',
+    'notifications.like_one': '{name} a aimé votre publication',
+    'notifications.like_other': '{name} et {count} autres personnes ont aimé votre publication',
+    'notifications.comment_one': '{name} a commenté votre publication',
+    'notifications.comment_other':
+      '{name} et {count} autres personnes ont commenté votre publication',
+    'notifications.reply_one': '{name} a répondu à votre commentaire',
+    'notifications.reply_other':
+      '{name} et {count} autres personnes ont répondu à votre commentaire',
+    'notifications.repost_one': '{name} a reposté votre publication',
+    'notifications.repost_other':
+      '{name} et {count} autres personnes ont reposté votre publication',
+    'notifications.quote': '{name} a cité votre publication',
+    'notifications.mention': '{name} vous a mentionné',
+
+    // — Détail d'une publication —
+    'common.back': 'Retour',
+    'post.detail_title': 'Publication',
+    'post.not_found': 'Publication introuvable.',
+
     // — Pages stub (états vides) —
     'notifications.heading': 'Rien pour le moment',
     'notifications.desc': 'Vos notifications (likes, abonnements, mentions) apparaîtront ici.',
@@ -499,6 +523,27 @@ export const messages: Record<Locale, Messages> = {
     'legal.mentions': 'Legal notice',
     'legal.cgu': 'Terms of Use',
     'legal.confidentialite': 'Privacy',
+
+    // — Notifications —
+    'notifications.title': 'Notifications',
+    'notifications.unread_aria': '{count} unread notifications',
+    'notifications.empty': 'No notifications yet.',
+    'notifications.load_more': 'Show more',
+    'notifications.like_one': '{name} liked your post',
+    'notifications.like_other': '{name} and {count} others liked your post',
+    'notifications.comment_one': '{name} commented on your post',
+    'notifications.comment_other': '{name} and {count} others commented on your post',
+    'notifications.reply_one': '{name} replied to your comment',
+    'notifications.reply_other': '{name} and {count} others replied to your comment',
+    'notifications.repost_one': '{name} reposted your post',
+    'notifications.repost_other': '{name} and {count} others reposted your post',
+    'notifications.quote': '{name} quoted your post',
+    'notifications.mention': '{name} mentioned you',
+
+    // — Post detail —
+    'common.back': 'Back',
+    'post.detail_title': 'Post',
+    'post.not_found': 'Post not found.',
 
     // — Stub pages (empty states) —
     'notifications.heading': 'Nothing yet',

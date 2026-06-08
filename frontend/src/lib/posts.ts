@@ -271,6 +271,12 @@ async function getPost(
   return toFeedPost(raw, likedIds, repostedIds, depth)
 }
 
+/** Charge un post complet par son id (page détail, lien depuis une notification). */
+export async function getPostById(id: string): Promise<FeedPost | null> {
+  const [likedIds, repostedIds] = await Promise.all([getLikedIds(), getRepostedIds()])
+  return getPost(id, likedIds, repostedIds)
+}
+
 async function mapPosts(raw: ApiPost[]): Promise<FeedPost[]> {
   const [likedIds, repostedIds] = await Promise.all([getLikedIds(), getRepostedIds()])
   return Promise.all((raw ?? []).map((p) => toFeedPost(p, likedIds, repostedIds)))
