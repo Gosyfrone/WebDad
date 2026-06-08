@@ -112,7 +112,11 @@ export function FeedView() {
   useEffect(
     () =>
       subscribePostCreated((post) =>
-        setPosts((prev) => [post, ...applyPostUpdate(prev, post)]),
+        setPosts((prev) =>
+          prev.some((p) => p.id === post.id)
+            ? applyPostUpdate(prev, post)
+            : [post, ...prev],
+        ),
       ),
     [],
   )

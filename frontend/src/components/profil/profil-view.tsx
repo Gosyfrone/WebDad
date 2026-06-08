@@ -7,7 +7,7 @@ import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { ROUTES } from '@/lib/routes'
 import { getMyProfil, getPublicProfil, saveMyProfil } from '@/lib/profil-client'
-import { listByAuthor, type FeedPost } from '@/lib/posts'
+import { listByAuthor, subscribePostCreated, type FeedPost } from '@/lib/posts'
 import { useToast } from '@/hooks/use-toast'
 import type { ProfilDetails, ProfilEditableFields } from '@/types'
 import { useT } from '@/components/language-provider'
@@ -24,8 +24,12 @@ interface ProfilViewProps {
 function sortProfilePosts(posts: FeedPost[]): FeedPost[] {
   return [...posts].sort((a, b) => {
     if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1
-    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    return profileSortTime(b) - profileSortTime(a)
   })
+}
+
+function profileSortTime(post: FeedPost): number {
+  return new Date(post.repostedAt || post.createdAt).getTime()
 }
 
 function applyPostUpdate(current: FeedPost[], updated: FeedPost): FeedPost[] {
@@ -100,6 +104,22 @@ export function ProfilView({ username }: ProfilViewProps) {
     return () => {
       cancelled = true
     }
+  }, [profil?.userId])
+
+  useEffect(() => {
+    if (!profil?.userId) return undefined
+    return subscribePostCreated((post) => {
+      const belongsToProfile =
+        post.author.id === profil.userId || post.repostedById === profil.userId
+      if (!belongsToProfile) return
+      setPosts((prev) =>
+        sortProfilePosts(
+          prev.some((p) => p.id === post.id)
+            ? prev.map((p) => (p.id === post.id ? post : p))
+            : [post, ...prev],
+        ),
+      )
+    })
   }, [profil?.userId])
 
   function handleDeleted(id: string) {

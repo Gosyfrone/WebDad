@@ -10,7 +10,7 @@ import (
 )
 
 // collectionOrder fige l'ordre de création (déterministe pour les logs/tests).
-var collectionOrder = []string{"posts", "comments", "likes", "reports"}
+var collectionOrder = []string{"posts", "comments", "likes", "reposts", "reports"}
 
 // EnsureSchema crée les collections (avec validateurs $jsonSchema) et les
 // index du post-service, de façon idempotente. Le service possède ainsi son
@@ -98,6 +98,8 @@ var validators = map[string]bson.M{
 				"hidden_at":      bson.M{"bsonType": bson.A{"date", "null"}},
 				"likes_count":    bson.M{"bsonType": "int", "minimum": 0},
 				"comments_count": bson.M{"bsonType": "int", "minimum": 0},
+				"reposts_count":  bson.M{"bsonType": "int", "minimum": 0},
+				"quote_post_id":  bson.M{"bsonType": bson.A{"string", "null"}},
 				"reports_count":  bson.M{"bsonType": "int", "minimum": 0},
 				"pinned_at":      bson.M{"bsonType": bson.A{"date", "null"}},
 				"created_at":     bson.M{"bsonType": "date"},
@@ -122,6 +124,17 @@ var validators = map[string]bson.M{
 		},
 	},
 	"likes": {
+		"$jsonSchema": bson.M{
+			"bsonType": "object",
+			"required": bson.A{"post_id", "user_id", "created_at"},
+			"properties": bson.M{
+				"post_id":    bson.M{"bsonType": "string"},
+				"user_id":    bson.M{"bsonType": "string"},
+				"created_at": bson.M{"bsonType": "date"},
+			},
+		},
+	},
+	"reposts": {
 		"$jsonSchema": bson.M{
 			"bsonType": "object",
 			"required": bson.A{"post_id", "user_id", "created_at"},
@@ -165,6 +178,10 @@ var indexes = map[string][]mongo.IndexModel{
 	"likes": {
 		{Keys: bson.D{{Key: "post_id", Value: 1}, {Key: "user_id", Value: 1}}, Options: options.Index().SetUnique(true)},
 		{Keys: bson.D{{Key: "user_id", Value: 1}}},
+	},
+	"reposts": {
+		{Keys: bson.D{{Key: "post_id", Value: 1}, {Key: "user_id", Value: 1}}, Options: options.Index().SetUnique(true)},
+		{Keys: bson.D{{Key: "user_id", Value: 1}, {Key: "created_at", Value: -1}}},
 	},
 	"reports": {
 		{Keys: bson.D{{Key: "post_id", Value: 1}}},

@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Loader2, Trash2 } from 'lucide-react'
+import { Loader2, Smile, Trash2 } from 'lucide-react'
 
 import { cn, initialOf, timeAgo } from '@/lib/utils'
 import { useInfiniteScroll } from '@/lib/use-infinite-scroll'
@@ -16,6 +16,7 @@ import { useToast } from '@/hooks/use-toast'
 import { useLanguage } from '@/components/language-provider'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
+import { EmojiPicker } from '@/components/feed/emoji-picker'
 import { TranslatedContent } from '@/components/feed/translated-content'
 import { ProfilLink } from '@/components/profil/profil-link'
 
@@ -113,6 +114,19 @@ export function CommentSection({ postId, onCountChange }: CommentSectionProps) {
     }
   }
 
+  function insertEmoji(emoji: string) {
+    const el = inputRef.current
+    const start = el?.selectionStart ?? content.length
+    const end = el?.selectionEnd ?? content.length
+    setContent(content.slice(0, start) + emoji + content.slice(end))
+    requestAnimationFrame(() => {
+      if (!el) return
+      const caret = start + emoji.length
+      el.focus()
+      el.setSelectionRange(caret, caret)
+    })
+  }
+
   function handleRemoveRoot(id: string) {
     setComments((prev) => prev.filter((c) => c.id !== id))
   }
@@ -135,6 +149,15 @@ export function CommentSection({ postId, onCountChange }: CommentSectionProps) {
           maxLength={MAX_CHARS + 20}
           className="min-w-0 flex-1 rounded-full border border-border bg-background/60 px-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-[#5B6CFF] focus:outline-none"
         />
+        <EmojiPicker onSelect={insertEmoji}>
+          <button
+            type="button"
+            aria-label={t('composer.add_emoji')}
+            className="shrink-0 rounded-full p-2 text-[#5B6CFF] transition-colors hover:bg-primary/10"
+          >
+            <Smile className="h-4 w-4" />
+          </button>
+        </EmojiPicker>
         <Button
           size="sm"
           className="shrink-0 rounded-full bg-gradient-to-r from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] font-bold text-white"
@@ -259,6 +282,19 @@ function CommentThread({ postId, comment, onRemove, onCountChange }: CommentThre
     }
   }
 
+  function insertReplyEmoji(emoji: string) {
+    const el = replyInputRef.current
+    const start = el?.selectionStart ?? content.length
+    const end = el?.selectionEnd ?? content.length
+    setContent(content.slice(0, start) + emoji + content.slice(end))
+    requestAnimationFrame(() => {
+      if (!el) return
+      const caret = start + emoji.length
+      el.focus()
+      el.setSelectionRange(caret, caret)
+    })
+  }
+
   async function deleteRoot() {
     try {
       await deleteComment(postId, comment.id)
@@ -330,6 +366,15 @@ function CommentThread({ postId, comment, onRemove, onCountChange }: CommentThre
                 maxLength={MAX_CHARS + 20}
                 className="min-w-0 flex-1 rounded-full border border-border bg-background/60 px-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-[#5B6CFF] focus:outline-none"
               />
+              <EmojiPicker onSelect={insertReplyEmoji}>
+                <button
+                  type="button"
+                  aria-label={t('composer.add_emoji')}
+                  className="shrink-0 rounded-full p-2 text-[#5B6CFF] transition-colors hover:bg-primary/10"
+                >
+                  <Smile className="h-4 w-4" />
+                </button>
+              </EmojiPicker>
               <Button
                 size="sm"
                 className="shrink-0 rounded-full bg-gradient-to-r from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] font-bold text-white"

@@ -41,13 +41,24 @@ func NewPostService(r *repository.PostRepository) *PostService {
 
 // CreatePost crée un post pour authorID (dérivé du JWT) et renvoie le document
 // créé (avec son id généré). Les compteurs sont posés à 0 explicitement.
-func (s *PostService) CreatePost(ctx context.Context, authorID, content string) (*models.Post, error) {
+func (s *PostService) CreatePost(ctx context.Context, authorID, content, quotePostID string) (*models.Post, error) {
+	if quotePostID != "" {
+		quoteOID, err := parseID(quotePostID)
+		if err != nil {
+			return nil, err
+		}
+		if _, err := s.repo.Get(ctx, quoteOID); err != nil {
+			return nil, translateNotFound(err)
+		}
+	}
 	now := time.Now()
 	post := &models.Post{
 		AuthorID:      authorID,
 		Content:       content,
+		QuotePostID:   quotePostID,
 		LikesCount:    0,
 		CommentsCount: 0,
+		RepostsCount:  0,
 		CreatedAt:     now,
 		UpdatedAt:     now,
 	}
@@ -148,6 +159,7 @@ func (s *PostService) DeletePost(ctx context.Context, id, actorID, actorRole str
 	}
 	_ = s.repo.DeleteLikesByPost(ctx, id)
 	_ = s.repo.DeleteCommentsByPost(ctx, id)
+	_ = s.repo.DeleteRepostsByPost(ctx, id)
 	return nil
 }
 
@@ -228,6 +240,60 @@ func (s *PostService) PostLikers(ctx context.Context, id string) ([]string, erro
 		return nil, err
 	}
 	return s.repo.LikersByPost(ctx, id)
+}
+
+// RepostPost enregistre un repost simple de actorID sur un post et renvoie le
+// post original annoté (`reposted_by_id`, `reposted_at`) pour l'affichage profil.
+func (s *PostService) RepostPost(ctx context.Context, id, actorID string) (*models.Post, error) {
+	oid, err := parseID(id)
+	if err != nil {
+		return nil, err
+	}
+	post, err := s.repo.Get(ctx, oid)
+	if err != nil {
+		return nil, translateNotFound(err)
+	}
+	repost, created, err := s.repo.AddRepost(ctx, id, actorID)
+	if err != nil {
+		return nil, err
+	}
+	if created {
+		post, err = s.repo.IncCounter(ctx, oid, "reposts_count", 1)
+		if err != nil {
+			return nil, err
+		}
+	}
+	post.RepostedByID = actorID
+	post.RepostedAt = &repost.CreatedAt
+	return post, nil
+}
+
+// UnrepostPost retire un repost simple. Idempotent.
+func (s *PostService) UnrepostPost(ctx context.Context, id, actorID string) (int32, error) {
+	oid, err := parseID(id)
+	if err != nil {
+		return 0, err
+	}
+	post, err := s.repo.Get(ctx, oid)
+	if err != nil {
+		return 0, translateNotFound(err)
+	}
+	removed, err := s.repo.RemoveRepost(ctx, id, actorID)
+	if err != nil {
+		return 0, err
+	}
+	if !removed {
+		return post.RepostsCount, nil
+	}
+	updated, err := s.repo.IncCounter(ctx, oid, "reposts_count", -1)
+	if err != nil {
+		return 0, err
+	}
+	return updated.RepostsCount, nil
+}
+
+func (s *PostService) RepostedPostIDs(ctx context.Context, actorID string) ([]string, error) {
+	return s.repo.RepostedPostIDs(ctx, actorID)
 }
 
 // CreateComment ajoute un commentaire (auteur dérivé du JWT) sur un post

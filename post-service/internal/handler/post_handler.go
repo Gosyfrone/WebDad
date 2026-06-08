@@ -39,7 +39,7 @@ func (h *PostHandler) CreatePost(c *gin.Context) {
 		return
 	}
 
-	post, err := h.service.CreatePost(c.Request.Context(), claims.UserID, req.Content)
+	post, err := h.service.CreatePost(c.Request.Context(), claims.UserID, req.Content, req.QuotePostID)
 	if err != nil {
 		respondPostError(c, err)
 		return
@@ -135,6 +135,55 @@ func (h *PostHandler) UnpinPost(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"data": post})
+}
+
+// RepostPost : POST /posts/:id/repost — repost simple, visible sur le profil
+// de l'acteur. Idempotent côté service.
+func (h *PostHandler) RepostPost(c *gin.Context) {
+	claims, ok := middleware.ClaimsFrom(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "claims absents"})
+		return
+	}
+
+	post, err := h.service.RepostPost(c.Request.Context(), c.Param("id"), claims.UserID)
+	if err != nil {
+		respondPostError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": post})
+}
+
+// UnrepostPost : DELETE /posts/:id/repost — retire le repost simple.
+func (h *PostHandler) UnrepostPost(c *gin.Context) {
+	claims, ok := middleware.ClaimsFrom(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "claims absents"})
+		return
+	}
+
+	count, err := h.service.UnrepostPost(c.Request.Context(), c.Param("id"), claims.UserID)
+	if err != nil {
+		respondPostError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": gin.H{"reposts_count": count}})
+}
+
+// RepostedByMe : GET /posts/me/reposted-ids — état initial des boutons repost.
+func (h *PostHandler) RepostedByMe(c *gin.Context) {
+	claims, ok := middleware.ClaimsFrom(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "claims absents"})
+		return
+	}
+
+	ids, err := h.service.RepostedPostIDs(c.Request.Context(), claims.UserID)
+	if err != nil {
+		respondPostError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": ids})
 }
 
 // DeletePost : DELETE /posts/:id — réservé à l'auteur (ou modérateur/admin).

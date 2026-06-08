@@ -5,6 +5,7 @@ package repository
 
 import (
 	"context"
+	"sort"
 	"time"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
@@ -22,6 +23,7 @@ type PostRepository struct {
 	posts    *mongo.Collection
 	likes    *mongo.Collection
 	comments *mongo.Collection
+	reposts  *mongo.Collection
 }
 
 func NewPostRepository(db *mongo.Database) *PostRepository {
@@ -29,6 +31,7 @@ func NewPostRepository(db *mongo.Database) *PostRepository {
 		posts:    db.Collection("posts"),
 		likes:    db.Collection("likes"),
 		comments: db.Collection("comments"),
+		reposts:  db.Collection("reposts"),
 	}
 }
 
@@ -55,8 +58,7 @@ func (r *PostRepository) GetAll(ctx context.Context, limit, skip int64) ([]model
 func (r *PostRepository) GetByProfile(ctx context.Context, authorID string, limit, skip int64) ([]models.Post, error) {
 	opts := options.Find().
 		SetSort(bson.D{{Key: "pinned_at", Value: -1}, {Key: "created_at", Value: -1}}).
-		SetLimit(limit).
-		SetSkip(skip)
+		SetLimit(limit + skip)
 
 	cursor, err := r.posts.Find(ctx, bson.M{"author_id": authorID}, opts)
 	if err != nil {
@@ -68,7 +70,34 @@ func (r *PostRepository) GetByProfile(ctx context.Context, authorID string, limi
 	if err := cursor.All(ctx, &posts); err != nil {
 		return nil, err
 	}
-	return posts, nil
+
+	reposts, err := r.ListRepostsByUser(ctx, authorID, limit+skip, 0)
+	if err != nil {
+		return nil, err
+	}
+	for _, repost := range reposts {
+		oid, err := bson.ObjectIDFromHex(repost.PostID)
+		if err != nil {
+			continue
+		}
+		post, err := r.Get(ctx, oid)
+		if err != nil {
+			continue
+		}
+		post.RepostedByID = repost.UserID
+		post.RepostedAt = &repost.CreatedAt
+		posts = append(posts, *post)
+	}
+
+	sortProfilePosts(posts)
+	if skip >= int64(len(posts)) {
+		return []models.Post{}, nil
+	}
+	end := skip + limit
+	if end > int64(len(posts)) {
+		end = int64(len(posts))
+	}
+	return posts[skip:end], nil
 }
 
 // GetByAuthors renvoie les posts d'un ensemble d'auteurs (fil « Abonnements »),
@@ -241,6 +270,71 @@ func (r *PostRepository) DeleteLikesByPost(ctx context.Context, postID string) e
 	return err
 }
 
+// --- Reposts -----------------------------------------------------------------
+
+func (r *PostRepository) AddRepost(ctx context.Context, postID, userID string) (*models.Repost, bool, error) {
+	repost := &models.Repost{
+		PostID:    postID,
+		UserID:    userID,
+		CreatedAt: time.Now(),
+	}
+	res, err := r.reposts.InsertOne(ctx, repost)
+	if err != nil {
+		if mongo.IsDuplicateKeyError(err) {
+			existing, getErr := r.GetRepost(ctx, postID, userID)
+			return existing, false, getErr
+		}
+		return nil, false, err
+	}
+	if oid, ok := res.InsertedID.(bson.ObjectID); ok {
+		repost.ID = oid
+	}
+	return repost, true, nil
+}
+
+func (r *PostRepository) GetRepost(ctx context.Context, postID, userID string) (*models.Repost, error) {
+	var repost models.Repost
+	if err := r.reposts.FindOne(ctx, bson.M{"post_id": postID, "user_id": userID}).Decode(&repost); err != nil {
+		return nil, err
+	}
+	return &repost, nil
+}
+
+func (r *PostRepository) RemoveRepost(ctx context.Context, postID, userID string) (bool, error) {
+	res, err := r.reposts.DeleteOne(ctx, bson.M{"post_id": postID, "user_id": userID})
+	if err != nil {
+		return false, err
+	}
+	return res.DeletedCount > 0, nil
+}
+
+func (r *PostRepository) RepostedPostIDs(ctx context.Context, userID string) ([]string, error) {
+	return r.distinctStrings(ctx, r.reposts, bson.M{"user_id": userID}, "post_id")
+}
+
+func (r *PostRepository) ListRepostsByUser(ctx context.Context, userID string, limit, skip int64) ([]models.Repost, error) {
+	opts := options.Find().
+		SetSort(bson.D{{Key: "created_at", Value: -1}}).
+		SetLimit(limit).
+		SetSkip(skip)
+	cursor, err := r.reposts.Find(ctx, bson.M{"user_id": userID}, opts)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = cursor.Close(ctx) }()
+
+	reposts := []models.Repost{}
+	if err := cursor.All(ctx, &reposts); err != nil {
+		return nil, err
+	}
+	return reposts, nil
+}
+
+func (r *PostRepository) DeleteRepostsByPost(ctx context.Context, postID string) error {
+	_, err := r.reposts.DeleteMany(ctx, bson.M{"post_id": postID})
+	return err
+}
+
 // --- Comments ----------------------------------------------------------------
 
 // AddComment insère le commentaire et renseigne comment.ID.
@@ -349,4 +443,23 @@ func (r *PostRepository) distinctStrings(ctx context.Context, coll *mongo.Collec
 		}
 	}
 	return ids, nil
+}
+
+func sortProfilePosts(posts []models.Post) {
+	sort.SliceStable(posts, func(i, j int) bool {
+		if posts[i].PinnedAt != nil && posts[j].PinnedAt == nil {
+			return true
+		}
+		if posts[i].PinnedAt == nil && posts[j].PinnedAt != nil {
+			return false
+		}
+		return profileSortTime(posts[i]).After(profileSortTime(posts[j]))
+	})
+}
+
+func profileSortTime(post models.Post) time.Time {
+	if post.RepostedAt != nil {
+		return *post.RepostedAt
+	}
+	return post.CreatedAt
 }
