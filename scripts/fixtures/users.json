@@ -1,0 +1,31 @@
+[
+  {
+    "birthDate": "2013-06-08",
+    "email": "admin@breezy.com",
+    "gender": "male",
+    "username": "Admin",
+    "password": "Password&123"
+  },
+  {
+    "birthDate": "2013-06-08",
+    "email": "moderator@breezy.com",
+    "gender": "female",
+    "username": "Moderateur",
+    "password": "Password&123"
+  },
+  {
+    "birthDate": "2013-06-08",
+    "email": "allan@breezy.com",
+    "gender": "male",
+    "username": "Allan",
+    "password": "Password&123"
+  },
+  {
+    "birthDate": "2013-06-08",
+    "email": "maxime@breezy.com",
+    "gender": "male",
+    "username": "Maxime",
+    "password": "Password&123"
+  }
+  
+]
