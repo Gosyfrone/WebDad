@@ -2,6 +2,7 @@ package service
 
 import (
 	"testing"
+	"time"
 
 	"github.com/webdad/message-service/internal/models"
 )
@@ -110,5 +111,36 @@ func TestCanWrite_ViewerCannot(t *testing.T) {
 	}
 	if !canWrite(models.MemberTalker) {
 		t.Error("un talker doit pouvoir écrire")
+	}
+}
+
+func TestConvLess_PinnedFirstThenActivity(t *testing.T) {
+	t0 := time.Date(2026, 6, 8, 10, 0, 0, 0, time.UTC)
+	pinOld := t0.Add(1 * time.Hour)
+	pinNew := t0.Add(2 * time.Hour)
+
+	view := func(updated time.Time, pinnedAt *time.Time) models.ConversationView {
+		return models.ConversationView{UpdatedAt: updated, PinnedAt: pinnedAt}
+	}
+
+	pinnedRecent := view(t0, &pinNew)
+	pinnedOlder := view(t0.Add(5*time.Hour), &pinOld) // plus actif mais épinglé plus tôt
+	active := view(t0.Add(9*time.Hour), nil)          // non épinglé, très actif
+	stale := view(t0, nil)                            // non épinglé, peu actif
+
+	// Une épinglée passe toujours devant une non-épinglée, même moins active.
+	if !convLess(pinnedOlder, active) {
+		t.Error("une conversation épinglée doit passer devant une non-épinglée")
+	}
+	if convLess(active, pinnedOlder) {
+		t.Error("une non-épinglée ne doit pas passer devant une épinglée")
+	}
+	// Entre deux épinglées : la plus récemment épinglée d'abord.
+	if !convLess(pinnedRecent, pinnedOlder) {
+		t.Error("l'épinglage le plus récent doit passer en premier")
+	}
+	// Entre deux non-épinglées : la plus active d'abord.
+	if !convLess(active, stale) {
+		t.Error("la non-épinglée la plus active doit passer en premier")
 	}
 }

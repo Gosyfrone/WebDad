@@ -1,7 +1,9 @@
 'use client'
 
+import { usePathname } from 'next/navigation'
 import { Search } from 'lucide-react'
 
+import { ROUTES } from '@/lib/routes'
 import { useT } from '@/components/language-provider'
 import { WhoToFollow } from '@/components/layout/who-to-follow'
 
@@ -17,6 +19,11 @@ const TRENDS = [
 
 export function SidebarRight() {
   const t = useT()
+  const pathname = usePathname()
+
+  // La messagerie occupe toute la largeur (chat à deux volets) : pas de colonne
+  // « Qui suivre » sur /messages.
+  if (pathname?.startsWith(ROUTES.messages)) return null
 
   return (
     <aside className="sticky top-0 hidden h-screen w-[350px] flex-col gap-4 overflow-y-auto px-4 py-4 xl:flex">

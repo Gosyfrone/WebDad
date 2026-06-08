@@ -1,15 +1,14 @@
-import { Mail } from 'lucide-react'
+import { Suspense } from 'react'
 
-import { PlaceholderPage } from '@/components/layout/placeholder-page'
+import { MessagesView } from '@/components/messages/messages-view'
 
-// TODO (issue post/profil) : messagerie privée (DMs) via l'API Gateway.
+// Messagerie privée chiffrée (E2EE) : DM, groupes et communautés via l'API
+// Gateway. `MessagesView` est un Client Component (apiFetch/WebSocket/IndexedDB)
+// ; le Suspense couvre `useSearchParams` (point d'entrée `?dm=<userId>`).
 export default function MessagesPage() {
   return (
-    <PlaceholderPage
-      icon={<Mail className="h-10 w-10 text-[#5B6CFF] dark:text-[#9aa6ff]" aria-hidden />}
-      titleKey="nav.messages"
-      headingKey="messages.heading"
-      descKey="messages.desc"
-    />
+    <Suspense fallback={null}>
+      <MessagesView />
+    </Suspense>
   )
 }

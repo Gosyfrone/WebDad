@@ -193,6 +193,49 @@ func (r *MessageRepository) CountWritableMembers(ctx context.Context, conversati
 	return r.members.CountDocuments(ctx, filter)
 }
 
+// SetMemberPinned (dés)épingle une conversation pour un membre. `at == nil`
+// retire l'épinglage (`$unset`), sinon le pose. mongo.ErrNoDocuments si absent.
+func (r *MessageRepository) SetMemberPinned(ctx context.Context, conversationID, userID string, at *time.Time) error {
+	var update bson.M
+	if at == nil {
+		update = bson.M{"$unset": bson.M{"pinned_at": ""}}
+	} else {
+		update = bson.M{"$set": bson.M{"pinned_at": *at}}
+	}
+	res, err := r.members.UpdateOne(ctx,
+		bson.M{"conversation_id": conversationID, "user_id": userID}, update)
+	if err != nil {
+		return err
+	}
+	if res.MatchedCount == 0 {
+		return mongo.ErrNoDocuments
+	}
+	return nil
+}
+
+// SetMemberCleared pose la date de suppression côté user (masque + coupe
+// l'historique). mongo.ErrNoDocuments si le membre n'existe pas.
+func (r *MessageRepository) SetMemberCleared(ctx context.Context, conversationID, userID string, at time.Time) error {
+	res, err := r.members.UpdateOne(ctx,
+		bson.M{"conversation_id": conversationID, "user_id": userID},
+		bson.M{"$set": bson.M{"cleared_at": at}})
+	if err != nil {
+		return err
+	}
+	if res.MatchedCount == 0 {
+		return mongo.ErrNoDocuments
+	}
+	return nil
+}
+
+// HasMessagesAfter indique s'il existe au moins un message postérieur à `after`
+// (sert à décider si une conversation « supprimée côté user » doit réapparaître).
+func (r *MessageRepository) HasMessagesAfter(ctx context.Context, conversationID string, after time.Time) (bool, error) {
+	filter := bson.M{"conversation_id": conversationID, "created_at": bson.M{"$gt": after}}
+	n, err := r.messages.CountDocuments(ctx, filter, options.Count().SetLimit(1))
+	return n > 0, err
+}
+
 // SetMemberRole change le rôle d'un membre. mongo.ErrNoDocuments si absent.
 func (r *MessageRepository) SetMemberRole(ctx context.Context, conversationID, userID, role string) error {
 	res, err := r.members.UpdateOne(ctx,
@@ -295,11 +338,16 @@ func (r *MessageRepository) InsertMessage(ctx context.Context, msg *models.Messa
 // ListMessages renvoie une page de messages d'une conversation, du plus ancien
 // au plus récent (ordre d'affichage). `before` (ObjectID, optionnel) pagine vers
 // l'arrière : on renvoie les messages ANTÉRIEURS à ce curseur (scroll vers le
-// haut). Sans curseur : la page la plus récente.
-func (r *MessageRepository) ListMessages(ctx context.Context, conversationID string, limit int64, before *bson.ObjectID) ([]models.Message, error) {
+// haut). Sans curseur : la page la plus récente. `after` (optionnel) coupe
+// l'historique : on ignore les messages antérieurs ou égaux (suppression côté
+// user → `cleared_at`).
+func (r *MessageRepository) ListMessages(ctx context.Context, conversationID string, limit int64, before *bson.ObjectID, after *time.Time) ([]models.Message, error) {
 	filter := bson.M{"conversation_id": conversationID}
 	if before != nil {
 		filter["_id"] = bson.M{"$lt": *before}
+	}
+	if after != nil {
+		filter["created_at"] = bson.M{"$gt": *after}
 	}
 	// On prend les N plus récents (tri desc), puis on renverse pour l'affichage.
 	opts := options.Find().SetSort(bson.D{{Key: "_id", Value: -1}}).SetLimit(limit)

@@ -167,6 +167,55 @@ func (h *ConversationHandler) DeleteConversation(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
+// PinConversation : PATCH /messages/conversations/:id/pin — épingle la
+// conversation en tête de MA liste (état par-utilisateur, pas de diffusion).
+func (h *ConversationHandler) PinConversation(c *gin.Context) {
+	claims, ok := middleware.ClaimsFrom(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "claims absents"})
+		return
+	}
+
+	view, err := h.service.PinConversation(c.Request.Context(), c.Param("id"), claims.UserID, true)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": view})
+}
+
+// UnpinConversation : DELETE /messages/conversations/:id/pin — retire l'épinglage.
+func (h *ConversationHandler) UnpinConversation(c *gin.Context) {
+	claims, ok := middleware.ClaimsFrom(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "claims absents"})
+		return
+	}
+
+	view, err := h.service.PinConversation(c.Request.Context(), c.Param("id"), claims.UserID, false)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": view})
+}
+
+// ClearConversation : DELETE /messages/conversations/:id/me — « supprime » la
+// conversation côté user (masque + coupe l'historique). N'affecte pas les autres.
+func (h *ConversationHandler) ClearConversation(c *gin.Context) {
+	claims, ok := middleware.ClaimsFrom(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "claims absents"})
+		return
+	}
+
+	if err := h.service.ClearConversation(c.Request.Context(), c.Param("id"), claims.UserID); err != nil {
+		respondError(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
 // ListMembers : GET /messages/conversations/:id/members — membres (id + rôle),
 // sans les enveloppes des autres (membre requis).
 func (h *ConversationHandler) ListMembers(c *gin.Context) {
