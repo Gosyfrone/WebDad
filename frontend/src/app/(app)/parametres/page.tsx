@@ -76,7 +76,7 @@ export default function ParametresPage() {
       <div className="glass mx-4 mb-6 mt-4 flex flex-col gap-3 rounded-[26px] border px-6 py-6 backdrop-blur-xl">
         <h2 className="flex items-center gap-2 text-base font-bold text-foreground">
           <Scale className="h-4 w-4 text-[#5B6CFF] dark:text-[#9aa6ff]" aria-hidden />
-          Légal
+          {t('legal.section')}
         </h2>
         <LegalLinks className="text-sm" />
       </div>
