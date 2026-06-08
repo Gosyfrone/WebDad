@@ -91,6 +91,42 @@ func (r *MessageRepository) TouchConversation(ctx context.Context, id bson.Objec
 	return err
 }
 
+// UpdateTitle remplace le nom chiffré (ciphertext + nonce) d'un groupe et
+// renvoie la conversation à jour.
+func (r *MessageRepository) UpdateTitle(ctx context.Context, id bson.ObjectID, title, titleNonce string) (*models.Conversation, error) {
+	update := bson.M{"$set": bson.M{"title": title, "title_nonce": titleNonce, "updated_at": time.Now()}}
+	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
+	var conv models.Conversation
+	if err := r.conversations.FindOneAndUpdate(ctx, bson.M{"_id": id}, update, opts).Decode(&conv); err != nil {
+		return nil, err
+	}
+	return &conv, nil
+}
+
+// PushMemberID ajoute un id à la liste dénormalisée member_ids (idempotent).
+func (r *MessageRepository) PushMemberID(ctx context.Context, id bson.ObjectID, userID string) error {
+	_, err := r.conversations.UpdateOne(ctx, bson.M{"_id": id}, bson.M{"$addToSet": bson.M{"member_ids": userID}})
+	return err
+}
+
+// PullMemberID retire un id de la liste dénormalisée member_ids.
+func (r *MessageRepository) PullMemberID(ctx context.Context, id bson.ObjectID, userID string) error {
+	_, err := r.conversations.UpdateOne(ctx, bson.M{"_id": id}, bson.M{"$pull": bson.M{"member_ids": userID}})
+	return err
+}
+
+// DeleteConversation supprime la conversation (mongo.ErrNoDocuments si absente).
+func (r *MessageRepository) DeleteConversation(ctx context.Context, id bson.ObjectID) error {
+	res, err := r.conversations.DeleteOne(ctx, bson.M{"_id": id})
+	if err != nil {
+		return err
+	}
+	if res.DeletedCount == 0 {
+		return mongo.ErrNoDocuments
+	}
+	return nil
+}
+
 // --- Membres -----------------------------------------------------------------
 
 // AddMember insère un membre (l'enveloppe de clé est fournie par l'appelant).
@@ -124,6 +160,47 @@ func (r *MessageRepository) ListMembersByUser(ctx context.Context, userID string
 		return nil, err
 	}
 	return out, nil
+}
+
+// ListMembers renvoie tous les membres d'une conversation (avec rôle).
+func (r *MessageRepository) ListMembers(ctx context.Context, conversationID string) ([]models.Member, error) {
+	cursor, err := r.members.Find(ctx, bson.M{"conversation_id": conversationID})
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = cursor.Close(ctx) }()
+
+	out := []models.Member{}
+	if err := cursor.All(ctx, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// CountMembers renvoie le nombre de membres d'une conversation (cap des groupes).
+func (r *MessageRepository) CountMembers(ctx context.Context, conversationID string) (int64, error) {
+	return r.members.CountDocuments(ctx, bson.M{"conversation_id": conversationID})
+}
+
+// RemoveMember retire un membre. Renvoie true si une ligne a été supprimée.
+func (r *MessageRepository) RemoveMember(ctx context.Context, conversationID, userID string) (bool, error) {
+	res, err := r.members.DeleteOne(ctx, bson.M{"conversation_id": conversationID, "user_id": userID})
+	if err != nil {
+		return false, err
+	}
+	return res.DeletedCount > 0, nil
+}
+
+// DeleteMembersByConversation purge l'appartenance d'une conversation (cascade).
+func (r *MessageRepository) DeleteMembersByConversation(ctx context.Context, conversationID string) error {
+	_, err := r.members.DeleteMany(ctx, bson.M{"conversation_id": conversationID})
+	return err
+}
+
+// DeleteMessagesByConversation purge les messages d'une conversation (cascade).
+func (r *MessageRepository) DeleteMessagesByConversation(ctx context.Context, conversationID string) error {
+	_, err := r.messages.DeleteMany(ctx, bson.M{"conversation_id": conversationID})
+	return err
 }
 
 // MemberIDs renvoie les ids des membres d'une conversation (pour la diffusion

@@ -62,3 +62,29 @@ func TestParseID_RejectsInvalid(t *testing.T) {
 		t.Errorf("un id invalide doit donner ErrInvalidID, obtenu %v", err)
 	}
 }
+
+func TestCheckRemoval(t *testing.T) {
+	cases := []struct {
+		name      string
+		role      string
+		isSelf    bool
+		wantError error
+	}{
+		{"un membre peut quitter", models.MemberTalker, true, nil},
+		{"l'owner ne peut PAS quitter", models.MemberOwner, true, ErrOwnerCannotLeave},
+		{"l'owner peut exclure autrui", models.MemberOwner, false, nil},
+		{"un membre ne peut PAS exclure autrui", models.MemberTalker, false, ErrOwnerOnly},
+	}
+	for _, tc := range cases {
+		if got := checkRemoval(tc.role, tc.isSelf); got != tc.wantError {
+			t.Errorf("%s : checkRemoval(%q,%v) = %v, want %v", tc.name, tc.role, tc.isSelf, got, tc.wantError)
+		}
+	}
+}
+
+func TestMaxGroupMembers(t *testing.T) {
+	// La règle métier (cap groupe) doit valoir 32 (exigence produit).
+	if MaxGroupMembers != 32 {
+		t.Errorf("MaxGroupMembers attendu 32, obtenu %d", MaxGroupMembers)
+	}
+}

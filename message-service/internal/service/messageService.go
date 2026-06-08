@@ -27,6 +27,13 @@ var (
 	ErrKeyNotFound          = errors.New("clé publique introuvable pour cet utilisateur")
 	ErrSelfConversation     = errors.New("impossible de démarrer une conversation avec soi-même")
 	ErrMissingEnvelope      = errors.New("enveloppe de clé manquante pour un membre")
+	ErrInvalidGroup         = errors.New("groupe invalide (créateur absent des enveloppes ou aucun membre)")
+	ErrNotGroup             = errors.New("opération réservée aux groupes")
+	ErrAlreadyMember        = errors.New("cet utilisateur est déjà membre")
+	ErrGroupFull            = errors.New("groupe complet (32 membres maximum)")
+	ErrOwnerOnly            = errors.New("action réservée au créateur du groupe")
+	ErrOwnerCannotLeave     = errors.New("le créateur ne peut pas quitter le groupe (le supprimer à la place)")
+	ErrTargetNotMember      = errors.New("cet utilisateur n'est pas membre du groupe")
 )
 
 // Bornes de pagination des messages.
@@ -34,6 +41,9 @@ const (
 	DefaultLimit = 30
 	MaxLimit     = 100
 )
+
+// MaxGroupMembers : nombre maximum de membres (« talkers ») d'un groupe.
+const MaxGroupMembers = 32
 
 type MessageService struct {
 	repo *repository.MessageRepository
@@ -122,6 +132,230 @@ func (s *MessageService) CreateDM(ctx context.Context, creatorID, peerID string,
 	}
 
 	return s.viewFor(ctx, conv, creatorID)
+}
+
+// CreateGroup crée un groupe. Le créateur (owner) a généré la clé de contenu,
+// chiffré le nom (title/titleNonce) avec elle, et l'a emballée pour CHAQUE
+// membre initial : `envelopes` mappe user_id -> enveloppe. Les clés de la map
+// définissent le set de membres (créateur inclus). Cap : 32 membres.
+func (s *MessageService) CreateGroup(ctx context.Context, creatorID, title, titleNonce string, envelopes map[string]string) (*models.ConversationView, error) {
+	if len(envelopes) == 0 || strings.TrimSpace(envelopes[creatorID]) == "" {
+		return nil, ErrInvalidGroup
+	}
+	if len(envelopes) > MaxGroupMembers {
+		return nil, ErrGroupFull
+	}
+	for _, env := range envelopes {
+		if strings.TrimSpace(env) == "" {
+			return nil, ErrMissingEnvelope
+		}
+	}
+
+	memberIDs := make([]string, 0, len(envelopes))
+	for uid := range envelopes {
+		memberIDs = append(memberIDs, uid)
+	}
+
+	now := time.Now()
+	conv := &models.Conversation{
+		Type:       models.TypeGroup,
+		MemberIDs:  memberIDs,
+		Title:      title,
+		TitleNonce: titleNonce,
+		CreatedBy:  creatorID,
+		CreatedAt:  now,
+		UpdatedAt:  now,
+	}
+	if err := s.repo.CreateConversation(ctx, conv); err != nil {
+		return nil, err
+	}
+
+	convID := conv.ID.Hex()
+	for uid, env := range envelopes {
+		role := models.MemberTalker
+		if uid == creatorID {
+			role = models.MemberOwner
+		}
+		m := &models.Member{
+			ConversationID: convID,
+			UserID:         uid,
+			Role:           role,
+			KeyEnvelope:    env,
+			CreatedAt:      now,
+		}
+		if err := s.repo.AddMember(ctx, m); err != nil {
+			return nil, err
+		}
+	}
+
+	return s.viewFor(ctx, conv, creatorID)
+}
+
+// AddMember ajoute (invite) un membre à un groupe. N'importe quel membre peut
+// inviter (il détient la clé de contenu → il l'emballe pour l'invité). Refus si :
+// l'acteur n'est pas membre, ce n'est pas un groupe, la cible est déjà membre,
+// ou le cap est atteint. Renvoie les ids des membres (après ajout) pour diffusion.
+func (s *MessageService) AddMember(ctx context.Context, conversationID, actorID, targetID, envelope string) ([]string, error) {
+	if _, err := s.requireMember(ctx, conversationID, actorID); err != nil {
+		return nil, err
+	}
+	conv, err := s.getConversationByID(ctx, conversationID)
+	if err != nil {
+		return nil, err
+	}
+	if conv.Type != models.TypeGroup {
+		return nil, ErrNotGroup
+	}
+
+	if _, err := s.repo.GetMember(ctx, conversationID, targetID); err == nil {
+		return nil, ErrAlreadyMember
+	} else if !errors.Is(err, mongo.ErrNoDocuments) {
+		return nil, err
+	}
+
+	count, err := s.repo.CountMembers(ctx, conversationID)
+	if err != nil {
+		return nil, err
+	}
+	if count >= MaxGroupMembers {
+		return nil, ErrGroupFull
+	}
+
+	now := time.Now()
+	m := &models.Member{
+		ConversationID: conversationID,
+		UserID:         targetID,
+		Role:           models.MemberTalker,
+		KeyEnvelope:    envelope,
+		CreatedAt:      now,
+	}
+	if err := s.repo.AddMember(ctx, m); err != nil {
+		return nil, err
+	}
+	if err := s.repo.PushMemberID(ctx, conv.ID, targetID); err != nil {
+		return nil, err
+	}
+	return s.repo.MemberIDs(ctx, conversationID)
+}
+
+// RemoveMember retire un membre. Deux cas :
+//   - targetID == actorID : QUITTER (interdit à l'owner → ErrOwnerCannotLeave) ;
+//   - targetID != actorID : EXCLURE, réservé à l'owner (ErrOwnerOnly sinon).
+//
+// Renvoie l'ensemble des ids concernés (membres restants + la cible) pour
+// notifier en temps réel y compris la personne retirée.
+func (s *MessageService) RemoveMember(ctx context.Context, conversationID, actorID, targetID string) ([]string, error) {
+	actor, err := s.requireMember(ctx, conversationID, actorID)
+	if err != nil {
+		return nil, err
+	}
+	conv, err := s.getConversationByID(ctx, conversationID)
+	if err != nil {
+		return nil, err
+	}
+	if conv.Type != models.TypeGroup {
+		return nil, ErrNotGroup
+	}
+	if err := checkRemoval(actor.Role, targetID == actorID); err != nil {
+		return nil, err
+	}
+	if targetID != actorID {
+		// La cible doit être membre (et n'est pas l'owner — on ne retire pas le créateur).
+		target, err := s.repo.GetMember(ctx, conversationID, targetID)
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return nil, ErrTargetNotMember
+		}
+		if err != nil {
+			return nil, err
+		}
+		if target.Role == models.MemberOwner {
+			return nil, ErrOwnerOnly
+		}
+	}
+
+	// Ids notifiés = membres actuels (avant retrait) — inclut la cible.
+	notify, _ := s.repo.MemberIDs(ctx, conversationID)
+
+	removed, err := s.repo.RemoveMember(ctx, conversationID, targetID)
+	if err != nil {
+		return nil, err
+	}
+	if !removed {
+		return nil, ErrTargetNotMember
+	}
+	if err := s.repo.PullMemberID(ctx, conv.ID, targetID); err != nil {
+		return nil, err
+	}
+	return notify, nil
+}
+
+// DeleteGroup supprime un groupe (owner uniquement) et purge membres + messages.
+// Renvoie les ids des membres (avant suppression) pour notification.
+func (s *MessageService) DeleteGroup(ctx context.Context, conversationID, actorID string) ([]string, error) {
+	actor, err := s.requireMember(ctx, conversationID, actorID)
+	if err != nil {
+		return nil, err
+	}
+	conv, err := s.getConversationByID(ctx, conversationID)
+	if err != nil {
+		return nil, err
+	}
+	if conv.Type != models.TypeGroup {
+		return nil, ErrNotGroup
+	}
+	if actor.Role != models.MemberOwner {
+		return nil, ErrOwnerOnly
+	}
+
+	notify, _ := s.repo.MemberIDs(ctx, conversationID)
+
+	if err := s.repo.DeleteConversation(ctx, conv.ID); err != nil {
+		return nil, translateNotFound(err)
+	}
+	_ = s.repo.DeleteMembersByConversation(ctx, conversationID)
+	_ = s.repo.DeleteMessagesByConversation(ctx, conversationID)
+	return notify, nil
+}
+
+// UpdateGroup renomme un groupe (nom re-chiffré côté client) — owner uniquement.
+func (s *MessageService) UpdateGroup(ctx context.Context, conversationID, actorID, title, titleNonce string) (*models.ConversationView, error) {
+	actor, err := s.requireMember(ctx, conversationID, actorID)
+	if err != nil {
+		return nil, err
+	}
+	conv, err := s.getConversationByID(ctx, conversationID)
+	if err != nil {
+		return nil, err
+	}
+	if conv.Type != models.TypeGroup {
+		return nil, ErrNotGroup
+	}
+	if actor.Role != models.MemberOwner {
+		return nil, ErrOwnerOnly
+	}
+
+	updated, err := s.repo.UpdateTitle(ctx, conv.ID, title, titleNonce)
+	if err != nil {
+		return nil, translateNotFound(err)
+	}
+	return s.viewFor(ctx, updated, actorID)
+}
+
+// ListMembers renvoie la liste des membres (id + rôle, SANS les enveloppes des
+// autres) — réservée aux membres de la conversation.
+func (s *MessageService) ListMembers(ctx context.Context, conversationID, actorID string) ([]models.MemberView, error) {
+	if _, err := s.requireMember(ctx, conversationID, actorID); err != nil {
+		return nil, err
+	}
+	members, err := s.repo.ListMembers(ctx, conversationID)
+	if err != nil {
+		return nil, err
+	}
+	views := make([]models.MemberView, 0, len(members))
+	for _, m := range members {
+		views = append(views, models.MemberView{UserID: m.UserID, Role: m.Role})
+	}
+	return views, nil
 }
 
 // ListConversations renvoie les conversations de l'utilisateur (avec SON
@@ -234,6 +468,19 @@ func (s *MessageService) IsMember(ctx context.Context, conversationID, userID st
 
 // --- Helpers internes --------------------------------------------------------
 
+// getConversationByID parse l'id et charge la conversation (404 si absente).
+func (s *MessageService) getConversationByID(ctx context.Context, conversationID string) (*models.Conversation, error) {
+	oid, err := parseID(conversationID)
+	if err != nil {
+		return nil, err
+	}
+	conv, err := s.repo.GetConversation(ctx, oid)
+	if err != nil {
+		return nil, translateNotFound(err)
+	}
+	return conv, nil
+}
+
 // requireMember renvoie l'appartenance ou ErrNotMember (403).
 func (s *MessageService) requireMember(ctx context.Context, conversationID, userID string) (*models.Member, error) {
 	if _, err := parseID(conversationID); err != nil {
@@ -279,6 +526,22 @@ func dmKey(a, b string) string {
 	return p[0] + ":" + p[1]
 }
 
+// checkRemoval : règle d'autorisation du retrait d'un membre (fonction PURE,
+// testée). `isSelf` = l'acteur se retire lui-même (quitter) vs retirer autrui
+// (exclure). L'owner ne peut pas quitter ; seul l'owner peut exclure autrui.
+func checkRemoval(actorRole string, isSelf bool) error {
+	if isSelf {
+		if actorRole == models.MemberOwner {
+			return ErrOwnerCannotLeave
+		}
+		return nil
+	}
+	if actorRole != models.MemberOwner {
+		return ErrOwnerOnly
+	}
+	return nil
+}
+
 // canWrite : un membre peut écrire s'il est owner, admin ou talker. viewer =
 // lecture seule (communautés).
 func canWrite(role string) bool {
@@ -297,6 +560,7 @@ func buildView(conv *models.Conversation, m *models.Member) models.ConversationV
 		Type:       conv.Type,
 		MemberIDs:  conv.MemberIDs,
 		Title:      conv.Title,
+		TitleNonce: conv.TitleNonce,
 		MyRole:     m.Role,
 		MyEnvelope: m.KeyEnvelope,
 		CreatedBy:  conv.CreatedBy,

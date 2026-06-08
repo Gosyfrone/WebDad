@@ -22,8 +22,9 @@ func NewConversationHandler(svc *service.MessageService, hub *realtime.Hub) *Con
 	return &ConversationHandler{service: svc, hub: hub}
 }
 
-// CreateConversation : POST /messages/conversations — crée (ou retrouve) un DM.
-// Le client a généré la clé de contenu et fournit les enveloppes par membre.
+// CreateConversation : POST /messages/conversations — crée (ou retrouve) une
+// conversation. `type:"group"` → groupe ; sinon (défaut) → DM. Le client a
+// généré la clé de contenu et fournit les enveloppes par membre.
 func (h *ConversationHandler) CreateConversation(c *gin.Context) {
 	claims, ok := middleware.ClaimsFrom(c)
 	if !ok {
@@ -31,18 +32,136 @@ func (h *ConversationHandler) CreateConversation(c *gin.Context) {
 		return
 	}
 
-	var req models.CreateDMRequest
+	var req models.CreateConversationRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "payload invalide : " + err.Error()})
 		return
 	}
 
-	view, err := h.service.CreateDM(c.Request.Context(), claims.UserID, req.PeerID, req.Envelopes)
+	var (
+		view *models.ConversationView
+		err  error
+	)
+	if req.Type == models.TypeGroup {
+		view, err = h.service.CreateGroup(c.Request.Context(), claims.UserID, req.Title, req.TitleNonce, req.Envelopes)
+	} else {
+		view, err = h.service.CreateDM(c.Request.Context(), claims.UserID, req.PeerID, req.Envelopes)
+	}
 	if err != nil {
 		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"data": view})
+}
+
+// UpdateConversation : PATCH /messages/conversations/:id — renomme un groupe
+// (owner uniquement, nom re-chiffré côté client).
+func (h *ConversationHandler) UpdateConversation(c *gin.Context) {
+	claims, ok := middleware.ClaimsFrom(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "claims absents"})
+		return
+	}
+
+	var req models.UpdateGroupRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "payload invalide : " + err.Error()})
+		return
+	}
+
+	view, err := h.service.UpdateGroup(c.Request.Context(), c.Param("id"), claims.UserID, req.Title, req.TitleNonce)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	h.hub.Publish(view.MemberIDs, gin.H{"type": "conversation_updated", "data": view})
+	c.JSON(http.StatusOK, gin.H{"data": view})
+}
+
+// DeleteConversation : DELETE /messages/conversations/:id — supprime un groupe
+// (owner uniquement) + cascade membres/messages.
+func (h *ConversationHandler) DeleteConversation(c *gin.Context) {
+	claims, ok := middleware.ClaimsFrom(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "claims absents"})
+		return
+	}
+
+	convID := c.Param("id")
+	notify, err := h.service.DeleteGroup(c.Request.Context(), convID, claims.UserID)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	h.hub.Publish(notify, gin.H{"type": "conversation_deleted", "data": gin.H{"id": convID}})
+	c.Status(http.StatusNoContent)
+}
+
+// ListMembers : GET /messages/conversations/:id/members — membres (id + rôle),
+// sans les enveloppes des autres (membre requis).
+func (h *ConversationHandler) ListMembers(c *gin.Context) {
+	claims, ok := middleware.ClaimsFrom(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "claims absents"})
+		return
+	}
+
+	members, err := h.service.ListMembers(c.Request.Context(), c.Param("id"), claims.UserID)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": members})
+}
+
+// AddMember : POST /messages/conversations/:id/members — invite (tout membre).
+func (h *ConversationHandler) AddMember(c *gin.Context) {
+	claims, ok := middleware.ClaimsFrom(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "claims absents"})
+		return
+	}
+
+	var req models.AddMemberRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "payload invalide : " + err.Error()})
+		return
+	}
+
+	notify, err := h.service.AddMember(c.Request.Context(), c.Param("id"), claims.UserID, req.UserID, req.Envelope)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	h.hub.Publish(notify, gin.H{"type": "member_added", "data": gin.H{
+		"conversation_id": c.Param("id"), "user_id": req.UserID,
+	}})
+	c.JSON(http.StatusCreated, gin.H{"data": gin.H{"user_id": req.UserID, "role": models.MemberTalker}})
+}
+
+// RemoveMember : DELETE /messages/conversations/:id/members/:userId — exclure
+// (owner) ou quitter (soi-même). `:userId` = "me" cible l'utilisateur courant.
+func (h *ConversationHandler) RemoveMember(c *gin.Context) {
+	claims, ok := middleware.ClaimsFrom(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "claims absents"})
+		return
+	}
+
+	targetID := c.Param("userId")
+	if targetID == "me" {
+		targetID = claims.UserID
+	}
+
+	notify, err := h.service.RemoveMember(c.Request.Context(), c.Param("id"), claims.UserID, targetID)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	h.hub.Publish(notify, gin.H{"type": "member_removed", "data": gin.H{
+		"conversation_id": c.Param("id"), "user_id": targetID,
+	}})
+	c.Status(http.StatusNoContent)
 }
 
 // ListConversations : GET /messages/conversations — mes conversations (avec mon

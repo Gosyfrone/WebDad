@@ -46,15 +46,21 @@ type UserKey struct {
 }
 
 // Conversation — document de la collection `conversations`.
+//
+// Pour un groupe, le NOM est chiffré avec la clé de contenu du groupe : `Title`
+// porte le ciphertext (base64) et `TitleNonce` son nonce. Le serveur ne voit
+// donc jamais le nom en clair (le client le déchiffre à l'affichage). DM : pas
+// de nom (champs vides).
 type Conversation struct {
-	ID        bson.ObjectID `bson:"_id,omitempty" json:"id"`
-	Type      string        `bson:"type" json:"type"`
-	MemberIDs []string      `bson:"member_ids" json:"member_ids"`
-	DMKey     string        `bson:"dm_key,omitempty" json:"-"`
-	Title     string        `bson:"title,omitempty" json:"title,omitempty"`
-	CreatedBy string        `bson:"created_by" json:"created_by"`
-	CreatedAt time.Time     `bson:"created_at" json:"created_at"`
-	UpdatedAt time.Time     `bson:"updated_at" json:"updated_at"`
+	ID         bson.ObjectID `bson:"_id,omitempty" json:"id"`
+	Type       string        `bson:"type" json:"type"`
+	MemberIDs  []string      `bson:"member_ids" json:"member_ids"`
+	DMKey      string        `bson:"dm_key,omitempty" json:"-"`
+	Title      string        `bson:"title,omitempty" json:"title,omitempty"`
+	TitleNonce string        `bson:"title_nonce,omitempty" json:"title_nonce,omitempty"`
+	CreatedBy  string        `bson:"created_by" json:"created_by"`
+	CreatedAt  time.Time     `bson:"created_at" json:"created_at"`
+	UpdatedAt  time.Time     `bson:"updated_at" json:"updated_at"`
 }
 
 // Member — appartenance d'un utilisateur à une conversation : son rôle + son
@@ -85,11 +91,19 @@ type ConversationView struct {
 	Type       string    `json:"type"`
 	MemberIDs  []string  `json:"member_ids"`
 	Title      string    `json:"title,omitempty"`
+	TitleNonce string    `json:"title_nonce,omitempty"`
 	MyRole     string    `json:"my_role"`
 	MyEnvelope string    `json:"my_envelope"`
 	CreatedBy  string    `json:"created_by"`
 	CreatedAt  time.Time `json:"created_at"`
 	UpdatedAt  time.Time `json:"updated_at"`
+}
+
+// MemberView — un membre exposé dans la liste des membres (sans son enveloppe :
+// la clé emballée d'un membre ne regarde que lui).
+type MemberView struct {
+	UserID string `json:"user_id"`
+	Role   string `json:"role"`
 }
 
 // --- Corps de requêtes -------------------------------------------------------
@@ -99,12 +113,35 @@ type PublishKeyRequest struct {
 	PublicKey string `json:"public_key" binding:"required"`
 }
 
-// CreateDMRequest : corps de POST /messages/conversations (DM). Le client génère
-// la clé de contenu, l'emballe pour les DEUX membres et fournit les enveloppes
-// (map user_id -> enveloppe base64). L'auteur est dérivé du JWT.
-type CreateDMRequest struct {
-	PeerID    string            `json:"peer_id" binding:"required"`
-	Envelopes map[string]string `json:"envelopes" binding:"required"`
+// CreateConversationRequest : corps de POST /messages/conversations.
+// `type` discrimine :
+//   - "dm" (défaut) : `peer_id` + `envelopes` (les 2 membres) ;
+//   - "group"       : `title`+`title_nonce` (nom chiffré) + `envelopes` (TOUS
+//     les membres initiaux, créateur inclus). Les clés de `envelopes` = le set
+//     de membres. L'auteur (owner) est dérivé du JWT.
+//
+// Le client génère la clé de contenu, l'emballe par membre et fournit les
+// enveloppes (map user_id -> enveloppe base64) ; le serveur ne voit pas la clé.
+type CreateConversationRequest struct {
+	Type       string            `json:"type"`
+	PeerID     string            `json:"peer_id"`
+	Title      string            `json:"title"`
+	TitleNonce string            `json:"title_nonce"`
+	Envelopes  map[string]string `json:"envelopes" binding:"required"`
+}
+
+// AddMemberRequest : corps de POST .../:id/members (inviter). L'invitant emballe
+// la clé de contenu (qu'il détient) pour la clé publique de l'invité.
+type AddMemberRequest struct {
+	UserID   string `json:"user_id" binding:"required"`
+	Envelope string `json:"envelope" binding:"required"`
+}
+
+// UpdateGroupRequest : corps de PATCH .../:id (renommer un groupe). Nom
+// re-chiffré côté client avec la clé de contenu du groupe.
+type UpdateGroupRequest struct {
+	Title      string `json:"title" binding:"required"`
+	TitleNonce string `json:"title_nonce" binding:"required"`
 }
 
 // SendMessageRequest : corps de POST .../messages. Déjà chiffré côté client.

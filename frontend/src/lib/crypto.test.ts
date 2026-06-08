@@ -98,6 +98,42 @@ describe('chiffrement symétrique des messages', () => {
   })
 })
 
+describe('scénario GROUPE (clé unique, Option A : historique complet)', () => {
+  it("un membre invite un nouveau venu qui lit TOUT l'historique + le nom chiffré", () => {
+    const owner = generateIdentityKeyPair()
+    const member = generateIdentityKeyPair()
+    const invited = generateIdentityKeyPair() // ajouté plus tard
+
+    // L'owner crée la clé de contenu du groupe et chiffre le NOM avec.
+    const groupKey = generateContentKey()
+    const name = encryptText(groupKey, 'Projet WebDad 🚀')
+    // …et emballe la clé pour lui + le membre initial.
+    const envOwner = sealKeyForRecipient(toBase64(owner.publicKey), groupKey)
+    const envMember = sealKeyForRecipient(toBase64(member.publicKey), groupKey)
+
+    // Messages envoyés AVANT l'arrivée de l'invité.
+    const m1 = encryptText(groupKey, 'message #1')
+    const m2 = encryptText(groupKey, 'message #2')
+
+    // « Tout le monde peut inviter » : le MEMBRE (pas l'owner) ouvre sa clé et
+    // l'emballe pour l'invité — il n'a besoin que de la clé publique de l'invité.
+    const memberKey = openKeyEnvelope(envMember, member.privateKey)
+    const envInvited = sealKeyForRecipient(toBase64(invited.publicKey), memberKey)
+
+    // L'invité ouvre SON enveloppe → clé du groupe → lit l'historique d'avant.
+    const invitedKey = openKeyEnvelope(envInvited, invited.privateKey)
+    expect(decryptText(invitedKey, m1.ciphertext, m1.nonce)).toBe('message #1')
+    expect(decryptText(invitedKey, m2.ciphertext, m2.nonce)).toBe('message #2')
+    // …et déchiffre le nom du groupe.
+    expect(decryptText(invitedKey, name.ciphertext, name.nonce)).toBe('Projet WebDad 🚀')
+
+    // Cohérence : owner, membre et invité partagent la MÊME clé.
+    const ownerKey = openKeyEnvelope(envOwner, owner.privateKey)
+    expect(Array.from(invitedKey)).toEqual(Array.from(ownerKey))
+    expect(Array.from(memberKey)).toEqual(Array.from(ownerKey))
+  })
+})
+
 describe('scénario DM bout-en-bout (Alice ↔ Bob)', () => {
   it("Alice scelle la CK pour les deux ; Bob l'ouvre et lit le message d'Alice", () => {
     const alice = generateIdentityKeyPair()

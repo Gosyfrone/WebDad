@@ -48,8 +48,18 @@ func RegisterRoutes(
 			conv := conversations.Group("/:id")
 			{
 				conv.GET("", convH.GetConversation)
+				conv.PATCH("", convH.UpdateConversation)  // renommer un groupe (owner)
+				conv.DELETE("", convH.DeleteConversation) // supprimer un groupe (owner)
+
 				conv.GET("/messages", convH.ListMessages)
 				conv.POST("/messages", convH.SendMessage)
+
+				members := conv.Group("/members")
+				{
+					members.GET("", convH.ListMembers)
+					members.POST("", convH.AddMember)              // inviter (tout membre)
+					members.DELETE("/:userId", convH.RemoveMember) // exclure (owner) / quitter (soi)
+				}
 			}
 		}
 	}
