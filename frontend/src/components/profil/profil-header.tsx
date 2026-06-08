@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils'
 import type { RelationKind } from '@/lib/api'
 import { useFollow } from '@/lib/use-follow'
 import type { ProfilDetails, ProfilEditableFields, RelationUser } from '@/types'
+import { useLanguage } from '@/components/language-provider'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -22,19 +23,13 @@ interface ProfilHeaderProps {
   onEdit: (fields: ProfilEditableFields) => Promise<void>
 }
 
-/** Libellé lisible pour chaque rôle. */
-const ROLE_LABELS: Record<ProfilDetails['role'], string> = {
-  user: 'Utilisateur',
-  moderator: 'Modérateur',
-  administrator: 'Administrateur',
-}
-
 /**
  * En-tête de la page profil : bannière, avatar superposé, identité, bio,
  * date d'inscription et compteurs d'abonnés. Le propriétaire voit le bouton
  * « Éditer le profil » ; un visiteur verrait « Suivre » (à brancher).
  */
 export function ProfilHeader({ profil, isOwner, saving = false, onEdit }: ProfilHeaderProps) {
+  const { t, locale } = useLanguage()
   const initials = profil.displayName.charAt(0).toUpperCase()
   const [relationsOpen, setRelationsOpen] = useState(false)
   const [relationsTab, setRelationsTab] = useState<RelationKind>('followers')
@@ -94,7 +89,7 @@ export function ProfilHeader({ profil, isOwner, saving = false, onEdit }: Profil
                   variant="outline"
                   className="rounded-full border-white/70 bg-white/80 font-bold shadow-sm backdrop-blur hover:bg-white dark:border-white/15 dark:bg-white/10 dark:hover:bg-white/20"
                 >
-                  Éditer le profil
+                  {t('profil.edit')}
                 </Button>
               </EditProfilDialog>
             ) : canFollow ? (
@@ -111,7 +106,7 @@ export function ProfilHeader({ profil, isOwner, saving = false, onEdit }: Profil
         <div className="mt-3 flex flex-col gap-0.5">
           <div className="flex items-center gap-2">
             <h1 className="text-xl font-extrabold text-foreground">{profil.displayName}</h1>
-            <Badge variant="secondary">{ROLE_LABELS[profil.role]}</Badge>
+            <Badge variant="secondary">{t(`role.${profil.role}`)}</Badge>
           </div>
           <span className="text-sm text-muted-foreground">@{profil.username}</span>
         </div>
@@ -142,12 +137,12 @@ export function ProfilHeader({ profil, isOwner, saving = false, onEdit }: Profil
           {profil.birthDate && (
             <span className="flex items-center gap-1.5">
               <CalendarDays className="h-4 w-4" aria-hidden />
-              Né(e) le {formatFullDate(profil.birthDate)}
+              {t('profil.born_on', { date: formatFullDate(profil.birthDate, locale) })}
             </span>
           )}
           <span className="flex items-center gap-1.5">
             <CalendarDays className="h-4 w-4" aria-hidden />
-            A rejoint en {formatJoinedAt(profil.joinedAt)}
+            {t('profil.joined', { date: formatJoinedAt(profil.joinedAt, locale) })}
           </span>
         </div>
 
@@ -155,12 +150,12 @@ export function ProfilHeader({ profil, isOwner, saving = false, onEdit }: Profil
         <div className="mt-3 flex gap-5 text-sm">
           <Count
             value={profil.followersCount}
-            label="Abonnés"
+            label={t('profil.followers')}
             onClick={() => openRelations('followers')}
           />
           <Count
             value={profil.followingCount}
-            label="Abonnements"
+            label={t('profil.following')}
             onClick={() => openRelations('following')}
           />
         </div>
@@ -202,6 +197,7 @@ function FollowButton({
   pending: boolean
   onToggle: (next: boolean) => void
 }) {
+  const { t } = useLanguage()
   return (
     <Button
       disabled={pending}
@@ -216,11 +212,11 @@ function FollowButton({
     >
       {following ? (
         <>
-          <span className="group-hover/btn:hidden">Abonné</span>
-          <span className="hidden group-hover/btn:inline">Ne plus suivre</span>
+          <span className="group-hover/btn:hidden">{t('follow.followed')}</span>
+          <span className="hidden group-hover/btn:inline">{t('follow.unfollow')}</span>
         </>
       ) : (
-        'Suivre'
+        t('follow.follow')
       )}
     </Button>
   )
@@ -254,17 +250,19 @@ function Count({
   )
 }
 
-/** « juin 2026 » à partir d'une date ISO. */
-function formatJoinedAt(iso: string): string {
+/** « juin 2026 » (ou « June 2026 » en anglais) à partir d'une date ISO. */
+function formatJoinedAt(iso: string, locale: string): string {
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) return '—'
-  return new Intl.DateTimeFormat('fr-FR', { month: 'long', year: 'numeric' }).format(date)
+  const intl = locale === 'en' ? 'en-US' : 'fr-FR'
+  return new Intl.DateTimeFormat(intl, { month: 'long', year: 'numeric' }).format(date)
 }
 
-function formatFullDate(iso: string): string {
+function formatFullDate(iso: string, locale: string): string {
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) return '—'
-  return new Intl.DateTimeFormat('fr-FR', {
+  const intl = locale === 'en' ? 'en-US' : 'fr-FR'
+  return new Intl.DateTimeFormat(intl, {
     day: 'numeric',
     month: 'long',
     year: 'numeric',

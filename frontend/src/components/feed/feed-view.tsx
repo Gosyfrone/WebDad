@@ -13,6 +13,7 @@ import {
 } from '@/lib/posts'
 import { CreatePost } from '@/components/feed/create-post'
 import { PostCard } from '@/components/feed/post-card'
+import { useT } from '@/components/language-provider'
 
 type FeedTab = 'for-you' | 'following'
 
@@ -42,6 +43,7 @@ function applyPostUpdate(current: FeedPost[], updated: FeedPost): FeedPost[] {
  * fraîchement publié est prépendu sans refetch (event `post-created`).
  */
 export function FeedView() {
+  const t = useT()
   const [tab, setTab] = useState<FeedTab>('for-you')
   const [posts, setPosts] = useState<FeedPost[]>([])
   const [loading, setLoading] = useState(true)
@@ -53,8 +55,10 @@ export function FeedView() {
   const offsetRef = useRef(0)
 
   const fetchPage = useCallback(
-    (t: FeedTab, offset: number) =>
-      t === 'for-you' ? listFeed(FEED_PAGE, offset) : listFollowingFeed(FEED_PAGE, offset),
+    (activeTab: FeedTab, offset: number) =>
+      activeTab === 'for-you'
+        ? listFeed(FEED_PAGE, offset)
+        : listFollowingFeed(FEED_PAGE, offset),
     [],
   )
 
@@ -74,7 +78,7 @@ export function FeedView() {
         setHasMore(list.length === FEED_PAGE)
       })
       .catch(() => {
-        if (!cancelled) setError('Impossible de charger le fil.')
+        if (!cancelled) setError(t('feed.load_error'))
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -83,7 +87,7 @@ export function FeedView() {
     return () => {
       cancelled = true
     }
-  }, [tab, fetchPage])
+  }, [tab, fetchPage, t])
 
   const loadMore = useCallback(async () => {
     setLoadingMore(true)
@@ -126,15 +130,15 @@ export function FeedView() {
       {/* En-tête : sticky sur desktop ; sur mobile l'en-tête global (logo) prend le relais */}
       <div className="panel z-10 border-b lg:sticky lg:top-0">
         <h1 className="brand-text hidden px-4 py-3 text-xl font-bold lg:block">
-          Fil d&apos;actualité
+          {t('feed.title')}
         </h1>
         {/* Onglets Pour toi / Abonnements */}
         <div className="flex">
           <TabButton active={tab === 'for-you'} onClick={() => setTab('for-you')}>
-            Pour toi
+            {t('feed.tab_for_you')}
           </TabButton>
           <TabButton active={tab === 'following'} onClick={() => setTab('following')}>
-            Abonnements
+            {t('feed.tab_following')}
           </TabButton>
         </div>
       </div>
@@ -149,17 +153,17 @@ export function FeedView() {
           <Loader2 className="h-6 w-6 animate-spin text-[#5B6CFF]" aria-hidden />
         </div>
       ) : error ? (
-        <EmptyState title="Fil indisponible" message={error} />
+        <EmptyState title={t('feed.unavailable')} message={error} />
       ) : posts.length === 0 ? (
         tab === 'for-you' ? (
           <EmptyState
-            title="Aucun post pour le moment"
-            message="Soyez le premier à publier quelque chose sur Breezy."
+            title={t('feed.empty_title')}
+            message={t('feed.empty_for_you')}
           />
         ) : (
           <EmptyState
-            title="Aucun post pour le moment"
-            message="Les posts des comptes que vous suivez apparaîtront ici. Abonnez-vous à des profils pour personnaliser ce fil."
+            title={t('feed.empty_title')}
+            message={t('feed.empty_following')}
           />
         )
       ) : (

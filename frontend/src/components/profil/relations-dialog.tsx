@@ -8,6 +8,7 @@ import type { RelationKind } from '@/lib/api'
 import { listRelations } from '@/lib/api'
 import { useFollow } from '@/lib/use-follow'
 import type { RelationUser } from '@/types'
+import { useT } from '@/components/language-provider'
 import {
   Dialog,
   DialogContent,
@@ -42,6 +43,7 @@ export function RelationsDialog({
   followersCount,
   followingCount,
 }: RelationsDialogProps) {
+  const t = useT()
   const [tab, setTab] = useState<RelationKind>(initialTab)
 
   // Cache par onglet : `undefined` = pas encore chargé.
@@ -76,12 +78,12 @@ export function RelationsDialog({
       })
       .catch(() => {
         if (id !== requestId.current) return
-        setError('Impossible de charger la liste.')
+        setError(t('relations.load_error'))
       })
       .finally(() => {
         if (id === requestId.current) setLoading(false)
       })
-  }, [open, tab, userId, lists])
+  }, [open, tab, userId, lists, t])
 
   const current = lists[tab]
 
@@ -89,16 +91,16 @@ export function RelationsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="panel gap-0 overflow-hidden border p-0 shadow-[0_28px_80px_rgba(91,108,255,0.24)] sm:max-w-md">
         <DialogHeader className="border-b p-4">
-          <DialogTitle className="brand-text">Connexions</DialogTitle>
+          <DialogTitle className="brand-text">{t('relations.title')}</DialogTitle>
         </DialogHeader>
 
         {/* Onglets */}
         <div className="flex border-b">
           <TabButton active={tab === 'followers'} onClick={() => setTab('followers')}>
-            {followersCount} Abonnés
+            {t('relations.tab_followers', { count: followersCount })}
           </TabButton>
           <TabButton active={tab === 'following'} onClick={() => setTab('following')}>
-            {followingCount} Abonnements
+            {t('relations.tab_following', { count: followingCount })}
           </TabButton>
         </div>
 
@@ -117,8 +119,8 @@ export function RelationsDialog({
               <Users className="h-8 w-8 text-[#5B6CFF] dark:text-[#9aa6ff]" aria-hidden />
               <p className="text-sm text-muted-foreground">
                 {tab === 'followers'
-                  ? 'Aucun abonné pour le moment.'
-                  : 'Aucun abonnement pour le moment.'}
+                  ? t('relations.empty_followers')
+                  : t('relations.empty_following')}
               </p>
             </CenteredState>
           ) : (

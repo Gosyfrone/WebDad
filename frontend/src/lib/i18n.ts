@@ -1,0 +1,677 @@
+/**
+ * Registre i18n de Breezy (mécanisme maison léger, sans dépendance).
+ *
+ * Deux briques :
+ *   - LOCALES : la liste des langues disponibles (source de vérité du sélecteur).
+ *   - messages : le dictionnaire `clé → texte` par locale.
+ *
+ * Pour AJOUTER UNE LANGUE (es, it, zh…) :
+ *   1. ajouter une entrée dans LOCALES ;
+ *   2. ajouter le bloc correspondant dans `messages` (mêmes clés que `fr`).
+ * Aucun autre changement : le provider, le hook `useT` et le sélecteur
+ * s'adaptent automatiquement (cf. language-provider.tsx / language-selector.tsx).
+ *
+ * Calqué sur lib/themes.ts (registre piloté par un provider client + localStorage),
+ * la dimension MODE étant gérée par next-themes et la dimension LANGUE par
+ * LanguageProvider.
+ */
+
+/** Une langue sélectionnable. */
+export interface LocaleDef {
+  /** Code court (ISO 639-1), posé sur <html lang> et persisté. */
+  id: string
+  /** Libellé natif affiché dans le sélecteur. */
+  label: string
+  /** Drapeau (emoji) pour la pastille du sélecteur. */
+  flag: string
+}
+
+/**
+ * Langues disponibles. La PREMIÈRE est la langue par défaut (rendu serveur).
+ * Pour l'instant : Français + English. Les suivantes (Español, Italiano, 中文…)
+ * s'ajoutent ici + dans `messages`.
+ */
+export const LOCALES: LocaleDef[] = [
+  { id: 'fr', label: 'Français', flag: '🇫🇷' },
+  { id: 'en', label: 'English', flag: '🇬🇧' },
+]
+
+export type Locale = (typeof LOCALES)[number]['id']
+
+/** Langue par défaut = première du registre. Utilisée au rendu serveur. */
+export const DEFAULT_LOCALE: Locale = LOCALES[0].id
+
+/** Clé localStorage de persistance de la préférence de langue. */
+export const LOCALE_STORAGE_KEY = 'breezy-locale'
+
+/** Garde de type : la valeur est-elle une locale connue ? */
+export function isLocale(value: unknown): value is Locale {
+  return typeof value === 'string' && LOCALES.some((l) => l.id === value)
+}
+
+/**
+ * Dictionnaire `clé → texte` par locale.
+ *
+ * Convention de clés : `namespace.key` (ex. `nav.feed`, `auth.login.title`).
+ * `fr` est la référence (toutes les clés y existent) ; les autres locales en
+ * sont une traduction. Une clé manquante dans une locale retombe sur `fr`, puis
+ * sur la clé brute (cf. translate()).
+ */
+export type Messages = Record<string, string>
+
+export const messages: Record<Locale, Messages> = {
+  fr: {
+    // — Commun —
+    'common.user': 'Utilisateur',
+    'common.username_fallback': 'utilisateur',
+    'common.not_connected': 'non connecté',
+    'common.logout': 'Se déconnecter',
+    'common.cancel': 'Annuler',
+    'common.save': 'Enregistrer',
+    'common.loading': 'Chargement…',
+    'common.retry': 'Réessayer',
+    'common.close': 'Fermer',
+
+    // — Navigation —
+    'nav.feed': 'Fil',
+    'nav.explore': 'Explorer',
+    'nav.notifications': 'Notifications',
+    'nav.messages': 'Messages',
+    'nav.profil': 'Profil',
+    'nav.moderation': 'Modération',
+    'nav.admin': 'Administration',
+    'nav.settings': 'Paramètres',
+    'nav.home': 'Accueil',
+    'nav.open_menu': 'Ouvrir le menu de navigation',
+    'nav.post': 'Breezer',
+    'nav.compose': 'Composer une publication',
+    'nav.search': 'Recherche',
+
+    // — Rôles —
+    'role.user': 'Utilisateur',
+    'role.moderator': 'Modérateur',
+    'role.administrator': 'Administrateur',
+
+    // — Sélecteur de thème —
+    'theme.title': 'Thème',
+    'theme.appearance': 'Apparence',
+    'theme.toggle_aria': 'Basculer entre le mode clair et sombre',
+    'theme.system': 'Mode système',
+    'theme.on': 'Activé',
+    'theme.off': 'Désactivé',
+
+    // — Sélecteur de langue —
+    'lang.title': 'Langue',
+    'lang.select_aria': 'Choisir la langue',
+
+    // — Paramètres —
+    'settings.title': 'Paramètres',
+    'settings.account_title': 'Paramètres du compte',
+    'settings.account_desc':
+      'Le thème, la langue et les préférences de confidentialité arriveront ici.',
+
+    // — Pages stub (états vides) —
+    'notifications.heading': 'Rien pour le moment',
+    'notifications.desc': 'Vos notifications (likes, abonnements, mentions) apparaîtront ici.',
+    'messages.heading': 'Aucune conversation',
+    'messages.desc': 'Vos messages privés apparaîtront ici une fois la messagerie disponible.',
+    'admin.heading': 'Administration Breezy',
+    'admin.desc': 'La gestion des utilisateurs et des rôles arrivera ici.',
+    'moderation.heading': 'Centre de modération',
+    'moderation.desc': 'Les signalements et les actions de modération apparaîtront ici.',
+
+    // — Recherche / Tendances (colonne droite) —
+    'search.placeholder': 'Rechercher',
+    'trends.title': 'Tendances',
+    'trends.trending': 'Tendance',
+    'trends.t1.category': 'Technologie',
+    'trends.t1.posts': '12,4 K posts',
+    'trends.t2.category': 'Dev',
+    'trends.t2.posts': '8,1 K posts',
+    'trends.t3.category': 'Cloud',
+    'trends.t3.posts': '5,6 K posts',
+
+    // — Navigation mobile —
+    'nav.main_aria': 'Navigation principale',
+    'post.create_aria': 'Créer un post',
+
+    // — 404 —
+    'notfound.message': "Cette page n'existe pas.",
+    'notfound.back': "Retour à l'accueil",
+
+    // — Authentification (commun) —
+    'auth.search_aria': 'Rechercher',
+    'auth.email_label': 'Adresse e-mail',
+    'auth.email_placeholder': 'toi@exemple.com',
+    'auth.password_label': 'Mot de passe',
+    'auth.show_password': 'Afficher le mot de passe',
+    'auth.hide_password': 'Masquer le mot de passe',
+    'auth.err.email_required': "L'adresse e-mail est requise.",
+    'auth.err.email_invalid': 'Saisis une adresse e-mail valide.',
+    'auth.err.email_max': "L'adresse e-mail est limitée à 50 caractères.",
+    'auth.err.password_required': 'Le mot de passe est requis.',
+    'auth.err.password_min': 'Le mot de passe doit contenir au moins 8 caractères.',
+    'auth.err.network': "Impossible de contacter l'API. Réessaie dans un instant.",
+
+    // — Login —
+    'auth.login.demo.kicker': 'Fil en direct',
+    'auth.login.demo.heading': 'Retrouve ton monde.',
+    'auth.login.demo.post1': 'Nouvelle playlist, nouveaux débats, même énergie Breezy.',
+    'auth.login.demo.views': '18.4K vues',
+    'auth.login.demo.joined': 'Noa a rejoint la conversation',
+    'auth.login.demo.joined_sub': 'Découvre les sujets qui montent ce soir.',
+    'auth.login.demo.rank': '#{n} sur Breezy',
+    'auth.login.demo.interactions': '17 nouvelles interactions',
+    'auth.login.demo.interactions_sub': "Ton fil t'attend, frais et vivant.",
+    'auth.login.badge': 'Connexion au réseau',
+    'auth.login.title': "Reprends ton fil là où tu l'as laissé.",
+    'auth.login.subtitle':
+      'Connecte-toi à Breezy, retrouve tes messages, tes posts et les conversations qui bougent.',
+    'auth.login.forgot': 'Mot de passe oublié ?',
+    'auth.login.submit': 'Se connecter',
+    'auth.login.submitting': 'Connexion en cours…',
+    'auth.login.or': 'Ou se connecter avec',
+    'auth.login.no_account': 'Pas encore de compte ?',
+    'auth.login.create_account': 'Créer un compte',
+    'auth.login.failed': 'La connexion a échoué. Vérifie tes identifiants.',
+
+    // — Register —
+    'auth.register.demo.kicker': 'Nouveau sur Breezy',
+    'auth.register.demo.heading': 'Crée ton espace.',
+    'auth.register.demo.you': 'Toi',
+    'auth.register.demo.now': 'maintenant',
+    'auth.register.demo.post1':
+      'Premier post, première vibe, et déjà toute une communauté à rencontrer.',
+    'auth.register.demo.welcome': 'Bienvenue',
+    'auth.register.demo.opens': "Breezy t'ouvre le fil",
+    'auth.register.demo.opens_sub': 'Choisis ton pseudo et commence à publier.',
+    'auth.register.demo.to_join': 'À rejoindre',
+    'auth.register.demo.community': 'Communauté #{n}',
+    'auth.register.demo.comm1': 'Créateurs',
+    'auth.register.demo.comm2': 'Campus CESI',
+    'auth.register.demo.comm3': 'Dev Distribué',
+    'auth.register.demo.alive': 'Ton compte prend vie',
+    'auth.register.demo.alive_sub': 'Profil, posts et conversations en quelques secondes.',
+    'auth.register.badge': 'Nouveau profil Breezy',
+    'auth.register.title': 'Rejoins Breezy et commence à publier.',
+    'auth.register.subtitle':
+      "Crée ton compte, choisis ton nom d'utilisateur et entre dans le fil.",
+    'auth.register.username_label': "Nom d'utilisateur",
+    'auth.register.username_tooltip':
+      "Le nom d'utilisateur pourra être changé après la création du compte, puis une fois tous les 14 jours.",
+    'auth.register.birthdate_label': 'Date de naissance',
+    'auth.register.birthdate_tooltip':
+      'La date de naissance ne pourra plus être changée une fois le compte créé.',
+    'auth.register.gender_label': 'Genre',
+    'auth.register.gender_male': 'Homme',
+    'auth.register.gender_female': 'Femme',
+    'auth.register.password_confirm_label': 'Confirmation du mot de passe',
+    'auth.register.show_password_confirm': 'Afficher la confirmation du mot de passe',
+    'auth.register.hide_password_confirm': 'Masquer la confirmation du mot de passe',
+    'auth.register.password_help':
+      '8 caractères min., majuscule, minuscule, chiffre et caractère spécial.',
+    'auth.register.submit': 'Créer mon compte',
+    'auth.register.submitting': 'Création du compte…',
+    'auth.register.or': 'Ou créer mon compte avec',
+    'auth.register.have_account': 'Tu as déjà un compte ?',
+    'auth.register.err.username_required': "Le nom d'utilisateur est requis.",
+    'auth.register.err.username_format':
+      '3 à 24 caractères : lettres, chiffres et tiret bas (_) uniquement.',
+    'auth.register.err.username_max': "Le nom d'utilisateur est limité à 24 caractères.",
+    'auth.register.err.username_reserved': "Ce nom d'utilisateur n'est pas autorisé.",
+    'auth.register.err.username_taken': "Ce nom d'utilisateur est déjà pris.",
+    'auth.register.err.username_check':
+      "Impossible de vérifier le nom d'utilisateur. Réessaie dans un instant.",
+    'auth.register.err.birthdate_required': 'La date de naissance est requise.',
+    'auth.register.err.age': "Tu dois avoir au moins 13 ans pour t'inscrire.",
+    'auth.register.err.gender_required': 'Choisis un genre.',
+    'auth.register.err.password_max': 'Le mot de passe est limité à 250 caractères.',
+    'auth.register.err.password_format':
+      '8 caractères minimum, une majuscule, une minuscule, un chiffre et un caractère spécial.',
+    'auth.register.err.confirm_required': 'Confirme ton mot de passe.',
+    'auth.register.err.confirm_max': 'La confirmation est limitée à 250 caractères.',
+    'auth.register.err.confirm_mismatch': 'Les mots de passe ne correspondent pas.',
+    'auth.register.err.failed': "L'inscription a échoué. Vérifie les informations saisies.",
+
+    // — Commun (toasts) —
+    'common.action_failed': 'Action impossible',
+    'common.delete_failed': 'Suppression impossible',
+
+    // — Fil d'actualité —
+    'feed.title': "Fil d'actualité",
+    'feed.tab_for_you': 'Pour toi',
+    'feed.tab_following': 'Abonnements',
+    'feed.load_error': 'Impossible de charger le fil.',
+    'feed.unavailable': 'Fil indisponible',
+    'feed.empty_title': 'Aucun post pour le moment',
+    'feed.empty_for_you': 'Soyez le premier à publier quelque chose sur Breezy.',
+    'feed.empty_following':
+      'Les posts des comptes que vous suivez apparaîtront ici. Abonnez-vous à des profils pour personnaliser ce fil.',
+
+    // — Composer —
+    'composer.placeholder': 'Ça breez ? 🌴',
+    'composer.add_image': 'Ajouter une image',
+    'composer.add_emoji': 'Ajouter un emoji',
+    'composer.add_poll': 'Ajouter un sondage',
+    'composer.pin_profile': 'Épingler sur mon profil',
+    'composer.post_failed': 'Publication impossible',
+    'composer.dialog_desc': 'Rédigez et publiez un nouveau post (280 caractères maximum).',
+    'emoji.aria': 'Emoji {emoji}',
+
+    // — Post (carte) —
+    'post.delete': 'Supprimer',
+    'post.more_options': "Plus d'options",
+    'post.comment': 'Commenter',
+    'post.repost': 'Reposter',
+    'post.like': 'Aimer',
+    'post.views': 'Vues',
+    'post.share': 'Partager',
+    'post.deleted': 'Post supprimé',
+
+    // — Commentaires —
+    'comment.reply': 'Répondre',
+    'comment.placeholder': 'Écrire un commentaire…',
+    'comment.reply_placeholder': 'Écrire une réponse…',
+    'comment.load_error': 'Impossible de charger les commentaires.',
+    'comment.empty': 'Aucun commentaire. Soyez le premier à réagir.',
+    'comment.hide_replies': 'Masquer les réponses',
+    'comment.view_replies_one': 'Voir les {count} réponse',
+    'comment.view_replies_other': 'Voir les {count} réponses',
+    'comment.view_more_replies': 'Voir plus de réponses',
+    'comment.delete_aria': 'Supprimer le commentaire',
+    'comment.submit_failed': 'Commentaire impossible',
+    'comment.reply_failed': 'Réponse impossible',
+    'comment.load_failed': 'Chargement impossible',
+
+    // — Profil —
+    'profil.not_found': 'Profil introuvable.',
+    'profil.updated': 'Profil mis à jour',
+    'profil.update_failed': 'Mise à jour impossible',
+    'profil.save_failed': "Le profil n'a pas pu être enregistré.",
+    'profil.unavailable': 'Profil indisponible',
+    'profil.back_aria': 'Retour au fil',
+    'profil.posts_count_one': '{count} post',
+    'profil.posts_count_other': '{count} posts',
+    'profil.tab_posts': 'Posts',
+    'profil.tab_replies': 'Réponses',
+    'profil.tab_likes': "J'aime",
+    'profil.empty_posts': 'Aucun post publié pour le moment.',
+    'profil.empty_replies': 'Les réponses apparaîtront ici.',
+    'profil.empty_likes': 'Les posts que vous aimez apparaîtront ici.',
+    'profil.edit': 'Éditer le profil',
+    'profil.born_on': 'Né(e) le {date}',
+    'profil.joined': 'A rejoint en {date}',
+    'profil.followers': 'Abonnés',
+    'profil.following': 'Abonnements',
+
+    // — Bouton de suivi —
+    'follow.follow': 'Suivre',
+    'follow.followed': 'Abonné',
+    'follow.unfollow': 'Ne plus suivre',
+    'follow.fail_title': 'Suivi impossible',
+    'follow.unfail_title': 'Désabonnement impossible',
+    'follow.fail_desc': 'Connectez-vous pour gérer vos abonnements.',
+
+    // — Liste d'utilisateurs —
+    'list.view_profile_aria': 'Voir le profil de {name}',
+
+    // — Modale des relations —
+    'relations.title': 'Connexions',
+    'relations.load_error': 'Impossible de charger la liste.',
+    'relations.tab_followers': '{count} Abonnés',
+    'relations.tab_following': '{count} Abonnements',
+    'relations.empty_followers': 'Aucun abonné pour le moment.',
+    'relations.empty_following': 'Aucun abonnement pour le moment.',
+
+    // — Édition du profil —
+    'editprofil.desc': 'Mettez à jour les informations visibles sur votre profil public.',
+    'editprofil.change_banner': 'Changer la bannière',
+    'editprofil.change_avatar': 'Changer la photo de profil',
+    'editprofil.name_label': 'Nom',
+    'editprofil.name_placeholder': 'Votre nom',
+    'editprofil.name_max': '{count} caractères maximum.',
+    'editprofil.name_locked': 'Le pseudo pourra être changé le {date}.',
+    'editprofil.bio_label': 'Bio',
+    'editprofil.bio_placeholder': 'Parlez de vous en quelques mots…',
+    'editprofil.location_label': 'Localisation',
+    'editprofil.location_placeholder': 'Ville, pays',
+    'editprofil.website_label': 'Site web',
+    'editprofil.birthdate_locked':
+      "La date de naissance ne peut pas être changée une fois renseignée.",
+    'editprofil.gender_locked': 'Le genre ne peut pas être changé une fois renseigné.',
+    'editprofil.gender_none': 'Non renseigné',
+    'editprofil.saving': 'Enregistrement...',
+
+    // — Explorer —
+    'explorer.search_placeholder': 'Rechercher un compte',
+    'explorer.hint_before': 'Astuce : commencez par',
+    'explorer.hint_after': 'pour chercher par identifiant.',
+    'explorer.search_failed_title': 'Recherche impossible',
+    'explorer.search_failed_msg': 'Réessayez dans un instant.',
+    'explorer.empty_title': 'Rechercher sur Breezy',
+    'explorer.empty_msg': 'Trouvez des comptes par nom ou par identifiant (@).',
+    'explorer.no_results': 'Aucun résultat',
+    'explorer.no_results_handle': 'Aucun identifiant ne correspond à « {q} ».',
+    'explorer.no_results_name': 'Aucun nom ne correspond à « {q} ».',
+
+    // — Qui suivre —
+    'who.title': 'Qui suivre',
+    'who.empty': 'Aucune suggestion pour le moment.',
+  },
+  en: {
+    // — Common —
+    'common.user': 'User',
+    'common.username_fallback': 'user',
+    'common.not_connected': 'not signed in',
+    'common.logout': 'Log out',
+    'common.cancel': 'Cancel',
+    'common.save': 'Save',
+    'common.loading': 'Loading…',
+    'common.retry': 'Retry',
+    'common.close': 'Close',
+
+    // — Navigation —
+    'nav.feed': 'Feed',
+    'nav.explore': 'Explore',
+    'nav.notifications': 'Notifications',
+    'nav.messages': 'Messages',
+    'nav.profil': 'Profile',
+    'nav.moderation': 'Moderation',
+    'nav.admin': 'Administration',
+    'nav.settings': 'Settings',
+    'nav.home': 'Home',
+    'nav.open_menu': 'Open navigation menu',
+    'nav.post': 'Breeze',
+    'nav.compose': 'Compose a post',
+    'nav.search': 'Search',
+
+    // — Roles —
+    'role.user': 'User',
+    'role.moderator': 'Moderator',
+    'role.administrator': 'Administrator',
+
+    // — Theme switch —
+    'theme.title': 'Theme',
+    'theme.appearance': 'Appearance',
+    'theme.toggle_aria': 'Switch between light and dark mode',
+    'theme.system': 'System mode',
+    'theme.on': 'On',
+    'theme.off': 'Off',
+
+    // — Language switch —
+    'lang.title': 'Language',
+    'lang.select_aria': 'Choose language',
+
+    // — Settings —
+    'settings.title': 'Settings',
+    'settings.account_title': 'Account settings',
+    'settings.account_desc':
+      'Theme, language and privacy preferences will live here.',
+
+    // — Stub pages (empty states) —
+    'notifications.heading': 'Nothing yet',
+    'notifications.desc': 'Your notifications (likes, follows, mentions) will show up here.',
+    'messages.heading': 'No conversations',
+    'messages.desc': 'Your private messages will show up here once messaging is available.',
+    'admin.heading': 'Breezy administration',
+    'admin.desc': 'User and role management will live here.',
+    'moderation.heading': 'Moderation center',
+    'moderation.desc': 'Reports and moderation actions will show up here.',
+
+    // — Search / Trends (right column) —
+    'search.placeholder': 'Search',
+    'trends.title': 'Trends',
+    'trends.trending': 'Trending',
+    'trends.t1.category': 'Technology',
+    'trends.t1.posts': '12.4K posts',
+    'trends.t2.category': 'Dev',
+    'trends.t2.posts': '8.1K posts',
+    'trends.t3.category': 'Cloud',
+    'trends.t3.posts': '5.6K posts',
+
+    // — Mobile navigation —
+    'nav.main_aria': 'Main navigation',
+    'post.create_aria': 'Create a post',
+
+    // — 404 —
+    'notfound.message': "This page doesn't exist.",
+    'notfound.back': 'Back to home',
+
+    // — Authentication (shared) —
+    'auth.search_aria': 'Search',
+    'auth.email_label': 'Email address',
+    'auth.email_placeholder': 'you@example.com',
+    'auth.password_label': 'Password',
+    'auth.show_password': 'Show password',
+    'auth.hide_password': 'Hide password',
+    'auth.err.email_required': 'Email address is required.',
+    'auth.err.email_invalid': 'Enter a valid email address.',
+    'auth.err.email_max': 'Email address is limited to 50 characters.',
+    'auth.err.password_required': 'Password is required.',
+    'auth.err.password_min': 'Password must be at least 8 characters.',
+    'auth.err.network': "Couldn't reach the API. Try again in a moment.",
+
+    // — Login —
+    'auth.login.demo.kicker': 'Live feed',
+    'auth.login.demo.heading': 'Find your world again.',
+    'auth.login.demo.post1': 'New playlist, new debates, same Breezy energy.',
+    'auth.login.demo.views': '18.4K views',
+    'auth.login.demo.joined': 'Noa joined the conversation',
+    'auth.login.demo.joined_sub': "Discover tonight's rising topics.",
+    'auth.login.demo.rank': '#{n} on Breezy',
+    'auth.login.demo.interactions': '17 new interactions',
+    'auth.login.demo.interactions_sub': 'Your feed is waiting, fresh and alive.',
+    'auth.login.badge': 'Sign in to the network',
+    'auth.login.title': 'Pick up your feed where you left off.',
+    'auth.login.subtitle':
+      'Sign in to Breezy and find your messages, your posts and the conversations that move.',
+    'auth.login.forgot': 'Forgot password?',
+    'auth.login.submit': 'Sign in',
+    'auth.login.submitting': 'Signing in…',
+    'auth.login.or': 'Or sign in with',
+    'auth.login.no_account': 'No account yet?',
+    'auth.login.create_account': 'Create an account',
+    'auth.login.failed': 'Sign-in failed. Check your credentials.',
+
+    // — Register —
+    'auth.register.demo.kicker': 'New to Breezy',
+    'auth.register.demo.heading': 'Create your space.',
+    'auth.register.demo.you': 'You',
+    'auth.register.demo.now': 'now',
+    'auth.register.demo.post1':
+      'First post, first vibe, and already a whole community to meet.',
+    'auth.register.demo.welcome': 'Welcome',
+    'auth.register.demo.opens': 'Breezy opens up the feed',
+    'auth.register.demo.opens_sub': 'Pick your handle and start posting.',
+    'auth.register.demo.to_join': 'To join',
+    'auth.register.demo.community': 'Community #{n}',
+    'auth.register.demo.comm1': 'Creators',
+    'auth.register.demo.comm2': 'CESI Campus',
+    'auth.register.demo.comm3': 'Distributed Dev',
+    'auth.register.demo.alive': 'Your account comes to life',
+    'auth.register.demo.alive_sub': 'Profile, posts and conversations in seconds.',
+    'auth.register.badge': 'New Breezy profile',
+    'auth.register.title': 'Join Breezy and start posting.',
+    'auth.register.subtitle':
+      'Create your account, pick your username and step into the feed.',
+    'auth.register.username_label': 'Username',
+    'auth.register.username_tooltip':
+      'The username can be changed after account creation, then once every 14 days.',
+    'auth.register.birthdate_label': 'Date of birth',
+    'auth.register.birthdate_tooltip':
+      "Your date of birth can't be changed once the account is created.",
+    'auth.register.gender_label': 'Gender',
+    'auth.register.gender_male': 'Male',
+    'auth.register.gender_female': 'Female',
+    'auth.register.password_confirm_label': 'Password confirmation',
+    'auth.register.show_password_confirm': 'Show password confirmation',
+    'auth.register.hide_password_confirm': 'Hide password confirmation',
+    'auth.register.password_help':
+      '8 chars min., uppercase, lowercase, number and special character.',
+    'auth.register.submit': 'Create my account',
+    'auth.register.submitting': 'Creating account…',
+    'auth.register.or': 'Or create my account with',
+    'auth.register.have_account': 'Already have an account?',
+    'auth.register.err.username_required': 'Username is required.',
+    'auth.register.err.username_format':
+      '3 to 24 characters: letters, numbers and underscore (_) only.',
+    'auth.register.err.username_max': 'Username is limited to 24 characters.',
+    'auth.register.err.username_reserved': "This username isn't allowed.",
+    'auth.register.err.username_taken': 'This username is already taken.',
+    'auth.register.err.username_check':
+      "Couldn't check the username. Try again in a moment.",
+    'auth.register.err.birthdate_required': 'Date of birth is required.',
+    'auth.register.err.age': 'You must be at least 13 to sign up.',
+    'auth.register.err.gender_required': 'Choose a gender.',
+    'auth.register.err.password_max': 'Password is limited to 250 characters.',
+    'auth.register.err.password_format':
+      'At least 8 characters, one uppercase, one lowercase, one number and one special character.',
+    'auth.register.err.confirm_required': 'Confirm your password.',
+    'auth.register.err.confirm_max': 'The confirmation is limited to 250 characters.',
+    'auth.register.err.confirm_mismatch': "Passwords don't match.",
+    'auth.register.err.failed': 'Sign-up failed. Check the information entered.',
+
+    // — Common (toasts) —
+    'common.action_failed': 'Action failed',
+    'common.delete_failed': "Couldn't delete",
+
+    // — Feed —
+    'feed.title': 'Feed',
+    'feed.tab_for_you': 'For you',
+    'feed.tab_following': 'Following',
+    'feed.load_error': "Couldn't load the feed.",
+    'feed.unavailable': 'Feed unavailable',
+    'feed.empty_title': 'No posts yet',
+    'feed.empty_for_you': 'Be the first to post something on Breezy.',
+    'feed.empty_following':
+      'Posts from accounts you follow will show up here. Follow some profiles to personalize this feed.',
+
+    // — Composer —
+    'composer.placeholder': "What's breezing? 🌴",
+    'composer.add_image': 'Add an image',
+    'composer.add_emoji': 'Add an emoji',
+    'composer.add_poll': 'Add a poll',
+    'composer.pin_profile': 'Pin to my profile',
+    'composer.post_failed': "Couldn't post",
+    'composer.dialog_desc': 'Write and publish a new post (280 characters max).',
+    'emoji.aria': 'Emoji {emoji}',
+
+    // — Post (card) —
+    'post.delete': 'Delete',
+    'post.more_options': 'More options',
+    'post.comment': 'Comment',
+    'post.repost': 'Repost',
+    'post.like': 'Like',
+    'post.views': 'Views',
+    'post.share': 'Share',
+    'post.deleted': 'Post deleted',
+
+    // — Comments —
+    'comment.reply': 'Reply',
+    'comment.placeholder': 'Write a comment…',
+    'comment.reply_placeholder': 'Write a reply…',
+    'comment.load_error': "Couldn't load comments.",
+    'comment.empty': 'No comments yet. Be the first to react.',
+    'comment.hide_replies': 'Hide replies',
+    'comment.view_replies_one': 'View {count} reply',
+    'comment.view_replies_other': 'View {count} replies',
+    'comment.view_more_replies': 'View more replies',
+    'comment.delete_aria': 'Delete comment',
+    'comment.submit_failed': "Couldn't comment",
+    'comment.reply_failed': "Couldn't reply",
+    'comment.load_failed': "Couldn't load",
+
+    // — Profile —
+    'profil.not_found': 'Profile not found.',
+    'profil.updated': 'Profile updated',
+    'profil.update_failed': "Couldn't update",
+    'profil.save_failed': "The profile couldn't be saved.",
+    'profil.unavailable': 'Profile unavailable',
+    'profil.back_aria': 'Back to feed',
+    'profil.posts_count_one': '{count} post',
+    'profil.posts_count_other': '{count} posts',
+    'profil.tab_posts': 'Posts',
+    'profil.tab_replies': 'Replies',
+    'profil.tab_likes': 'Likes',
+    'profil.empty_posts': 'No posts yet.',
+    'profil.empty_replies': 'Replies will show up here.',
+    'profil.empty_likes': 'Posts you like will show up here.',
+    'profil.edit': 'Edit profile',
+    'profil.born_on': 'Born on {date}',
+    'profil.joined': 'Joined {date}',
+    'profil.followers': 'Followers',
+    'profil.following': 'Following',
+
+    // — Follow button —
+    'follow.follow': 'Follow',
+    'follow.followed': 'Following',
+    'follow.unfollow': 'Unfollow',
+    'follow.fail_title': "Couldn't follow",
+    'follow.unfail_title': "Couldn't unfollow",
+    'follow.fail_desc': 'Sign in to manage your follows.',
+
+    // — User list —
+    'list.view_profile_aria': "View {name}'s profile",
+
+    // — Relations dialog —
+    'relations.title': 'Connections',
+    'relations.load_error': "Couldn't load the list.",
+    'relations.tab_followers': '{count} Followers',
+    'relations.tab_following': '{count} Following',
+    'relations.empty_followers': 'No followers yet.',
+    'relations.empty_following': 'Not following anyone yet.',
+
+    // — Profile editing —
+    'editprofil.desc': 'Update the information shown on your public profile.',
+    'editprofil.change_banner': 'Change banner',
+    'editprofil.change_avatar': 'Change profile picture',
+    'editprofil.name_label': 'Name',
+    'editprofil.name_placeholder': 'Your name',
+    'editprofil.name_max': '{count} characters max.',
+    'editprofil.name_locked': 'Your handle can be changed on {date}.',
+    'editprofil.bio_label': 'Bio',
+    'editprofil.bio_placeholder': 'Tell us about yourself in a few words…',
+    'editprofil.location_label': 'Location',
+    'editprofil.location_placeholder': 'City, country',
+    'editprofil.website_label': 'Website',
+    'editprofil.birthdate_locked': "Your date of birth can't be changed once set.",
+    'editprofil.gender_locked': "Gender can't be changed once set.",
+    'editprofil.gender_none': 'Not specified',
+    'editprofil.saving': 'Saving...',
+
+    // — Explore —
+    'explorer.search_placeholder': 'Search for an account',
+    'explorer.hint_before': 'Tip: start with',
+    'explorer.hint_after': 'to search by handle.',
+    'explorer.search_failed_title': 'Search failed',
+    'explorer.search_failed_msg': 'Try again in a moment.',
+    'explorer.empty_title': 'Search on Breezy',
+    'explorer.empty_msg': 'Find accounts by name or handle (@).',
+    'explorer.no_results': 'No results',
+    'explorer.no_results_handle': 'No handle matches “{q}”.',
+    'explorer.no_results_name': 'No name matches “{q}”.',
+
+    // — Who to follow —
+    'who.title': 'Who to follow',
+    'who.empty': 'No suggestions yet.',
+  },
+}
+
+/**
+ * Traduit une clé pour une locale donnée, avec interpolation `{param}` optionnelle.
+ *
+ * Repli en cascade : locale demandée → DEFAULT_LOCALE → clé brute (pour repérer
+ * une clé manquante en dev sans casser le rendu).
+ */
+export function translate(
+  locale: Locale,
+  key: string,
+  params?: Record<string, string | number>,
+): string {
+  const table = messages[locale] ?? messages[DEFAULT_LOCALE]
+  const template = table[key] ?? messages[DEFAULT_LOCALE][key] ?? key
+  if (!params) return template
+  return template.replace(/\{(\w+)\}/g, (match, name: string) =>
+    name in params ? String(params[name]) : match,
+  )
+}

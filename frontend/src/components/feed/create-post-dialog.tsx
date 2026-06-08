@@ -3,6 +3,7 @@
 import { useState } from 'react'
 
 import { PostComposer } from '@/components/feed/post-composer'
+import { useT } from '@/components/language-provider'
 import {
   Dialog,
   DialogContent,
@@ -24,6 +25,7 @@ interface CreatePostDialogProps {
  * la description sont masqués visuellement mais présents pour l'accessibilité.
  */
 export function CreatePostDialog({ children }: CreatePostDialogProps) {
+  const t = useT()
   const [open, setOpen] = useState(false)
 
   return (
@@ -31,10 +33,8 @@ export function CreatePostDialog({ children }: CreatePostDialogProps) {
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent className="panel top-24 translate-y-0 border p-4 shadow-[0_28px_80px_rgba(91,108,255,0.24)] sm:max-w-xl">
         <DialogHeader className="sr-only">
-          <DialogTitle>Créer un post</DialogTitle>
-          <DialogDescription>
-            Rédigez et publiez un nouveau post (280 caractères maximum).
-          </DialogDescription>
+          <DialogTitle>{t('post.create_aria')}</DialogTitle>
+          <DialogDescription>{t('composer.dialog_desc')}</DialogDescription>
         </DialogHeader>
 
         <PostComposer

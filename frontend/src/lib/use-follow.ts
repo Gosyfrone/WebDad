@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { follow, getFollowingIds, getMe, unfollow } from '@/lib/api'
 import type { RelationUser } from '@/types'
 import { useToast } from '@/hooks/use-toast'
+import { useT } from '@/components/language-provider'
 
 /**
  * État de suivi partagé (modale des relations, Explorer, « Qui suivre »).
@@ -17,6 +18,7 @@ import { useToast } from '@/hooks/use-toast'
  */
 export function useFollow(enabled = true) {
   const { toast } = useToast()
+  const t = useT()
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [followingIds, setFollowingIds] = useState<Set<string>>(new Set())
   const [pending, setPending] = useState<Set<string>>(new Set())
@@ -60,8 +62,8 @@ export function useFollow(enabled = true) {
           return copy
         })
         toast({
-          title: next ? 'Suivi impossible' : 'Désabonnement impossible',
-          description: 'Connectez-vous pour gérer vos abonnements.',
+          title: next ? t('follow.fail_title') : t('follow.unfail_title'),
+          description: t('follow.fail_desc'),
           variant: 'destructive',
         })
       } finally {
@@ -72,7 +74,7 @@ export function useFollow(enabled = true) {
         })
       }
     },
-    [toast],
+    [toast, t],
   )
 
   return {

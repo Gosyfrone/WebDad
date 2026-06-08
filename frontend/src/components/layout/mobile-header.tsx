@@ -11,6 +11,8 @@ import { logout } from '@/lib/auth-client'
 import { getMyProfil, subscribeProfilUpdated } from '@/lib/profil-client'
 import { ROUTES, navItemsForRole } from '@/lib/routes'
 import type { ProfilDetails, UserRole } from '@/types'
+import { useT } from '@/components/language-provider'
+import { LanguageSelector } from '@/components/language-selector'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
@@ -45,6 +47,7 @@ const SWIPE_THRESHOLD = 60
  * pas → on rend `null` sur ces routes (le swipe y est aussi désactivé).
  */
 export function MobileHeader({ role, username = 'Utilisateur' }: MobileHeaderProps) {
+  const t = useT()
   const pathname = usePathname()
   const hidden = pathname?.startsWith(ROUTES.profil) ?? false
   const [open, setOpen] = useState(false)
@@ -58,7 +61,9 @@ export function MobileHeader({ role, username = 'Utilisateur' }: MobileHeaderPro
   const fallbackInitial = (account.displayName || account.username || 'U')
     .charAt(0)
     .toUpperCase()
-  const handle = account.username ? `@${account.username}` : '@utilisateur'
+  // Avant le chargement du profil (username vide) on affiche un libellé traduit.
+  const shownName = account.username ? account.displayName : t('common.user')
+  const handle = account.username ? `@${account.username}` : `@${t('common.username_fallback')}`
   const displayedRole = account.role ?? role
 
   useEffect(() => {
@@ -133,7 +138,7 @@ export function MobileHeader({ role, username = 'Utilisateur' }: MobileHeaderPro
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetTrigger asChild>
           <button
-            aria-label="Ouvrir le menu de navigation"
+            aria-label={t('nav.open_menu')}
             className="rounded-full ring-offset-background transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
             <Avatar className="h-8 w-8">
@@ -156,9 +161,9 @@ export function MobileHeader({ role, username = 'Utilisateur' }: MobileHeaderPro
                 <AvatarFallback className="text-lg">{fallbackInitial}</AvatarFallback>
               </Avatar>
               <div className="flex min-w-0 flex-col">
-                <SheetTitle className="truncate">{account.displayName}</SheetTitle>
+                <SheetTitle className="truncate">{shownName}</SheetTitle>
                 <SheetDescription className="truncate">
-                  {handle} · {displayedRole ?? 'non connecté'}
+                  {handle} · {displayedRole ? t(`role.${displayedRole}`) : t('common.not_connected')}
                 </SheetDescription>
               </div>
             </div>
@@ -177,16 +182,17 @@ export function MobileHeader({ role, username = 'Utilisateur' }: MobileHeaderPro
                       active && 'bg-accent font-bold text-[#5B6CFF] shadow-sm dark:text-[#9aa6ff]',
                     )}
                   >
-                    {item.label}
+                    {t(item.labelKey)}
                   </Link>
                 </SheetClose>
               )
             })}
           </nav>
 
-          {/* Thème + Paramètres + déconnexion */}
+          {/* Langue + Thème + Paramètres + déconnexion */}
           <div className="border-t p-2">
-            {/* Le sélecteur de thème ne ferme pas le tiroir (on garde le retour visuel) */}
+            {/* Langue (au-dessus) et thème ne ferment pas le tiroir (retour visuel gardé) */}
+            <LanguageSelector />
             <ThemeToggle />
             <SheetClose asChild>
               <Link
@@ -194,7 +200,7 @@ export function MobileHeader({ role, username = 'Utilisateur' }: MobileHeaderPro
                 className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-base transition-colors hover:bg-accent"
               >
                 <Settings className="h-5 w-5" />
-                Paramètres
+                {t('nav.settings')}
               </Link>
             </SheetClose>
             <button
@@ -203,7 +209,7 @@ export function MobileHeader({ role, username = 'Utilisateur' }: MobileHeaderPro
               className="flex w-full items-center gap-3 rounded-md px-3 py-3 text-base transition-colors hover:bg-accent"
             >
               <LogOut className="h-5 w-5" />
-              Se déconnecter
+              {t('common.logout')}
             </button>
           </div>
         </SheetContent>
@@ -212,7 +218,7 @@ export function MobileHeader({ role, username = 'Utilisateur' }: MobileHeaderPro
       {/* Logo Breezy centré */}
       <Link
         href={ROUTES.feed}
-        aria-label="Accueil"
+        aria-label={t('nav.home')}
         className="absolute left-1/2 -translate-x-1/2"
       >
         <Image

@@ -7,19 +7,21 @@ import { Bell, Mail, Search } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import { ROUTES } from '@/lib/routes'
+import { useT } from '@/components/language-provider'
 
 interface TabItem {
   href: string
-  label: string
+  /** Clé i18n du libellé (cf. lib/i18n.ts, namespace `nav`). */
+  labelKey: string
   /** Icône lucide ; `null` = logo Breezy (Accueil). */
   icon: React.ElementType | null
 }
 
 const TABS: TabItem[] = [
-  { href: ROUTES.feed, label: 'Accueil', icon: null },
-  { href: ROUTES.explorer, label: 'Recherche', icon: Search },
-  { href: ROUTES.notifications, label: 'Notifications', icon: Bell },
-  { href: ROUTES.messages, label: 'Messages', icon: Mail },
+  { href: ROUTES.feed, labelKey: 'nav.home', icon: null },
+  { href: ROUTES.explorer, labelKey: 'nav.search', icon: Search },
+  { href: ROUTES.notifications, labelKey: 'nav.notifications', icon: Bell },
+  { href: ROUTES.messages, labelKey: 'nav.messages', icon: Mail },
 ]
 
 /**
@@ -27,11 +29,12 @@ const TABS: TabItem[] = [
  * « Accueil » utilise le logo Breezy seul (`logo_only.png`).
  */
 export function MobileTabBar() {
+  const t = useT()
   const pathname = usePathname()
 
   return (
     <nav
-      aria-label="Navigation principale"
+      aria-label={t('nav.main_aria')}
       className="panel fixed inset-x-0 bottom-0 z-40 flex h-14 border-t shadow-[0_-18px_44px_rgba(91,108,255,0.12)] backdrop-blur-2xl lg:hidden"
     >
       {TABS.map((tab) => {
@@ -42,7 +45,7 @@ export function MobileTabBar() {
           <Link
             key={tab.href}
             href={tab.href}
-            aria-label={tab.label}
+            aria-label={t(tab.labelKey)}
             aria-current={active ? 'page' : undefined}
             className="flex flex-1 items-center justify-center transition-colors hover:bg-accent"
           >

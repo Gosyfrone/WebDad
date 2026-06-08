@@ -5,6 +5,7 @@ import { Camera } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import type { ProfilEditableFields } from '@/types'
+import { useLanguage } from '@/components/language-provider'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -53,6 +54,7 @@ export function EditProfilDialog({
   saving = false,
   onSave,
 }: EditProfilDialogProps) {
+  const { t, locale } = useLanguage()
   const [open, setOpen] = useState(false)
   const [displayName, setDisplayName] = useState(initial.displayName)
   const [bio, setBio] = useState(initial.bio)
@@ -111,17 +113,15 @@ export function EditProfilDialog({
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent className="panel gap-0 overflow-hidden border p-0 shadow-[0_28px_80px_rgba(91,108,255,0.24)] sm:max-w-lg">
         <DialogHeader className="border-b p-4">
-          <DialogTitle className="brand-text">
-            Éditer le profil
-          </DialogTitle>
+          <DialogTitle className="brand-text">{t('profil.edit')}</DialogTitle>
           <DialogDescription className="text-muted-foreground">
-            Mettez à jour les informations visibles sur votre profil public.
+            {t('editprofil.desc')}
           </DialogDescription>
         </DialogHeader>
 
         {/* Bannière éditable */}
         <ImagePicker
-          label="Changer la bannière"
+          label={t('editprofil.change_banner')}
           onPick={setBannerUrl}
           className={cn(
             'relative flex h-36 w-full items-center justify-center overflow-hidden bg-cover bg-center',
@@ -135,7 +135,7 @@ export function EditProfilDialog({
         <div className="px-4">
           <div className="-mt-12 w-fit">
             <ImagePicker
-              label="Changer la photo de profil"
+              label={t('editprofil.change_avatar')}
               onPick={setAvatarUrl}
               className="relative rounded-full"
             >
@@ -151,31 +151,33 @@ export function EditProfilDialog({
 
         {/* Champs texte */}
         <div className="flex flex-col gap-4 p-4 pt-2">
-          <Field label="Nom" htmlFor="profil-name">
+          <Field label={t('editprofil.name_label')} htmlFor="profil-name">
             <Input
               id="profil-name"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
-              placeholder="Votre nom"
+              placeholder={t('editprofil.name_placeholder')}
               aria-invalid={nameTooLong}
               className="rounded-2xl border-white/70 bg-white/82 shadow-sm shadow-slate-200/50 transition-all placeholder:text-slate-400 hover:border-[#47D9FF]/70 focus-visible:border-[#5B6CFF] focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15 dark:border-white/15 dark:bg-white/5 dark:placeholder:text-muted-foreground"
             />
             {nameTooLong && (
-              <p className="text-xs text-destructive">{MAX_NAME} caractères maximum.</p>
+              <p className="text-xs text-destructive">
+                {t('editprofil.name_max', { count: MAX_NAME })}
+              </p>
             )}
             {displayNameLocked && (
               <p className="text-xs text-destructive">
-                Le pseudo pourra être changé le {formatDate(nextDisplayNameDate)}.
+                {t('editprofil.name_locked', { date: formatDate(nextDisplayNameDate, locale) })}
               </p>
             )}
           </Field>
 
-          <Field label="Bio" htmlFor="profil-bio">
+          <Field label={t('editprofil.bio_label')} htmlFor="profil-bio">
             <textarea
               id="profil-bio"
               value={bio}
               onChange={(e) => setBio(e.target.value)}
-              placeholder="Parlez de vous en quelques mots…"
+              placeholder={t('editprofil.bio_placeholder')}
               rows={3}
               className="flex w-full resize-none rounded-2xl border border-white/70 bg-white/82 px-3 py-2 text-sm shadow-sm shadow-slate-200/50 transition-all placeholder:text-slate-400 hover:border-[#47D9FF]/70 focus-visible:border-[#5B6CFF] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15 dark:border-white/15 dark:bg-white/5 dark:placeholder:text-muted-foreground"
             />
@@ -190,17 +192,17 @@ export function EditProfilDialog({
           </Field>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Localisation" htmlFor="profil-location">
+            <Field label={t('editprofil.location_label')} htmlFor="profil-location">
               <Input
                 id="profil-location"
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
-                placeholder="Ville, pays"
+                placeholder={t('editprofil.location_placeholder')}
                 className="rounded-2xl border-white/70 bg-white/82 shadow-sm shadow-slate-200/50 transition-all placeholder:text-slate-400 hover:border-[#47D9FF]/70 focus-visible:border-[#5B6CFF] focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15"
               />
             </Field>
 
-            <Field label="Site web" htmlFor="profil-website">
+            <Field label={t('editprofil.website_label')} htmlFor="profil-website">
               <Input
                 id="profil-website"
                 value={website}
@@ -212,18 +214,14 @@ export function EditProfilDialog({
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Date de naissance" htmlFor="profil-birth-date">
+            <Field label={t('auth.register.birthdate_label')} htmlFor="profil-birth-date">
               <Input
                 id="profil-birth-date"
                 type="date"
                 value={birthDate}
                 onChange={(e) => setBirthDate(e.target.value)}
                 disabled={birthDateLocked}
-                title={
-                  birthDateLocked
-                    ? "La date de naissance ne peut pas être changée une fois renseignée."
-                    : undefined
-                }
+                title={birthDateLocked ? t('editprofil.birthdate_locked') : undefined}
                 className={cn(
                   'rounded-2xl border-white/70 bg-white/82 shadow-sm shadow-slate-200/50 transition-all hover:border-[#47D9FF]/70 focus-visible:border-[#5B6CFF] focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15',
                   birthDateLocked &&
@@ -232,26 +230,22 @@ export function EditProfilDialog({
               />
             </Field>
 
-            <Field label="Genre" htmlFor="profil-gender">
+            <Field label={t('auth.register.gender_label')} htmlFor="profil-gender">
               <select
                 id="profil-gender"
                 value={gender}
                 onChange={(e) => setGender(e.target.value as ProfilEditableFields['gender'])}
                 disabled={genderLocked}
-                title={
-                  genderLocked
-                    ? "Le genre ne peut pas être changé une fois renseigné."
-                    : undefined
-                }
+                title={genderLocked ? t('editprofil.gender_locked') : undefined}
                 className={cn(
                   'flex h-10 w-full rounded-2xl border border-white/70 bg-white/82 px-3 py-2 text-sm shadow-sm shadow-slate-200/50 transition-all hover:border-[#47D9FF]/70 focus-visible:border-[#5B6CFF] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15',
                   genderLocked &&
                     'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-500 hover:border-slate-200',
                 )}
               >
-                <option value="">Non renseigné</option>
-                <option value="female">Femme</option>
-                <option value="male">Homme</option>
+                <option value="">{t('editprofil.gender_none')}</option>
+                <option value="female">{t('auth.register.gender_female')}</option>
+                <option value="male">{t('auth.register.gender_male')}</option>
               </select>
             </Field>
           </div>
@@ -263,7 +257,7 @@ export function EditProfilDialog({
             disabled={!canSave || saving}
             onClick={handleSubmit}
           >
-            {saving ? 'Enregistrement...' : 'Enregistrer'}
+            {saving ? t('editprofil.saving') : t('common.save')}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -351,8 +345,8 @@ function getNextDisplayNameDate(changedAt: string): Date {
   return date
 }
 
-function formatDate(date: Date): string {
-  return new Intl.DateTimeFormat('fr-FR', {
+function formatDate(date: Date, locale: string): string {
+  return new Intl.DateTimeFormat(locale === 'en' ? 'en-US' : 'fr-FR', {
     day: 'numeric',
     month: 'long',
     year: 'numeric',

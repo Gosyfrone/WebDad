@@ -17,6 +17,7 @@ import {
 import { cn, initialOf, timeAgo } from '@/lib/utils'
 import { deletePost, likePost, pinPost, unlikePost, unpinPost, type FeedPost } from '@/lib/posts'
 import { useToast } from '@/hooks/use-toast'
+import { useLanguage } from '@/components/language-provider'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
   DropdownMenu,
@@ -45,6 +46,7 @@ interface PostCardProps {
  */
 export function PostCard({ post, onDeleted, onUpdated }: PostCardProps) {
   const { toast } = useToast()
+  const { t, locale } = useLanguage()
 
   const [liked, setLiked] = useState(post.liked)
   const [likeCount, setLikeCount] = useState(post.likesCount)
@@ -76,7 +78,7 @@ export function PostCard({ post, onDeleted, onUpdated }: PostCardProps) {
       // Rollback.
       setLiked(!next)
       setLikeCount((n) => n + (next ? -1 : 1))
-      toast({ title: 'Action impossible', variant: 'destructive' })
+      toast({ title: t('common.action_failed'), variant: 'destructive' })
     }
   }
 
@@ -89,11 +91,11 @@ export function PostCard({ post, onDeleted, onUpdated }: PostCardProps) {
     setDeleting(true)
     try {
       await deletePost(post.id)
-      toast({ title: 'Post supprimé' })
+      toast({ title: t('post.deleted') })
       onDeleted?.(post.id)
     } catch {
       setDeleting(false)
-      toast({ title: 'Suppression impossible', variant: 'destructive' })
+      toast({ title: t('common.delete_failed'), variant: 'destructive' })
     }
   }
 
@@ -145,13 +147,13 @@ export function PostCard({ post, onDeleted, onUpdated }: PostCardProps) {
               </ProfilLink>
             )}
             <span className="shrink-0 text-muted-foreground">·</span>
-            <span className="shrink-0 text-muted-foreground">{timeAgo(post.createdAt)}</span>
+            <span className="shrink-0 text-muted-foreground">{timeAgo(post.createdAt, locale)}</span>
           </div>
 
           {post.canDelete && (
             <DropdownMenu>
               <DropdownMenuTrigger
-                aria-label="Plus d'options"
+                aria-label={t('post.more_options')}
                 disabled={deleting}
                 className="shrink-0 rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary focus:outline-none"
               >
@@ -177,7 +179,7 @@ export function PostCard({ post, onDeleted, onUpdated }: PostCardProps) {
                   className="cursor-pointer text-red-500 focus:text-red-500"
                 >
                   <Trash2 className="mr-2 h-4 w-4" />
-                  Supprimer
+                  {t('post.delete')}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -203,7 +205,7 @@ export function PostCard({ post, onDeleted, onUpdated }: PostCardProps) {
           <ActionButton
             icon={MessageCircle}
             count={commentCount}
-            label="Commenter"
+            label={t('post.comment')}
             active={showComments}
             onClick={() => setShowComments((v) => !v)}
             className="hover:text-primary hover:bg-primary/10"
@@ -212,7 +214,7 @@ export function PostCard({ post, onDeleted, onUpdated }: PostCardProps) {
           <ActionButton
             icon={Repeat2}
             count={repostCount}
-            label="Reposter"
+            label={t('post.repost')}
             active={reposted}
             onClick={toggleRepost}
             className="hover:text-green-500 hover:bg-green-500/10"
@@ -221,7 +223,7 @@ export function PostCard({ post, onDeleted, onUpdated }: PostCardProps) {
           <ActionButton
             icon={Heart}
             count={likeCount}
-            label="Aimer"
+            label={t('post.like')}
             active={liked}
             onClick={toggleLike}
             burstKey={likeBurst}
@@ -231,11 +233,11 @@ export function PostCard({ post, onDeleted, onUpdated }: PostCardProps) {
           <ActionButton
             icon={BarChart2}
             count={0}
-            label="Vues"
+            label={t('post.views')}
             className="hover:text-primary hover:bg-primary/10"
           />
           <button
-            aria-label="Partager"
+            aria-label={t('post.share')}
             className="rounded-full p-1.5 transition-colors hover:bg-primary/10 hover:text-primary"
           >
             <Share className="h-4 w-4" />

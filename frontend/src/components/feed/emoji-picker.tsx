@@ -1,6 +1,7 @@
 'use client'
 
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { useT } from '@/components/language-provider'
 
 /**
  * Sélection d'emojis courants. Liste statique côté client (pas de dépendance
@@ -21,6 +22,7 @@ interface EmojiPickerProps {
 }
 
 export function EmojiPicker({ onSelect, children }: EmojiPickerProps) {
+  const t = useT()
   return (
     <Popover>
       <PopoverTrigger asChild>{children}</PopoverTrigger>
@@ -30,7 +32,7 @@ export function EmojiPicker({ onSelect, children }: EmojiPickerProps) {
             <button
               key={emoji}
               type="button"
-              aria-label={`Emoji ${emoji}`}
+              aria-label={t('emoji.aria', { emoji })}
               onClick={() => onSelect(emoji)}
               className="rounded p-1 text-lg leading-none transition-colors hover:bg-accent"
             >
