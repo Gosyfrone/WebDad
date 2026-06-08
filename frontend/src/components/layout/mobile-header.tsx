@@ -12,8 +12,6 @@ import { getMyProfil, subscribeProfilUpdated } from '@/lib/profil-client'
 import { ROUTES, navItemsForRole } from '@/lib/routes'
 import type { ProfilDetails, UserRole } from '@/types'
 import { useT } from '@/components/language-provider'
-import { LanguageSelector } from '@/components/language-selector'
-import { ThemeToggle } from '@/components/theme-toggle'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
   Sheet,
@@ -189,11 +187,8 @@ export function MobileHeader({ role, username = 'Utilisateur' }: MobileHeaderPro
             })}
           </nav>
 
-          {/* Langue + Thème + Paramètres + déconnexion */}
+          {/* Paramètres + déconnexion */}
           <div className="border-t p-2">
-            {/* Langue (au-dessus) et thème ne ferment pas le tiroir (retour visuel gardé) */}
-            <LanguageSelector />
-            <ThemeToggle />
             <SheetClose asChild>
               <Link
                 href={ROUTES.parametres}
