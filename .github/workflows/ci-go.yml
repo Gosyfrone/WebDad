@@ -9,6 +9,7 @@ on:
       - "user-service/**"
       - "profil-service/**"
       - "post-service/**"
+      - "message-service/**"
       - "api-gateway/**"
       - ".github/workflows/ci-go.yml"
 
@@ -32,6 +33,7 @@ jobs:
           - user-service
           - profil-service
           - post-service
+          - message-service
           - api-gateway
     defaults:
       run:

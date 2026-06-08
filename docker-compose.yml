@@ -7,6 +7,7 @@ volumes:
   postgres-user-data:
   mongo-profil-data:
   mongo-post-data:
+  mongo-message-data:
 
 # ────────────────────────────────────────────────────────────────────
 # Convention de config :
@@ -93,6 +94,25 @@ services:
       - mongo-post-data:/data/db
     ports:
       - "27018:27017"
+    networks:
+      - webdad-net
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  mongo-message:
+    image: mongo:7
+    restart: unless-stopped
+    env_file:
+      - ./message-service/.env       # MONGO_INITDB_ROOT_* / DATABASE
+    # Pas de script d'init monté : message-service crée lui-même ses
+    # collections, validateurs et index au démarrage (EnsureSchema, idempotent).
+    volumes:
+      - mongo-message-data:/data/db
+    ports:
+      - "27019:27017"
     networks:
       - webdad-net
     healthcheck:
@@ -199,6 +219,30 @@ services:
       retries: 5
       start_period: 5s
 
+  message-service:
+    build:
+      context: ./message-service
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./message-service/.env
+    environment:
+      MONGO_HOST: mongo-message       # override : nom du conteneur dans le réseau
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET requis}
+    ports:
+      - "8085:8085"
+    networks:
+      - webdad-net
+    depends_on:
+      mongo-message:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8085/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
   api-gateway:
     build:
       context: ./api-gateway
@@ -212,6 +256,7 @@ services:
       USER_SERVICE_URL: http://user-service:8082
       PROFIL_SERVICE_URL: http://profil-service:8083
       POST_SERVICE_URL: http://post-service:8084
+      MESSAGE_SERVICE_URL: http://message-service:8085
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET requis}
     ports:
       - "8080:8080"
@@ -225,6 +270,8 @@ services:
       profil-service:
         condition: service_healthy
       post-service:
+        condition: service_healthy
+      message-service:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]

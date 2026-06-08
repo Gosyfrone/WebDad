@@ -41,5 +41,8 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Tests unitaires (Vitest)
+        run: npm test
+
       - name: Build (typecheck inclus)
         run: npm run build
