@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
+import { NavigationLoader } from '@/components/layout/navigation-loader'
 import { ThemeProvider } from '@/components/theme-provider'
 import { LanguageProvider } from '@/components/language-provider'
 import { RouteOriginTracker } from '@/components/route-origin-tracker'
@@ -38,6 +39,7 @@ export default function RootLayout({
         >
           <LanguageProvider>
             <RouteOriginTracker />
+            <NavigationLoader />
             {children}
             <Toaster />
           </LanguageProvider>
