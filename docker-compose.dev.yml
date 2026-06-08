@@ -23,6 +23,8 @@ volumes:
   go-build-profil:
   go-mod-post:
   go-build-post:
+  go-mod-message:
+  go-build-message:
   go-mod-gateway:
   go-build-gateway:
 
@@ -70,6 +72,17 @@ services:
       - /app/tmp
       - go-mod-post:/go/pkg/mod
       - go-build-post:/root/.cache/go-build
+    healthcheck:
+      start_period: 90s
+
+  message-service:
+    build:
+      target: dev
+    volumes:
+      - ./message-service:/app
+      - /app/tmp
+      - go-mod-message:/go/pkg/mod
+      - go-build-message:/root/.cache/go-build
     healthcheck:
       start_period: 90s
 
