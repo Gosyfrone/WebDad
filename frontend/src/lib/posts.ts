@@ -29,9 +29,13 @@ interface ApiPost {
   id: string
   author_id: string
   content: string
+  quote_post_id?: string
   likes_count: number
   comments_count: number
+  reposts_count?: number
   pinned_at?: string
+  reposted_by_id?: string
+  reposted_at?: string
   created_at: string
 }
 
@@ -71,13 +75,20 @@ export interface FeedPost {
   id: string
   author: PostAuthor
   content: string
+  quotePostId: string
+  quotedPost: FeedPost | null
   likesCount: number
   commentsCount: number
+  repostsCount: number
   pinnedAt: string
+  repostedById: string
+  repostedAt: string
   createdAt: string
   isPinned: boolean
   /** L'utilisateur courant a-t-il liké ce post ? */
   liked: boolean
+  /** L'utilisateur courant a-t-il reposté ce post ? */
+  reposted: boolean
   /** L'utilisateur courant peut-il supprimer (auteur ou mod/admin) ? */
   canDelete: boolean
   /** L'utilisateur courant peut-il épingler/désépingler ce post ? */
@@ -188,18 +199,31 @@ function resolveAuthor(userId: string): Promise<PostAuthor> {
 
 // --- Mapping post / commentaire ---------------------------------------------
 
-async function toFeedPost(p: ApiPost, likedIds: Set<string>): Promise<FeedPost> {
+async function toFeedPost(
+  p: ApiPost,
+  likedIds: Set<string>,
+  repostedIds: Set<string>,
+  depth = 0,
+): Promise<FeedPost> {
+  const quotedPost =
+    p.quote_post_id && depth < 1 ? await getPost(p.quote_post_id, likedIds, repostedIds, depth + 1) : null
   return {
     id: p.id,
     author: await resolveAuthor(p.author_id),
     content: p.content,
+    quotePostId: p.quote_post_id ?? '',
+    quotedPost,
     likesCount: p.likes_count ?? 0,
     commentsCount: p.comments_count ?? 0,
+    repostsCount: p.reposts_count ?? 0,
     pinnedAt: p.pinned_at ?? '',
+    repostedById: p.reposted_by_id ?? '',
+    repostedAt: p.reposted_at ?? '',
     createdAt: p.created_at,
     isPinned: Boolean(p.pinned_at),
     liked: likedIds.has(p.id),
-    canDelete: canDelete(p.author_id),
+    reposted: repostedIds.has(p.id),
+    canDelete: !p.reposted_by_id && canDelete(p.author_id),
     canPin: currentUserId() === p.author_id,
   }
 }
@@ -227,9 +251,29 @@ export async function getLikedIds(): Promise<Set<string>> {
   return new Set(ids ?? [])
 }
 
+/** Ids des posts repostés par l'utilisateur courant. */
+export async function getRepostedIds(): Promise<Set<string>> {
+  const res = await apiFetch('/posts/me/reposted-ids')
+  if (!res.ok) return new Set()
+  const ids = await unwrap<string[]>(res)
+  return new Set(ids ?? [])
+}
+
+async function getPost(
+  id: string,
+  likedIds = new Set<string>(),
+  repostedIds = new Set<string>(),
+  depth = 0,
+): Promise<FeedPost | null> {
+  const res = await apiFetch(`/posts/${id}`)
+  if (!res.ok) return null
+  const raw = await unwrap<ApiPost>(res)
+  return toFeedPost(raw, likedIds, repostedIds, depth)
+}
+
 async function mapPosts(raw: ApiPost[]): Promise<FeedPost[]> {
-  const likedIds = await getLikedIds()
-  return Promise.all((raw ?? []).map((p) => toFeedPost(p, likedIds)))
+  const [likedIds, repostedIds] = await Promise.all([getLikedIds(), getRepostedIds()])
+  return Promise.all((raw ?? []).map((p) => toFeedPost(p, likedIds, repostedIds)))
 }
 
 /** Fil global (« Pour toi »), paginé. */
@@ -261,29 +305,31 @@ export async function listByAuthor(authorId: string, limit = 20, offset = 0): Pr
 }
 
 /** Crée un post (auteur dérivé du JWT côté back). */
-export async function createPost(content: string): Promise<FeedPost> {
+export async function createPost(content: string, quotePostId?: string): Promise<FeedPost> {
   const created = await unwrap<ApiPost>(
     await apiFetch('/posts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content }),
+      body: JSON.stringify(quotePostId ? { content, quote_post_id: quotePostId } : { content }),
     }),
   )
-  return toFeedPost(created, new Set())
+  return toFeedPost(created, new Set(), new Set())
 }
 
 /** Épingle un post sur le profil de l'auteur courant ; renvoie le post à jour. */
 export async function pinPost(id: string): Promise<FeedPost> {
   const updated = await unwrap<ApiPost>(await apiFetch(`/posts/${id}/pin`, { method: 'PATCH' }))
   const likedIds = await getLikedIds()
-  return toFeedPost(updated, likedIds)
+  const repostedIds = await getRepostedIds()
+  return toFeedPost(updated, likedIds, repostedIds)
 }
 
 /** Désépingle un post ; renvoie le post à jour. */
 export async function unpinPost(id: string): Promise<FeedPost> {
   const updated = await unwrap<ApiPost>(await apiFetch(`/posts/${id}/pin`, { method: 'DELETE' }))
   const likedIds = await getLikedIds()
-  return toFeedPost(updated, likedIds)
+  const repostedIds = await getRepostedIds()
+  return toFeedPost(updated, likedIds, repostedIds)
 }
 
 /** Supprime un post (auteur ou mod/admin côté back). */
@@ -307,6 +353,23 @@ export async function unlikePost(id: string): Promise<number> {
     await apiFetch(`/posts/${id}/like`, { method: 'DELETE' }),
   )
   return data.likes_count
+}
+
+// --- Reposts -----------------------------------------------------------------
+
+/** Repost simple ; renvoie le post original annoté pour affichage profil. */
+export async function repostPost(id: string): Promise<FeedPost> {
+  const updated = await unwrap<ApiPost>(await apiFetch(`/posts/${id}/repost`, { method: 'POST' }))
+  const [likedIds, repostedIds] = await Promise.all([getLikedIds(), getRepostedIds()])
+  return toFeedPost(updated, likedIds, repostedIds)
+}
+
+/** Retire le repost ; renvoie le nombre de reposts à jour. */
+export async function unrepostPost(id: string): Promise<number> {
+  const data = await unwrap<{ reposts_count: number }>(
+    await apiFetch(`/posts/${id}/repost`, { method: 'DELETE' }),
+  )
+  return data.reposts_count
 }
 
 // --- Commentaires ------------------------------------------------------------

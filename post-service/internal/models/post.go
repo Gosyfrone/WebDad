@@ -24,11 +24,25 @@ type Post struct {
 	ID            bson.ObjectID `bson:"_id,omitempty" json:"id"`
 	AuthorID      string        `bson:"author_id" json:"author_id"`
 	Content       string        `bson:"content" json:"content"`
+	QuotePostID   string        `bson:"quote_post_id,omitempty" json:"quote_post_id,omitempty"`
 	LikesCount    int32         `bson:"likes_count" json:"likes_count"`
 	CommentsCount int32         `bson:"comments_count" json:"comments_count"`
+	RepostsCount  int32         `bson:"reposts_count" json:"reposts_count"`
 	PinnedAt      *time.Time    `bson:"pinned_at,omitempty" json:"pinned_at,omitempty"`
+	RepostedByID  string        `bson:"-" json:"reposted_by_id,omitempty"`
+	RepostedAt    *time.Time    `bson:"-" json:"reposted_at,omitempty"`
 	CreatedAt     time.Time     `bson:"created_at" json:"created_at"`
 	UpdatedAt     time.Time     `bson:"updated_at" json:"updated_at"`
+}
+
+// Repost — document de la collection `reposts`. Index unique `post_id+user_id`
+// pour que l'action soit idempotente : un utilisateur ne peut repost qu'une
+// fois le même post.
+type Repost struct {
+	ID        bson.ObjectID `bson:"_id,omitempty" json:"id"`
+	PostID    string        `bson:"post_id" json:"post_id"`
+	UserID    string        `bson:"user_id" json:"user_id"`
+	CreatedAt time.Time     `bson:"created_at" json:"created_at"`
 }
 
 // Comment — document de la collection `comments`. Un commentaire référence son
@@ -53,7 +67,8 @@ type Comment struct {
 // CreatePostRequest : corps de POST /posts. L'auteur n'est PAS dans le corps —
 // il est dérivé du JWT (un utilisateur ne poste que pour lui-même).
 type CreatePostRequest struct {
-	Content string `json:"content" binding:"required,max=280"`
+	Content     string `json:"content" binding:"required,max=280"`
+	QuotePostID string `json:"quote_post_id"`
 }
 
 // UpdatePostRequest : corps de PATCH /posts/:id.

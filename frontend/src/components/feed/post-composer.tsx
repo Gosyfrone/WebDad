@@ -5,7 +5,7 @@ import { Image as ImageIcon, Smile, BarChart2, Loader2, Pin } from 'lucide-react
 
 import { cn } from '@/lib/utils'
 import { getMyProfil, subscribeProfilUpdated } from '@/lib/profil-client'
-import { createPost, notifyPostCreated, pinPost } from '@/lib/posts'
+import { createPost, notifyPostCreated, pinPost, type FeedPost } from '@/lib/posts'
 import { useToast } from '@/hooks/use-toast'
 import type { ProfilDetails } from '@/types'
 import { useT } from '@/components/language-provider'
@@ -25,6 +25,8 @@ interface PostComposerProps {
   submitLabel?: string
   /** Appelé après une publication réussie (ex. fermer la popup). */
   onPosted?: (content: string) => void
+  /** Post cité, affiché sous le champ et envoyé comme quote_post_id. */
+  quotePost?: FeedPost
 }
 
 /**
@@ -39,6 +41,7 @@ export function PostComposer({
   autoFocus = false,
   submitLabel,
   onPosted,
+  quotePost,
 }: PostComposerProps) {
   const t = useT()
   const { toast } = useToast()
@@ -74,7 +77,7 @@ export function PostComposer({
     if (isEmpty || isOver || submitting) return
     setSubmitting(true)
     try {
-      const created = await createPost(content.trim())
+      const created = await createPost(content.trim(), quotePost?.id)
       const post = pinOnProfile ? await pinPost(created.id) : created
       notifyPostCreated(post) // le fil prépend sans refetch
       onPosted?.(content)
@@ -121,6 +124,10 @@ export function PostComposer({
           autoFocus={autoFocus}
           className="w-full cursor-text resize-none bg-transparent text-xl text-foreground caret-[#5B6CFF] placeholder:text-muted-foreground focus:outline-none"
         />
+
+        {quotePost && (
+          <QuotePreview post={quotePost} />
+        )}
 
         <Separator className="bg-border" />
 
@@ -179,6 +186,22 @@ export function PostComposer({
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+function QuotePreview({ post }: { post: FeedPost }) {
+  return (
+    <div className="rounded-xl border border-border bg-background/45 px-3 py-2 text-sm">
+      <div className="mb-1 flex min-w-0 items-center gap-1.5 text-xs">
+        <span className="truncate font-bold text-foreground">{post.author.displayName}</span>
+        {post.author.username && (
+          <span className="shrink-0 text-muted-foreground">@{post.author.username}</span>
+        )}
+      </div>
+      <p className="line-clamp-4 whitespace-pre-wrap break-words text-foreground/75">
+        {post.content}
+      </p>
     </div>
   )
 }

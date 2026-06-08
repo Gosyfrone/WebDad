@@ -15,17 +15,36 @@ import {
 } from 'lucide-react'
 
 import { cn, initialOf, timeAgo } from '@/lib/utils'
-import { deletePost, likePost, pinPost, unlikePost, unpinPost, type FeedPost } from '@/lib/posts'
+import {
+  deletePost,
+  likePost,
+  notifyPostCreated,
+  pinPost,
+  repostPost,
+  unlikePost,
+  unrepostPost,
+  unpinPost,
+  type FeedPost,
+} from '@/lib/posts'
 import { useToast } from '@/hooks/use-toast'
 import { useLanguage } from '@/components/language-provider'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { CommentSection } from '@/components/feed/comment-section'
+import { PostComposer } from '@/components/feed/post-composer'
 import { TranslatedContent } from '@/components/feed/translated-content'
 import { ProfilLink } from '@/components/profil/profil-link'
 
@@ -42,7 +61,7 @@ interface PostCardProps {
  * d'actions (commenter / liker / partager) et section commentaires repliable.
  *
  * Like et suppression sont câblés sur le post-service (optimistes + rollback).
- * Repost et vues restent décoratifs (pas d'API back).
+ * Repost simple et citation sont câblés sur le post-service.
  */
 export function PostCard({ post, onDeleted, onUpdated }: PostCardProps) {
   const { toast } = useToast()
@@ -57,13 +76,20 @@ export function PostCard({ post, onDeleted, onUpdated }: PostCardProps) {
   const [showComments, setShowComments] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
-  // Décoratifs (pas de backend) : état purement local.
-  const [reposted, setReposted] = useState(false)
-  const [repostCount, setRepostCount] = useState(0)
+  const [reposted, setReposted] = useState(post.reposted)
+  const [repostCount, setRepostCount] = useState(post.repostsCount)
+  const [reposting, setReposting] = useState(false)
+  const [repostMenuOpen, setRepostMenuOpen] = useState(false)
+  const [quoteOpen, setQuoteOpen] = useState(false)
 
   useEffect(() => {
     setIsPinned(post.isPinned)
   }, [post.isPinned])
+
+  useEffect(() => {
+    setReposted(post.reposted)
+    setRepostCount(post.repostsCount)
+  }, [post.reposted, post.repostsCount])
 
   async function toggleLike() {
     const next = !liked
@@ -82,9 +108,30 @@ export function PostCard({ post, onDeleted, onUpdated }: PostCardProps) {
     }
   }
 
-  function toggleRepost() {
-    setReposted((prev) => !prev)
-    setRepostCount((prev) => (reposted ? prev - 1 : prev + 1))
+  async function toggleRepost() {
+    if (reposting) return
+    const next = !reposted
+    setReposting(true)
+    setReposted(next)
+    setRepostCount((prev) => Math.max(0, prev + (next ? 1 : -1)))
+    setRepostMenuOpen(false)
+    try {
+      if (next) {
+        const updated = await repostPost(post.id)
+        setRepostCount(updated.repostsCount)
+        notifyPostCreated(updated)
+        toast({ title: 'Post reposté sur votre profil' })
+      } else {
+        const count = await unrepostPost(post.id)
+        setRepostCount(count)
+      }
+    } catch {
+      setReposted(!next)
+      setRepostCount((prev) => Math.max(0, prev + (next ? -1 : 1)))
+      toast({ title: 'Repost impossible', variant: 'destructive' })
+    } finally {
+      setReposting(false)
+    }
   }
 
   async function handleDelete() {
@@ -186,10 +233,20 @@ export function PostCard({ post, onDeleted, onUpdated }: PostCardProps) {
           )}
         </div>
 
-        {isPinned && (
-          <div className="mb-0.5 flex items-center gap-1 text-xs font-semibold text-primary">
-            <Pin className="h-3.5 w-3.5 fill-current" />
-            <span>Épinglé</span>
+        {(isPinned || post.repostedById) && (
+          <div className="mb-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold">
+            {isPinned && (
+              <div className="flex items-center gap-1 text-primary">
+                <Pin className="h-3.5 w-3.5 fill-current" />
+                <span>Épinglé</span>
+              </div>
+            )}
+            {post.repostedById && (
+              <div className="flex items-center gap-1 text-green-500">
+                <Repeat2 className="h-3.5 w-3.5" />
+                <span>Reposté</span>
+              </div>
+            )}
           </div>
         )}
 
@@ -199,6 +256,10 @@ export function PostCard({ post, onDeleted, onUpdated }: PostCardProps) {
           content={post.content}
           className="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/80"
         />
+
+        {post.quotedPost && (
+          <QuotedPost post={post.quotedPost} />
+        )}
 
         {/* Actions */}
         <div className="-ml-2 mt-1 flex items-center justify-between text-muted-foreground">
@@ -211,15 +272,45 @@ export function PostCard({ post, onDeleted, onUpdated }: PostCardProps) {
             className="hover:text-primary hover:bg-primary/10"
             activeClassName="text-primary"
           />
-          <ActionButton
-            icon={Repeat2}
-            count={repostCount}
-            label={t('post.repost')}
-            active={reposted}
-            onClick={toggleRepost}
-            className="hover:text-green-500 hover:bg-green-500/10"
-            activeClassName="text-green-500"
-          />
+          <Popover open={repostMenuOpen} onOpenChange={setRepostMenuOpen}>
+            <PopoverTrigger asChild>
+              <button
+                aria-label={t('post.repost')}
+                className={cn(
+                  'flex items-center gap-1 rounded-full p-1.5 text-xs transition-colors hover:bg-green-500/10 hover:text-green-500',
+                  reposted && 'text-green-500',
+                )}
+              >
+                {reposting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Repeat2 className={cn('h-4 w-4', reposted && 'stroke-[2.6]')} />
+                )}
+                {repostCount > 0 && <span>{formatCount(repostCount)}</span>}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-36 p-1">
+              <button
+                type="button"
+                onClick={toggleRepost}
+                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-accent"
+              >
+                <Repeat2 className="h-4 w-4" />
+                {reposted ? 'Annuler' : 'Repost'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setRepostMenuOpen(false)
+                  setQuoteOpen(true)
+                }}
+                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-accent"
+              >
+                <MessageCircle className="h-4 w-4" />
+                Citer
+              </button>
+            </PopoverContent>
+          </Popover>
           <ActionButton
             icon={Heart}
             count={likeCount}
@@ -251,8 +342,44 @@ export function PostCard({ post, onDeleted, onUpdated }: PostCardProps) {
             onCountChange={(delta) => setCommentCount((n) => Math.max(0, n + delta))}
           />
         )}
+
+        <Dialog open={quoteOpen} onOpenChange={setQuoteOpen}>
+          <DialogContent className="panel top-24 translate-y-0 border p-4 shadow-[0_28px_80px_rgba(91,108,255,0.24)] sm:max-w-xl">
+            <DialogHeader className="sr-only">
+              <DialogTitle>Citer le post</DialogTitle>
+              <DialogDescription>Composer un post avec le post cité en dessous.</DialogDescription>
+            </DialogHeader>
+            <PostComposer
+              autoFocus
+              submitLabel="Citer"
+              quotePost={post}
+              className="pt-6"
+              onPosted={() => setQuoteOpen(false)}
+            />
+          </DialogContent>
+        </Dialog>
       </div>
     </article>
+  )
+}
+
+function QuotedPost({ post }: { post: FeedPost }) {
+  return (
+    <div className="mt-3 rounded-xl border border-border bg-background/45 px-3 py-2">
+      <div className="mb-1 flex min-w-0 items-center gap-1.5 text-xs">
+        <ProfilLink author={post.author} className="truncate font-bold text-foreground hover:underline">
+          {post.author.displayName}
+        </ProfilLink>
+        {post.author.username && (
+          <ProfilLink author={post.author} className="shrink-0 text-muted-foreground hover:underline">
+            @{post.author.username}
+          </ProfilLink>
+        )}
+      </div>
+      <p className="line-clamp-5 whitespace-pre-wrap break-words text-sm text-foreground/75">
+        {post.content}
+      </p>
+    </div>
   )
 }
 

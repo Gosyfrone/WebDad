@@ -33,6 +33,7 @@ func RegisterRoutes(r *gin.Engine, serviceName string, postService *service.Post
 		// Posts likés par l'utilisateur courant — route STATIQUE placée avant
 		// le groupe `/:id` (sinon « me » serait capturé comme un id).
 		posts.GET("/me/liked-ids", auth, LikeHandler.LikedByMe)
+		posts.GET("/me/reposted-ids", auth, PostHandler.RepostedByMe)
 
 		post := posts.Group("/:id")
 		{
@@ -46,6 +47,8 @@ func RegisterRoutes(r *gin.Engine, serviceName string, postService *service.Post
 			post.GET("/likes", LikeHandler.ListPostLikes)
 			post.POST("/like", auth, LikeHandler.LikePost)
 			post.DELETE("/like", auth, LikeHandler.UnlikePost)
+			post.POST("/repost", auth, PostHandler.RepostPost)
+			post.DELETE("/repost", auth, PostHandler.UnrepostPost)
 
 			comment := post.Group("/comments")
 			{
