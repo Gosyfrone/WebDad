@@ -15,6 +15,7 @@ import {
 import { useToast } from '@/hooks/use-toast'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
+import { TranslatedContent } from '@/components/feed/translated-content'
 import { ProfilLink } from '@/components/profil/profil-link'
 
 const MAX_CHARS = 280
@@ -403,7 +404,12 @@ function CommentRow({
           <span className="shrink-0 text-muted-foreground">·</span>
           <span className="shrink-0 text-muted-foreground">{timeAgo(comment.createdAt)}</span>
         </div>
-        <p className="whitespace-pre-wrap break-words text-sm text-foreground/85">{comment.content}</p>
+        <TranslatedContent
+          contentId={`comment:${comment.id}`}
+          content={comment.content}
+          className="whitespace-pre-wrap break-words text-sm text-foreground/85"
+          indicatorClassName="min-h-5 text-[11px]"
+        />
         {footer}
       </div>
 
