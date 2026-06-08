@@ -27,6 +27,7 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { LegalLinks } from '@/components/legal/legal-links'
 import { setAccessToken } from '@/lib/auth-client'
 import { ROUTES } from '@/lib/routes'
 import { useT } from '@/components/language-provider'
@@ -460,6 +461,8 @@ export default function LoginPage() {
                   {t('auth.login.create_account')}
                 </Link>
               </p>
+
+              <LegalLinks className="items-center text-center" />
             </form>
           </CardContent>
         </Card>

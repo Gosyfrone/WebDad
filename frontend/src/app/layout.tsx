@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import { ThemeProvider } from '@/components/theme-provider'
 import { LanguageProvider } from '@/components/language-provider'
+import { RouteOriginTracker } from '@/components/route-origin-tracker'
 import { Toaster } from '@/components/ui/toaster'
 import './globals.css'
 
@@ -36,6 +37,7 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <LanguageProvider>
+            <RouteOriginTracker />
             {children}
             <Toaster />
           </LanguageProvider>

@@ -6,6 +6,7 @@ import { Search } from 'lucide-react'
 import { ROUTES } from '@/lib/routes'
 import { useT } from '@/components/language-provider'
 import { WhoToFollow } from '@/components/layout/who-to-follow'
+import { LegalLinks } from '@/components/legal/legal-links'
 
 /**
  * Tendances décoratives (placeholder, pas de back). Les libellés viennent du
@@ -57,6 +58,9 @@ export function SidebarRight() {
 
       {/* Qui suivre */}
       <WhoToFollow />
+
+      {/* Liens légaux, sous les suggestions */}
+      <LegalLinks className="px-4 pb-2" />
     </aside>
   )
 }

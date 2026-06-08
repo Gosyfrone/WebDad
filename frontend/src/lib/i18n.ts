@@ -110,6 +110,15 @@ export const messages: Record<Locale, Messages> = {
     'settings.account_desc':
       'Le thème, la langue et les préférences de confidentialité arriveront ici.',
 
+    // — Pages légales —
+    'legal.badge': 'Informations légales',
+    'legal.updated': 'Dernière mise à jour : {date}',
+    'legal.back': 'Retour à Breezy',
+    'legal.section': 'Légal',
+    'legal.mentions': 'Mentions légales',
+    'legal.cgu': 'CGU',
+    'legal.confidentialite': 'Confidentialité',
+
     // — Pages stub (états vides) —
     'notifications.heading': 'Rien pour le moment',
     'notifications.desc': 'Vos notifications (likes, abonnements, mentions) apparaîtront ici.',
@@ -481,6 +490,15 @@ export const messages: Record<Locale, Messages> = {
     'settings.account_title': 'Account settings',
     'settings.account_desc':
       'Theme, language and privacy preferences will live here.',
+
+    // — Legal pages —
+    'legal.badge': 'Legal information',
+    'legal.updated': 'Last updated: {date}',
+    'legal.back': 'Back to Breezy',
+    'legal.section': 'Legal',
+    'legal.mentions': 'Legal notice',
+    'legal.cgu': 'Terms of Use',
+    'legal.confidentialite': 'Privacy',
 
     // — Stub pages (empty states) —
     'notifications.heading': 'Nothing yet',
