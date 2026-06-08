@@ -8,6 +8,7 @@ import { getMyProfil, subscribeProfilUpdated } from '@/lib/profil-client'
 import { createPost, notifyPostCreated, pinPost } from '@/lib/posts'
 import { useToast } from '@/hooks/use-toast'
 import type { ProfilDetails } from '@/types'
+import { useT } from '@/components/language-provider'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -20,7 +21,7 @@ interface PostComposerProps {
   className?: string
   /** Place le curseur dans le champ dès le montage (utile en modale). */
   autoFocus?: boolean
-  /** Libellé du bouton d'envoi. */
+  /** Libellé du bouton d'envoi (défaut : « Breezer » traduit). */
   submitLabel?: string
   /** Appelé après une publication réussie (ex. fermer la popup). */
   onPosted?: (content: string) => void
@@ -36,10 +37,12 @@ interface PostComposerProps {
 export function PostComposer({
   className,
   autoFocus = false,
-  submitLabel = 'Breezer',
+  submitLabel,
   onPosted,
 }: PostComposerProps) {
+  const t = useT()
   const { toast } = useToast()
+  const label = submitLabel ?? t('nav.post')
   const [content, setContent] = useState('')
   const [avatarUrl, setAvatarUrl] = useState('')
   const [initial, setInitial] = useState('U')
@@ -78,7 +81,7 @@ export function PostComposer({
       setContent('')
       setPinOnProfile(false)
     } catch {
-      toast({ title: 'Publication impossible', variant: 'destructive' })
+      toast({ title: t('composer.post_failed'), variant: 'destructive' })
     } finally {
       setSubmitting(false)
     }
@@ -113,7 +116,7 @@ export function PostComposer({
           ref={textareaRef}
           value={content}
           onChange={(e) => setContent(e.target.value)}
-          placeholder="Ça breez ? 🌴"
+          placeholder={t('composer.placeholder')}
           rows={3}
           autoFocus={autoFocus}
           className="w-full cursor-text resize-none bg-transparent text-xl text-foreground caret-[#5B6CFF] placeholder:text-muted-foreground focus:outline-none"
@@ -124,20 +127,20 @@ export function PostComposer({
         {/* Toolbar */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1 text-[#5B6CFF]">
-            <ActionIcon icon={ImageIcon} label="Ajouter une image" />
+            <ActionIcon icon={ImageIcon} label={t('composer.add_image')} />
             <EmojiPicker onSelect={insertEmoji}>
               <button
                 type="button"
-                aria-label="Ajouter un emoji"
+                aria-label={t('composer.add_emoji')}
                 className="rounded-full p-2 transition-colors hover:bg-primary/10"
               >
                 <Smile className="h-5 w-5" />
               </button>
             </EmojiPicker>
-            <ActionIcon icon={BarChart2} label="Ajouter un sondage" />
+            <ActionIcon icon={BarChart2} label={t('composer.add_poll')} />
             <button
               type="button"
-              aria-label="Épingler sur mon profil"
+              aria-label={t('composer.pin_profile')}
               aria-pressed={pinOnProfile}
               onClick={() => setPinOnProfile((v) => !v)}
               className={cn(
@@ -171,7 +174,7 @@ export function PostComposer({
               disabled={isEmpty || isOver || submitting}
               onClick={handleSubmit}
             >
-              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : submitLabel}
+              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : label}
             </Button>
           </div>
         </div>

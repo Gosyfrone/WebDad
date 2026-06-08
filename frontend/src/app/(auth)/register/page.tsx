@@ -32,6 +32,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { setAccessToken } from '@/lib/auth-client'
 import { ROUTES } from '@/lib/routes'
+import { useT } from '@/components/language-provider'
 
 type FormErrors = Partial<{
   username: string
@@ -109,6 +110,7 @@ function mapServerError(message: string): FormErrors {
 }
 
 export default function RegisterPage() {
+  const t = useT()
   const router = useRouter()
   const [username, setUsername] = React.useState('')
   const [birthDate, setBirthDate] = React.useState('')
@@ -135,58 +137,55 @@ export default function RegisterPage() {
     const minimumBirthDate = new Date(`${maxBirthDate}T23:59:59`)
 
     if (!trimmedUsername) {
-      nextErrors.username = 'Le nom d’utilisateur est requis.'
+      nextErrors.username = t('auth.register.err.username_required')
     } else if (!usernamePattern.test(trimmedUsername)) {
-      nextErrors.username =
-        '3 à 24 caractères : lettres, chiffres et tiret bas (_) uniquement.'
+      nextErrors.username = t('auth.register.err.username_format')
     } else if (trimmedUsername.length > maxUsernameLength) {
-      nextErrors.username = 'Le nom d’utilisateur est limité à 24 caractères.'
+      nextErrors.username = t('auth.register.err.username_max')
     } else if (reservedUsernames.has(trimmedUsername.toLowerCase())) {
-      nextErrors.username = 'Ce nom d’utilisateur n’est pas autorisé.'
+      nextErrors.username = t('auth.register.err.username_reserved')
     }
 
     if (!birthDate) {
-      nextErrors.birthDate = 'La date de naissance est requise.'
+      nextErrors.birthDate = t('auth.register.err.birthdate_required')
     } else if (
       !selectedBirthDate ||
       Number.isNaN(selectedBirthDate.getTime()) ||
       selectedBirthDate > minimumBirthDate
     ) {
-      nextErrors.birthDate = 'Tu dois avoir au moins 13 ans pour t’inscrire.'
+      nextErrors.birthDate = t('auth.register.err.age')
     }
 
     if (!gender) {
-      nextErrors.gender = 'Choisis un genre.'
+      nextErrors.gender = t('auth.register.err.gender_required')
     }
 
     if (!trimmedEmail) {
-      nextErrors.email = 'L’adresse e-mail est requise.'
+      nextErrors.email = t('auth.err.email_required')
     } else if (trimmedEmail.length > maxEmailLength) {
-      nextErrors.email = 'L’adresse e-mail est limitée à 50 caractères.'
+      nextErrors.email = t('auth.err.email_max')
     } else if (!emailPattern.test(trimmedEmail)) {
-      nextErrors.email = 'Saisis une adresse e-mail valide.'
+      nextErrors.email = t('auth.err.email_invalid')
     }
 
     if (!password) {
-      nextErrors.password = 'Le mot de passe est requis.'
+      nextErrors.password = t('auth.err.password_required')
     } else if (password.length > maxPasswordLength) {
-      nextErrors.password = 'Le mot de passe est limité à 250 caractères.'
+      nextErrors.password = t('auth.register.err.password_max')
     } else if (!passwordPattern.test(password)) {
-      nextErrors.password =
-        '8 caractères minimum, une majuscule, une minuscule, un chiffre et un caractère spécial.'
+      nextErrors.password = t('auth.register.err.password_format')
     }
 
     if (!passwordConfirmation) {
-      nextErrors.passwordConfirmation = 'Confirme ton mot de passe.'
+      nextErrors.passwordConfirmation = t('auth.register.err.confirm_required')
     } else if (passwordConfirmation.length > maxPasswordLength) {
-      nextErrors.passwordConfirmation =
-        'La confirmation est limitée à 250 caractères.'
+      nextErrors.passwordConfirmation = t('auth.register.err.confirm_max')
     } else if (passwordConfirmation !== password) {
-      nextErrors.passwordConfirmation = 'Les mots de passe ne correspondent pas.'
+      nextErrors.passwordConfirmation = t('auth.register.err.confirm_mismatch')
     }
 
     return nextErrors
-  }, [birthDate, email, gender, maxBirthDate, password, passwordConfirmation, username])
+  }, [birthDate, email, gender, maxBirthDate, password, passwordConfirmation, username, t])
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -207,13 +206,11 @@ export default function RegisterPage() {
       const availability = await availabilityResponse.json().catch(() => null)
 
       if (!availabilityResponse.ok) {
-        setErrors({
-          form: 'Impossible de vérifier le nom d’utilisateur. Réessaie dans un instant.',
-        })
+        setErrors({ form: t('auth.register.err.username_check') })
         return
       }
       if (!availability?.available) {
-        setErrors({ username: 'Ce nom d’utilisateur est déjà pris.' })
+        setErrors({ username: t('auth.register.err.username_taken') })
         return
       }
 
@@ -239,7 +236,7 @@ export default function RegisterPage() {
             typeof payload === 'object' &&
             (payload.error ?? payload.message)) ||
           (typeof payload === 'string' && payload.trim()) ||
-          'L’inscription a échoué. Vérifie les informations saisies.'
+          t('auth.register.err.failed')
 
         setErrors(mapServerError(message))
         return
@@ -257,10 +254,7 @@ export default function RegisterPage() {
       router.refresh()
     } catch (error) {
       setErrors({
-        form: getMessage(
-          error,
-          'Impossible de contacter l’API. Réessaie dans un instant.'
-        ),
+        form: getMessage(error, t('auth.err.network')),
       })
     } finally {
       setIsSubmitting(false)
@@ -296,16 +290,16 @@ export default function RegisterPage() {
               <div className="flex items-center justify-between border-b border-white/60 px-5 py-3 dark:border-white/10">
                 <div>
                   <p className="text-xs font-semibold uppercase text-[#5B6CFF]">
-                    Nouveau sur Breezy
+                    {t('auth.register.demo.kicker')}
                   </p>
                   <h1 className="text-2xl font-semibold text-foreground">
-                    Crée ton espace.
+                    {t('auth.register.demo.heading')}
                   </h1>
                 </div>
 
                 <button
                   type="button"
-                  aria-label="Rechercher"
+                  aria-label={t('auth.search_aria')}
                   className="grid h-10 w-10 place-items-center rounded-full bg-white/90 text-foreground/80 shadow-sm transition hover:scale-105 hover:text-[#5B6CFF] dark:bg-white/10"
                 >
                   <Search className="h-5 w-5" />
@@ -321,13 +315,17 @@ export default function RegisterPage() {
 
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1 text-sm">
-                        <span className="font-bold text-foreground">Toi</span>
+                        <span className="font-bold text-foreground">
+                          {t('auth.register.demo.you')}
+                        </span>
                         <span className="truncate text-muted-foreground">@breezy_user</span>
                         <span className="text-muted-foreground">·</span>
-                        <span className="text-muted-foreground">maintenant</span>
+                        <span className="text-muted-foreground">
+                          {t('auth.register.demo.now')}
+                        </span>
                       </div>
                       <p className="mt-1 text-sm leading-relaxed text-foreground/80">
-                        Premier post, première vibe, et déjà toute une communauté à rencontrer.
+                        {t('auth.register.demo.post1')}
                       </p>
                       <div className="mt-3 grid grid-cols-3 gap-2">
                         <div className="h-16 rounded-[16px] bg-gradient-to-br from-[#8D3DFF] to-[#5B6CFF]" />
@@ -343,7 +341,7 @@ export default function RegisterPage() {
                           <Heart className="h-4 w-4 fill-red-500" />
                           1.2K
                         </span>
-                        <span>Bienvenue</span>
+                        <span>{t('auth.register.demo.welcome')}</span>
                       </div>
                     </div>
                   </div>
@@ -356,10 +354,10 @@ export default function RegisterPage() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-bold text-foreground">
-                        Breezy t’ouvre le fil
+                        {t('auth.register.demo.opens')}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        Choisis ton pseudo et commence à publier.
+                        {t('auth.register.demo.opens_sub')}
                       </p>
                     </div>
                     <UserPlus className="h-5 w-5 text-[#8D3DFF]" />
@@ -370,21 +368,23 @@ export default function RegisterPage() {
 
             <div className="absolute right-8 top-20 w-64 rounded-[28px] border border-white/40 bg-slate-950/90 p-4 text-white shadow-[0_28px_70px_rgba(15,23,42,0.32)] backdrop-blur-xl dark:border-white/10">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-semibold">À rejoindre</span>
+                <span className="text-sm font-semibold">
+                  {t('auth.register.demo.to_join')}
+                </span>
                 <Sparkles className="h-4 w-4 text-[#47D9FF]" />
               </div>
 
               <div className="mt-4 space-y-3">
-                {['Créateurs', 'Campus CESI', 'Dev Distribué'].map(
-                  (community, index) => (
+                {['auth.register.demo.comm1', 'auth.register.demo.comm2', 'auth.register.demo.comm3'].map(
+                  (communityKey, index) => (
                     <div
-                      key={community}
+                      key={communityKey}
                       className="rounded-2xl bg-white/10 px-3 py-2"
                     >
                       <p className="text-xs text-white/50">
-                        Communauté #{index + 1}
+                        {t('auth.register.demo.community', { n: index + 1 })}
                       </p>
-                      <p className="text-sm font-semibold">{community}</p>
+                      <p className="text-sm font-semibold">{t(communityKey)}</p>
                     </div>
                   )
                 )}
@@ -397,10 +397,10 @@ export default function RegisterPage() {
               </div>
               <div>
                 <p className="text-sm font-bold text-foreground">
-                  Ton compte prend vie
+                  {t('auth.register.demo.alive')}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Profil, posts et conversations en quelques secondes.
+                  {t('auth.register.demo.alive_sub')}
                 </p>
               </div>
             </div>
@@ -428,16 +428,16 @@ export default function RegisterPage() {
 
             <div className="inline-flex w-fit items-center gap-2 rounded-full border border-white/70 bg-white/80 px-3 py-1 text-xs font-semibold text-[#5B6CFF] shadow-sm dark:border-white/15 dark:bg-white/10">
               <span className="h-2 w-2 rounded-full bg-[#47D9FF]" />
-              Nouveau profil Breezy
+              {t('auth.register.badge')}
             </div>
 
             <div className="space-y-1.5">
               <CardTitle className="brand-text max-w-md text-[24px] font-semibold leading-tight sm:text-[28px]">
-                Rejoins Breezy et commence à publier.
+                {t('auth.register.title')}
               </CardTitle>
 
               <CardDescription className="max-w-sm text-xs leading-relaxed text-muted-foreground">
-                Crée ton compte, choisis ton nom d’utilisateur et entre dans le fil.
+                {t('auth.register.subtitle')}
               </CardDescription>
             </div>
           </CardHeader>
@@ -448,7 +448,7 @@ export default function RegisterPage() {
                 <div className="space-y-0.5">
                   <div className="flex min-h-5 items-center gap-1.5">
                     <label htmlFor="username" className="text-xs font-medium text-foreground/80">
-                      Nom d’utilisateur
+                      {t('auth.register.username_label')}
                     </label>
 
                     <span className="group/help relative inline-flex">
@@ -464,7 +464,7 @@ export default function RegisterPage() {
                         role="tooltip"
                         className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 w-56 -translate-x-1/2 rounded-2xl border border-white/70 bg-slate-950 px-3 py-2 text-[11px] font-medium leading-4 text-white opacity-0 shadow-[0_16px_40px_rgba(15,23,42,0.25)] transition group-hover/help:opacity-100 group-focus-within/help:opacity-100 dark:border-white/10"
                       >
-                        Le nom d’utilisateur pourra être changé après la création du compte, puis une fois tous les 14 jours.
+                        {t('auth.register.username_tooltip')}
                       </span>
                     </span>
                   </div>
@@ -502,7 +502,7 @@ export default function RegisterPage() {
                 <div className="space-y-0.5">
                   <div className="flex min-h-5 items-center gap-1.5">
                     <label htmlFor="birthDate" className="text-xs font-medium text-foreground/80">
-                      Date de naissance
+                      {t('auth.register.birthdate_label')}
                     </label>
 
                     <span className="group/help relative inline-flex">
@@ -518,7 +518,7 @@ export default function RegisterPage() {
                         role="tooltip"
                         className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 w-56 -translate-x-1/2 rounded-2xl border border-white/70 bg-slate-950 px-3 py-2 text-[11px] font-medium leading-4 text-white opacity-0 shadow-[0_16px_40px_rgba(15,23,42,0.25)] transition group-hover/help:opacity-100 group-focus-within/help:opacity-100 dark:border-white/10"
                       >
-                        La date de naissance ne pourra plus être changée une fois le compte créé.
+                        {t('auth.register.birthdate_tooltip')}
                       </span>
                     </span>
                   </div>
@@ -557,7 +557,7 @@ export default function RegisterPage() {
 
                 <fieldset className="space-y-0.5 sm:col-span-2">
                   <legend className="text-xs font-medium text-foreground/80">
-                    Genre
+                    {t('auth.register.gender_label')}
                   </legend>
 
                   <div className="grid grid-cols-2 gap-2">
@@ -581,7 +581,7 @@ export default function RegisterPage() {
 
                       <span className="flex h-8 cursor-pointer items-center justify-center gap-2 rounded-2xl border border-white/70 bg-white/85 text-xs font-semibold text-foreground/80 shadow-sm transition peer-checked:border-[#5B6CFF]/70 peer-checked:bg-[#5B6CFF]/10 peer-checked:text-[#5B6CFF] group-hover:bg-white dark:border-white/15 dark:bg-white/10 dark:peer-checked:bg-[#5B6CFF]/20 dark:group-hover:bg-white/20">
                         <User className="h-4 w-4" />
-                        Homme
+                        {t('auth.register.gender_male')}
                       </span>
                     </label>
 
@@ -605,7 +605,7 @@ export default function RegisterPage() {
 
                       <span className="flex h-8 cursor-pointer items-center justify-center gap-2 rounded-2xl border border-white/70 bg-white/85 text-xs font-semibold text-foreground/80 shadow-sm transition peer-checked:border-[#8D3DFF]/70 peer-checked:bg-[#8D3DFF]/10 peer-checked:text-[#8D3DFF] group-hover:bg-white dark:border-white/15 dark:bg-white/10 dark:peer-checked:bg-[#8D3DFF]/25 dark:group-hover:bg-white/20">
                         <User className="h-4 w-4" />
-                        Femme
+                        {t('auth.register.gender_female')}
                       </span>
                     </label>
                   </div>
@@ -620,7 +620,7 @@ export default function RegisterPage() {
 
               <div className="space-y-0.5">
                 <label htmlFor="email" className="text-xs font-medium text-foreground/80">
-                  Adresse e-mail
+                  {t('auth.email_label')}
                 </label>
 
                 <div className="group relative">
@@ -632,7 +632,7 @@ export default function RegisterPage() {
                     type="email"
                     autoComplete="email"
                     inputMode="email"
-                    placeholder="toi@exemple.com"
+                    placeholder={t('auth.email_placeholder')}
                     maxLength={maxEmailLength}
                     className="h-9 rounded-2xl border-white/70 bg-white/90 pl-11 text-sm shadow-sm shadow-slate-200/60 transition-all placeholder:text-muted-foreground hover:border-[#47D9FF]/70 focus-visible:border-[#5B6CFF] focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15 dark:border-white/15 dark:bg-white/5"
                     value={email}
@@ -656,7 +656,7 @@ export default function RegisterPage() {
 
               <div className="space-y-0.5">
                 <label htmlFor="password" className="text-xs font-medium text-foreground/80">
-                  Mot de passe
+                  {t('auth.password_label')}
                 </label>
 
                 <div className="group relative">
@@ -684,9 +684,7 @@ export default function RegisterPage() {
                   <button
                     type="button"
                     aria-label={
-                      showPassword
-                        ? 'Masquer le mot de passe'
-                        : 'Afficher le mot de passe'
+                      showPassword ? t('auth.hide_password') : t('auth.show_password')
                     }
                     aria-pressed={showPassword}
                     className="absolute right-3 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-full text-muted-foreground transition hover:bg-[#5B6CFF]/10 hover:text-[#5B6CFF] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15"
@@ -706,8 +704,7 @@ export default function RegisterPage() {
                     errors.password ? 'text-red-600' : 'text-muted-foreground'
                   }`}
                 >
-                  {errors.password ??
-                    '8 caractères min., majuscule, minuscule, chiffre et caractère spécial.'}
+                  {errors.password ?? t('auth.register.password_help')}
                 </p>
               </div>
 
@@ -716,7 +713,7 @@ export default function RegisterPage() {
                   htmlFor="passwordConfirmation"
                   className="text-xs font-medium text-foreground/80"
                 >
-                  Confirmation du mot de passe
+                  {t('auth.register.password_confirm_label')}
                 </label>
 
                 <div className="group relative">
@@ -752,8 +749,8 @@ export default function RegisterPage() {
                     type="button"
                     aria-label={
                       showPasswordConfirmation
-                        ? 'Masquer la confirmation du mot de passe'
-                        : 'Afficher la confirmation du mot de passe'
+                        ? t('auth.register.hide_password_confirm')
+                        : t('auth.register.show_password_confirm')
                     }
                     aria-pressed={showPasswordConfirmation}
                     className="absolute right-3 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-full text-muted-foreground transition hover:bg-[#5B6CFF]/10 hover:text-[#5B6CFF] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15"
@@ -791,7 +788,7 @@ export default function RegisterPage() {
                 className="h-9 w-full rounded-2xl bg-gradient-to-r from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] text-sm font-semibold text-white shadow-[0_18px_44px_rgba(91,108,255,0.34)] transition duration-300 hover:scale-[1.015] hover:shadow-[0_24px_56px_rgba(91,108,255,0.42)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70"
                 disabled={isSubmitting}
               >
-                {isSubmitting ? 'Création du compte…' : 'Créer mon compte'}
+                {isSubmitting ? t('auth.register.submitting') : t('auth.register.submit')}
               </Button>
 
               <div className="space-y-2 pt-0.5">
@@ -799,7 +796,7 @@ export default function RegisterPage() {
                   <div className="h-px flex-1 bg-gradient-to-r from-transparent via-border to-transparent" />
 
                   <span className="text-[11px] font-medium text-muted-foreground">
-                    Ou créer mon compte avec
+                    {t('auth.register.or')}
                   </span>
 
                   <div className="h-px flex-1 bg-gradient-to-r from-transparent via-border to-transparent" />
@@ -839,12 +836,12 @@ export default function RegisterPage() {
               </div>
 
               <p className="text-center text-xs text-muted-foreground">
-                Tu as déjà un compte ?{' '}
+                {t('auth.register.have_account')}{' '}
                 <Link
                   href={ROUTES.login}
                   className="font-semibold text-[#5B6CFF] underline-offset-4 transition hover:text-[#8D3DFF] hover:underline"
                 >
-                  Se connecter
+                  {t('auth.login.submit')}
                 </Link>
               </p>
             </form>

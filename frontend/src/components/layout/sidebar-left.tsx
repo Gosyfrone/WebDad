@@ -20,8 +20,10 @@ import { cn } from '@/lib/utils'
 import { logout } from '@/lib/auth-client'
 import { getMyProfil, subscribeProfilUpdated } from '@/lib/profil-client'
 import { ROUTES } from '@/lib/routes'
+import { useT } from '@/components/language-provider'
 import type { ProfilDetails, UserRole } from '@/types'
 import { CreatePostDialog } from '@/components/feed/create-post-dialog'
+import { LanguageSelector } from '@/components/language-selector'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -35,26 +37,27 @@ import {
 } from '@/components/ui/dropdown-menu'
 
 interface NavItem {
-  label: string
+  /** Clé i18n du libellé (cf. lib/i18n.ts, namespace `nav`). */
+  labelKey: string
   href: string
   icon: React.ElementType
   roles?: UserRole[]
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { label: 'Fil', href: ROUTES.feed, icon: Home },
-  { label: 'Explorer', href: '/explorer', icon: Search },
-  { label: 'Notifications', href: '/notifications', icon: Bell },
-  { label: 'Messages', href: '/messages', icon: Mail },
-  { label: 'Profil', href: ROUTES.profil, icon: User },
+  { labelKey: 'nav.feed', href: ROUTES.feed, icon: Home },
+  { labelKey: 'nav.explore', href: '/explorer', icon: Search },
+  { labelKey: 'nav.notifications', href: '/notifications', icon: Bell },
+  { labelKey: 'nav.messages', href: '/messages', icon: Mail },
+  { labelKey: 'nav.profil', href: ROUTES.profil, icon: User },
   {
-    label: 'Modération',
+    labelKey: 'nav.moderation',
     href: ROUTES.moderation,
     icon: Shield,
     roles: ['moderator', 'administrator'],
   },
   {
-    label: 'Administration',
+    labelKey: 'nav.admin',
     href: ROUTES.admin,
     icon: Settings2,
     roles: ['administrator'],
@@ -67,6 +70,7 @@ interface SidebarLeftProps {
 }
 
 export function SidebarLeft({ role, username = 'Utilisateur' }: SidebarLeftProps) {
+  const t = useT()
   const pathname = usePathname()
   const [account, setAccount] = useState({
     displayName: username,
@@ -81,7 +85,9 @@ export function SidebarLeft({ role, username = 'Utilisateur' }: SidebarLeftProps
   const fallbackInitial = (account.displayName || account.username || 'U')
     .charAt(0)
     .toUpperCase()
-  const handle = account.username ? `@${account.username}` : '@utilisateur'
+  // Avant le chargement du profil (username vide) on affiche un libellé traduit.
+  const shownName = account.username ? account.displayName : t('common.user')
+  const handle = account.username ? `@${account.username}` : `@${t('common.username_fallback')}`
   const displayedRole = account.role ?? role
 
   useEffect(() => {
@@ -152,7 +158,7 @@ export function SidebarLeft({ role, username = 'Utilisateur' }: SidebarLeftProps
                 className={cn('h-6 w-6 shrink-0', active && 'stroke-[2.5]')}
                 aria-hidden
               />
-              <span>{item.label}</span>
+              <span>{t(item.labelKey)}</span>
             </Link>
           )
         })}
@@ -163,16 +169,18 @@ export function SidebarLeft({ role, username = 'Utilisateur' }: SidebarLeftProps
             size="lg"
             className="mt-4 w-[90%] rounded-full bg-gradient-to-r from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] text-base font-bold text-white shadow-[0_18px_44px_rgba(91,108,255,0.3)] transition hover:scale-[1.015]"
           >
-            Breezer
+            {t('nav.post')}
           </Button>
         </CreatePostDialog>
       </div>
 
       {/* Bas de la sidebar : sélecteur de thème + menu utilisateur */}
       <div className="flex flex-col gap-2">
-        {/* Interrupteur clair/sombre (même composant que le tiroir mobile),
-            posé sur un panneau pastel pour s'accorder à la card user. */}
+        {/* Sélecteur de langue (au-dessus) + interrupteur clair/sombre (même
+            composants que le tiroir mobile), posés sur un panneau pastel pour
+            s'accorder à la card user. */}
         <div className="panel rounded-2xl border px-1 py-1 shadow-sm">
+          <LanguageSelector />
           <ThemeToggle />
         </div>
 
@@ -187,7 +195,7 @@ export function SidebarLeft({ role, username = 'Utilisateur' }: SidebarLeftProps
                 <AvatarFallback>{fallbackInitial}</AvatarFallback>
               </Avatar>
               <div className="flex min-w-0 flex-1 flex-col text-left">
-                <span className="truncate text-sm font-bold">{account.displayName}</span>
+                <span className="truncate text-sm font-bold">{shownName}</span>
                 <span className="truncate text-sm text-muted-foreground">{handle}</span>
               </div>
               <MoreHorizontal className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden />
@@ -199,15 +207,15 @@ export function SidebarLeft({ role, username = 'Utilisateur' }: SidebarLeftProps
             className="panel w-56 border shadow-[0_18px_44px_rgba(91,108,255,0.18)]"
           >
             <DropdownMenuLabel>
-              <span className="block font-bold">{account.displayName}</span>
+              <span className="block font-bold">{shownName}</span>
               <span className="block text-xs font-normal text-muted-foreground">
-                {displayedRole ?? 'non connecté'}
+                {displayedRole ? t(`role.${displayedRole}`) : t('common.not_connected')}
               </span>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={() => void logout()}>
               <LogOut className="mr-2 h-4 w-4" />
-              Se déconnecter
+              {t('common.logout')}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

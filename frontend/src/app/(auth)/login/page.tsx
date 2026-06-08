@@ -29,6 +29,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { setAccessToken } from '@/lib/auth-client'
 import { ROUTES } from '@/lib/routes'
+import { useT } from '@/components/language-provider'
 
 type FormErrors = Partial<{
   email: string
@@ -45,6 +46,7 @@ function getMessage(error: unknown, fallback: string): string {
 }
 
 export default function LoginPage() {
+  const t = useT()
   const router = useRouter()
   const [email, setEmail] = React.useState('')
   const [password, setPassword] = React.useState('')
@@ -57,19 +59,19 @@ export default function LoginPage() {
     const trimmedEmail = email.trim()
 
     if (!trimmedEmail) {
-      nextErrors.email = 'L’adresse e-mail est requise.'
+      nextErrors.email = t('auth.err.email_required')
     } else if (!emailPattern.test(trimmedEmail)) {
-      nextErrors.email = 'Saisis une adresse e-mail valide.'
+      nextErrors.email = t('auth.err.email_invalid')
     }
 
     if (!password) {
-      nextErrors.password = 'Le mot de passe est requis.'
+      nextErrors.password = t('auth.err.password_required')
     } else if (password.length < 8) {
-      nextErrors.password = 'Le mot de passe doit contenir au moins 8 caractères.'
+      nextErrors.password = t('auth.err.password_min')
     }
 
     return nextErrors
-  }, [email, password])
+  }, [email, password, t])
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -97,10 +99,7 @@ export default function LoginPage() {
 
       if (!response.ok) {
         setErrors({
-          form:
-            payload?.error ??
-            payload?.message ??
-            'La connexion a échoué. Vérifie tes identifiants.',
+          form: payload?.error ?? payload?.message ?? t('auth.login.failed'),
         })
         return
       }
@@ -115,10 +114,7 @@ export default function LoginPage() {
       router.refresh()
     } catch (error) {
       setErrors({
-        form: getMessage(
-          error,
-          'Impossible de contacter l’API. Réessaie dans un instant.'
-        ),
+        form: getMessage(error, t('auth.err.network')),
       })
     } finally {
       setIsSubmitting(false)
@@ -154,16 +150,16 @@ export default function LoginPage() {
               <div className="flex items-center justify-between border-b border-white/60 px-5 py-4 dark:border-white/10">
                 <div>
                   <p className="text-xs font-semibold uppercase text-[#5B6CFF]">
-                    Fil en direct
+                    {t('auth.login.demo.kicker')}
                   </p>
                   <h1 className="text-2xl font-semibold text-foreground">
-                    Retrouve ton monde.
+                    {t('auth.login.demo.heading')}
                   </h1>
                 </div>
 
                 <button
                   type="button"
-                  aria-label="Rechercher"
+                  aria-label={t('auth.search_aria')}
                   className="grid h-10 w-10 place-items-center rounded-full bg-white/90 text-foreground/80 shadow-sm transition hover:scale-105 hover:text-[#5B6CFF] dark:bg-white/10"
                 >
                   <Search className="h-5 w-5" />
@@ -185,7 +181,7 @@ export default function LoginPage() {
                         <span className="text-muted-foreground">2 min</span>
                       </div>
                       <p className="mt-1 text-sm leading-relaxed text-foreground/80">
-                        Nouvelle playlist, nouveaux débats, même énergie Breezy.
+                        {t('auth.login.demo.post1')}
                       </p>
                       <div className="mt-3 h-28 rounded-[18px] bg-gradient-to-br from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] p-px">
                         <div className="h-full rounded-[17px] bg-white/20 p-3">
@@ -201,7 +197,7 @@ export default function LoginPage() {
                           <Heart className="h-4 w-4 fill-red-500" />
                           2.8K
                         </span>
-                        <span>18.4K vues</span>
+                        <span>{t('auth.login.demo.views')}</span>
                       </div>
                     </div>
                   </div>
@@ -214,10 +210,10 @@ export default function LoginPage() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-bold text-foreground">
-                        Noa a rejoint la conversation
+                        {t('auth.login.demo.joined')}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        Découvre les sujets qui montent ce soir.
+                        {t('auth.login.demo.joined_sub')}
                       </p>
                     </div>
                     <UserPlus className="h-5 w-5 text-[#8D3DFF]" />
@@ -228,7 +224,7 @@ export default function LoginPage() {
 
             <div className="absolute right-8 top-20 w-64 rounded-[28px] border border-white/40 bg-slate-950/90 p-4 text-white shadow-[0_28px_70px_rgba(15,23,42,0.32)] backdrop-blur-xl dark:border-white/10">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-semibold">Tendances</span>
+                <span className="text-sm font-semibold">{t('trends.title')}</span>
                 <Sparkles className="h-4 w-4 text-[#47D9FF]" />
               </div>
 
@@ -236,7 +232,9 @@ export default function LoginPage() {
                 {['#DesignSprint', '#CampusLife', '#DevDistribue'].map(
                   (trend, index) => (
                     <div key={trend} className="rounded-2xl bg-white/10 px-3 py-2">
-                      <p className="text-xs text-white/50">#{index + 1} sur Breezy</p>
+                      <p className="text-xs text-white/50">
+                        {t('auth.login.demo.rank', { n: index + 1 })}
+                      </p>
                       <p className="text-sm font-semibold">{trend}</p>
                     </div>
                   )
@@ -250,10 +248,10 @@ export default function LoginPage() {
               </div>
               <div>
                 <p className="text-sm font-bold text-foreground">
-                  17 nouvelles interactions
+                  {t('auth.login.demo.interactions')}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Ton fil t’attend, frais et vivant.
+                  {t('auth.login.demo.interactions_sub')}
                 </p>
               </div>
             </div>
@@ -281,16 +279,16 @@ export default function LoginPage() {
 
             <div className="inline-flex w-fit items-center gap-2 rounded-full border border-white/70 bg-white/80 px-3 py-1 text-xs font-semibold text-[#5B6CFF] shadow-sm dark:border-white/15 dark:bg-white/10">
               <span className="h-2 w-2 rounded-full bg-[#47D9FF]" />
-              Connexion au réseau
+              {t('auth.login.badge')}
             </div>
 
             <div className="space-y-2">
               <CardTitle className="brand-text max-w-md text-[31px] font-semibold leading-tight sm:text-[38px]">
-                Reprends ton fil là où tu l’as laissé.
+                {t('auth.login.title')}
               </CardTitle>
 
               <CardDescription className="max-w-sm text-sm leading-relaxed text-muted-foreground">
-                Connecte-toi à Breezy, retrouve tes messages, tes posts et les conversations qui bougent.
+                {t('auth.login.subtitle')}
               </CardDescription>
             </div>
           </CardHeader>
@@ -299,7 +297,7 @@ export default function LoginPage() {
             <form className="space-y-3.5" onSubmit={handleSubmit} noValidate>
               <div className="space-y-1.5">
                 <label htmlFor="email" className="text-sm font-medium text-foreground/80">
-                  Adresse e-mail
+                  {t('auth.email_label')}
                 </label>
 
                 <div className="group relative">
@@ -311,7 +309,7 @@ export default function LoginPage() {
                     type="email"
                     autoComplete="email"
                     inputMode="email"
-                    placeholder="toi@exemple.com"
+                    placeholder={t('auth.email_placeholder')}
                     className="h-12 rounded-2xl border-white/70 bg-white/90 pl-11 text-[15px] shadow-sm shadow-slate-200/60 transition-all placeholder:text-muted-foreground hover:border-[#47D9FF]/70 focus-visible:border-[#5B6CFF] focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15 dark:border-white/15 dark:bg-white/5"
                     value={email}
                     onChange={(event) => {
@@ -334,7 +332,7 @@ export default function LoginPage() {
 
               <div className="space-y-1.5">
                 <label htmlFor="password" className="text-sm font-medium text-foreground/80">
-                  Mot de passe
+                  {t('auth.password_label')}
                 </label>
 
                 <div className="group relative">
@@ -364,9 +362,7 @@ export default function LoginPage() {
                   <button
                     type="button"
                     aria-label={
-                      showPassword
-                        ? 'Masquer le mot de passe'
-                        : 'Afficher le mot de passe'
+                      showPassword ? t('auth.hide_password') : t('auth.show_password')
                     }
                     aria-pressed={showPassword}
                     className="absolute right-3 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full text-muted-foreground transition hover:bg-[#5B6CFF]/10 hover:text-[#5B6CFF] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15"
@@ -392,7 +388,7 @@ export default function LoginPage() {
                   href={ROUTES.home}
                   className="font-medium text-[#5B6CFF] underline-offset-4 transition hover:text-[#8D3DFF] hover:underline"
                 >
-                  Mot de passe oublié ?
+                  {t('auth.login.forgot')}
                 </Link>
               </div>
 
@@ -408,7 +404,7 @@ export default function LoginPage() {
                 className="h-12 w-full rounded-2xl bg-gradient-to-r from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] text-base font-semibold text-white shadow-[0_18px_44px_rgba(91,108,255,0.34)] transition duration-300 hover:scale-[1.015] hover:shadow-[0_24px_56px_rgba(91,108,255,0.42)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70"
                 disabled={isSubmitting}
               >
-                {isSubmitting ? 'Connexion en cours…' : 'Se connecter'}
+                {isSubmitting ? t('auth.login.submitting') : t('auth.login.submit')}
               </Button>
 
               <div className="space-y-3 pt-1">
@@ -416,7 +412,7 @@ export default function LoginPage() {
                   <div className="h-px flex-1 bg-gradient-to-r from-transparent via-border to-transparent" />
 
                   <span className="text-xs font-medium text-muted-foreground">
-                    Ou se connecter avec
+                    {t('auth.login.or')}
                   </span>
 
                   <div className="h-px flex-1 bg-gradient-to-r from-transparent via-border to-transparent" />
@@ -456,12 +452,12 @@ export default function LoginPage() {
               </div>
 
               <p className="text-center text-sm text-muted-foreground">
-                Pas encore de compte ?{' '}
+                {t('auth.login.no_account')}{' '}
                 <Link
                   href={ROUTES.register}
                   className="font-semibold text-[#5B6CFF] underline-offset-4 transition hover:text-[#8D3DFF] hover:underline"
                 >
-                  Créer un compte
+                  {t('auth.login.create_account')}
                 </Link>
               </p>
             </form>

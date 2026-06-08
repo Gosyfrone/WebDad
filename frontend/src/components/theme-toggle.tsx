@@ -5,6 +5,7 @@ import { Monitor, Moon, Sun } from 'lucide-react'
 import { useTheme } from 'next-themes'
 
 import { cn } from '@/lib/utils'
+import { useT } from '@/components/language-provider'
 
 /**
  * Sélecteur d'apparence :
@@ -17,6 +18,7 @@ import { cn } from '@/lib/utils'
  * évite le mismatch d'hydratation (le serveur ignore le thème).
  */
 export function ThemeToggle() {
+  const t = useT()
   const { theme, resolvedTheme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
   useEffect(() => setMounted(true), [])
@@ -43,17 +45,17 @@ export function ThemeToggle() {
 
   return (
     <div className="px-2 py-1">
-      <span className="text-xs font-medium text-muted-foreground">Thème</span>
+      <span className="text-xs font-medium text-muted-foreground">{t('theme.title')}</span>
 
       <div className="mt-2 flex flex-col gap-1">
         {/* Interrupteur clair / sombre */}
         <div className="flex items-center justify-between rounded-lg px-1 py-2">
-          <span className="text-sm">Apparence</span>
+          <span className="text-sm">{t('theme.appearance')}</span>
           <button
             type="button"
             role="switch"
             aria-checked={isDark}
-            aria-label="Basculer entre le mode clair et sombre"
+            aria-label={t('theme.toggle_aria')}
             disabled={systemOn}
             onClick={toggleLightDark}
             className={cn(
@@ -97,7 +99,7 @@ export function ThemeToggle() {
         >
           <span className="flex items-center gap-2 text-sm">
             <Monitor className="h-5 w-5" aria-hidden />
-            Mode système
+            {t('theme.system')}
           </span>
           <span
             className={cn(
@@ -105,7 +107,7 @@ export function ThemeToggle() {
               systemOn ? 'text-primary' : 'text-muted-foreground',
             )}
           >
-            {systemOn ? 'Activé' : 'Désactivé'}
+            {systemOn ? t('theme.on') : t('theme.off')}
           </span>
         </button>
       </div>
@@ -123,6 +125,7 @@ export function ThemeToggle() {
  * l'apparence effective `resolvedTheme` et on fige un choix manuel).
  */
 export function FloatingThemeToggle() {
+  const t = useT()
   const { resolvedTheme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
   const [slide, setSlide] = useState<'left' | 'right' | null>(null)
@@ -152,7 +155,7 @@ export function FloatingThemeToggle() {
       type="button"
       role="switch"
       aria-checked={isDark}
-      aria-label="Basculer entre le mode clair et sombre"
+      aria-label={t('theme.toggle_aria')}
       onClick={toggle}
       className="fixed bottom-4 left-4 z-50 inline-flex h-9 w-16 animate-in items-center rounded-full border border-white/40 bg-white/20 shadow-lg backdrop-blur-md transition-colors fade-in hover:bg-white/30 dark:border-white/15 dark:bg-white/10 dark:hover:bg-white/20"
     >

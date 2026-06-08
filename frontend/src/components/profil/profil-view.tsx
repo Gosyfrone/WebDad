@@ -10,6 +10,7 @@ import { getMyProfil, getPublicProfil, saveMyProfil } from '@/lib/profil-client'
 import { listByAuthor, type FeedPost } from '@/lib/posts'
 import { useToast } from '@/hooks/use-toast'
 import type { ProfilDetails, ProfilEditableFields } from '@/types'
+import { useT } from '@/components/language-provider'
 import { PostCard } from '@/components/feed/post-card'
 import { ProfilHeader } from '@/components/profil/profil-header'
 
@@ -48,6 +49,7 @@ function applyPostUpdate(current: FeedPost[], updated: FeedPost): FeedPost[] {
  */
 export function ProfilView({ username }: ProfilViewProps) {
   const { toast } = useToast()
+  const t = useT()
   const [profil, setProfil] = useState<ProfilDetails | null>(null)
   const [posts, setPosts] = useState<FeedPost[]>([])
   const [tab, setTab] = useState<ProfilTab>('posts')
@@ -71,7 +73,7 @@ export function ProfilView({ username }: ProfilViewProps) {
       } catch (err) {
         if (!cancelled) {
           setProfil(null)
-          setError(err instanceof Error ? err.message : 'Profil introuvable.')
+          setError(err instanceof Error ? err.message : t('profil.not_found'))
         }
       } finally {
         if (!cancelled) setLoading(false)
@@ -82,7 +84,7 @@ export function ProfilView({ username }: ProfilViewProps) {
     return () => {
       cancelled = true
     }
-  }, [username])
+  }, [username, t])
 
   // Posts de l'auteur (onglet « Posts »), chargés une fois le profil connu.
   useEffect(() => {
@@ -115,12 +117,11 @@ export function ProfilView({ username }: ProfilViewProps) {
     try {
       const updated = await saveMyProfil(fields, profil.profileExists)
       setProfil(updated)
-      toast({ title: 'Profil mis à jour' })
+      toast({ title: t('profil.updated') })
     } catch (err) {
       toast({
-        title: 'Mise à jour impossible',
-        description:
-          err instanceof Error ? err.message : 'Le profil n’a pas pu être enregistré.',
+        title: t('profil.update_failed'),
+        description: err instanceof Error ? err.message : t('profil.save_failed'),
         variant: 'destructive',
       })
       throw err
@@ -140,7 +141,7 @@ export function ProfilView({ username }: ProfilViewProps) {
   if (error || !profil) {
     return (
       <div className="mx-4 mt-6 rounded-[24px] border border-white/55 bg-white/72 px-5 py-8 text-center shadow-[0_18px_54px_rgba(91,108,255,0.12)] backdrop-blur-xl">
-        <h1 className="text-lg font-bold text-slate-950">Profil indisponible</h1>
+        <h1 className="text-lg font-bold text-slate-950">{t('profil.unavailable')}</h1>
         <p className="mt-2 text-sm text-muted-foreground">{error}</p>
       </div>
     )
@@ -152,7 +153,7 @@ export function ProfilView({ username }: ProfilViewProps) {
       <div className="panel sticky top-0 z-10 flex items-center gap-6 border-b px-4 py-2">
         <Link
           href={ROUTES.feed}
-          aria-label="Retour au fil"
+          aria-label={t('profil.back_aria')}
           className="rounded-full p-2 transition-colors hover:bg-accent hover:text-[#5B6CFF] dark:hover:text-[#9aa6ff]"
         >
           <ArrowLeft className="h-5 w-5" />
@@ -160,7 +161,9 @@ export function ProfilView({ username }: ProfilViewProps) {
         <div className="flex flex-col">
           <span className="font-bold leading-tight text-foreground">{profil.displayName}</span>
           <span className="text-xs text-muted-foreground">
-            {posts.length} post{posts.length > 1 ? 's' : ''}
+            {t(posts.length > 1 ? 'profil.posts_count_other' : 'profil.posts_count_one', {
+              count: posts.length,
+            })}
           </span>
         </div>
       </div>
@@ -170,13 +173,13 @@ export function ProfilView({ username }: ProfilViewProps) {
       {/* Onglets */}
       <div className="panel flex border-b">
         <TabButton active={tab === 'posts'} onClick={() => setTab('posts')}>
-          Posts
+          {t('profil.tab_posts')}
         </TabButton>
         <TabButton active={tab === 'replies'} onClick={() => setTab('replies')}>
-          Réponses
+          {t('profil.tab_replies')}
         </TabButton>
         <TabButton active={tab === 'likes'} onClick={() => setTab('likes')}>
-          J&apos;aime
+          {t('profil.tab_likes')}
         </TabButton>
       </div>
 
@@ -189,15 +192,11 @@ export function ProfilView({ username }: ProfilViewProps) {
             ))}
           </div>
         ) : (
-          <EmptyTab message="Aucun post publié pour le moment." />
+          <EmptyTab message={t('profil.empty_posts')} />
         )
       ) : (
         <EmptyTab
-          message={
-            tab === 'replies'
-              ? 'Les réponses apparaîtront ici.'
-              : "Les posts que vous aimez apparaîtront ici."
-          }
+          message={tab === 'replies' ? t('profil.empty_replies') : t('profil.empty_likes')}
         />
       )}
     </div>

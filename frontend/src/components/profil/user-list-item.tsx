@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { ROUTES } from '@/lib/routes'
 import type { RelationUser } from '@/types'
+import { useT } from '@/components/language-provider'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 
@@ -43,6 +44,7 @@ export function UserListItem({
   showBio = true,
   onToggleFollow,
 }: UserListItemProps) {
+  const t = useT()
   const initials = (user.displayName.charAt(0) || user.username.charAt(0) || '?').toUpperCase()
   const href = isSelf ? ROUTES.profil : `${ROUTES.profil}/${user.username}`
 
@@ -51,7 +53,7 @@ export function UserListItem({
       {/* Lien « étiré » : rend toute la ligne cliquable vers le profil. */}
       <Link
         href={href}
-        aria-label={`Voir le profil de ${user.displayName}`}
+        aria-label={t('list.view_profile_aria', { name: user.displayName })}
         className="absolute inset-0 z-0"
       />
 
@@ -88,11 +90,11 @@ export function UserListItem({
         >
           {isFollowing ? (
             <>
-              <span className="group-hover/btn:hidden">Abonné</span>
-              <span className="hidden group-hover/btn:inline">Ne plus suivre</span>
+              <span className="group-hover/btn:hidden">{t('follow.followed')}</span>
+              <span className="hidden group-hover/btn:inline">{t('follow.unfollow')}</span>
             </>
           ) : (
-            'Suivre'
+            t('follow.follow')
           )}
         </Button>
       )}

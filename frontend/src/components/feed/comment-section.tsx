@@ -13,6 +13,7 @@ import {
   type PostComment,
 } from '@/lib/posts'
 import { useToast } from '@/hooks/use-toast'
+import { useLanguage } from '@/components/language-provider'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { TranslatedContent } from '@/components/feed/translated-content'
@@ -41,6 +42,7 @@ interface CommentSectionProps {
  */
 export function CommentSection({ postId, onCountChange }: CommentSectionProps) {
   const { toast } = useToast()
+  const { t } = useLanguage()
   const [comments, setComments] = useState<PostComment[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -66,7 +68,7 @@ export function CommentSection({ postId, onCountChange }: CommentSectionProps) {
         setHasMore(list.length === COMMENTS_PAGE)
       })
       .catch(() => {
-        if (!cancelled) setError('Impossible de charger les commentaires.')
+        if (!cancelled) setError(t('comment.load_error'))
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -74,7 +76,7 @@ export function CommentSection({ postId, onCountChange }: CommentSectionProps) {
     return () => {
       cancelled = true
     }
-  }, [postId])
+  }, [postId, t])
 
   const loadMore = useCallback(async () => {
     setLoadingMore(true)
@@ -105,7 +107,7 @@ export function CommentSection({ postId, onCountChange }: CommentSectionProps) {
       onCountChange?.(1)
       inputRef.current?.focus()
     } catch {
-      toast({ title: 'Commentaire impossible', variant: 'destructive' })
+      toast({ title: t('comment.submit_failed'), variant: 'destructive' })
     } finally {
       setSubmitting(false)
     }
@@ -129,7 +131,7 @@ export function CommentSection({ postId, onCountChange }: CommentSectionProps) {
               void handleSubmit()
             }
           }}
-          placeholder="Écrire un commentaire…"
+          placeholder={t('comment.placeholder')}
           maxLength={MAX_CHARS + 20}
           className="min-w-0 flex-1 rounded-full border border-border bg-background/60 px-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-[#5B6CFF] focus:outline-none"
         />
@@ -139,7 +141,7 @@ export function CommentSection({ postId, onCountChange }: CommentSectionProps) {
           disabled={!canSubmit}
           onClick={handleSubmit}
         >
-          {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Répondre'}
+          {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : t('comment.reply')}
         </Button>
       </div>
 
@@ -153,7 +155,7 @@ export function CommentSection({ postId, onCountChange }: CommentSectionProps) {
           <p className="py-2 text-center text-xs text-muted-foreground">{error}</p>
         ) : comments.length === 0 ? (
           <p className="py-2 text-center text-xs text-muted-foreground">
-            Aucun commentaire. Soyez le premier à réagir.
+            {t('comment.empty')}
           </p>
         ) : (
           <>
@@ -194,6 +196,7 @@ interface CommentThreadProps {
  */
 function CommentThread({ postId, comment, onRemove, onCountChange }: CommentThreadProps) {
   const { toast } = useToast()
+  const { t } = useLanguage()
   const [replies, setReplies] = useState<PostComment[]>([])
   const [replyCount, setReplyCount] = useState(comment.replyCount)
   const [open, setOpen] = useState(false)
@@ -218,7 +221,7 @@ function CommentThread({ postId, comment, onRemove, onCountChange }: CommentThre
       const next = await listReplies(postId, comment.id, REPLIES_PAGE, offset)
       setReplies((prev) => mergeUnique(prev, next))
     } catch {
-      toast({ title: 'Chargement impossible', variant: 'destructive' })
+      toast({ title: t('comment.load_failed'), variant: 'destructive' })
     } finally {
       setLoading(false)
     }
@@ -231,9 +234,9 @@ function CommentThread({ postId, comment, onRemove, onCountChange }: CommentThre
     setOpen((v) => !v)
   }
 
-  function openReplyTo(t: { id: string; username: string }) {
-    setTarget(t)
-    setContent(t.username ? `@${t.username} ` : '')
+  function openReplyTo(to: { id: string; username: string }) {
+    setTarget(to)
+    setContent(to.username ? `@${to.username} ` : '')
     setComposerOpen(true)
     requestAnimationFrame(() => replyInputRef.current?.focus())
   }
@@ -250,7 +253,7 @@ function CommentThread({ postId, comment, onRemove, onCountChange }: CommentThre
       setComposerOpen(false)
       onCountChange?.(1)
     } catch {
-      toast({ title: 'Réponse impossible', variant: 'destructive' })
+      toast({ title: t('comment.reply_failed'), variant: 'destructive' })
     } finally {
       setSubmitting(false)
     }
@@ -262,7 +265,7 @@ function CommentThread({ postId, comment, onRemove, onCountChange }: CommentThre
       onCountChange?.(-(1 + replyCount)) // racine + ses réponses (cascade back)
       onRemove(comment.id)
     } catch {
-      toast({ title: 'Suppression impossible', variant: 'destructive' })
+      toast({ title: t('common.delete_failed'), variant: 'destructive' })
     }
   }
 
@@ -277,7 +280,7 @@ function CommentThread({ postId, comment, onRemove, onCountChange }: CommentThre
       setReplies(snapshot) // rollback
       setReplyCount((n) => n + 1)
       onCountChange?.(1)
-      toast({ title: 'Suppression impossible', variant: 'destructive' })
+      toast({ title: t('common.delete_failed'), variant: 'destructive' })
     }
   }
 
@@ -292,13 +295,16 @@ function CommentThread({ postId, comment, onRemove, onCountChange }: CommentThre
               className="transition-colors hover:text-[#5B6CFF]"
               onClick={() => openReplyTo({ id: comment.id, username: comment.author.username })}
             >
-              Répondre
+              {t('comment.reply')}
             </button>
             {replyCount > 0 && (
               <button className="transition-colors hover:text-[#5B6CFF]" onClick={toggleReplies}>
                 {open
-                  ? 'Masquer les réponses'
-                  : `Voir les ${replyCount} réponse${replyCount > 1 ? 's' : ''}`}
+                  ? t('comment.hide_replies')
+                  : t(
+                      replyCount > 1 ? 'comment.view_replies_other' : 'comment.view_replies_one',
+                      { count: replyCount },
+                    )}
               </button>
             )}
           </div>
@@ -320,7 +326,7 @@ function CommentThread({ postId, comment, onRemove, onCountChange }: CommentThre
                     void submitReply()
                   }
                 }}
-                placeholder="Écrire une réponse…"
+                placeholder={t('comment.reply_placeholder')}
                 maxLength={MAX_CHARS + 20}
                 className="min-w-0 flex-1 rounded-full border border-border bg-background/60 px-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-[#5B6CFF] focus:outline-none"
               />
@@ -330,7 +336,7 @@ function CommentThread({ postId, comment, onRemove, onCountChange }: CommentThre
                 disabled={!canSubmit}
                 onClick={submitReply}
               >
-                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Répondre'}
+                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : t('comment.reply')}
               </Button>
             </div>
           )}
@@ -347,7 +353,7 @@ function CommentThread({ postId, comment, onRemove, onCountChange }: CommentThre
                       className="transition-colors hover:text-[#5B6CFF]"
                       onClick={() => openReplyTo({ id: r.id, username: r.author.username })}
                     >
-                      Répondre
+                      {t('comment.reply')}
                     </button>
                   </div>
                 }
@@ -356,7 +362,7 @@ function CommentThread({ postId, comment, onRemove, onCountChange }: CommentThre
 
           {open && hasMoreReplies && (
             <LoadMoreButton loading={loading} onClick={() => loadReplies(replies.length)}>
-              Voir plus de réponses
+              {t('comment.view_more_replies')}
             </LoadMoreButton>
           )}
         </div>
@@ -374,6 +380,7 @@ function CommentRow({
   onDelete: () => void
   footer?: React.ReactNode
 }) {
+  const { t, locale } = useLanguage()
   return (
     <div className="group flex gap-2">
       <ProfilLink author={comment.author} className="shrink-0 transition hover:opacity-90">
@@ -402,7 +409,7 @@ function CommentRow({
             </ProfilLink>
           )}
           <span className="shrink-0 text-muted-foreground">·</span>
-          <span className="shrink-0 text-muted-foreground">{timeAgo(comment.createdAt)}</span>
+          <span className="shrink-0 text-muted-foreground">{timeAgo(comment.createdAt, locale)}</span>
         </div>
         <TranslatedContent
           contentId={`comment:${comment.id}`}
@@ -415,7 +422,7 @@ function CommentRow({
 
       {comment.canDelete && (
         <button
-          aria-label="Supprimer le commentaire"
+          aria-label={t('comment.delete_aria')}
           onClick={onDelete}
           className={cn(
             'h-fit shrink-0 rounded-full p-1.5 text-muted-foreground transition-colors',

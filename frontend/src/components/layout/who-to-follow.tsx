@@ -6,6 +6,7 @@ import { Loader2 } from 'lucide-react'
 import { getSuggestions } from '@/lib/api'
 import { useFollow } from '@/lib/use-follow'
 import type { RelationUser } from '@/types'
+import { useT } from '@/components/language-provider'
 import { UserListItem } from '@/components/profil/user-list-item'
 
 /** Nombre de suggestions affichées dans la carte. */
@@ -17,6 +18,7 @@ const VISIBLE = 3
  * bio) via `UserListItem` ; bouton Suivre branché par `useFollow`.
  */
 export function WhoToFollow() {
+  const t = useT()
   const [users, setUsers] = useState<RelationUser[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -45,7 +47,7 @@ export function WhoToFollow() {
 
   return (
     <div className="glass overflow-hidden rounded-[24px] border backdrop-blur-xl">
-      <h2 className="brand-text px-4 py-3 text-xl font-bold">Qui suivre</h2>
+      <h2 className="brand-text px-4 py-3 text-xl font-bold">{t('who.title')}</h2>
 
       {loading ? (
         <div className="flex justify-center py-6">
@@ -53,7 +55,7 @@ export function WhoToFollow() {
         </div>
       ) : visible.length === 0 ? (
         <p className="px-4 pb-4 text-sm text-muted-foreground">
-          Aucune suggestion pour le moment.
+          {t('who.empty')}
         </p>
       ) : (
         <div className="divide-y divide-border">

@@ -32,7 +32,8 @@ export function profilHref(username: string): string {
 
 /** Un lien de navigation affiché dans la barre de navigation. */
 export interface NavItem {
-  label: string
+  /** Clé i18n du libellé (cf. lib/i18n.ts, namespace `nav`). */
+  labelKey: string
   href: Route
   /** Rôles autorisés à voir ce lien. `undefined` = visible par tous. */
   roles?: UserRole[]
@@ -43,10 +44,10 @@ export interface NavItem {
  * La visibilité par rôle reflète les 3 rôles du projet (cf. CLAUDE.md §1).
  */
 export const APP_NAV: NavItem[] = [
-  { label: 'Fil', href: ROUTES.feed },
-  { label: 'Profil', href: ROUTES.profil },
-  { label: 'Modération', href: ROUTES.moderation, roles: ['moderator', 'administrator'] },
-  { label: 'Administration', href: ROUTES.admin, roles: ['administrator'] },
+  { labelKey: 'nav.feed', href: ROUTES.feed },
+  { labelKey: 'nav.profil', href: ROUTES.profil },
+  { labelKey: 'nav.moderation', href: ROUTES.moderation, roles: ['moderator', 'administrator'] },
+  { labelKey: 'nav.admin', href: ROUTES.admin, roles: ['administrator'] },
 ]
 
 /** Filtre les liens de navigation selon le rôle de l'utilisateur courant. */
