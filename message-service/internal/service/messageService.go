@@ -28,12 +28,16 @@ var (
 	ErrSelfConversation     = errors.New("impossible de démarrer une conversation avec soi-même")
 	ErrMissingEnvelope      = errors.New("enveloppe de clé manquante pour un membre")
 	ErrInvalidGroup         = errors.New("groupe invalide (créateur absent des enveloppes ou aucun membre)")
+	ErrInvalidCommunity     = errors.New("communauté invalide (nom ou clé de contenu manquant)")
 	ErrNotGroup             = errors.New("opération réservée aux groupes")
+	ErrNotCommunity         = errors.New("opération réservée aux communautés")
+	ErrNotManageable        = errors.New("opération réservée aux groupes et communautés")
 	ErrAlreadyMember        = errors.New("cet utilisateur est déjà membre")
-	ErrGroupFull            = errors.New("groupe complet (32 membres maximum)")
-	ErrOwnerOnly            = errors.New("action réservée au créateur du groupe")
-	ErrOwnerCannotLeave     = errors.New("le créateur ne peut pas quitter le groupe (le supprimer à la place)")
-	ErrTargetNotMember      = errors.New("cet utilisateur n'est pas membre du groupe")
+	ErrTalkersFull          = errors.New("nombre maximum de participants pouvant écrire atteint (32)")
+	ErrInvalidRole          = errors.New("rôle invalide (talker ou viewer attendu)")
+	ErrOwnerOnly            = errors.New("action réservée au créateur")
+	ErrOwnerCannotLeave     = errors.New("le créateur ne peut pas quitter (le supprimer à la place)")
+	ErrTargetNotMember      = errors.New("cet utilisateur n'est pas membre")
 )
 
 // Bornes de pagination des messages.
@@ -42,8 +46,10 @@ const (
 	MaxLimit     = 100
 )
 
-// MaxGroupMembers : nombre maximum de membres (« talkers ») d'un groupe.
-const MaxGroupMembers = 32
+// MaxTalkers : nombre maximum de participants pouvant écrire (owner + talkers).
+// Vaut pour les groupes (tous talkers) ET les communautés (les viewers, en
+// lecture seule, ne sont PAS comptés et sont illimités).
+const MaxTalkers = 32
 
 type MessageService struct {
 	repo *repository.MessageRepository
@@ -142,8 +148,8 @@ func (s *MessageService) CreateGroup(ctx context.Context, creatorID, title, titl
 	if len(envelopes) == 0 || strings.TrimSpace(envelopes[creatorID]) == "" {
 		return nil, ErrInvalidGroup
 	}
-	if len(envelopes) > MaxGroupMembers {
-		return nil, ErrGroupFull
+	if len(envelopes) > MaxTalkers {
+		return nil, ErrTalkersFull
 	}
 	for _, env := range envelopes {
 		if strings.TrimSpace(env) == "" {
@@ -191,6 +197,157 @@ func (s *MessageService) CreateGroup(ctx context.Context, creatorID, title, titl
 	return s.viewFor(ctx, conv, creatorID)
 }
 
+// CreateCommunity crée une communauté. Modèle HYBRIDE : le client génère la clé
+// de contenu et la CONFIE au serveur (`contentKey`), qui la remettra à chaque
+// nouvel arrivant (auto-join illimité). Le nom (`title`) est en CLAIR (semi-
+// public, découvrable). Le créateur est l'owner (et l'unique membre au départ).
+// ⚠️ Conséquence assumée : le serveur peut lire les communautés (pas DM/groupes).
+func (s *MessageService) CreateCommunity(ctx context.Context, creatorID, title, contentKey string) (*models.ConversationView, error) {
+	if strings.TrimSpace(title) == "" || strings.TrimSpace(contentKey) == "" {
+		return nil, ErrInvalidCommunity
+	}
+
+	now := time.Now()
+	conv := &models.Conversation{
+		Type:       models.TypeCommunity,
+		MemberIDs:  []string{creatorID},
+		Title:      title,
+		ContentKey: contentKey,
+		CreatedBy:  creatorID,
+		CreatedAt:  now,
+		UpdatedAt:  now,
+	}
+	if err := s.repo.CreateConversation(ctx, conv); err != nil {
+		return nil, err
+	}
+	if err := s.repo.AddMember(ctx, &models.Member{
+		ConversationID: conv.ID.Hex(),
+		UserID:         creatorID,
+		Role:           models.MemberOwner,
+		CreatedAt:      now,
+	}); err != nil {
+		return nil, err
+	}
+	return s.viewFor(ctx, conv, creatorID)
+}
+
+// JoinCommunity : auto-join d'une communauté en VIEWER (lecture seule). Renvoie
+// la vue AVEC la clé de contenu (le serveur la remet). Idempotent : déjà membre
+// → renvoie sa vue inchangée. Renvoie aussi les ids à notifier (membres + soi).
+func (s *MessageService) JoinCommunity(ctx context.Context, conversationID, userID string) (*models.ConversationView, []string, error) {
+	conv, err := s.getConversationByID(ctx, conversationID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if conv.Type != models.TypeCommunity {
+		return nil, nil, ErrNotCommunity
+	}
+
+	// Déjà membre → idempotent.
+	if _, err := s.repo.GetMember(ctx, conversationID, userID); err == nil {
+		view, verr := s.viewFor(ctx, conv, userID)
+		return view, nil, verr
+	} else if !errors.Is(err, mongo.ErrNoDocuments) {
+		return nil, nil, err
+	}
+
+	now := time.Now()
+	if err := s.repo.AddMember(ctx, &models.Member{
+		ConversationID: conversationID,
+		UserID:         userID,
+		Role:           models.MemberViewer, // rejoint en lecture seule
+		CreatedAt:      now,
+	}); err != nil {
+		return nil, nil, err
+	}
+	if err := s.repo.PushMemberID(ctx, conv.ID, userID); err != nil {
+		return nil, nil, err
+	}
+
+	view, err := s.viewFor(ctx, conv, userID)
+	if err != nil {
+		return nil, nil, err
+	}
+	notify, _ := s.repo.MemberIDs(ctx, conversationID)
+	return view, notify, nil
+}
+
+// SetMemberRole promeut/rétrograde un membre d'une communauté entre talker
+// (peut écrire) et viewer (lecture seule). Owner uniquement. Le cap de 32 ne
+// porte que sur les talkers (la promotion le vérifie). On ne touche pas l'owner.
+func (s *MessageService) SetMemberRole(ctx context.Context, conversationID, actorID, targetID, role string) ([]string, error) {
+	if role != models.MemberTalker && role != models.MemberViewer {
+		return nil, ErrInvalidRole
+	}
+	actor, err := s.requireMember(ctx, conversationID, actorID)
+	if err != nil {
+		return nil, err
+	}
+	conv, err := s.getConversationByID(ctx, conversationID)
+	if err != nil {
+		return nil, err
+	}
+	if conv.Type != models.TypeCommunity {
+		return nil, ErrNotCommunity
+	}
+	if actor.Role != models.MemberOwner {
+		return nil, ErrOwnerOnly
+	}
+
+	target, err := s.repo.GetMember(ctx, conversationID, targetID)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return nil, ErrTargetNotMember
+	}
+	if err != nil {
+		return nil, err
+	}
+	if target.Role == models.MemberOwner {
+		return nil, ErrOwnerOnly // le rôle de l'owner n'est pas modifiable
+	}
+
+	// Promotion viewer → talker : vérifier le cap des talkers (no-op si déjà talker).
+	if role == models.MemberTalker && !canWrite(target.Role) {
+		count, cerr := s.repo.CountWritableMembers(ctx, conversationID)
+		if cerr != nil {
+			return nil, cerr
+		}
+		if count >= MaxTalkers {
+			return nil, ErrTalkersFull
+		}
+	}
+
+	if err := s.repo.SetMemberRole(ctx, conversationID, targetID, role); err != nil {
+		return nil, translateNotFound(err)
+	}
+	notify, _ := s.repo.MemberIDs(ctx, conversationID)
+	return notify, nil
+}
+
+// ListCommunities renvoie l'annuaire public des communautés (nom en clair, nb de
+// membres, déjà-membre), paginé, recherche par nom optionnelle. Jamais la clé.
+func (s *MessageService) ListCommunities(ctx context.Context, userID string, limit, offset int64, q string) ([]models.CommunityListItem, error) {
+	convs, err := s.repo.ListCommunities(ctx, clampLimit(limit), clampOffset(offset), q)
+	if err != nil {
+		return nil, err
+	}
+	items := make([]models.CommunityListItem, 0, len(convs))
+	for _, conv := range convs {
+		id := conv.ID.Hex()
+		count, _ := s.repo.CountMembers(ctx, id)
+		_, mErr := s.repo.GetMember(ctx, id, userID)
+		items = append(items, models.CommunityListItem{
+			ID:          id,
+			Title:       conv.Title,
+			MemberCount: count,
+			IsMember:    mErr == nil,
+			CreatedBy:   conv.CreatedBy,
+			CreatedAt:   conv.CreatedAt,
+			UpdatedAt:   conv.UpdatedAt,
+		})
+	}
+	return items, nil
+}
+
 // AddMember ajoute (invite) un membre à un groupe. N'importe quel membre peut
 // inviter (il détient la clé de contenu → il l'emballe pour l'invité). Refus si :
 // l'acteur n'est pas membre, ce n'est pas un groupe, la cible est déjà membre,
@@ -213,12 +370,12 @@ func (s *MessageService) AddMember(ctx context.Context, conversationID, actorID,
 		return nil, err
 	}
 
-	count, err := s.repo.CountMembers(ctx, conversationID)
+	count, err := s.repo.CountWritableMembers(ctx, conversationID)
 	if err != nil {
 		return nil, err
 	}
-	if count >= MaxGroupMembers {
-		return nil, ErrGroupFull
+	if count >= MaxTalkers {
+		return nil, ErrTalkersFull
 	}
 
 	now := time.Now()
@@ -253,8 +410,8 @@ func (s *MessageService) RemoveMember(ctx context.Context, conversationID, actor
 	if err != nil {
 		return nil, err
 	}
-	if conv.Type != models.TypeGroup {
-		return nil, ErrNotGroup
+	if !isManageable(conv.Type) {
+		return nil, ErrNotManageable
 	}
 	if err := checkRemoval(actor.Role, targetID == actorID); err != nil {
 		return nil, err
@@ -300,8 +457,8 @@ func (s *MessageService) DeleteGroup(ctx context.Context, conversationID, actorI
 	if err != nil {
 		return nil, err
 	}
-	if conv.Type != models.TypeGroup {
-		return nil, ErrNotGroup
+	if !isManageable(conv.Type) {
+		return nil, ErrNotManageable
 	}
 	if actor.Role != models.MemberOwner {
 		return nil, ErrOwnerOnly
@@ -327,8 +484,8 @@ func (s *MessageService) UpdateGroup(ctx context.Context, conversationID, actorI
 	if err != nil {
 		return nil, err
 	}
-	if conv.Type != models.TypeGroup {
-		return nil, ErrNotGroup
+	if !isManageable(conv.Type) {
+		return nil, ErrNotManageable
 	}
 	if actor.Role != models.MemberOwner {
 		return nil, ErrOwnerOnly
@@ -542,6 +699,12 @@ func checkRemoval(actorRole string, isSelf bool) error {
 	return nil
 }
 
+// isManageable : une conversation « administrable » (membres/suppression/renommage)
+// est un groupe ou une communauté — pas un DM. Fonction PURE (testée).
+func isManageable(convType string) bool {
+	return convType == models.TypeGroup || convType == models.TypeCommunity
+}
+
 // canWrite : un membre peut écrire s'il est owner, admin ou talker. viewer =
 // lecture seule (communautés).
 func canWrite(role string) bool {
@@ -555,7 +718,7 @@ func canWrite(role string) bool {
 
 // buildView assemble la vue renvoyée au client (conversation + données du membre).
 func buildView(conv *models.Conversation, m *models.Member) models.ConversationView {
-	return models.ConversationView{
+	v := models.ConversationView{
 		ID:         conv.ID.Hex(),
 		Type:       conv.Type,
 		MemberIDs:  conv.MemberIDs,
@@ -567,6 +730,13 @@ func buildView(conv *models.Conversation, m *models.Member) models.ConversationV
 		CreatedAt:  conv.CreatedAt,
 		UpdatedAt:  conv.UpdatedAt,
 	}
+	// Communauté : on remet la clé de contenu (détenue par le serveur) au membre.
+	// buildView n'est appelé qu'après vérification d'appartenance → jamais à un
+	// non-membre.
+	if conv.Type == models.TypeCommunity {
+		v.ContentKey = conv.ContentKey
+	}
+	return v
 }
 
 // parseID valide qu'un id est bien un ObjectID hexadécimal.
@@ -595,4 +765,12 @@ func clampLimit(limit int64) int64 {
 		return MaxLimit
 	}
 	return limit
+}
+
+// clampOffset interdit un décalage négatif.
+func clampOffset(offset int64) int64 {
+	if offset < 0 {
+		return 0
+	}
+	return offset
 }

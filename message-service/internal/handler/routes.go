@@ -39,6 +39,9 @@ func RegisterRoutes(
 		messages.PUT("/keys", auth, keyH.PublishKey)
 		messages.GET("/keys/:userId", auth, keyH.GetKey)
 
+		// Annuaire public des communautés (découverte + recherche).
+		messages.GET("/communities", auth, convH.ListCommunities)
+
 		// Conversations + messages.
 		conversations := messages.Group("/conversations", auth)
 		{
@@ -48,8 +51,10 @@ func RegisterRoutes(
 			conv := conversations.Group("/:id")
 			{
 				conv.GET("", convH.GetConversation)
-				conv.PATCH("", convH.UpdateConversation)  // renommer un groupe (owner)
-				conv.DELETE("", convH.DeleteConversation) // supprimer un groupe (owner)
+				conv.PATCH("", convH.UpdateConversation)  // renommer (owner)
+				conv.DELETE("", convH.DeleteConversation) // supprimer (owner)
+
+				conv.POST("/join", convH.JoinCommunity) // rejoindre une communauté (viewer)
 
 				conv.GET("/messages", convH.ListMessages)
 				conv.POST("/messages", convH.SendMessage)
@@ -57,7 +62,8 @@ func RegisterRoutes(
 				members := conv.Group("/members")
 				{
 					members.GET("", convH.ListMembers)
-					members.POST("", convH.AddMember)              // inviter (tout membre)
+					members.POST("", convH.AddMember)              // inviter un groupe (tout membre)
+					members.PATCH("/:userId", convH.SetMemberRole) // promouvoir/rétrograder (owner, communauté)
 					members.DELETE("/:userId", convH.RemoveMember) // exclure (owner) / quitter (soi)
 				}
 			}

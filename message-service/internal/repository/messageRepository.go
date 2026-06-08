@@ -5,6 +5,7 @@ package repository
 
 import (
 	"context"
+	"regexp"
 	"time"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
@@ -177,9 +178,60 @@ func (r *MessageRepository) ListMembers(ctx context.Context, conversationID stri
 	return out, nil
 }
 
-// CountMembers renvoie le nombre de membres d'une conversation (cap des groupes).
+// CountMembers renvoie le nombre total de membres d'une conversation.
 func (r *MessageRepository) CountMembers(ctx context.Context, conversationID string) (int64, error) {
 	return r.members.CountDocuments(ctx, bson.M{"conversation_id": conversationID})
+}
+
+// CountWritableMembers compte les membres pouvant écrire (owner/admin/talker) —
+// c'est sur eux que porte le cap de 32 (les viewers d'une communauté ne comptent pas).
+func (r *MessageRepository) CountWritableMembers(ctx context.Context, conversationID string) (int64, error) {
+	filter := bson.M{
+		"conversation_id": conversationID,
+		"role":            bson.M{"$in": bson.A{models.MemberOwner, models.MemberAdmin, models.MemberTalker}},
+	}
+	return r.members.CountDocuments(ctx, filter)
+}
+
+// SetMemberRole change le rôle d'un membre. mongo.ErrNoDocuments si absent.
+func (r *MessageRepository) SetMemberRole(ctx context.Context, conversationID, userID, role string) error {
+	res, err := r.members.UpdateOne(ctx,
+		bson.M{"conversation_id": conversationID, "user_id": userID},
+		bson.M{"$set": bson.M{"role": role}},
+	)
+	if err != nil {
+		return err
+	}
+	if res.MatchedCount == 0 {
+		return mongo.ErrNoDocuments
+	}
+	return nil
+}
+
+// ListCommunities renvoie l'annuaire public des communautés, du plus actif au
+// plus ancien, paginé. `q` (optionnel) filtre par nom (regex insensible à la
+// casse, métacaractères échappés — le nom d'une communauté est en clair).
+func (r *MessageRepository) ListCommunities(ctx context.Context, limit, skip int64, q string) ([]models.Conversation, error) {
+	filter := bson.M{"type": models.TypeCommunity}
+	if q != "" {
+		filter["title"] = bson.M{"$regex": regexp.QuoteMeta(q), "$options": "i"}
+	}
+	opts := options.Find().
+		SetSort(bson.D{{Key: "updated_at", Value: -1}}).
+		SetLimit(limit).
+		SetSkip(skip)
+
+	cursor, err := r.conversations.Find(ctx, filter, opts)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = cursor.Close(ctx) }()
+
+	out := []models.Conversation{}
+	if err := cursor.All(ctx, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 // RemoveMember retire un membre. Renvoie true si une ligne a été supprimée.

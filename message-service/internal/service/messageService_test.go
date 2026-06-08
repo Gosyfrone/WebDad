@@ -82,9 +82,33 @@ func TestCheckRemoval(t *testing.T) {
 	}
 }
 
-func TestMaxGroupMembers(t *testing.T) {
-	// La règle métier (cap groupe) doit valoir 32 (exigence produit).
-	if MaxGroupMembers != 32 {
-		t.Errorf("MaxGroupMembers attendu 32, obtenu %d", MaxGroupMembers)
+func TestMaxTalkers(t *testing.T) {
+	// La règle métier (cap des participants pouvant écrire) doit valoir 32.
+	if MaxTalkers != 32 {
+		t.Errorf("MaxTalkers attendu 32, obtenu %d", MaxTalkers)
+	}
+}
+
+func TestIsManageable(t *testing.T) {
+	cases := map[string]bool{
+		models.TypeGroup:     true,
+		models.TypeCommunity: true,
+		models.TypeDM:        false, // un DM n'a ni admin de membres ni suppression
+		"":                   false,
+	}
+	for typ, want := range cases {
+		if got := isManageable(typ); got != want {
+			t.Errorf("isManageable(%q) = %v, want %v", typ, got, want)
+		}
+	}
+}
+
+func TestCanWrite_ViewerCannot(t *testing.T) {
+	// Garde-fou communautés : un viewer ne peut jamais écrire.
+	if canWrite(models.MemberViewer) {
+		t.Error("un viewer ne doit PAS pouvoir écrire")
+	}
+	if !canWrite(models.MemberTalker) {
+		t.Error("un talker doit pouvoir écrire")
 	}
 }

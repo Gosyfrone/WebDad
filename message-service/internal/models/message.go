@@ -58,9 +58,13 @@ type Conversation struct {
 	DMKey      string        `bson:"dm_key,omitempty" json:"-"`
 	Title      string        `bson:"title,omitempty" json:"title,omitempty"`
 	TitleNonce string        `bson:"title_nonce,omitempty" json:"title_nonce,omitempty"`
-	CreatedBy  string        `bson:"created_by" json:"created_by"`
-	CreatedAt  time.Time     `bson:"created_at" json:"created_at"`
-	UpdatedAt  time.Time     `bson:"updated_at" json:"updated_at"`
+	// ContentKey : clé de contenu (base64) d'une COMMUNAUTÉ, détenue par le
+	// serveur (auto-join). `json:"-"` : jamais sérialisée directement — elle
+	// n'est exposée qu'aux MEMBRES via ConversationView (cf. buildView).
+	ContentKey string    `bson:"content_key,omitempty" json:"-"`
+	CreatedBy  string    `bson:"created_by" json:"created_by"`
+	CreatedAt  time.Time `bson:"created_at" json:"created_at"`
+	UpdatedAt  time.Time `bson:"updated_at" json:"updated_at"`
 }
 
 // Member — appartenance d'un utilisateur à une conversation : son rôle + son
@@ -87,13 +91,16 @@ type Message struct {
 // ConversationView — vue renvoyée au client : la conversation + l'enveloppe de
 // clé DU DEMANDEUR (les enveloppes des autres ne le concernent pas) + son rôle.
 type ConversationView struct {
-	ID         string    `json:"id"`
-	Type       string    `json:"type"`
-	MemberIDs  []string  `json:"member_ids"`
-	Title      string    `json:"title,omitempty"`
-	TitleNonce string    `json:"title_nonce,omitempty"`
-	MyRole     string    `json:"my_role"`
-	MyEnvelope string    `json:"my_envelope"`
+	ID         string   `json:"id"`
+	Type       string   `json:"type"`
+	MemberIDs  []string `json:"member_ids"`
+	Title      string   `json:"title,omitempty"`
+	TitleNonce string   `json:"title_nonce,omitempty"`
+	MyRole     string   `json:"my_role"`
+	MyEnvelope string   `json:"my_envelope"`
+	// ContentKey : clé de contenu d'une COMMUNAUTÉ (base64), remise au membre par
+	// le serveur. Vide pour DM/groupes (qui utilisent les enveloppes scellées).
+	ContentKey string    `json:"content_key,omitempty"`
 	CreatedBy  string    `json:"created_by"`
 	CreatedAt  time.Time `json:"created_at"`
 	UpdatedAt  time.Time `json:"updated_at"`
@@ -104,6 +111,19 @@ type ConversationView struct {
 type MemberView struct {
 	UserID string `json:"user_id"`
 	Role   string `json:"role"`
+}
+
+// CommunityListItem — entrée de l'annuaire public des communautés. Le nom est
+// en CLAIR (les communautés sont semi-publiques → découvrables). La clé de
+// contenu n'y figure JAMAIS (réservée aux membres).
+type CommunityListItem struct {
+	ID          string    `json:"id"`
+	Title       string    `json:"title"`
+	MemberCount int64     `json:"member_count"`
+	IsMember    bool      `json:"is_member"`
+	CreatedBy   string    `json:"created_by"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 // --- Corps de requêtes -------------------------------------------------------
@@ -122,12 +142,15 @@ type PublishKeyRequest struct {
 //
 // Le client génère la clé de contenu, l'emballe par membre et fournit les
 // enveloppes (map user_id -> enveloppe base64) ; le serveur ne voit pas la clé.
+//   - "community"    : `title` (nom en CLAIR) + `content_key` (la clé de contenu
+//     en base64, confiée au serveur pour l'auto-join). Pas d'`envelopes`.
 type CreateConversationRequest struct {
 	Type       string            `json:"type"`
 	PeerID     string            `json:"peer_id"`
 	Title      string            `json:"title"`
 	TitleNonce string            `json:"title_nonce"`
-	Envelopes  map[string]string `json:"envelopes" binding:"required"`
+	ContentKey string            `json:"content_key"`
+	Envelopes  map[string]string `json:"envelopes"`
 }
 
 // AddMemberRequest : corps de POST .../:id/members (inviter). L'invitant emballe
@@ -137,11 +160,19 @@ type AddMemberRequest struct {
 	Envelope string `json:"envelope" binding:"required"`
 }
 
-// UpdateGroupRequest : corps de PATCH .../:id (renommer un groupe). Nom
-// re-chiffré côté client avec la clé de contenu du groupe.
+// UpdateGroupRequest : corps de PATCH .../:id (renommer). Groupe : nom
+// re-chiffré (title+title_nonce). Communauté : nom en clair (title seul,
+// title_nonce vide).
 type UpdateGroupRequest struct {
 	Title      string `json:"title" binding:"required"`
-	TitleNonce string `json:"title_nonce" binding:"required"`
+	TitleNonce string `json:"title_nonce"`
+}
+
+// SetMemberRoleRequest : corps de PATCH .../:id/members/:userId — promouvoir /
+// rétrograder un membre d'une communauté (owner uniquement). Rôle attendu :
+// "talker" (peut écrire) ou "viewer" (lecture seule).
+type SetMemberRoleRequest struct {
+	Role string `json:"role" binding:"required"`
 }
 
 // SendMessageRequest : corps de POST .../messages. Déjà chiffré côté client.

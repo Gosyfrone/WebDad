@@ -134,6 +134,25 @@ describe('scénario GROUPE (clé unique, Option A : historique complet)', () => 
   })
 })
 
+describe('scénario COMMUNAUTÉ (clé détenue par le serveur, hybride)', () => {
+  it("la clé remise par le serveur déchiffre l'historique pour un viewer qui rejoint", () => {
+    // L'owner génère la clé et la CONFIE au serveur (transitée en base64).
+    const communityKey = generateContentKey()
+    const keyHandedByServer = toBase64(communityKey) // ce que le back stocke/redistribue
+
+    // Des messages sont postés par des talkers.
+    const m1 = encryptText(communityKey, 'Bienvenue dans la communauté')
+    const m2 = encryptText(communityKey, 'Règle n°1 : soyez sympas')
+
+    // Un viewer rejoint : le serveur lui remet la clé → il la décode et lit tout.
+    const viewerKey = fromBase64(keyHandedByServer)
+    expect(decryptText(viewerKey, m1.ciphertext, m1.nonce)).toBe('Bienvenue dans la communauté')
+    expect(decryptText(viewerKey, m2.ciphertext, m2.nonce)).toBe('Règle n°1 : soyez sympas')
+    // Même clé que l'originale (aller-retour base64 fidèle).
+    expect(Array.from(viewerKey)).toEqual(Array.from(communityKey))
+  })
+})
+
 describe('scénario DM bout-en-bout (Alice ↔ Bob)', () => {
   it("Alice scelle la CK pour les deux ; Bob l'ouvre et lit le message d'Alice", () => {
     const alice = generateIdentityKeyPair()

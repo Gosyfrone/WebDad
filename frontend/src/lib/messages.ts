@@ -20,6 +20,7 @@ import { API_URL } from '@/lib/config'
 import {
   decryptText,
   encryptText,
+  fromBase64,
   generateContentKey,
   openKeyEnvelope,
   sealKeyForRecipient,
@@ -48,10 +49,11 @@ interface ApiConversation {
   id: string
   type: 'dm' | 'group' | 'community'
   member_ids: string[]
-  title?: string // groupe : nom CHIFFRÉ (ciphertext base64)
+  title?: string // groupe : nom CHIFFRÉ (ciphertext base64) ; communauté : nom EN CLAIR
   title_nonce?: string
   my_role: string
   my_envelope: string
+  content_key?: string // communauté : clé de contenu (base64) remise par le serveur
   created_by: string
   created_at: string
   updated_at: string
@@ -60,6 +62,16 @@ interface ApiConversation {
 interface ApiMember {
   user_id: string
   role: string
+}
+
+interface ApiCommunity {
+  id: string
+  title: string
+  member_count: number
+  is_member: boolean
+  created_by: string
+  created_at: string
+  updated_at: string
 }
 
 interface ApiMessage {
@@ -93,6 +105,17 @@ export interface Conversation {
 export interface MemberInfo {
   userId: string
   role: string
+}
+
+/** Entrée de l'annuaire public des communautés (nom en clair, jamais la clé). */
+export interface CommunitySummary {
+  id: string
+  title: string
+  memberCount: number
+  isMember: boolean
+  createdBy: string
+  createdAt: string
+  updatedAt: string
 }
 
 /** Message déchiffré pour l'affichage. */
@@ -170,22 +193,34 @@ async function fetchPeerPublicKey(userId: string): Promise<string> {
 
 // --- Conversations -----------------------------------------------------------
 
-/** Dérive la CK d'une conversation depuis l'enveloppe scellée pour soi, et
- *  déchiffre le nom du groupe avec cette clé. */
+/**
+ * Construit une Conversation prête à l'emploi (clé + nom).
+ *   - DM / groupe : la clé vient de l'enveloppe scellée pour soi (E2EE), le nom
+ *     d'un groupe est chiffré avec cette clé.
+ *   - Communauté : la clé est **fournie par le serveur** (`content_key`), le nom
+ *     est en **clair** (semi-public).
+ */
 function toConversation(api: ApiConversation, identity: KeyPair): Conversation {
   let contentKey: Uint8Array | null = null
-  try {
-    contentKey = api.my_envelope ? openKeyEnvelope(api.my_envelope, identity.privateKey) : null
-  } catch {
-    contentKey = null // enveloppe créée pour une autre clé (autre appareil)
-  }
-
   let title = ''
-  if (contentKey && api.title && api.title_nonce) {
+
+  if (api.type === 'community') {
+    // Communauté : clé remise par le serveur, nom en clair.
+    contentKey = api.content_key ? fromBase64(api.content_key) : null
+    title = api.title ?? ''
+  } else {
+    // DM / groupe : clé dérivée de l'enveloppe scellée pour soi (E2EE).
     try {
-      title = decryptText(contentKey, api.title, api.title_nonce)
+      contentKey = api.my_envelope ? openKeyEnvelope(api.my_envelope, identity.privateKey) : null
     } catch {
-      title = ''
+      contentKey = null // enveloppe créée pour une autre clé (autre appareil)
+    }
+    if (contentKey && api.title && api.title_nonce) {
+      try {
+        title = decryptText(contentKey, api.title, api.title_nonce)
+      } catch {
+        title = ''
+      }
     }
   }
 
@@ -334,6 +369,81 @@ export async function listMembers(conversationId: string): Promise<MemberInfo[]>
     await apiFetch(`/messages/conversations/${conversationId}/members`),
   )
   return (raw ?? []).map((m) => ({ userId: m.user_id, role: m.role }))
+}
+
+// --- Communautés (Phase 3, modèle hybride) ----------------------------------
+
+/**
+ * Crée une communauté : le client génère la clé de contenu et la **confie au
+ * serveur** (`content_key`) pour permettre l'auto-join illimité. Le nom est en
+ * CLAIR (semi-public). ⚠️ Conséquence assumée : le serveur peut lire les
+ * communautés (contrairement aux DM/groupes).
+ */
+export async function createCommunity(name: string): Promise<Conversation> {
+  const identity = await ensureMyKeys()
+  const contentKey = generateContentKey()
+  const created = await unwrap<ApiConversation>(
+    await apiFetch('/messages/conversations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'community', title: name, content_key: toBase64(contentKey) }),
+    }),
+  )
+  return toConversation(created, identity)
+}
+
+/** Annuaire public des communautés (recherche `q` optionnelle). */
+export async function listCommunities(q = '', limit = 20, offset = 0): Promise<CommunitySummary[]> {
+  const params = new URLSearchParams({ limit: String(limit), offset: String(offset) })
+  if (q) params.set('q', q)
+  const raw = await unwrap<ApiCommunity[]>(await apiFetch(`/messages/communities?${params.toString()}`))
+  return (raw ?? []).map((c) => ({
+    id: c.id,
+    title: c.title,
+    memberCount: c.member_count,
+    isMember: c.is_member,
+    createdBy: c.created_by,
+    createdAt: c.created_at,
+    updatedAt: c.updated_at,
+  }))
+}
+
+/** Rejoint une communauté (en viewer). Le serveur remet la clé de contenu. */
+export async function joinCommunity(communityId: string): Promise<Conversation> {
+  const identity = await ensureMyKeys()
+  const joined = await unwrap<ApiConversation>(
+    await apiFetch(`/messages/conversations/${communityId}/join`, { method: 'POST' }),
+  )
+  return toConversation(joined, identity)
+}
+
+/** Promeut/rétrograde un membre d'une communauté (owner only) : talker ↔ viewer. */
+export async function setMemberRole(
+  conv: Conversation,
+  userId: string,
+  role: 'talker' | 'viewer',
+): Promise<void> {
+  await expectOk(
+    await apiFetch(`/messages/conversations/${conv.id}/members/${encodeURIComponent(userId)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role }),
+    }),
+    'Changement de rôle impossible',
+  )
+}
+
+/** Renomme une communauté (owner only) — nom en CLAIR (pas de chiffrement). */
+export async function renameCommunity(conv: Conversation, name: string): Promise<Conversation> {
+  const identity = await ensureMyKeys()
+  const updated = await unwrap<ApiConversation>(
+    await apiFetch(`/messages/conversations/${conv.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: name }),
+    }),
+  )
+  return toConversation(updated, identity)
 }
 
 /** Liste mes conversations (CK dérivées), de la plus active à la plus ancienne. */

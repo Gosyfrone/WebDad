@@ -105,6 +105,11 @@ var validators = map[string]bson.M{
 				"dm_key":      bson.M{"bsonType": bson.A{"string", "null"}},
 				"title":       bson.M{"bsonType": bson.A{"string", "null"}},
 				"title_nonce": bson.M{"bsonType": bson.A{"string", "null"}},
+				// content_key : clé de contenu d'une COMMUNAUTÉ, détenue par le
+				// serveur pour la remettre aux nouveaux arrivants (auto-join). Les
+				// communautés ne sont donc PAS admin-proof (compromis hybride
+				// assumé) ; DM/groupes n'ont jamais ce champ (clé jamais côté serveur).
+				"content_key": bson.M{"bsonType": bson.A{"string", "null"}},
 				"created_by":  bson.M{"bsonType": "string"},
 				"created_at":  bson.M{"bsonType": "date"},
 				"updated_at":  bson.M{"bsonType": "date"},
@@ -152,6 +157,8 @@ var indexes = map[string][]mongo.IndexModel{
 		// seuls les DM portent un dm_key (groups/communities ne l'ont pas).
 		{Keys: bson.D{{Key: "dm_key", Value: 1}}, Options: options.Index().SetUnique(true).SetSparse(true)},
 		{Keys: bson.D{{Key: "updated_at", Value: -1}}},
+		// Annuaire des communautés (liste publique, du plus actif au plus ancien).
+		{Keys: bson.D{{Key: "type", Value: 1}, {Key: "updated_at", Value: -1}}},
 	},
 	"members": {
 		// Un utilisateur n'apparaît qu'une fois par conversation.

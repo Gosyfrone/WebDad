@@ -42,9 +42,12 @@ func (h *ConversationHandler) CreateConversation(c *gin.Context) {
 		view *models.ConversationView
 		err  error
 	)
-	if req.Type == models.TypeGroup {
+	switch req.Type {
+	case models.TypeGroup:
 		view, err = h.service.CreateGroup(c.Request.Context(), claims.UserID, req.Title, req.TitleNonce, req.Envelopes)
-	} else {
+	case models.TypeCommunity:
+		view, err = h.service.CreateCommunity(c.Request.Context(), claims.UserID, req.Title, req.ContentKey)
+	default:
 		view, err = h.service.CreateDM(c.Request.Context(), claims.UserID, req.PeerID, req.Envelopes)
 	}
 	if err != nil {
@@ -52,6 +55,73 @@ func (h *ConversationHandler) CreateConversation(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"data": view})
+}
+
+// ListCommunities : GET /messages/communities — annuaire public (nom en clair,
+// nb de membres, déjà-membre). Pagination + recherche `?q=`. Jamais la clé.
+func (h *ConversationHandler) ListCommunities(c *gin.Context) {
+	claims, ok := middleware.ClaimsFrom(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "claims absents"})
+		return
+	}
+
+	items, err := h.service.ListCommunities(
+		c.Request.Context(), claims.UserID, pageLimit(c), pageOffset(c), c.Query("q"),
+	)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": items})
+}
+
+// JoinCommunity : POST /messages/conversations/:id/join — auto-join en viewer ;
+// renvoie la vue AVEC la clé de contenu (remise par le serveur).
+func (h *ConversationHandler) JoinCommunity(c *gin.Context) {
+	claims, ok := middleware.ClaimsFrom(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "claims absents"})
+		return
+	}
+
+	view, notify, err := h.service.JoinCommunity(c.Request.Context(), c.Param("id"), claims.UserID)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	if len(notify) > 0 {
+		h.hub.Publish(notify, gin.H{"type": "member_added", "data": gin.H{
+			"conversation_id": c.Param("id"), "user_id": claims.UserID,
+		}})
+	}
+	c.JSON(http.StatusOK, gin.H{"data": view})
+}
+
+// SetMemberRole : PATCH /messages/conversations/:id/members/:userId — promouvoir
+// / rétrograder talker↔viewer dans une communauté (owner uniquement).
+func (h *ConversationHandler) SetMemberRole(c *gin.Context) {
+	claims, ok := middleware.ClaimsFrom(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "claims absents"})
+		return
+	}
+
+	var req models.SetMemberRoleRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "payload invalide : " + err.Error()})
+		return
+	}
+
+	notify, err := h.service.SetMemberRole(c.Request.Context(), c.Param("id"), claims.UserID, c.Param("userId"), req.Role)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	h.hub.Publish(notify, gin.H{"type": "member_role_changed", "data": gin.H{
+		"conversation_id": c.Param("id"), "user_id": c.Param("userId"), "role": req.Role,
+	}})
+	c.JSON(http.StatusOK, gin.H{"data": gin.H{"user_id": c.Param("userId"), "role": req.Role}})
 }
 
 // UpdateConversation : PATCH /messages/conversations/:id — renomme un groupe
@@ -249,6 +319,15 @@ func (h *ConversationHandler) SendMessage(c *gin.Context) {
 // pageLimit lit ?limit (défaut/borne appliqués côté service).
 func pageLimit(c *gin.Context) int64 {
 	n, err := strconv.ParseInt(c.Query("limit"), 10, 64)
+	if err != nil {
+		return 0
+	}
+	return n
+}
+
+// pageOffset lit ?offset (défaut 0).
+func pageOffset(c *gin.Context) int64 {
+	n, err := strconv.ParseInt(c.Query("offset"), 10, 64)
 	if err != nil {
 		return 0
 	}
