@@ -1,9 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import { CalendarDays, LinkIcon, MapPin } from 'lucide-react'
+import Link from 'next/link'
+import { CalendarDays, LinkIcon, Mail, MapPin } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
+import { ROUTES } from '@/lib/routes'
 import type { RelationKind } from '@/lib/api'
 import { useFollow } from '@/lib/use-follow'
 import type { ProfilDetails, ProfilEditableFields, RelationUser } from '@/types'
@@ -93,11 +95,25 @@ export function ProfilHeader({ profil, isOwner, saving = false, onEdit }: Profil
                 </Button>
               </EditProfilDialog>
             ) : canFollow ? (
-              <FollowButton
-                following={isFollowing(profil.userId)}
-                pending={isPending(profil.userId)}
-                onToggle={(next) => toggle(toRelationUser(profil), next)}
-              />
+              <div className="flex items-center gap-2">
+                <Button
+                  asChild
+                  variant="outline"
+                  size="icon"
+                  aria-label={t('messages.message_action')}
+                  title={t('messages.message_action')}
+                  className="rounded-full border-white/70 bg-white/80 shadow-sm backdrop-blur hover:bg-white dark:border-white/15 dark:bg-white/10 dark:hover:bg-white/20"
+                >
+                  <Link href={`${ROUTES.messages}?dm=${profil.userId}`}>
+                    <Mail className="h-4 w-4" />
+                  </Link>
+                </Button>
+                <FollowButton
+                  following={isFollowing(profil.userId)}
+                  pending={isPending(profil.userId)}
+                  onToggle={(next) => toggle(toRelationUser(profil), next)}
+                />
+              </div>
             ) : null}
           </div>
         </div>

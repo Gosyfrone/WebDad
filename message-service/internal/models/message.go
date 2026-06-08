@@ -69,12 +69,21 @@ type Conversation struct {
 
 // Member — appartenance d'un utilisateur à une conversation : son rôle + son
 // enveloppe de clé (la clé de contenu emballée pour lui).
+//
+// État PAR-UTILISATEUR (ne concerne que ce membre, jamais les autres) :
+//   - PinnedAt : épinglage de la conversation en tête de SA liste (nil = non
+//     épinglée) ;
+//   - ClearedAt : suppression « côté user » — masque la conversation de SA liste
+//     et coupe SON historique (seuls les messages postérieurs sont renvoyés).
+//     La conversation réapparaît si un message plus récent arrive.
 type Member struct {
 	ID             bson.ObjectID `bson:"_id,omitempty" json:"id"`
 	ConversationID string        `bson:"conversation_id" json:"conversation_id"`
 	UserID         string        `bson:"user_id" json:"user_id"`
 	Role           string        `bson:"role" json:"role"`
 	KeyEnvelope    string        `bson:"key_envelope,omitempty" json:"key_envelope,omitempty"`
+	PinnedAt       *time.Time    `bson:"pinned_at,omitempty" json:"-"`
+	ClearedAt      *time.Time    `bson:"cleared_at,omitempty" json:"-"`
 	CreatedAt      time.Time     `bson:"created_at" json:"created_at"`
 }
 
@@ -100,10 +109,13 @@ type ConversationView struct {
 	MyEnvelope string   `json:"my_envelope"`
 	// ContentKey : clé de contenu d'une COMMUNAUTÉ (base64), remise au membre par
 	// le serveur. Vide pour DM/groupes (qui utilisent les enveloppes scellées).
-	ContentKey string    `json:"content_key,omitempty"`
-	CreatedBy  string    `json:"created_by"`
-	CreatedAt  time.Time `json:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at"`
+	ContentKey string `json:"content_key,omitempty"`
+	// PinnedAt : épinglage de la conversation par CE membre (nil/omis = non
+	// épinglée). Sert au tri « épinglé d'abord » côté client.
+	PinnedAt  *time.Time `json:"pinned_at,omitempty"`
+	CreatedBy string     `json:"created_by"`
+	CreatedAt time.Time  `json:"created_at"`
+	UpdatedAt time.Time  `json:"updated_at"`
 }
 
 // MemberView — un membre exposé dans la liste des membres (sans son enveloppe :

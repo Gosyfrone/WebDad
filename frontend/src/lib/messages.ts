@@ -54,6 +54,7 @@ interface ApiConversation {
   my_role: string
   my_envelope: string
   content_key?: string // communauté : clé de contenu (base64) remise par le serveur
+  pinned_at?: string // épinglage PAR-UTILISATEUR (absent = non épinglée)
   created_by: string
   created_at: string
   updated_at: string
@@ -96,6 +97,8 @@ export interface Conversation {
   createdBy: string
   createdAt: string
   updatedAt: string
+  /** Date d'épinglage (ISO) PAR CET utilisateur ; '' si non épinglée. */
+  pinnedAt: string
   /** Clé de contenu déchiffrée ; null si l'enveloppe ne s'ouvre pas ici
    *  (clé créée sur un autre appareil). */
   contentKey: Uint8Array | null
@@ -233,6 +236,7 @@ function toConversation(api: ApiConversation, identity: KeyPair): Conversation {
     createdBy: api.created_by,
     createdAt: api.created_at,
     updatedAt: api.updated_at,
+    pinnedAt: api.pinned_at ?? '',
     contentKey,
   }
 }
@@ -460,6 +464,36 @@ export async function getConversation(id: string): Promise<Conversation> {
   return toConversation(raw, identity)
 }
 
+/** Épingle une conversation en tête de MA liste (état par-utilisateur). */
+export async function pinConversation(conv: Conversation): Promise<Conversation> {
+  const identity = await ensureMyKeys()
+  const updated = await unwrap<ApiConversation>(
+    await apiFetch(`/messages/conversations/${conv.id}/pin`, { method: 'PATCH' }),
+  )
+  return toConversation(updated, identity)
+}
+
+/** Retire l'épinglage d'une conversation. */
+export async function unpinConversation(conv: Conversation): Promise<Conversation> {
+  const identity = await ensureMyKeys()
+  const updated = await unwrap<ApiConversation>(
+    await apiFetch(`/messages/conversations/${conv.id}/pin`, { method: 'DELETE' }),
+  )
+  return toConversation(updated, identity)
+}
+
+/**
+ * « Supprime » une conversation côté user : la masque de ma liste et coupe mon
+ * historique (les autres membres ne sont pas affectés). Elle réapparaît si un
+ * nouveau message arrive, sans l'ancien historique.
+ */
+export async function clearConversation(conv: Conversation): Promise<void> {
+  await expectOk(
+    await apiFetch(`/messages/conversations/${conv.id}/me`, { method: 'DELETE' }),
+    'Suppression impossible',
+  )
+}
+
 // --- Messages ----------------------------------------------------------------
 
 /** Déchiffre un message brut avec la CK d'une conversation (échec → texte vide). */
@@ -528,6 +562,31 @@ export function buildMessagePage(messages: ChatMessage[], limit: number): Messag
 }
 
 /**
+ * Position de la ligne « Nouveaux messages » dans un fil : id du 1ᵉʳ message
+ * non-lu qui n'est PAS le mien, à partir de l'ancre (= dernier message lu,
+ * capturé à l'ouverture). Fonction PURE (testée).
+ *
+ *   - `null` si pas d'ancre (1re ouverture) ou si rien de nouveau ;
+ *   - si l'ancre est dans la page : 1ᵉʳ message d'autrui après elle ;
+ *   - sinon (ancre plus ancienne que la page) : 1ᵉʳ message d'autrui plus récent
+ *     que l'ancre (les ids ObjectId sont ordonnés par création).
+ */
+export function computeDivider(messages: ChatMessage[], anchor: string | null): string | null {
+  if (!anchor) return null
+  const idx = messages.findIndex((m) => m.id === anchor)
+  if (idx >= 0) {
+    for (let j = idx + 1; j < messages.length; j++) {
+      if (!messages[j].mine) return messages[j].id
+    }
+    return null
+  }
+  for (const m of messages) {
+    if (m.id > anchor && !m.mine) return m.id
+  }
+  return null
+}
+
+/**
  * Charge une page de messages pour le défilement infini : la plus récente sans
  * `beforeId`, sinon les messages ANTÉRIEURS au curseur (scroll vers le haut).
  * Pagination par CURSEUR (et non offset) : stable même quand de nouveaux
@@ -558,6 +617,42 @@ export async function sendMessage(conv: Conversation, text: string): Promise<Cha
   return decryptMessage(conv, created, currentUserId())
 }
 
+// --- Recherche dans une conversation (côté client, E2EE) --------------------
+
+/** Taille de page et borne de sécurité pour la récupération de l'historique. */
+const HISTORY_PAGE = 50
+const MAX_HISTORY_PAGES = 40 // ~2000 messages max (garde-fou anti-boucle/charge)
+
+/**
+ * Récupère TOUT l'historique déchiffré d'une conversation (du plus ancien au
+ * plus récent), en paginant par curseur. Borné par `MAX_HISTORY_PAGES`.
+ *
+ * Nécessaire car la recherche est **forcément côté client** : le serveur ne voit
+ * que du chiffré (DM/groupes) et n'expose aucune recherche de messages.
+ */
+export async function listAllMessages(conv: Conversation): Promise<ChatMessage[]> {
+  let all: ChatMessage[] = []
+  let before: string | undefined
+  for (let i = 0; i < MAX_HISTORY_PAGES; i++) {
+    const page = await listMessagesPage(conv, HISTORY_PAGE, before)
+    all = [...page.messages, ...all] // les pages antérieures se préfixent
+    if (!page.hasMore || !page.oldestId) break
+    before = page.oldestId
+  }
+  return all
+}
+
+/**
+ * Filtre des messages par sous-chaîne (insensible à la casse). Ignore les
+ * messages non déchiffrés (clé absente). Fonction PURE (testée). Conserve l'ordre
+ * d'entrée (l'appelant décide du sens d'affichage).
+ */
+export function searchMessages(messages: ChatMessage[], query: string): ChatMessage[] {
+  const q = query.trim().toLowerCase()
+  if (!q) return []
+  return messages.filter((m) => m.decrypted && m.text.toLowerCase().includes(q))
+}
+
 // --- Temps réel (WebSocket) --------------------------------------------------
 
 /**
@@ -576,11 +671,26 @@ export interface RealtimeHandle {
 }
 
 /**
- * Ouvre la connexion temps réel et appelle `onMessage` pour chaque nouveau
- * message (brut, chiffré — à déchiffrer via `decryptMessage` avec la bonne
- * conversation). Reconnexion automatique simple en cas de coupure.
+ * Événement temps réel NON-message (changement de rôle, renommage, ajout/retrait
+ * de membre, suppression de conversation). `data` est un objet libre dont les
+ * champs dépendent du type (`conversation_id`/`id`, `user_id`, `role`…).
  */
-export function connectRealtime(onMessage: (raw: ApiMessage) => void): RealtimeHandle {
+export interface RealtimeEvent {
+  type: string
+  data: Record<string, unknown> | null
+}
+
+/**
+ * Ouvre la connexion temps réel. `onMessage` reçoit chaque nouveau message (brut,
+ * chiffré — à déchiffrer via `decryptMessage`). `onEvent` (optionnel) reçoit les
+ * autres événements (rôle/membres/conversation) pour resynchroniser la vue —
+ * sans lui, la personne promue ne verrait pas son rôle changer avant un reload.
+ * Reconnexion automatique simple en cas de coupure.
+ */
+export function connectRealtime(
+  onMessage: (raw: ApiMessage) => void,
+  onEvent?: (evt: RealtimeEvent) => void,
+): RealtimeHandle {
   let socket: WebSocket | null = null
   let closedByUs = false
   let retry = 0
@@ -592,8 +702,14 @@ export function connectRealtime(onMessage: (raw: ApiMessage) => void): RealtimeH
 
     socket.onmessage = (event) => {
       try {
-        const payload = JSON.parse(event.data as string) as { type?: string; data?: ApiMessage }
-        if (payload.type === 'message' && payload.data) onMessage(payload.data)
+        const payload = JSON.parse(event.data as string) as { type?: string; data?: unknown }
+        if (payload.type === 'message' && payload.data) {
+          onMessage(payload.data as ApiMessage)
+          return
+        }
+        if (payload.type) {
+          onEvent?.({ type: payload.type, data: (payload.data as Record<string, unknown>) ?? null })
+        }
       } catch {
         // message non-JSON : ignoré
       }

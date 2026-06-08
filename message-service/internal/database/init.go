@@ -127,7 +127,10 @@ var validators = map[string]bson.M{
 				"user_id":         bson.M{"bsonType": "string"},
 				"role":            bson.M{"bsonType": "string", "enum": bson.A{"owner", "admin", "talker", "viewer"}},
 				"key_envelope":    bson.M{"bsonType": bson.A{"string", "null"}},
-				"created_at":      bson.M{"bsonType": "date"},
+				// État par-utilisateur (optionnel) : épinglage + suppression côté user.
+				"pinned_at":  bson.M{"bsonType": bson.A{"date", "null"}},
+				"cleared_at": bson.M{"bsonType": bson.A{"date", "null"}},
+				"created_at": bson.M{"bsonType": "date"},
 			},
 		},
 	},

@@ -516,7 +516,9 @@ func (s *MessageService) ListMembers(ctx context.Context, conversationID, actorI
 }
 
 // ListConversations renvoie les conversations de l'utilisateur (avec SON
-// enveloppe et SON rôle), triées par activité décroissante.
+// enveloppe, SON rôle, SON épinglage), triées « épinglées d'abord » puis par
+// activité décroissante. Les conversations « supprimées côté user » (`cleared_at`)
+// sans message plus récent sont masquées (elles réapparaissent au prochain message).
 func (s *MessageService) ListConversations(ctx context.Context, userID string) ([]models.ConversationView, error) {
 	memberships, err := s.repo.ListMembersByUser(ctx, userID)
 	if err != nil {
@@ -533,13 +535,53 @@ func (s *MessageService) ListConversations(ctx context.Context, userID string) (
 		if err != nil {
 			continue // conversation supprimée → on ignore l'appartenance orpheline
 		}
+		// Supprimée côté user : masquée tant qu'aucun message n'est postérieur.
+		if m.ClearedAt != nil {
+			hasNewer, herr := s.repo.HasMessagesAfter(ctx, m.ConversationID, *m.ClearedAt)
+			if herr == nil && !hasNewer {
+				continue
+			}
+		}
 		views = append(views, buildView(conv, &m))
 	}
 
-	sort.Slice(views, func(i, j int) bool {
-		return views[i].UpdatedAt.After(views[j].UpdatedAt)
+	sort.SliceStable(views, func(i, j int) bool {
+		return convLess(views[i], views[j])
 	})
 	return views, nil
+}
+
+// PinConversation (dés)épingle une conversation pour l'utilisateur (membre requis)
+// et renvoie la vue à jour.
+func (s *MessageService) PinConversation(ctx context.Context, conversationID, userID string, pinned bool) (*models.ConversationView, error) {
+	if _, err := s.requireMember(ctx, conversationID, userID); err != nil {
+		return nil, err
+	}
+	var at *time.Time
+	if pinned {
+		now := time.Now()
+		at = &now
+	}
+	if err := s.repo.SetMemberPinned(ctx, conversationID, userID, at); err != nil {
+		return nil, translateNotFound(err)
+	}
+	conv, err := s.getConversationByID(ctx, conversationID)
+	if err != nil {
+		return nil, err
+	}
+	return s.viewFor(ctx, conv, userID)
+}
+
+// ClearConversation « supprime » la conversation côté user : masque + coupe
+// l'historique (membre requis). N'affecte pas les autres membres.
+func (s *MessageService) ClearConversation(ctx context.Context, conversationID, userID string) error {
+	if _, err := s.requireMember(ctx, conversationID, userID); err != nil {
+		return err
+	}
+	if err := s.repo.SetMemberCleared(ctx, conversationID, userID, time.Now()); err != nil {
+		return translateNotFound(err)
+	}
+	return nil
 }
 
 // GetConversation renvoie la vue d'une conversation pour un membre (403 sinon).
@@ -557,9 +599,12 @@ func (s *MessageService) GetConversation(ctx context.Context, conversationID, us
 
 // --- Messages ----------------------------------------------------------------
 
-// ListMessages renvoie une page de messages (réservée aux membres).
+// ListMessages renvoie une page de messages (réservée aux membres). Si le membre
+// a « supprimé côté user » la conversation (`cleared_at`), l'historique est coupé
+// à cette date (on ne renvoie que les messages postérieurs).
 func (s *MessageService) ListMessages(ctx context.Context, conversationID, userID string, limit int64, beforeID string) ([]models.Message, error) {
-	if _, err := s.requireMember(ctx, conversationID, userID); err != nil {
+	member, err := s.requireMember(ctx, conversationID, userID)
+	if err != nil {
 		return nil, err
 	}
 
@@ -571,7 +616,7 @@ func (s *MessageService) ListMessages(ctx context.Context, conversationID, userI
 		}
 		before = &oid
 	}
-	return s.repo.ListMessages(ctx, conversationID, clampLimit(limit), before)
+	return s.repo.ListMessages(ctx, conversationID, clampLimit(limit), before, member.ClearedAt)
 }
 
 // SendMessage persiste un message chiffré (membre + droit d'écriture requis) et
@@ -716,6 +761,20 @@ func canWrite(role string) bool {
 	}
 }
 
+// convLess ordonne deux conversations pour la liste : épinglées d'abord (par
+// date d'épinglage décroissante), puis par activité décroissante. Fonction PURE
+// (testée). `a` passe avant `b` si la fonction renvoie true.
+func convLess(a, b models.ConversationView) bool {
+	ap, bp := a.PinnedAt != nil, b.PinnedAt != nil
+	if ap != bp {
+		return ap // l'épinglée passe devant la non-épinglée
+	}
+	if ap && bp && !a.PinnedAt.Equal(*b.PinnedAt) {
+		return a.PinnedAt.After(*b.PinnedAt) // épinglée la plus récente d'abord
+	}
+	return a.UpdatedAt.After(b.UpdatedAt)
+}
+
 // buildView assemble la vue renvoyée au client (conversation + données du membre).
 func buildView(conv *models.Conversation, m *models.Member) models.ConversationView {
 	v := models.ConversationView{
@@ -726,6 +785,7 @@ func buildView(conv *models.Conversation, m *models.Member) models.ConversationV
 		TitleNonce: conv.TitleNonce,
 		MyRole:     m.Role,
 		MyEnvelope: m.KeyEnvelope,
+		PinnedAt:   m.PinnedAt,
 		CreatedBy:  conv.CreatedBy,
 		CreatedAt:  conv.CreatedAt,
 		UpdatedAt:  conv.UpdatedAt,

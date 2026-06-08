@@ -56,6 +56,11 @@ func RegisterRoutes(
 
 				conv.POST("/join", convH.JoinCommunity) // rejoindre une communauté (viewer)
 
+				// État par-utilisateur (membre requis, pas de diffusion).
+				conv.PATCH("/pin", convH.PinConversation)    // épingler
+				conv.DELETE("/pin", convH.UnpinConversation) // désépingler
+				conv.DELETE("/me", convH.ClearConversation)  // supprimer côté user
+
 				conv.GET("/messages", convH.ListMessages)
 				conv.POST("/messages", convH.SendMessage)
 
