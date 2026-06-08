@@ -11,6 +11,7 @@ import {
   Mail,
   MoreHorizontal,
   Search,
+  Settings,
   Settings2,
   Shield,
   User,
@@ -23,8 +24,6 @@ import { ROUTES } from '@/lib/routes'
 import { useT } from '@/components/language-provider'
 import type { ProfilDetails, UserRole } from '@/types'
 import { CreatePostDialog } from '@/components/feed/create-post-dialog'
-import { LanguageSelector } from '@/components/language-selector'
-import { ThemeToggle } from '@/components/theme-toggle'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import {
@@ -174,16 +173,8 @@ export function SidebarLeft({ role, username = 'Utilisateur' }: SidebarLeftProps
         </CreatePostDialog>
       </div>
 
-      {/* Bas de la sidebar : sélecteur de thème + menu utilisateur */}
+      {/* Bas de la sidebar : menu utilisateur */}
       <div className="flex flex-col gap-2">
-        {/* Sélecteur de langue (au-dessus) + interrupteur clair/sombre (même
-            composants que le tiroir mobile), posés sur un panneau pastel pour
-            s'accorder à la card user. */}
-        <div className="panel rounded-2xl border px-1 py-1 shadow-sm">
-          <LanguageSelector />
-          <ThemeToggle />
-        </div>
-
         {/* User menu : identité réelle chargée via profil-service */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -213,6 +204,12 @@ export function SidebarLeft({ role, username = 'Utilisateur' }: SidebarLeftProps
               </span>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <Link href={ROUTES.parametres}>
+                <Settings className="mr-2 h-4 w-4" />
+                {t('nav.settings')}
+              </Link>
+            </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => void logout()}>
               <LogOut className="mr-2 h-4 w-4" />
               {t('common.logout')}
