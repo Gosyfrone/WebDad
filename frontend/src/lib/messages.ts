@@ -393,6 +393,45 @@ export async function listMessages(
   return (raw ?? []).map((m) => decryptMessage(conv, m, myId))
 }
 
+/** Page de messages prête pour le défilement infini (curseur + « y a-t-il plus ? »). */
+export interface MessagePage {
+  /** Messages de la page, du plus ancien au plus récent (à préfixer à la liste). */
+  messages: ChatMessage[]
+  /** Reste-t-il des messages plus anciens à charger ? (false = haut atteint) */
+  hasMore: boolean
+  /** Curseur à repasser en `beforeId` pour la page d'avant (null si page vide). */
+  oldestId: string | null
+}
+
+/**
+ * Assemble une page paginée à partir des messages chargés. Logique PURE (testée)
+ * : `hasMore` = la page est pleine (donc il en reste probablement) ; `oldestId`
+ * = le plus ancien message (les messages sont triés croissant), curseur de la
+ * page suivante.
+ */
+export function buildMessagePage(messages: ChatMessage[], limit: number): MessagePage {
+  return {
+    messages,
+    hasMore: messages.length === limit,
+    oldestId: messages.length > 0 ? messages[0].id : null,
+  }
+}
+
+/**
+ * Charge une page de messages pour le défilement infini : la plus récente sans
+ * `beforeId`, sinon les messages ANTÉRIEURS au curseur (scroll vers le haut).
+ * Pagination par CURSEUR (et non offset) : stable même quand de nouveaux
+ * messages arrivent en temps réel. Brancher `oldestId` → `beforeId` du prochain
+ * appel, et s'arrêter quand `hasMore` est false.
+ */
+export async function listMessagesPage(
+  conv: Conversation,
+  limit = 30,
+  beforeId?: string,
+): Promise<MessagePage> {
+  return buildMessagePage(await listMessages(conv, limit, beforeId), limit)
+}
+
 /** Chiffre et envoie un message ; renvoie le message (déchiffré localement). */
 export async function sendMessage(conv: Conversation, text: string): Promise<ChatMessage> {
   if (!conv.contentKey) {
