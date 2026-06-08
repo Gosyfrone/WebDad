@@ -104,6 +104,39 @@ func (h *PostHandler) UpdatePost(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": post})
 }
 
+// PinPost : PATCH /posts/:id/pin — réservé à l'auteur du post. L'épinglage
+// est persistant et visible par tous sur le profil public.
+func (h *PostHandler) PinPost(c *gin.Context) {
+	claims, ok := middleware.ClaimsFrom(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "claims absents"})
+		return
+	}
+
+	post, err := h.service.PinPost(c.Request.Context(), c.Param("id"), claims.UserID)
+	if err != nil {
+		respondPostError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": post})
+}
+
+// UnpinPost : DELETE /posts/:id/pin — réservé à l'auteur du post.
+func (h *PostHandler) UnpinPost(c *gin.Context) {
+	claims, ok := middleware.ClaimsFrom(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "claims absents"})
+		return
+	}
+
+	post, err := h.service.UnpinPost(c.Request.Context(), c.Param("id"), claims.UserID)
+	if err != nil {
+		respondPostError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": post})
+}
+
 // DeletePost : DELETE /posts/:id — réservé à l'auteur (ou modérateur/admin).
 func (h *PostHandler) DeletePost(c *gin.Context) {
 	claims, ok := middleware.ClaimsFrom(c)

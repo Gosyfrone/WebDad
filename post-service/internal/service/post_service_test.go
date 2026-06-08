@@ -42,6 +42,21 @@ func TestCanModifyNilPost(t *testing.T) {
 	}
 }
 
+// TestCanPin : l'épinglage est réservé à l'auteur, même si l'acteur tiers est
+// modérateur/admin (personnalisation du profil, pas modération).
+func TestCanPin(t *testing.T) {
+	post := &models.Post{AuthorID: "author-1"}
+	if !canPin(post, "author-1") {
+		t.Fatal("l'auteur doit pouvoir épingler son post")
+	}
+	if canPin(post, "admin-1") {
+		t.Fatal("un tiers ne doit pas pouvoir épingler le post d'un autre")
+	}
+	if canPin(nil, "author-1") {
+		t.Fatal("canPin(nil, …) doit être false")
+	}
+}
+
 // TestCanAct : règle commune posts/commentaires — auteur ou mod/admin. PURE.
 func TestCanAct(t *testing.T) {
 	cases := []struct {

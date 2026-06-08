@@ -90,6 +90,45 @@ func (s *PostService) UpdatePost(ctx context.Context, id, content, actorID, acto
 	return updated, translateNotFound(err)
 }
 
+// PinPost épingle un post sur le profil de son auteur. Contrairement à la
+// suppression/édition, les modérateurs/admins ne peuvent pas épingler à la
+// place de l'auteur : c'est un choix de profil personnel.
+func (s *PostService) PinPost(ctx context.Context, id, actorID string) (*models.Post, error) {
+	oid, err := parseID(id)
+	if err != nil {
+		return nil, err
+	}
+	post, err := s.repo.Get(ctx, oid)
+	if err != nil {
+		return nil, translateNotFound(err)
+	}
+	if !canPin(post, actorID) {
+		return nil, ErrForbidden
+	}
+	if err := s.repo.UnpinByAuthor(ctx, post.AuthorID); err != nil {
+		return nil, err
+	}
+	pinned, err := s.repo.Pin(ctx, oid, time.Now())
+	return pinned, translateNotFound(err)
+}
+
+// UnpinPost retire l'épinglage d'un post. Seul l'auteur peut le faire.
+func (s *PostService) UnpinPost(ctx context.Context, id, actorID string) (*models.Post, error) {
+	oid, err := parseID(id)
+	if err != nil {
+		return nil, err
+	}
+	post, err := s.repo.Get(ctx, oid)
+	if err != nil {
+		return nil, translateNotFound(err)
+	}
+	if !canPin(post, actorID) {
+		return nil, ErrForbidden
+	}
+	unpinned, err := s.repo.Unpin(ctx, oid)
+	return unpinned, translateNotFound(err)
+}
+
 // DeletePost supprime un post si l'acteur en a le droit, puis purge ses likes
 // et commentaires (best-effort, pour ne pas laisser d'orphelins).
 func (s *PostService) DeletePost(ctx context.Context, id, actorID, actorRole string) error {
@@ -313,6 +352,12 @@ func canModify(post *models.Post, actorID, actorRole string) bool {
 		return false
 	}
 	return canAct(post.AuthorID, actorID, actorRole)
+}
+
+// canPin : l'épinglage est une action de personnalisation du profil, réservée
+// à l'auteur du post.
+func canPin(post *models.Post, actorID string) bool {
+	return post != nil && post.AuthorID == actorID
 }
 
 // canAct : règle d'autorisation commune (posts ET commentaires) — l'auteur, un

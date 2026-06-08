@@ -24,6 +24,16 @@ function mergeUnique(current: FeedPost[], incoming: FeedPost[]): FeedPost[] {
   return [...current, ...incoming.filter((p) => !seen.has(p.id))]
 }
 
+function applyPostUpdate(current: FeedPost[], updated: FeedPost): FeedPost[] {
+  return current.map((post) => {
+    if (post.id === updated.id) return updated
+    if (updated.isPinned && post.author.id === updated.author.id) {
+      return { ...post, isPinned: false, pinnedAt: '' }
+    }
+    return post
+  })
+}
+
 /**
  * Corps du fil d'actualité : en-tête sticky, onglets « Pour toi » /
  * « Abonnements », zone de composition, puis la liste de l'onglet actif.
@@ -95,10 +105,20 @@ export function FeedView() {
   })
 
   // Un nouveau post (composer inline ou popup sidebar) est prépendu au fil.
-  useEffect(() => subscribePostCreated((post) => setPosts((prev) => [post, ...prev])), [])
+  useEffect(
+    () =>
+      subscribePostCreated((post) =>
+        setPosts((prev) => [post, ...applyPostUpdate(prev, post)]),
+      ),
+    [],
+  )
 
   const handleDeleted = useCallback((id: string) => {
     setPosts((prev) => prev.filter((p) => p.id !== id))
+  }, [])
+
+  const handleUpdated = useCallback((post: FeedPost) => {
+    setPosts((prev) => applyPostUpdate(prev, post))
   }, [])
 
   return (
@@ -146,7 +166,12 @@ export function FeedView() {
         <>
           <div className="divide-y divide-border">
             {posts.map((post) => (
-              <PostCard key={post.id} post={post} onDeleted={handleDeleted} />
+              <PostCard
+                key={post.id}
+                post={post}
+                onDeleted={handleDeleted}
+                onUpdated={handleUpdated}
+              />
             ))}
           </div>
           {/* Sentinelle de défilement infini + indicateur de chargement. */}

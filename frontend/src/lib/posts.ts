@@ -31,6 +31,7 @@ interface ApiPost {
   content: string
   likes_count: number
   comments_count: number
+  pinned_at?: string
   created_at: string
 }
 
@@ -72,11 +73,15 @@ export interface FeedPost {
   content: string
   likesCount: number
   commentsCount: number
+  pinnedAt: string
   createdAt: string
+  isPinned: boolean
   /** L'utilisateur courant a-t-il liké ce post ? */
   liked: boolean
   /** L'utilisateur courant peut-il supprimer (auteur ou mod/admin) ? */
   canDelete: boolean
+  /** L'utilisateur courant peut-il épingler/désépingler ce post ? */
+  canPin: boolean
 }
 
 /** Commentaire enrichi pour l'affichage. */
@@ -190,9 +195,12 @@ async function toFeedPost(p: ApiPost, likedIds: Set<string>): Promise<FeedPost> 
     content: p.content,
     likesCount: p.likes_count ?? 0,
     commentsCount: p.comments_count ?? 0,
+    pinnedAt: p.pinned_at ?? '',
     createdAt: p.created_at,
+    isPinned: Boolean(p.pinned_at),
     liked: likedIds.has(p.id),
     canDelete: canDelete(p.author_id),
+    canPin: currentUserId() === p.author_id,
   }
 }
 
@@ -262,6 +270,20 @@ export async function createPost(content: string): Promise<FeedPost> {
     }),
   )
   return toFeedPost(created, new Set())
+}
+
+/** Épingle un post sur le profil de l'auteur courant ; renvoie le post à jour. */
+export async function pinPost(id: string): Promise<FeedPost> {
+  const updated = await unwrap<ApiPost>(await apiFetch(`/posts/${id}/pin`, { method: 'PATCH' }))
+  const likedIds = await getLikedIds()
+  return toFeedPost(updated, likedIds)
+}
+
+/** Désépingle un post ; renvoie le post à jour. */
+export async function unpinPost(id: string): Promise<FeedPost> {
+  const updated = await unwrap<ApiPost>(await apiFetch(`/posts/${id}/pin`, { method: 'DELETE' }))
+  const likedIds = await getLikedIds()
+  return toFeedPost(updated, likedIds)
 }
 
 /** Supprime un post (auteur ou mod/admin côté back). */

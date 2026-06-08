@@ -20,6 +20,25 @@ interface ProfilViewProps {
   username?: string
 }
 
+function sortProfilePosts(posts: FeedPost[]): FeedPost[] {
+  return [...posts].sort((a, b) => {
+    if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  })
+}
+
+function applyPostUpdate(current: FeedPost[], updated: FeedPost): FeedPost[] {
+  return sortProfilePosts(
+    current.map((post) => {
+      if (post.id === updated.id) return updated
+      if (updated.isPinned && post.author.id === updated.author.id) {
+        return { ...post, isPinned: false, pinnedAt: '' }
+      }
+      return post
+    }),
+  )
+}
+
 /**
  * Corps de la page profil : en-tête sticky (retour + nb de posts), en-tête de
  * profil éditable, onglets, puis la liste de posts de l'onglet actif.
@@ -83,6 +102,10 @@ export function ProfilView({ username }: ProfilViewProps) {
 
   function handleDeleted(id: string) {
     setPosts((prev) => prev.filter((p) => p.id !== id))
+  }
+
+  function handleUpdated(post: FeedPost) {
+    setPosts((prev) => applyPostUpdate(prev, post))
   }
 
   async function handleEdit(fields: ProfilEditableFields) {
@@ -162,7 +185,7 @@ export function ProfilView({ username }: ProfilViewProps) {
         posts.length > 0 ? (
           <div className="divide-y divide-border">
             {posts.map((post) => (
-              <PostCard key={post.id} post={post} onDeleted={handleDeleted} />
+              <PostCard key={post.id} post={post} onDeleted={handleDeleted} onUpdated={handleUpdated} />
             ))}
           </div>
         ) : (

@@ -23,8 +23,14 @@ func EnsureSchema(ctx context.Context, db *mongo.Database) error {
 	return ensureIndexes(ctx, db)
 }
 
-// ensureCollections crée les collections manquantes avec leur validateur.
-// (Une collection déjà présente est laissée telle quelle.)
+// ensureCollections crée les collections manquantes avec leur validateur, et
+// resynchronise le validateur des collections déjà présentes (`collMod`).
+//
+// Le service possède son schéma : il ne se contente pas de le poser à la
+// création, il le MAINTIENT à chaque démarrage. Sans le `collMod`, un volume
+// créé par une version antérieure conserverait indéfiniment son ancien
+// validateur (ex. un schéma `posts` sans `pinned_at`) → les écritures conformes
+// au schéma courant échoueraient.
 func ensureCollections(ctx context.Context, db *mongo.Database) error {
 	existing, err := db.ListCollectionNames(ctx, bson.M{})
 	if err != nil {
@@ -37,12 +43,27 @@ func ensureCollections(ctx context.Context, db *mongo.Database) error {
 
 	for _, name := range collectionOrder {
 		if have[name] {
+			if err := updateValidator(ctx, db, name); err != nil {
+				return err
+			}
 			continue
 		}
 		opts := options.CreateCollection().SetValidator(validators[name])
 		if err := db.CreateCollection(ctx, name, opts); err != nil {
 			return fmt.Errorf("création collection %q : %w", name, err)
 		}
+	}
+	return nil
+}
+
+// updateValidator aligne le validateur d'une collection existante avec le
+// schéma courant. `collMod` est idempotent si le validateur est déjà à jour.
+func updateValidator(ctx context.Context, db *mongo.Database, name string) error {
+	if _, err := db.RunCommand(ctx, bson.D{
+		{Key: "collMod", Value: name},
+		{Key: "validator", Value: validators[name]},
+	}).Raw(); err != nil {
+		return fmt.Errorf("mise à jour validateur %q : %w", name, err)
 	}
 	return nil
 }
@@ -78,6 +99,7 @@ var validators = map[string]bson.M{
 				"likes_count":    bson.M{"bsonType": "int", "minimum": 0},
 				"comments_count": bson.M{"bsonType": "int", "minimum": 0},
 				"reports_count":  bson.M{"bsonType": "int", "minimum": 0},
+				"pinned_at":      bson.M{"bsonType": bson.A{"date", "null"}},
 				"created_at":     bson.M{"bsonType": "date"},
 				"updated_at":     bson.M{"bsonType": "date"},
 			},
@@ -130,6 +152,7 @@ var indexes = map[string][]mongo.IndexModel{
 	"posts": {
 		{Keys: bson.D{{Key: "author_id", Value: 1}}},
 		{Keys: bson.D{{Key: "created_at", Value: -1}}}, // tri fil d'actu
+		{Keys: bson.D{{Key: "author_id", Value: 1}, {Key: "pinned_at", Value: -1}, {Key: "created_at", Value: -1}}},
 		{Keys: bson.D{{Key: "is_hidden", Value: 1}}},
 	},
 	"comments": {

@@ -252,6 +252,42 @@
   }
 }
 
+@layer utilities {
+  @keyframes heart-pop {
+    0% {
+      transform: scale(1);
+    }
+    42% {
+      transform: scale(1.45) rotate(-10deg);
+    }
+    70% {
+      transform: scale(0.92) rotate(5deg);
+    }
+    100% {
+      transform: scale(1);
+    }
+  }
+
+  @keyframes like-burst {
+    0% {
+      opacity: 0.9;
+      transform: scale(0.2);
+    }
+    100% {
+      opacity: 0;
+      transform: scale(1.6);
+    }
+  }
+
+  .animate-heart-pop {
+    animation: heart-pop 360ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  .animate-like-burst {
+    animation: like-burst 420ms ease-out forwards;
+  }
+}
+
 @layer base {
   * {
     @apply border-border;

@@ -1,11 +1,11 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Image as ImageIcon, Smile, BarChart2, Loader2 } from 'lucide-react'
+import { Image as ImageIcon, Smile, BarChart2, Loader2, Pin } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import { getMyProfil, subscribeProfilUpdated } from '@/lib/profil-client'
-import { createPost, notifyPostCreated } from '@/lib/posts'
+import { createPost, notifyPostCreated, pinPost } from '@/lib/posts'
 import { useToast } from '@/hooks/use-toast'
 import type { ProfilDetails } from '@/types'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -44,6 +44,7 @@ export function PostComposer({
   const [avatarUrl, setAvatarUrl] = useState('')
   const [initial, setInitial] = useState('U')
   const [submitting, setSubmitting] = useState(false)
+  const [pinOnProfile, setPinOnProfile] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const remaining = MAX_CHARS - content.length
   const isEmpty = content.trim().length === 0
@@ -70,10 +71,12 @@ export function PostComposer({
     if (isEmpty || isOver || submitting) return
     setSubmitting(true)
     try {
-      const post = await createPost(content.trim())
+      const created = await createPost(content.trim())
+      const post = pinOnProfile ? await pinPost(created.id) : created
       notifyPostCreated(post) // le fil prépend sans refetch
       onPosted?.(content)
       setContent('')
+      setPinOnProfile(false)
     } catch {
       toast({ title: 'Publication impossible', variant: 'destructive' })
     } finally {
@@ -132,6 +135,18 @@ export function PostComposer({
               </button>
             </EmojiPicker>
             <ActionIcon icon={BarChart2} label="Ajouter un sondage" />
+            <button
+              type="button"
+              aria-label="Épingler sur mon profil"
+              aria-pressed={pinOnProfile}
+              onClick={() => setPinOnProfile((v) => !v)}
+              className={cn(
+                'rounded-full p-2 transition-colors hover:bg-primary/10',
+                pinOnProfile && 'bg-primary/10 text-primary',
+              )}
+            >
+              <Pin className={cn('h-5 w-5', pinOnProfile && 'fill-current')} />
+            </button>
           </div>
 
           <div className="flex items-center gap-3">

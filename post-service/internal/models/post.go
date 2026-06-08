@@ -26,6 +26,7 @@ type Post struct {
 	Content       string        `bson:"content" json:"content"`
 	LikesCount    int32         `bson:"likes_count" json:"likes_count"`
 	CommentsCount int32         `bson:"comments_count" json:"comments_count"`
+	PinnedAt      *time.Time    `bson:"pinned_at,omitempty" json:"pinned_at,omitempty"`
 	CreatedAt     time.Time     `bson:"created_at" json:"created_at"`
 	UpdatedAt     time.Time     `bson:"updated_at" json:"updated_at"`
 }
