@@ -4,6 +4,7 @@ import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+const SHOW_DELAY_MS = 700
 const MIN_VISIBLE_MS = 450
 const MAX_VISIBLE_MS = 5000
 
@@ -39,10 +40,16 @@ export function NavigationLoader() {
   const [visible, setVisible] = useState(false)
   const visibleRef = useRef(false)
   const startedAtRef = useRef(0)
+  const showTimerRef = useRef<number | null>(null)
   const hideTimerRef = useRef<number | null>(null)
   const fallbackTimerRef = useRef<number | null>(null)
 
   const clearTimers = useCallback(() => {
+    if (showTimerRef.current !== null) {
+      window.clearTimeout(showTimerRef.current)
+      showTimerRef.current = null
+    }
+
     if (hideTimerRef.current !== null) {
       window.clearTimeout(hideTimerRef.current)
       hideTimerRef.current = null
@@ -74,13 +81,18 @@ export function NavigationLoader() {
       }
 
       clearTimers()
-      startedAtRef.current = window.performance.now()
-      visibleRef.current = true
-      setVisible(true)
+      visibleRef.current = false
+      setVisible(false)
 
-      fallbackTimerRef.current = window.setTimeout(() => {
-        hideLoader()
-      }, MAX_VISIBLE_MS)
+      showTimerRef.current = window.setTimeout(() => {
+        startedAtRef.current = window.performance.now()
+        visibleRef.current = true
+        setVisible(true)
+
+        fallbackTimerRef.current = window.setTimeout(() => {
+          hideLoader()
+        }, MAX_VISIBLE_MS)
+      }, SHOW_DELAY_MS)
     }
 
     document.addEventListener('click', handleClick, true)
@@ -92,6 +104,11 @@ export function NavigationLoader() {
   }, [clearTimers, hideLoader])
 
   useEffect(() => {
+    if (!visibleRef.current && showTimerRef.current !== null) {
+      hideLoader()
+      return
+    }
+
     if (!visibleRef.current) {
       return
     }
