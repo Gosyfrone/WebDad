@@ -1,0 +1,142 @@
+/**
+ * Client d'administration (réservé au rôle administrateur).
+ *
+ * L'annuaire a pour BASE l'auth-service (`GET /auth/users`), source faisant
+ * autorité pour le rôle et l'état du compte (`is_active` = login autorisé).
+ * L'identité visible (username, nom affiché, avatar) est ENRICHIE côté front
+ * depuis user-service + profil-service (`resolveUser`, mémoïsé) — même pattern
+ * cross-service que la recherche de comptes (cf. CLAUDE.md §5).
+ *
+ * « Bannir » = bloquer le login (auth) ET masquer le compte (user) : deux
+ * écritures orchestrées ici (une donnée = un service). Le changement de rôle
+ * ne prend effet dans le JWT qu'au prochain /refresh de l'utilisateur ciblé.
+ *
+ * ⚠️ À usage CLIENT uniquement (`apiFetch` lit le token en localStorage).
+ */
+
+import { apiFetch } from '@/lib/auth-client'
+import { mapRole } from '@/lib/session'
+import { resolveUser } from '@/lib/user-cache'
+import type { UserRole } from '@/types'
+
+/** Erreur d'appel API admin portant le code HTTP. */
+export class AdminApiError extends Error {
+  status: number
+  constructor(message: string, status: number) {
+    super(message)
+    this.name = 'AdminApiError'
+    this.status = status
+  }
+}
+
+/** Compte vu par l'admin : identité auth + enrichissement user/profil. */
+export interface AdminUser {
+  id: string
+  email: string
+  role: UserRole
+  /** Compte actif = peut se connecter. `false` = banni (login bloqué). */
+  isActive: boolean
+  createdAt: string
+  username: string
+  displayName: string
+  avatarUrl: string
+}
+
+interface ApiAuthUser {
+  id: string
+  email: string
+  role: string
+  is_active: boolean
+  created_at: string
+}
+
+/** Rôle front → rôle back (`administrator` ⇒ `admin` ; les autres identiques). */
+function toBackendRole(role: UserRole): string {
+  return role === 'administrator' ? 'admin' : role
+}
+
+async function unwrap<T>(res: Response): Promise<T> {
+  const body = (await res.json().catch(() => null)) as
+    | { data?: T; error?: string }
+    | null
+  if (!res.ok) {
+    throw new AdminApiError(body?.error ?? `Erreur ${res.status}`, res.status)
+  }
+  return (body?.data ?? null) as T
+}
+
+async function expectOk(res: Response): Promise<void> {
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as { error?: string } | null
+    throw new AdminApiError(body?.error ?? `Erreur ${res.status}`, res.status)
+  }
+}
+
+/** Annuaire des comptes (admin). `query` filtre par email. */
+export async function listAdminUsers(
+  query = '',
+  limit = 50,
+  offset = 0,
+): Promise<AdminUser[]> {
+  const params = new URLSearchParams({
+    q: query,
+    limit: String(limit),
+    offset: String(offset),
+  })
+  const users = await unwrap<ApiAuthUser[]>(await apiFetch(`/auth/users?${params}`))
+
+  return Promise.all(
+    (users ?? []).map(async (u): Promise<AdminUser> => {
+      const resolved = await resolveUser(u.id)
+      return {
+        id: u.id,
+        email: u.email,
+        role: mapRole(u.role),
+        isActive: u.is_active,
+        createdAt: u.created_at,
+        username: resolved.username,
+        displayName: resolved.displayName,
+        avatarUrl: resolved.avatarUrl,
+      }
+    }),
+  )
+}
+
+/** Change le rôle d'un compte (effet au prochain refresh JWT de la cible). */
+export async function updateUserRole(id: string, role: UserRole): Promise<void> {
+  await expectOk(
+    await apiFetch(`/auth/users/${id}/role`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role: toBackendRole(role) }),
+    }),
+  )
+}
+
+/**
+ * Bannit (`banned=true`) ou réactive (`banned=false`) un compte. Orchestre les
+ * deux services : auth (bloque le login) PUIS user (masque le compte). L'ordre
+ * met l'effet critique (accès) en premier ; la visibilité suit.
+ */
+export async function setUserBanned(id: string, banned: boolean): Promise<void> {
+  const active = !banned
+  // 1) auth-service = verrou d'accès (login/refresh). Critique : on propage l'erreur.
+  await expectOk(
+    await apiFetch(`/auth/users/${id}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_active: active }),
+    }),
+  )
+  // 2) user-service = visibilité publique. Un 404 est toléré : un compte jamais
+  // provisionné côté user (inscrit mais jamais passé par /users/me) n'a ni
+  // posts ni profil → rien à masquer. Les autres erreurs sont propagées.
+  const res = await apiFetch(`/users/${id}/status`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ is_active: active }),
+  })
+  if (res.status !== 404) {
+    await expectOk(res)
+  }
+}

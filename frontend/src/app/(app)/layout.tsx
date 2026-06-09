@@ -5,7 +5,6 @@ import { MobileTabBar } from '@/components/layout/mobile-tab-bar'
 import { ComposeFab } from '@/components/layout/compose-fab'
 import { NotificationsProvider } from '@/components/notifications-provider'
 import { MessagesProvider } from '@/components/messages-provider'
-import type { UserRole } from '@/types'
 
 /**
  * Layout de l'espace authentifié, responsive (mobile-first).
@@ -15,11 +14,9 @@ import type { UserRole } from '@/types'
  *   - ≥ lg (iPad paysage, desktop) : colonne de navigation à gauche + contenu.
  *   - ≥ xl : ajout de la colonne de droite (suggestions / tendances).
  *
- * TODO (issue auth) : récupérer la session (JWT) côté serveur, en déduire
- * `role` / `username`, et rediriger vers /login si l'utilisateur n'est pas connecté.
+ * Le rôle réel est désormais dérivé du JWT par `useSession()` directement dans
+ * `SidebarLeft` / `MobileHeader` (cf. lib/session.ts) — plus de placeholder.
  */
-const PLACEHOLDER_ROLE: UserRole = 'administrator'
-
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <NotificationsProvider>
@@ -29,13 +26,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <div className="bg-page-glow-2 pointer-events-none fixed inset-0" />
 
           <div className="relative flex w-full max-w-[1265px]">
-            <SidebarLeft role={PLACEHOLDER_ROLE} />
+            <SidebarLeft />
 
             {/* Colonne centrale. overflow-x-clip : empêche tout défilement horizontal
                 parasite sur mobile (sans créer de conteneur de scroll, donc sans
                 casser les en-têtes sticky, contrairement à overflow-x-hidden). */}
             <div className="glass-column flex min-h-screen w-full min-w-0 flex-1 flex-col overflow-x-clip backdrop-blur-2xl lg:border-x">
-              <MobileHeader role={PLACEHOLDER_ROLE} />
+              <MobileHeader />
               {/* pb-16 : dégage la barre d'onglets fixe (masquée ≥ lg) */}
               <main className="flex-1 pb-16 lg:pb-0">{children}</main>
             </div>

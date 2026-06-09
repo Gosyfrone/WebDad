@@ -222,22 +222,30 @@ func (h *Handler) UpdateMe(c *gin.Context) {
 // @Failure     404 {object} map[string]string
 // @Router      /users/{id} [delete]
 func (h *Handler) Delete(c *gin.Context) {
-	claims, ok := middleware.ClaimsFrom(c)
-	if !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "claims absents"})
-		return
-	}
-	if claims.Role != models.RoleAdmin {
-		c.JSON(http.StatusForbidden, gin.H{"error": "réservé aux administrateurs"})
-		return
-	}
-
 	if err := h.users.SoftDelete(c.Param("id")); err != nil {
 		respondUserError(c, err)
 		return
 	}
 
 	c.Status(http.StatusNoContent)
+}
+
+// SetStatus : PATCH /users/:id/status — bannit/réactive un compte (admin via
+// middleware). Bascule la visibilité publique `users.is_active` ; le blocage
+// de connexion est porté par auth-service (PATCH /auth/users/:id/status).
+func (h *Handler) SetStatus(c *gin.Context) {
+	var req models.UpdateStatusRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "payload invalide : " + err.Error()})
+		return
+	}
+
+	if err := h.users.SetActive(c.Param("id"), *req.IsActive); err != nil {
+		respondUserError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"data": gin.H{"id": c.Param("id"), "is_active": *req.IsActive}})
 }
 
 // respondUserError mappe les erreurs métier vers des codes HTTP.

@@ -25,6 +25,8 @@ var (
 	ErrInvalidCredentials  = errors.New("email ou mot de passe invalide")
 	ErrUserInactive        = errors.New("compte désactivé")
 	ErrInvalidRefreshToken = errors.New("refresh token invalide ou expiré")
+	ErrUserNotFound        = errors.New("utilisateur introuvable")
+	ErrInvalidRole         = errors.New("rôle invalide (user, moderator ou admin)")
 )
 
 // defaultAdminID : UUID figé de l'admin par défaut, partagé avec les autres
@@ -213,6 +215,94 @@ func (s *AuthService) EnsureDefaultAdmin(email, password string) error {
 
 	if _, err := s.db.Exec(q, defaultAdminID, email, string(hash), models.RoleAdmin); err != nil {
 		return fmt.Errorf("seed admin : %w", err)
+	}
+	return nil
+}
+
+// ─── Administration (réservé aux comptes admin, garde côté handler/route) ───
+
+// ListUsers retourne une page de comptes (annuaire admin). `query` filtre par
+// email (sous-chaîne, insensible à la casse) ; vide = tous les comptes. Inclut
+// les comptes désactivés (l'admin doit voir les bannis).
+func (s *AuthService) ListUsers(limit, offset int, query string) ([]models.User, error) {
+	const q = `
+		SELECT id, email, role, is_active, created_at
+		FROM credentials
+		WHERE ($1 = '' OR email ILIKE '%' || $1 || '%')
+		ORDER BY created_at DESC
+		LIMIT $2 OFFSET $3`
+
+	rows, err := s.db.Query(q, query, limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("liste comptes : %w", err)
+	}
+	defer rows.Close()
+
+	users := make([]models.User, 0, limit)
+	for rows.Next() {
+		var u models.User
+		if err := rows.Scan(&u.ID, &u.Email, &u.Role, &u.IsActive, &u.CreatedAt); err != nil {
+			return nil, fmt.Errorf("lecture compte : %w", err)
+		}
+		users = append(users, u)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("parcours comptes : %w", err)
+	}
+	return users, nil
+}
+
+// SetRole change le rôle d'un compte (source de vérité du rôle = ce service).
+// La prise d'effet côté JWT est différée au prochain /refresh de l'utilisateur
+// (le token courant porte l'ancien rôle jusqu'à expiration ≤ jwtExpiry).
+func (s *AuthService) SetRole(id, role string) error {
+	if !validRole(role) {
+		return ErrInvalidRole
+	}
+	res, err := s.db.Exec(`UPDATE credentials SET role = $2 WHERE id = $1`, id, role)
+	if err != nil {
+		return fmt.Errorf("changement de rôle : %w", err)
+	}
+	return errIfNoRows(res)
+}
+
+// SetActive active/désactive un compte. Désactiver = bannir : bloque le login
+// ET le /refresh (cf. Login/Refresh), et on révoque immédiatement les refresh
+// tokens du compte pour tuer sa session courante au plus vite (sa session ne
+// survit alors qu'à l'access token en cours, ≤ jwtExpiry).
+func (s *AuthService) SetActive(id string, active bool) error {
+	res, err := s.db.Exec(`UPDATE credentials SET is_active = $2 WHERE id = $1`, id, active)
+	if err != nil {
+		return fmt.Errorf("changement d'état du compte : %w", err)
+	}
+	if err := errIfNoRows(res); err != nil {
+		return err
+	}
+	if !active {
+		// Révocation best-effort : l'échec ne doit pas annuler le bannissement.
+		_, _ = s.db.Exec(`DELETE FROM refresh_tokens WHERE user_id = $1`, id)
+	}
+	return nil
+}
+
+// validRole vérifie qu'un rôle fait partie de l'enum autorisé.
+func validRole(role string) bool {
+	switch role {
+	case models.RoleUser, models.RoleModerator, models.RoleAdmin:
+		return true
+	default:
+		return false
+	}
+}
+
+// errIfNoRows mappe « 0 ligne affectée » vers ErrUserNotFound.
+func errIfNoRows(res sql.Result) error {
+	n, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("lignes affectées : %w", err)
+	}
+	if n == 0 {
+		return ErrUserNotFound
 	}
 	return nil
 }

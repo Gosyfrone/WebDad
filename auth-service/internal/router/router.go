@@ -34,6 +34,15 @@ func New(auth *services.AuthService) *gin.Engine {
 		// /auth/validate est protégée : le middleware valide le JWT et
 		// pose les claims avant que le handler ne les renvoie.
 		authGroup.GET("/validate", middleware.JWTAuth(auth), h.Validate)
+
+		// Administration des comptes (rôle + bannissement). Garde : JWT valide
+		// + rôle admin. Source de vérité du rôle et de l'état du compte.
+		admin := authGroup.Group("/users", middleware.JWTAuth(auth), middleware.AdminOnly())
+		{
+			admin.GET("", h.ListUsers)
+			admin.PATCH("/:id/role", h.SetRole)
+			admin.PATCH("/:id/status", h.SetStatus)
+		}
 	}
 
 	return r

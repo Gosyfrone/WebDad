@@ -176,12 +176,18 @@ func (s *UserService) Update(id string, username *string) (*models.User, error) 
 
 // SoftDelete désactive un compte.
 func (s *UserService) SoftDelete(id string) error {
-	err := s.repo.SoftDelete(id)
+	return s.SetActive(id, false)
+}
+
+// SetActive active/désactive un compte (admin). Désactiver = masquer le compte
+// des listes/recherche publiques (le blocage de connexion vit dans auth-service).
+func (s *UserService) SetActive(id string, active bool) error {
+	err := s.repo.SetActive(id, active)
 	if errors.Is(err, sql.ErrNoRows) {
 		return ErrUserNotFound
 	}
 	if err != nil {
-		return fmt.Errorf("désactivation utilisateur : %w", err)
+		return fmt.Errorf("changement d'état utilisateur : %w", err)
 	}
 	return nil
 }

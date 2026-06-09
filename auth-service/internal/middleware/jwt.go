@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 
+	"github.com/webdad/auth-service/internal/models"
 	"github.com/webdad/auth-service/internal/services"
 )
 
@@ -49,6 +50,33 @@ func JWTAuth(auth *services.AuthService) gin.HandlerFunc {
 		}
 
 		c.Set("claims", claims)
+		c.Next()
+	}
+}
+
+// ClaimsFrom récupère les claims posés par JWTAuth dans le contexte.
+func ClaimsFrom(c *gin.Context) (*services.Claims, bool) {
+	val, exists := c.Get("claims")
+	if !exists {
+		return nil, false
+	}
+	claims, ok := val.(*services.Claims)
+	return claims, ok
+}
+
+// AdminOnly stoppe la requête (403) si l'utilisateur authentifié n'est pas
+// administrateur. À chaîner APRÈS JWTAuth (qui pose les claims).
+func AdminOnly() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		claims, ok := ClaimsFrom(c)
+		if !ok {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "claims absents"})
+			return
+		}
+		if claims.Role != models.RoleAdmin {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "réservé aux administrateurs"})
+			return
+		}
 		c.Next()
 	}
 }

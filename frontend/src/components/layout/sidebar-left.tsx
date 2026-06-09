@@ -21,6 +21,7 @@ import {
 import { cn } from '@/lib/utils'
 import { logout } from '@/lib/auth-client'
 import { getMyProfil, subscribeProfilUpdated } from '@/lib/profil-client'
+import { useSession } from '@/lib/session'
 import { ROUTES } from '@/lib/routes'
 import { useNotifications } from '@/components/notifications-provider'
 import { useMessages } from '@/components/messages-provider'
@@ -68,23 +69,21 @@ const NAV_ITEMS: NavItem[] = [
   },
 ]
 
-interface SidebarLeftProps {
-  role: UserRole | null
-  username?: string
-}
-
-export function SidebarLeft({ role, username = 'Utilisateur' }: SidebarLeftProps) {
+export function SidebarLeft() {
   const t = useT()
   const pathname = usePathname()
+  const session = useSession()
   const { unreadCount } = useNotifications()
   const { unreadCount: msgUnread } = useMessages()
   const [account, setAccount] = useState({
-    displayName: username,
-    username: username === 'Utilisateur' ? '' : username,
+    displayName: '',
+    username: '',
     avatarUrl: '',
-    role,
   })
 
+  // Rôle réel issu du JWT (cf. lib/session). `null` au 1er rendu (hydratation),
+  // puis renseigné au montage → les liens Modération/Admin apparaissent ensuite.
+  const role = session?.role ?? null
   const visibleItems = NAV_ITEMS.filter(
     (item) => !item.roles || (role !== null && item.roles.includes(role)),
   )
@@ -94,7 +93,7 @@ export function SidebarLeft({ role, username = 'Utilisateur' }: SidebarLeftProps
   // Avant le chargement du profil (username vide) on affiche un libellé traduit.
   const shownName = account.username ? account.displayName : t('common.user')
   const handle = account.username ? `@${account.username}` : `@${t('common.username_fallback')}`
-  const displayedRole = account.role ?? role
+  const displayedRole = role
 
   useEffect(() => {
     let cancelled = false
@@ -104,7 +103,6 @@ export function SidebarLeft({ role, username = 'Utilisateur' }: SidebarLeftProps
         displayName: profil.displayName,
         username: profil.username,
         avatarUrl: profil.avatarUrl,
-        role: profil.role,
       })
     }
 
@@ -125,7 +123,7 @@ export function SidebarLeft({ role, username = 'Utilisateur' }: SidebarLeftProps
       cancelled = true
       unsubscribe()
     }
-  }, [role, username])
+  }, [])
 
   return (
     <aside className="sticky top-0 hidden h-screen w-[275px] flex-col justify-between overflow-y-auto px-3 py-4 lg:flex">

@@ -53,3 +53,15 @@ type LoginRequest struct {
 type RefreshRequest struct {
 	RefreshToken string `json:"refresh_token"`
 }
+
+// UpdateRoleRequest : payload de PATCH /auth/users/:id/role (admin).
+type UpdateRoleRequest struct {
+	Role string `json:"role" binding:"required"`
+}
+
+// UpdateStatusRequest : payload de PATCH /auth/users/:id/status (admin).
+// Pointeur + required : force la présence explicite de `is_active` (sinon un
+// `false` omis serait indistinct d'un champ absent).
+type UpdateStatusRequest struct {
+	IsActive *bool `json:"is_active" binding:"required"`
+}

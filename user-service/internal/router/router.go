@@ -42,11 +42,16 @@ func New(users *service.UserService, jwtSecret string) *gin.Engine {
 		u.PATCH("/me", auth, h.UpdateMe)
 		u.GET("/me/follow-requests/outgoing", auth, h.PendingFollowRequests)
 		u.DELETE("/me/followers/:id", auth, h.RemoveFollower)
-		u.DELETE("/:id", auth, h.Delete) // admin (vérifié dans le handler)
 		u.POST("/:id/follow", auth, h.Follow)
 		u.DELETE("/:id/follow", auth, h.Unfollow)
 		u.POST("/follow-requests/:followerId/accept", auth, h.AcceptFollowRequest)
 		u.POST("/follow-requests/:followerId/reject", auth, h.RejectFollowRequest)
+
+		// Administration (JWT + rôle admin). Bannir/réactiver = visibilité
+		// publique du compte (le blocage de connexion vit dans auth-service).
+		admin := middleware.AdminOnly()
+		u.DELETE("/:id", auth, admin, h.Delete)
+		u.PATCH("/:id/status", auth, admin, h.SetStatus)
 	}
 	internal := r.Group("/internal")
 	{

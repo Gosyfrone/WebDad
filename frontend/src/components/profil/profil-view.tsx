@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { ArrowLeft, FileText, Loader2, Lock } from 'lucide-react'
+import { ArrowLeft, FileText, Loader2, Lock, ShieldAlert } from 'lucide-react'
 import Link from 'next/link'
 
 import { cn } from '@/lib/utils'
@@ -251,6 +251,31 @@ export function ProfilView({ username }: ProfilViewProps) {
       <div className="mx-4 mt-6 rounded-[24px] border border-white/55 bg-white/72 px-5 py-8 text-center shadow-[0_18px_54px_rgba(91,108,255,0.12)] backdrop-blur-xl">
         <h1 className="text-lg font-bold text-slate-950">{t('profil.unavailable')}</h1>
         <p className="mt-2 text-sm text-muted-foreground">{error}</p>
+      </div>
+    )
+  }
+
+  // Compte banni : un visiteur (pas le propriétaire) ne voit ni le profil ni
+  // les posts, seulement un état « compte banni » (le back masque déjà le
+  // compte des listes ; ici on couvre l'accès direct par URL).
+  if (!isOwner && !profil.isActive) {
+    return (
+      <div className="flex flex-col">
+        <div className="panel sticky top-0 z-10 flex items-center gap-6 border-b px-4 py-2">
+          <Link
+            href={ROUTES.feed}
+            aria-label={t('profil.back_aria')}
+            className="rounded-full p-2 transition-colors hover:bg-accent hover:text-[#5B6CFF] dark:hover:text-[#9aa6ff]"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Link>
+          <span className="font-bold leading-tight text-foreground">@{profil.username}</span>
+        </div>
+        <div className="glass mx-4 mt-6 flex flex-col items-center gap-2 rounded-[26px] border px-8 py-16 text-center backdrop-blur-xl">
+          <ShieldAlert className="h-10 w-10 text-muted-foreground" aria-hidden />
+          <h1 className="text-lg font-bold text-foreground">{t('profil.banned_title')}</h1>
+          <p className="max-w-sm text-sm text-muted-foreground">{t('profil.banned_desc')}</p>
+        </div>
       </div>
     )
   }

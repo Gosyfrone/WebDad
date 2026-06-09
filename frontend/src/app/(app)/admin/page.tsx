@@ -1,18 +1,10 @@
-import { Settings2 } from 'lucide-react'
+import { AdminView } from '@/components/admin/admin-view'
 
-import { PlaceholderPage } from '@/components/layout/placeholder-page'
-
-// TODO : implémenter le panneau d'administration (rôle administrator)
-//   - lister / gérer les utilisateurs (via Gateway -> user-service)
-//   - changer les rôles (user / moderator / administrator)
-//   - garde d'accès : refuser si le rôle n'est pas administrator
+/**
+ * Panneau d'administration (rôle administrator) : annuaire des comptes,
+ * changement de rôle (auth-service) et bannissement/réactivation (auth + user).
+ * La garde d'accès est faite côté client dans AdminView et côté back (403).
+ */
 export default function AdminPage() {
-  return (
-    <PlaceholderPage
-      icon={<Settings2 className="h-10 w-10 text-[#5B6CFF] dark:text-[#9aa6ff]" aria-hidden />}
-      titleKey="nav.admin"
-      headingKey="admin.heading"
-      descKey="admin.desc"
-    />
-  )
+  return <AdminView />
 }
