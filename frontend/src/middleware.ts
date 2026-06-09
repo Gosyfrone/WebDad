@@ -28,6 +28,7 @@ export const config = {
     '/notifications/:path*',
     '/posts/:path*',
     '/messages/:path*',
+    '/signets/:path*',
     '/profil/:path*',
     '/parametres/:path*',
     '/moderation/:path*',

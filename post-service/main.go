@@ -43,7 +43,7 @@ func main() {
 	}
 
 	postRepo := repository.NewPostRepository(db)
-	postService := service.NewPostService(postRepo)
+	postService := service.NewPostService(postRepo, cfg.BookmarkWindow)
 
 	// Émission des événements de notification (best-effort, fire-and-forget).
 	// Activée uniquement si le notification-service est configuré → post-service

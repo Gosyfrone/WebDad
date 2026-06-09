@@ -21,6 +21,7 @@ export const ROUTES = {
   explorer: '/explorer',
   notifications: '/notifications',
   messages: '/messages',
+  bookmarks: '/signets',
   profil: '/profil',
   parametres: '/parametres',
   moderation: '/moderation',
@@ -49,6 +50,7 @@ export interface NavItem {
  */
 export const APP_NAV: NavItem[] = [
   { labelKey: 'nav.feed', href: ROUTES.feed },
+  { labelKey: 'nav.bookmarks', href: ROUTES.bookmarks },
   { labelKey: 'nav.profil', href: ROUTES.profil },
   { labelKey: 'nav.moderation', href: ROUTES.moderation, roles: ['moderator', 'administrator'] },
   { labelKey: 'nav.admin', href: ROUTES.admin, roles: ['administrator'] },

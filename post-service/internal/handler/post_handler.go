@@ -204,11 +204,11 @@ func (h *PostHandler) DeletePost(c *gin.Context) {
 // respondPostError mappe les erreurs métier vers des codes HTTP.
 func respondPostError(c *gin.Context, err error) {
 	switch {
-	case errors.Is(err, service.ErrPostNotFound):
+	case errors.Is(err, service.ErrPostNotFound), errors.Is(err, service.ErrCollectionNotFound):
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 	case errors.Is(err, service.ErrInvalidID):
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-	case errors.Is(err, service.ErrForbidden):
+	case errors.Is(err, service.ErrForbidden), errors.Is(err, service.ErrDefaultCollection):
 		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
 	default:
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "erreur interne"})

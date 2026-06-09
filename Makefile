@@ -1,4 +1,4 @@
-.PHONY: help env up dev dev-down dev-logs down build logs ps clean reset db-only \
+.PHONY: help env env-sync sync-one up dev dev-down dev-logs down build logs ps clean reset db-only \
         logs-gateway logs-auth logs-user logs-profil logs-post logs-message logs-notification logs-front logs-db \
         sh-auth sh-user sh-profil sh-post sh-message sh-notification sh-gateway \
         psql-auth psql-user mongo-profil-cli mongo-post-cli mongo-message-cli mongo-notification-cli
@@ -15,6 +15,7 @@ help:
 	@echo "  WebDad — Commandes disponibles"
 	@echo "  ────────────────────────────────────────────────────"
 	@echo "  make env       Créer les .env manquants depuis les .env.example"
+	@echo "  make env-sync  Ajouter aux .env les clés manquantes des .env.example (valeurs préservées)"
 	@echo "  make up        Démarrer tout l'environnement (images de prod)"
 	@echo "  make dev       Démarrer en mode DEV (détaché) : hot-reload front + Go (air)"
 	@echo "  make dev-logs  Suivre les logs front + Go (sans le bruit des BDD)"
@@ -41,6 +42,28 @@ env:
 		test -f $$s/.env || { cp $$s/.env.example $$s/.env; echo "✓ créé $$s/.env"; }; \
 	done
 	@echo "✓ .env prêts — pense à renseigner les secrets (JWT_SECRET, mots de passe)"
+
+# Réconcilie les .env existants avec leurs .env.example : crée les .env manquants
+# ET ajoute (append) les clés présentes dans l'exemple mais absentes du .env.
+# Idempotent et non destructif : une clé déjà présente n'est JAMAIS modifiée.
+# Utile après un merge qui introduit de nouvelles variables (cf. limite de `env`).
+env-sync:
+	@$(MAKE) -s sync-one EX=.env.example ENV=.env
+	@for s in $(SERVICES); do $(MAKE) -s sync-one EX=$$s/.env.example ENV=$$s/.env; done
+	@echo "✓ .env synchronisés (clés manquantes ajoutées, valeurs existantes préservées)"
+
+# Cible utilitaire (interne) : ajoute à $(ENV) les lignes KEY=… de $(EX) dont la
+# clé manque dans $(ENV). Crée $(ENV) depuis $(EX) s'il n'existe pas. Ignore les
+# lignes vides et les commentaires de l'exemple.
+sync-one:
+	@[ -f "$(EX)" ] || exit 0; \
+	if [ ! -f "$(ENV)" ]; then cp "$(EX)" "$(ENV)"; echo "✓ créé $(ENV)"; exit 0; fi; \
+	while IFS= read -r line; do \
+		case "$$line" in ''|\#*) continue;; esac; \
+		case "$$line" in *=*) ;; *) continue;; esac; \
+		key=$${line%%=*}; \
+		grep -qE "^[[:space:]]*$$key=" "$(ENV)" || { echo "$$line" >> "$(ENV)"; echo "  + $$key → $(ENV)"; }; \
+	done < "$(EX)"
 
 # ─── Stack complète ───────────────────────────────────────────────
 up:

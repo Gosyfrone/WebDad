@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"github.com/joho/godotenv"
 )
@@ -23,6 +24,11 @@ type Config struct {
 	// (post-service reste autonome). InternalSecret authentifie ces appels.
 	NotificationURL string
 	InternalSecret  string
+	// BookmarkWindow : fenêtre glissante de « rafale » des signets. Un clic court
+	// qui suit le précédent de moins de cette durée range automatiquement dans la
+	// dernière collection ; au-delà, le serveur redemande la collection. Défaut 5m,
+	// configurable via BOOKMARK_SESSION_WINDOW (format durée Go, ex. « 10m »).
+	BookmarkWindow time.Duration
 }
 
 // Load construit la config. Charge les .env best-effort (ignorés s'ils
@@ -44,6 +50,7 @@ func Load() *Config {
 		JWTSecret:       os.Getenv("JWT_SECRET"),
 		NotificationURL: os.Getenv("NOTIFICATION_SERVICE_URL"),
 		InternalSecret:  os.Getenv("INTERNAL_EVENT_SECRET"),
+		BookmarkWindow:  getDuration("BOOKMARK_SESSION_WINDOW", 5*time.Minute),
 	}
 
 	if cfg.JWTSecret == "" {
@@ -51,6 +58,21 @@ func Load() *Config {
 	}
 
 	return cfg
+}
+
+// getDuration lit une durée Go (ex. « 5m », « 10m ») depuis l'env, avec repli.
+// Une valeur invalide journalise un avertissement et retombe sur le défaut.
+func getDuration(key string, fallback time.Duration) time.Duration {
+	raw := os.Getenv(key)
+	if raw == "" {
+		return fallback
+	}
+	d, err := time.ParseDuration(raw)
+	if err != nil {
+		log.Printf("[config] %s invalide (%q) : %v — repli sur %s", key, raw, err, fallback)
+		return fallback
+	}
+	return d
 }
 
 // buildMongoURI assemble l'URI à partir des variables d'env. MONGO_HOST est

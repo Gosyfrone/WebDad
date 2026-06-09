@@ -20,6 +20,7 @@ func RegisterRoutes(r *gin.Engine, serviceName string, postService *service.Post
 	PostHandler := NewPostHandler(postService, serviceName)
 	LikeHandler := NewLikeHandler(postService, serviceName)
 	CommentHandler := NewCommentHandler(postService, serviceName)
+	BookmarkHandler := NewBookmarkHandler(postService, serviceName)
 
 	posts := r.Group("/posts")
 	{
@@ -34,6 +35,25 @@ func RegisterRoutes(r *gin.Engine, serviceName string, postService *service.Post
 		// le groupe `/:id` (sinon « me » serait capturé comme un id).
 		posts.GET("/me/liked-ids", auth, LikeHandler.LikedByMe)
 		posts.GET("/me/reposted-ids", auth, PostHandler.RepostedByMe)
+		posts.GET("/me/bookmarked-ids", auth, BookmarkHandler.BookmarkedByMe)
+
+		// Signets — routes STATIQUES (`/posts/bookmarks/…`), placées avant le
+		// groupe `/:id` ; toutes protégées (les signets sont strictement privés).
+		bookmarks := posts.Group("/bookmarks", auth)
+		{
+			bookmarks.GET("", BookmarkHandler.ListAll) // vue « Tous mes signets »
+			collections := bookmarks.Group("/collections")
+			{
+				collections.GET("", BookmarkHandler.ListCollections)
+				collections.POST("", BookmarkHandler.CreateCollection)
+				collection := collections.Group("/:cid")
+				{
+					collection.PATCH("", BookmarkHandler.RenameCollection)
+					collection.DELETE("", BookmarkHandler.DeleteCollection)
+					collection.GET("/posts", BookmarkHandler.ListCollectionPosts)
+				}
+			}
+		}
 
 		post := posts.Group("/:id")
 		{
@@ -49,6 +69,10 @@ func RegisterRoutes(r *gin.Engine, serviceName string, postService *service.Post
 			post.DELETE("/like", auth, LikeHandler.UnlikePost)
 			post.POST("/repost", auth, PostHandler.RepostPost)
 			post.DELETE("/repost", auth, PostHandler.UnrepostPost)
+
+			post.POST("/bookmark", auth, BookmarkHandler.Bookmark)
+			post.DELETE("/bookmark", auth, BookmarkHandler.Unbookmark)
+			post.GET("/bookmark/collections", auth, BookmarkHandler.PostCollections)
 
 			comment := post.Group("/comments")
 			{
