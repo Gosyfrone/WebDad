@@ -91,8 +91,20 @@ var validators = map[string]bson.M{
 			"bsonType": "object",
 			"required": bson.A{"author_id", "content", "created_at"},
 			"properties": bson.M{
-				"author_id":      bson.M{"bsonType": "string"},
-				"content":        bson.M{"bsonType": "string", "maxLength": 280},
+				"author_id": bson.M{"bsonType": "string"},
+				"content":   bson.M{"bsonType": "string", "maxLength": 280},
+				"media": bson.M{
+					"bsonType": "array",
+					"maxItems": 4,
+					"items": bson.M{
+						"bsonType": "object",
+						"required": bson.A{"url", "type"},
+						"properties": bson.M{
+							"url":  bson.M{"bsonType": "string"},
+							"type": bson.M{"enum": bson.A{"image", "video"}},
+						},
+					},
+				},
 				"is_hidden":      bson.M{"bsonType": "bool"},
 				"hidden_by":      bson.M{"bsonType": bson.A{"string", "null"}},
 				"hidden_at":      bson.M{"bsonType": bson.A{"date", "null"}},

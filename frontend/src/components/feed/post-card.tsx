@@ -27,6 +27,7 @@ import {
   unrepostPost,
   unpinPost,
   type FeedPost,
+  type PostMedia,
 } from '@/lib/posts'
 import { quickBookmark, removeBookmarkEverywhere } from '@/lib/bookmarks'
 import { BookmarkDialog } from '@/components/feed/bookmark-dialog'
@@ -341,11 +342,15 @@ export function PostCard({ post, showPinBadge = false, onDeleted, onUpdated }: P
         )}
 
         {/* Content */}
-        <TranslatedContent
-          contentId={`post:${post.id}`}
-          content={post.content}
-          className="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/80"
-        />
+        {post.content && (
+          <TranslatedContent
+            contentId={`post:${post.id}`}
+            content={post.content}
+            className="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/80"
+          />
+        )}
+
+        {post.media.length > 0 && <MediaGallery media={post.media} />}
 
         {post.quotedPost && (
           <QuotedPost post={post.quotedPost} />
@@ -475,6 +480,52 @@ export function PostCard({ post, showPinBadge = false, onDeleted, onUpdated }: P
         />
       </div>
     </article>
+  )
+}
+
+/**
+ * Galerie des médias d'un post (images + vidéos). Disposition façon X :
+ * 1 média = pleine largeur ; 2-4 = grille 2 colonnes. Les URLs sont déjà
+ * absolues (résolues dans `toFeedPost`). Cache navigateur géré par le
+ * media-service (`Cache-Control: immutable`) ; lazy-loading des images.
+ */
+function MediaGallery({ media }: { media: PostMedia[] }) {
+  return (
+    <div
+      className={cn(
+        'mt-2 grid gap-1.5 overflow-hidden rounded-2xl border border-border',
+        media.length === 1 ? 'grid-cols-1' : 'grid-cols-2',
+      )}
+    >
+      {media.map((m, i) =>
+        m.type === 'video' ? (
+          <video
+            key={m.url}
+            src={m.url}
+            controls
+            playsInline
+            className={cn(
+              'w-full bg-black object-cover',
+              media.length === 1 ? 'max-h-[32rem]' : 'aspect-square',
+              media.length === 3 && i === 0 && 'row-span-2 aspect-auto',
+            )}
+          />
+        ) : (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            key={m.url}
+            src={m.url}
+            alt=""
+            loading="lazy"
+            className={cn(
+              'w-full object-cover',
+              media.length === 1 ? 'max-h-[32rem]' : 'aspect-square',
+              media.length === 3 && i === 0 && 'row-span-2 aspect-auto',
+            )}
+          />
+        ),
+      )}
+    </div>
   )
 }
 

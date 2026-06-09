@@ -30,6 +30,7 @@ export interface ApiPost {
   id: string
   author_id: string
   content: string
+  media?: { url: string; type: 'image' | 'video' }[]
   quote_post_id?: string
   likes_count: number
   comments_count: number
@@ -71,11 +72,19 @@ export interface PostAuthor {
   avatarUrl: string
 }
 
+/** Média attaché à un post (URL prête à l'affichage + nature). */
+export interface PostMedia {
+  /** URL absolue (gateway) en lecture ; chemin relatif `/media/<id>` à la création. */
+  url: string
+  type: 'image' | 'video'
+}
+
 /** Post enrichi pour l'affichage. */
 export interface FeedPost {
   id: string
   author: PostAuthor
   content: string
+  media: PostMedia[]
   quotePostId: string
   quotedPost: FeedPost | null
   likesCount: number
@@ -217,6 +226,7 @@ async function toFeedPost(
     id: p.id,
     author: await resolveAuthor(p.author_id),
     content: p.content,
+    media: (p.media ?? []).map((m) => ({ url: resolveMediaUrl(m.url), type: m.type })),
     quotePostId: p.quote_post_id ?? '',
     quotedPost,
     likesCount: p.likes_count ?? 0,
@@ -340,12 +350,20 @@ export async function listByAuthor(authorId: string, limit = 20, offset = 0): Pr
 }
 
 /** Crée un post (auteur dérivé du JWT côté back). */
-export async function createPost(content: string, quotePostId?: string): Promise<FeedPost> {
+export async function createPost(
+  content: string,
+  media: PostMedia[] = [],
+  quotePostId?: string,
+): Promise<FeedPost> {
+  const payload: Record<string, unknown> = { content }
+  if (media.length > 0) payload.media = media
+  if (quotePostId) payload.quote_post_id = quotePostId
+
   const created = await unwrap<ApiPost>(
     await apiFetch('/posts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(quotePostId ? { content, quote_post_id: quotePostId } : { content }),
+      body: JSON.stringify(payload),
     }),
   )
   return toFeedPost(created, new Set(), new Set())

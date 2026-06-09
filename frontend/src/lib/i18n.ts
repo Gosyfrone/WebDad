@@ -403,7 +403,10 @@ export const messages: Record<Locale, Messages> = {
 
     // — Composer —
     'composer.placeholder': 'Ça breez ? 🌴',
-    'composer.add_image': 'Ajouter une image',
+    'composer.add_image': 'Ajouter une image ou une vidéo',
+    'composer.media_failed': "Échec de l'envoi du média.",
+    'composer.media_max': 'Maximum {count} médias par post.',
+    'composer.media_remove': 'Retirer le média',
     'composer.add_emoji': 'Ajouter un emoji',
     'composer.add_poll': 'Ajouter un sondage',
     'composer.pin_profile': 'Épingler sur mon profil',
@@ -851,7 +854,10 @@ export const messages: Record<Locale, Messages> = {
 
     // — Composer —
     'composer.placeholder': "What's breezing? 🌴",
-    'composer.add_image': 'Add an image',
+    'composer.add_image': 'Add an image or video',
+    'composer.media_failed': 'Media upload failed.',
+    'composer.media_max': 'Up to {count} media per post.',
+    'composer.media_remove': 'Remove media',
     'composer.add_emoji': 'Add an emoji',
     'composer.add_poll': 'Add a poll',
     'composer.pin_profile': 'Pin to my profile',

@@ -73,7 +73,7 @@ func (s *PostService) SetNotifier(n notifier.Notifier) {
 
 // CreatePost crée un post pour authorID (dérivé du JWT) et renvoie le document
 // créé (avec son id généré). Les compteurs sont posés à 0 explicitement.
-func (s *PostService) CreatePost(ctx context.Context, authorID, content, quotePostID string) (*models.Post, error) {
+func (s *PostService) CreatePost(ctx context.Context, authorID, content, quotePostID string, media []models.MediaRef) (*models.Post, error) {
 	quotedAuthorID := "" // auteur du post cité (destinataire de la notif « citation »)
 	if quotePostID != "" {
 		quoteOID, err := parseID(quotePostID)
@@ -90,6 +90,7 @@ func (s *PostService) CreatePost(ctx context.Context, authorID, content, quotePo
 	post := &models.Post{
 		AuthorID:      authorID,
 		Content:       content,
+		Media:         media,
 		QuotePostID:   quotePostID,
 		LikesCount:    0,
 		CommentsCount: 0,
