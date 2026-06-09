@@ -251,3 +251,9 @@ export async function rejectFollowRequest(followerId: string): Promise<void> {
   const res = await apiFetch(`/users/follow-requests/${followerId}/reject`, { method: 'POST' })
   if (!res.ok) throw new ApiError('Refus impossible', res.status)
 }
+
+/** Retire un utilisateur de mes abonnés (`DELETE /users/me/followers/:id`). */
+export async function removeFollower(userId: string): Promise<void> {
+  const res = await apiFetch(`/users/me/followers/${userId}`, { method: 'DELETE' })
+  if (!res.ok) throw new ApiError('Retrait impossible', res.status)
+}

@@ -25,6 +25,10 @@ interface UserListItemProps {
   trailingAction?: React.ReactNode
   /** Bascule suivre / ne plus suivre. */
   onToggleFollow: (user: RelationUser, next: boolean) => void
+  /** Affiche l'action de retrait d'un abonné à la place du follow. */
+  canRemoveFollower?: boolean
+  /** Retire cette personne des abonnés de l'utilisateur courant. */
+  onRemoveFollower?: (user: RelationUser) => void
 }
 
 /**
@@ -49,6 +53,8 @@ export function UserListItem({
   onProfileOpen,
   trailingAction,
   onToggleFollow,
+  canRemoveFollower = false,
+  onRemoveFollower,
 }: UserListItemProps) {
   const t = useT()
   const initials = (user.displayName.charAt(0) || user.username.charAt(0) || '?').toUpperCase()
@@ -79,7 +85,22 @@ export function UserListItem({
 
       {trailingAction && <div className="relative z-10 mt-0.5 shrink-0">{trailingAction}</div>}
 
-      {!isSelf && (
+      {!isSelf && canRemoveFollower && onRemoveFollower ? (
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={pending}
+          onClick={(e) => {
+            // Empêche le clic du bouton de déclencher la navigation du lien étiré.
+            e.preventDefault()
+            e.stopPropagation()
+            onRemoveFollower(user)
+          }}
+          className="relative z-10 mt-0.5 shrink-0 rounded-full border-white/70 bg-white/80 font-bold backdrop-blur hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive dark:border-white/15 dark:bg-white/10 dark:hover:bg-destructive/20"
+        >
+          {t('follow.remove_follower')}
+        </Button>
+      ) : !isSelf ? (
         <Button
           size="sm"
           variant={isFollowing ? 'outline' : 'default'}
@@ -106,7 +127,7 @@ export function UserListItem({
             t('follow.follow')
           )}
         </Button>
-      )}
+      ) : null}
     </div>
   )
 }
