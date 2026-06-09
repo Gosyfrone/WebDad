@@ -126,10 +126,10 @@ type ConversationView struct {
 	LastReadAt *time.Time `json:"last_read_at,omitempty"`
 	// Muted : la conversation est-elle en sourdine pour CE membre ? (exclue du
 	// badge non-lu app-wide, mais toujours « non lue » dans la liste).
-	Muted     bool   `json:"muted"`
-	CreatedBy string `json:"created_by"`
-	CreatedAt time.Time  `json:"created_at"`
-	UpdatedAt time.Time  `json:"updated_at"`
+	Muted     bool      `json:"muted"`
+	CreatedBy string    `json:"created_by"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // MemberView — un membre exposé dans la liste des membres (sans son enveloppe :
