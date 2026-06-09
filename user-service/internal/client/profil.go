@@ -34,7 +34,7 @@ func (c *ProfilClient) Visibility(ctx context.Context, userID string) (string, e
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode == http.StatusNotFound {
 		return "", nil
 	}

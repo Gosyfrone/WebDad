@@ -11,7 +11,7 @@ const (
 )
 
 const (
-	VisibilityPublic = "public"
+	VisibilityPublic  = "public"
 	VisibilityPrivate = "private"
 )
 
@@ -32,7 +32,7 @@ type Profil struct {
 	Gender      string     `json:"gender,omitempty"      bson:"gender,omitempty"` // "male" | "female"
 	CreatedAt   time.Time  `json:"created_at"            bson:"created_at"`
 	UpdatedAt   time.Time  `json:"updated_at"            bson:"updated_at"`
-	Visibility string `json:"visibility" bson:"visibility"`
+	Visibility  string     `json:"visibility" bson:"visibility"`
 	// DisplayNameChangedAt : date du dernier changement EFFECTIF de display_name
 	// (nil = jamais changé depuis le provisioning). Enregistrée dès aujourd'hui
 	// pour servir de base à un cooldown « X jours entre deux changements de nom »

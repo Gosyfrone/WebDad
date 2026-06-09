@@ -139,15 +139,15 @@ func (h *ProfilHandler) Delete(c *gin.Context) {
 }
 
 func (h *ProfilHandler) GetVisibility(c *gin.Context) {
-    userID := c.Param("userId")
+	userID := c.Param("userId")
 
-    profil, err := h.profils.GetByUserID(c.Request.Context(),userID)
-    if err != nil {
-        c.JSON(http.StatusNotFound, gin.H{"error": "profil introuvable"})
-        return
-    }
+	profil, err := h.profils.GetByUserID(c.Request.Context(), userID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "profil introuvable"})
+		return
+	}
 
-    c.JSON(http.StatusOK, gin.H{"visibility": profil.Visibility})
+	c.JSON(http.StatusOK, gin.H{"visibility": profil.Visibility})
 }
 
 // respondProfilError mappe les erreurs métier vers des codes HTTP.

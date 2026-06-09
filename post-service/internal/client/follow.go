@@ -42,7 +42,7 @@ func (c *FollowClient) IsFollowing(ctx context.Context, followerID, followingID 
 	if err != nil {
 		return false, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode >= http.StatusBadRequest {
 		return false, fmt.Errorf("user-service follow status %d", resp.StatusCode)
