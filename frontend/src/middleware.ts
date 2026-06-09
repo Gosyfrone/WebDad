@@ -26,6 +26,7 @@ export const config = {
     '/feed/:path*',
     '/explorer/:path*',
     '/notifications/:path*',
+    '/posts/:path*',
     '/messages/:path*',
     '/profil/:path*',
     '/parametres/:path*',

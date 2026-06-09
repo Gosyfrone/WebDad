@@ -119,6 +119,30 @@ export const messages: Record<Locale, Messages> = {
     'legal.cgu': 'CGU',
     'legal.confidentialite': 'Confidentialité',
 
+    // — Notifications —
+    'notifications.title': 'Notifications',
+    'notifications.unread_aria': '{count} notifications non lues',
+    'notifications.empty': 'Aucune notification pour le moment.',
+    'notifications.load_more': 'Voir plus',
+    'notifications.like_one': '{name} a aimé votre publication',
+    'notifications.like_other': '{name} et {count} autres personnes ont aimé votre publication',
+    'notifications.comment_one': '{name} a commenté votre publication',
+    'notifications.comment_other':
+      '{name} et {count} autres personnes ont commenté votre publication',
+    'notifications.reply_one': '{name} a répondu à votre commentaire',
+    'notifications.reply_other':
+      '{name} et {count} autres personnes ont répondu à votre commentaire',
+    'notifications.repost_one': '{name} a reposté votre publication',
+    'notifications.repost_other':
+      '{name} et {count} autres personnes ont reposté votre publication',
+    'notifications.quote': '{name} a cité votre publication',
+    'notifications.mention': '{name} vous a mentionné',
+
+    // — Détail d'une publication —
+    'common.back': 'Retour',
+    'post.detail_title': 'Publication',
+    'post.not_found': 'Publication introuvable.',
+
     // — Pages stub (états vides) —
     'notifications.heading': 'Rien pour le moment',
     'notifications.desc': 'Vos notifications (likes, abonnements, mentions) apparaîtront ici.',
@@ -176,9 +200,13 @@ export const messages: Record<Locale, Messages> = {
     'messages.new_messages_divider': 'Nouveaux messages',
     'messages.you_prefix': 'Vous : {text}',
     'messages.unread_aria': 'Messages non lus',
+    'messages.badge_aria': '{count} conversations avec des messages non lus',
     'messages.actions_aria': 'Actions de la conversation',
     'messages.pin': 'Épingler',
     'messages.unpin': 'Désépingler',
+    'messages.mute': 'Mettre en sourdine',
+    'messages.unmute': 'Réactiver les notifications',
+    'messages.muted_aria': 'Conversation en sourdine',
     'messages.delete_for_me': 'Supprimer pour moi',
     'messages.delete_failed': 'Suppression impossible.',
     'messages.search_in_conversation': 'Rechercher dans la conversation…',
@@ -500,6 +528,27 @@ export const messages: Record<Locale, Messages> = {
     'legal.cgu': 'Terms of Use',
     'legal.confidentialite': 'Privacy',
 
+    // — Notifications —
+    'notifications.title': 'Notifications',
+    'notifications.unread_aria': '{count} unread notifications',
+    'notifications.empty': 'No notifications yet.',
+    'notifications.load_more': 'Show more',
+    'notifications.like_one': '{name} liked your post',
+    'notifications.like_other': '{name} and {count} others liked your post',
+    'notifications.comment_one': '{name} commented on your post',
+    'notifications.comment_other': '{name} and {count} others commented on your post',
+    'notifications.reply_one': '{name} replied to your comment',
+    'notifications.reply_other': '{name} and {count} others replied to your comment',
+    'notifications.repost_one': '{name} reposted your post',
+    'notifications.repost_other': '{name} and {count} others reposted your post',
+    'notifications.quote': '{name} quoted your post',
+    'notifications.mention': '{name} mentioned you',
+
+    // — Post detail —
+    'common.back': 'Back',
+    'post.detail_title': 'Post',
+    'post.not_found': 'Post not found.',
+
     // — Stub pages (empty states) —
     'notifications.heading': 'Nothing yet',
     'notifications.desc': 'Your notifications (likes, follows, mentions) will show up here.',
@@ -556,9 +605,13 @@ export const messages: Record<Locale, Messages> = {
     'messages.new_messages_divider': 'New messages',
     'messages.you_prefix': 'You: {text}',
     'messages.unread_aria': 'Unread messages',
+    'messages.badge_aria': '{count} conversations with unread messages',
     'messages.actions_aria': 'Conversation actions',
     'messages.pin': 'Pin',
     'messages.unpin': 'Unpin',
+    'messages.mute': 'Mute',
+    'messages.unmute': 'Unmute',
+    'messages.muted_aria': 'Muted conversation',
     'messages.delete_for_me': 'Delete for me',
     'messages.delete_failed': 'Could not delete.',
     'messages.search_in_conversation': 'Search this conversation…',

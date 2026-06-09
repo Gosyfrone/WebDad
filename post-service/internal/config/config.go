@@ -18,6 +18,11 @@ type Config struct {
 	MongoURI  string
 	MongoDB   string
 	JWTSecret string // secret partagé (validation des tokens émis par auth)
+	// NotificationURL : base du notification-service, vers lequel post-service
+	// émet ses événements (like/commentaire/mention…). Vide → émission désactivée
+	// (post-service reste autonome). InternalSecret authentifie ces appels.
+	NotificationURL string
+	InternalSecret  string
 }
 
 // Load construit la config. Charge les .env best-effort (ignorés s'ils
@@ -32,11 +37,13 @@ func Load() *Config {
 	_ = godotenv.Load("../.env")
 
 	cfg := &Config{
-		Port:      getEnv("PORT", "8084"),
-		GinMode:   getEnv("GIN_MODE", "debug"),
-		MongoURI:  buildMongoURI(),
-		MongoDB:   getEnv("MONGO_INITDB_DATABASE", "webdad_post"),
-		JWTSecret: os.Getenv("JWT_SECRET"),
+		Port:            getEnv("PORT", "8084"),
+		GinMode:         getEnv("GIN_MODE", "debug"),
+		MongoURI:        buildMongoURI(),
+		MongoDB:         getEnv("MONGO_INITDB_DATABASE", "webdad_post"),
+		JWTSecret:       os.Getenv("JWT_SECRET"),
+		NotificationURL: os.Getenv("NOTIFICATION_SERVICE_URL"),
+		InternalSecret:  os.Getenv("INTERNAL_EVENT_SECRET"),
 	}
 
 	if cfg.JWTSecret == "" {

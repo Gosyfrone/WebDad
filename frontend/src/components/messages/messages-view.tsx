@@ -5,24 +5,25 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { MessagesSquare } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
-import { getLastRead, setLastRead } from '@/lib/message-reads'
 import {
   clearConversation,
-  connectRealtime,
   currentUserId,
   decryptMessage,
   ensureMyKeys,
   getConversation,
   listConversations,
   listMessagesPage,
+  muteConversation,
   pinConversation,
   startDM,
+  unmuteConversation,
   unpinConversation,
   type ChatMessage,
   type Conversation,
   type RealtimeEvent,
 } from '@/lib/messages'
 import { useToast } from '@/hooks/use-toast'
+import { useMessages } from '@/components/messages-provider'
 import { useLanguage } from '@/components/language-provider'
 import { ChatPane } from '@/components/messages/chat-pane'
 import { ConversationInfoDialog } from '@/components/messages/conversation-info-dialog'
@@ -59,18 +60,31 @@ function toPreview(m: ChatMessage): ConversationPreview {
 }
 
 /**
+ * Une conversation est « non lue » si son dernier message n'est pas le mien et
+ * est postérieur à mon curseur de lecture serveur (`lastReadAt`, '' = jamais lu).
+ */
+function isConvUnread(lastReadAt: string, last: ChatMessage | null): boolean {
+  if (!last || last.mine) return false
+  if (!lastReadAt) return true
+  return new Date(last.createdAt).getTime() > new Date(lastReadAt).getTime()
+}
+
+/**
  * Orchestrateur de la messagerie : charge les conversations (DM / groupes /
- * communautés) + l'aperçu de leur dernier message, maintient UNE connexion
- * WebSocket (déchiffrement + routage des messages entrants, aperçus, état
- * non-lu, remontée en tête), et pilote les modales de création / gestion.
+ * communautés) + l'aperçu de leur dernier message, s'abonne à la WebSocket
+ * UNIQUE du `MessagesProvider` (déchiffrement + routage des messages entrants,
+ * aperçus, pastille non-lue, remontée en tête), et pilote les modales.
  *
- * L'état « lu » est local (`message-reads`, par appareil) : pastille non-lue
- * dans la liste, et ancre de la ligne « Nouveaux messages » capturée à
- * l'ouverture d'une conversation.
+ * L'état « lu » est porté par le serveur (`lastReadAt` par conversation,
+ * multi-appareil) : pastille non-lue dans la liste et ancre de la ligne
+ * « Nouveaux messages » capturée à l'ouverture. Le badge app-wide vit dans le
+ * provider ; ouvrir une conversation la marque lue (`markRead`).
  */
 export function MessagesView() {
   const { t } = useLanguage()
   const { toast } = useToast()
+  const { markRead, setActiveConversation, subscribeMessages, subscribeEvents, refresh } =
+    useMessages()
   const myId = useMemo(() => currentUserId(), [])
 
   const [conversations, setConversations] = useState<Conversation[]>([])
@@ -90,17 +104,15 @@ export function MessagesView() {
   conversationsRef.current = conversations
   const selectedIdRef = useRef<string | null>(null)
   selectedIdRef.current = selectedId
-  const previewsRef = useRef<Record<string, ConversationPreview>>({})
-  previewsRef.current = previews
 
   const selected = conversations.find((c) => c.id === selectedId) ?? null
 
-  /** Intègre un message (WS, envoi local, ou aperçu) : aperçu + ordre + non-lu. */
+  /** Intègre un message (WS, envoi local, ou aperçu) : aperçu + ordre + pastille.
+   *  Le marquage « lu » serveur d'une conv ouverte est géré par le provider. */
   const ingest = useCallback((conversationId: string, msg: ChatMessage, seen: boolean) => {
     setPreviews((p) => ({ ...p, [conversationId]: toPreview(msg) }))
     setConversations((prev) => touchAndSort(prev, conversationId, msg.createdAt))
     if (seen || msg.mine) {
-      setLastRead(conversationId, msg.id)
       setUnread((u) => (u[conversationId] ? { ...u, [conversationId]: false } : u))
     } else {
       setUnread((u) => ({ ...u, [conversationId]: true }))
@@ -133,10 +145,11 @@ export function MessagesView() {
       for (const [id, last] of entries) if (last) next[id] = toPreview(last)
       return next
     })
+    const readById = new Map(list.map((c) => [c.id, c.lastReadAt]))
     setUnread((prev) => {
       const next = { ...prev }
       for (const [id, last] of entries) {
-        if (last) next[id] = last.id !== getLastRead(id) && !last.mine
+        next[id] = isConvUnread(readById.get(id) ?? '', last)
       }
       return next
     })
@@ -208,24 +221,32 @@ export function MessagesView() {
     [myId, loadConversations],
   )
 
-  // Temps réel : une seule connexion pour toute la page.
+  // Temps réel : on s'abonne à la WebSocket UNIQUE du provider (qui la possède).
   useEffect(() => {
-    const handle = connectRealtime(
-      (raw) => {
-        const conv = conversationsRef.current.find((c) => c.id === raw.conversation_id)
-        if (!conv) {
-          // Conversation inconnue (quelqu'un vient de m'écrire) → on recharge tout.
-          loadConversations().catch(() => {})
-          return
-        }
-        const msg = decryptMessage(conv, raw, myId)
-        setLiveMessage(msg)
-        ingest(conv.id, msg, selectedIdRef.current === conv.id)
-      },
-      handleEvent,
-    )
-    return () => handle.close()
-  }, [myId, ingest, loadConversations, handleEvent])
+    const unsubMsg = subscribeMessages((raw) => {
+      const conv = conversationsRef.current.find((c) => c.id === raw.conversation_id)
+      if (!conv) {
+        // Conversation inconnue (quelqu'un vient de m'écrire) → on recharge tout.
+        loadConversations().catch(() => {})
+        return
+      }
+      const msg = decryptMessage(conv, raw, myId)
+      setLiveMessage(msg)
+      ingest(conv.id, msg, selectedIdRef.current === conv.id)
+    })
+    const unsubEvt = subscribeEvents(handleEvent)
+    return () => {
+      unsubMsg()
+      unsubEvt()
+    }
+  }, [myId, ingest, loadConversations, handleEvent, subscribeMessages, subscribeEvents])
+
+  // Tient le provider informé de la conversation ouverte (pour qu'il marque lus
+  // les messages entrants de la conv active et n'enfle pas le badge).
+  useEffect(() => {
+    setActiveConversation(selectedId)
+    return () => setActiveConversation(null)
+  }, [selectedId, setActiveConversation])
 
   // Point d'entrée depuis un profil : /messages?dm=<userId> → ouvre le DM.
   const router = useRouter()
@@ -248,20 +269,28 @@ export function MessagesView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dmTarget])
 
+  /** Marque une conversation lue : serveur (`markRead`) + état local optimiste
+   *  (curseur `lastReadAt` avancé + pastille effacée), après capture de l'ancre. */
+  function markConvRead(id: string) {
+    markRead(id)
+    const now = new Date().toISOString()
+    setConversations((prev) => prev.map((c) => (c.id === id ? { ...c, lastReadAt: now } : c)))
+    setUnread((u) => (u[id] ? { ...u, [id]: false } : u))
+  }
+
   /** Sélectionne une conversation : capture l'ancre du séparateur PUIS marque lu. */
   function selectConversation(id: string) {
-    setDividerAnchor({ convId: id, anchor: getLastRead(id) })
+    const conv = conversationsRef.current.find((c) => c.id === id)
+    setDividerAnchor({ convId: id, anchor: conv?.lastReadAt || null })
     setSelectedId(id)
-    const latest = previewsRef.current[id]?.messageId
-    if (latest) setLastRead(id, latest)
-    setUnread((u) => (u[id] ? { ...u, [id]: false } : u))
+    markConvRead(id)
   }
 
   function upsertAndSelect(conv: Conversation) {
     setConversations((prev) => sortConversations([conv, ...prev.filter((c) => c.id !== conv.id)]))
-    setDividerAnchor({ convId: conv.id, anchor: getLastRead(conv.id) })
+    setDividerAnchor({ convId: conv.id, anchor: conv.lastReadAt || null })
     setSelectedId(conv.id)
-    setUnread((u) => (u[conv.id] ? { ...u, [conv.id]: false } : u))
+    markConvRead(conv.id)
     setDialog(null)
   }
 
@@ -284,6 +313,21 @@ export function MessagesView() {
     try {
       const updated = pin ? await pinConversation(conv) : await unpinConversation(conv)
       updateConv(updated)
+    } catch {
+      toast({ title: t('messages.action_failed'), variant: 'destructive' })
+      loadConversations().catch(() => {})
+    }
+  }
+
+  /** (Dé)met en sourdine — optimiste. Le badge app-wide est ré-interrogé via le
+   *  provider (`refresh`) car le serveur exclut les sourdines du non-lu. */
+  async function toggleMute(conv: Conversation) {
+    const mute = !conv.muted
+    setConversations((prev) => prev.map((c) => (c.id === conv.id ? { ...c, muted: mute } : c)))
+    try {
+      const updated = mute ? await muteConversation(conv) : await unmuteConversation(conv)
+      updateConv(updated)
+      refresh()
     } catch {
       toast({ title: t('messages.action_failed'), variant: 'destructive' })
       loadConversations().catch(() => {})
@@ -321,6 +365,7 @@ export function MessagesView() {
           unread={unread}
           onSelect={selectConversation}
           onTogglePin={togglePin}
+          onToggleMute={toggleMute}
           onDelete={deleteConversation}
           onNewDM={() => setDialog('dm')}
           onNewGroup={() => setDialog('group')}

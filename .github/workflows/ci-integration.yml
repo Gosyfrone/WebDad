@@ -10,6 +10,7 @@ on:
       - "profil-service/**"
       - "post-service/**"
       - "message-service/**"
+      - "notification-service/**"
       - "api-gateway/**"
       - "docker-compose.yml"
       - "**/Dockerfile"
@@ -25,8 +26,8 @@ permissions:
 # Services démarrés (tout sauf le frontend, déjà couvert par ci-frontend).
 env:
   STACK_SERVICES: >-
-    postgres-auth postgres-user mongo-profil mongo-post mongo-message
-    auth-service user-service profil-service post-service message-service api-gateway
+    postgres-auth postgres-user mongo-profil mongo-post mongo-message mongo-notification
+    auth-service user-service profil-service post-service message-service notification-service api-gateway
 
 jobs:
   stack-health:
@@ -38,7 +39,7 @@ jobs:
       - name: Générer les .env depuis les .example
         run: |
           cp .env.example .env
-          for svc in auth-service user-service profil-service post-service message-service api-gateway; do
+          for svc in auth-service user-service profil-service post-service message-service notification-service api-gateway; do
             cp "$svc/.env.example" "$svc/.env"
           done
 

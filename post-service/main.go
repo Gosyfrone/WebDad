@@ -10,6 +10,7 @@ import (
 	"github.com/webdad/post-service/internal/config"
 	"github.com/webdad/post-service/internal/database"
 	"github.com/webdad/post-service/internal/handler"
+	"github.com/webdad/post-service/internal/notifier"
 	"github.com/webdad/post-service/internal/repository"
 	"github.com/webdad/post-service/internal/service"
 )
@@ -43,6 +44,14 @@ func main() {
 
 	postRepo := repository.NewPostRepository(db)
 	postService := service.NewPostService(postRepo)
+
+	// Émission des événements de notification (best-effort, fire-and-forget).
+	// Activée uniquement si le notification-service est configuré → post-service
+	// reste autonome sans lui.
+	if cfg.NotificationURL != "" && cfg.InternalSecret != "" {
+		postService.SetNotifier(notifier.New(cfg.NotificationURL, cfg.InternalSecret))
+		log.Printf("[%s] notifications activées → %s", serviceName, cfg.NotificationURL)
+	}
 
 	r := gin.Default()
 	handler.RegisterRoutes(r, serviceName, postService, cfg.JWTSecret)

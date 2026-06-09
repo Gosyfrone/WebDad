@@ -1,10 +1,10 @@
 .PHONY: help env up dev dev-down dev-logs down build logs ps clean reset db-only \
-        logs-gateway logs-auth logs-user logs-profil logs-post logs-front logs-db \
-        sh-auth sh-user sh-profil sh-post sh-gateway \
-        psql-auth psql-user mongo-profil-cli mongo-post-cli
+        logs-gateway logs-auth logs-user logs-profil logs-post logs-message logs-notification logs-front logs-db \
+        sh-auth sh-user sh-profil sh-post sh-message sh-notification sh-gateway \
+        psql-auth psql-user mongo-profil-cli mongo-post-cli mongo-message-cli mongo-notification-cli
 
 # Services possédant un .env propre (chargé par compose via env_file)
-SERVICES := auth-service user-service profil-service post-service api-gateway
+SERVICES := auth-service user-service profil-service post-service message-service notification-service api-gateway
 
 # Invocation compose en mode DEV (overlay hot-reload par-dessus la base)
 DEV := docker compose -f docker-compose.yml -f docker-compose.dev.yml
@@ -27,9 +27,9 @@ help:
 	@echo "  make reset     Reset complet (données supprimées)"
 	@echo "  make db-only   Démarrer seulement les BDD"
 	@echo ""
-	@echo "  Logs d'un service : make logs-auth | logs-user | logs-profil | logs-post | logs-front | logs-gateway | logs-db"
-	@echo "  Shell d'un service: make sh-auth | sh-user | sh-profil | sh-post | sh-gateway"
-	@echo "  CLI BDD           : make psql-auth | psql-user | mongo-profil-cli | mongo-post-cli"
+	@echo "  Logs d'un service : make logs-auth | logs-user | logs-profil | logs-post | logs-message | logs-notification | logs-front | logs-gateway | logs-db"
+	@echo "  Shell d'un service: make sh-auth | sh-user | sh-profil | sh-post | sh-message | sh-notification | sh-gateway"
+	@echo "  CLI BDD           : make psql-auth | psql-user | mongo-profil-cli | mongo-post-cli | mongo-message-cli | mongo-notification-cli"
 	@echo ""
 
 # ─── Préparation des .env ─────────────────────────────────────────
@@ -81,7 +81,7 @@ dev:
 
 # Logs des services applicatifs (front + Go), sans le bruit des BDD.
 dev-logs:
-	$(DEV) logs -f frontend api-gateway auth-service user-service profil-service post-service
+	$(DEV) logs -f frontend api-gateway auth-service user-service profil-service post-service message-service notification-service
 
 dev-down:
 	$(DEV) down
@@ -97,7 +97,7 @@ ps:
 
 # ─── BDD uniquement (pour dev sans rebuilder les services Go) ─────
 db-only:
-	docker compose up -d postgres-auth postgres-user mongo-profil mongo-post
+	docker compose up -d postgres-auth postgres-user mongo-profil mongo-post mongo-message mongo-notification
 	@echo "BDD démarrées. Attente des healthchecks..."
 	@sleep 3
 	docker compose ps
@@ -126,11 +126,17 @@ logs-profil:
 logs-post:
 	docker compose logs -f post-service
 
+logs-message:
+	docker compose logs -f message-service
+
+logs-notification:
+	docker compose logs -f notification-service
+
 logs-front:
 	docker compose logs -f frontend
 
 logs-db:
-	docker compose logs -f postgres-auth postgres-user mongo-profil mongo-post
+	docker compose logs -f postgres-auth postgres-user mongo-profil mongo-post mongo-message mongo-notification
 
 # ─── Shell dans les conteneurs ────────────────────────────────────
 sh-auth:
@@ -144,6 +150,12 @@ sh-profil:
 
 sh-post:
 	docker compose exec post-service sh
+
+sh-message:
+	docker compose exec message-service sh
+
+sh-notification:
+	docker compose exec notification-service sh
 
 sh-gateway:
 	docker compose exec api-gateway sh
@@ -163,3 +175,9 @@ mongo-profil-cli:
 
 mongo-post-cli:
 	docker compose exec mongo-post sh -c 'mongosh -u "$$MONGO_INITDB_ROOT_USERNAME" -p "$$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin "$$MONGO_INITDB_DATABASE"'
+
+mongo-message-cli:
+	docker compose exec mongo-message sh -c 'mongosh -u "$$MONGO_INITDB_ROOT_USERNAME" -p "$$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin "$$MONGO_INITDB_DATABASE"'
+
+mongo-notification-cli:
+	docker compose exec mongo-notification sh -c 'mongosh -u "$$MONGO_INITDB_ROOT_USERNAME" -p "$$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin "$$MONGO_INITDB_DATABASE"'

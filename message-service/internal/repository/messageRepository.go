@@ -213,6 +213,27 @@ func (r *MessageRepository) SetMemberPinned(ctx context.Context, conversationID,
 	return nil
 }
 
+// SetMemberMuted met en sourdine (ou réactive) une conversation pour un membre.
+// `at == nil` réactive (`$unset`), sinon pose la sourdine. mongo.ErrNoDocuments
+// si absent.
+func (r *MessageRepository) SetMemberMuted(ctx context.Context, conversationID, userID string, at *time.Time) error {
+	var update bson.M
+	if at == nil {
+		update = bson.M{"$unset": bson.M{"muted_at": ""}}
+	} else {
+		update = bson.M{"$set": bson.M{"muted_at": *at}}
+	}
+	res, err := r.members.UpdateOne(ctx,
+		bson.M{"conversation_id": conversationID, "user_id": userID}, update)
+	if err != nil {
+		return err
+	}
+	if res.MatchedCount == 0 {
+		return mongo.ErrNoDocuments
+	}
+	return nil
+}
+
 // SetMemberCleared pose la date de suppression côté user (masque + coupe
 // l'historique). mongo.ErrNoDocuments si le membre n'existe pas.
 func (r *MessageRepository) SetMemberCleared(ctx context.Context, conversationID, userID string, at time.Time) error {
@@ -234,6 +255,78 @@ func (r *MessageRepository) HasMessagesAfter(ctx context.Context, conversationID
 	filter := bson.M{"conversation_id": conversationID, "created_at": bson.M{"$gt": after}}
 	n, err := r.messages.CountDocuments(ctx, filter, options.Count().SetLimit(1))
 	return n > 0, err
+}
+
+// SetMemberRead avance le curseur de lecture d'un membre (`last_read_at`).
+// mongo.ErrNoDocuments si le membre n'existe pas.
+func (r *MessageRepository) SetMemberRead(ctx context.Context, conversationID, userID string, at time.Time) error {
+	res, err := r.members.UpdateOne(ctx,
+		bson.M{"conversation_id": conversationID, "user_id": userID},
+		bson.M{"$set": bson.M{"last_read_at": at}})
+	if err != nil {
+		return err
+	}
+	if res.MatchedCount == 0 {
+		return mongo.ErrNoDocuments
+	}
+	return nil
+}
+
+// CountUnreadConversations renvoie le NOMBRE de conversations de `userID` ayant au
+// moins un message non lu, SANS jamais lire le contenu chiffré (compare seulement
+// `created_at`/`sender_id`, des métadonnées en clair) → l'E2EE reste intact.
+//
+// Un message compte comme non lu s'il est postérieur au curseur de lecture du
+// membre (`last_read_at`) ET à sa suppression côté user (`cleared_at`) ET qu'il
+// n'a pas été envoyé par l'utilisateur lui-même. Le curseur effectif est le max
+// des deux dates (epoch si aucune). Une seule requête (`$lookup` borné à 1
+// message par conversation grâce à l'index `conversation_id`).
+func (r *MessageRepository) CountUnreadConversations(ctx context.Context, userID string) (int, error) {
+	epoch := time.Unix(0, 0)
+	pipeline := mongo.Pipeline{
+		// On exclut d'emblée les conversations en sourdine (muted_at posé) : elles
+		// n'alimentent pas le badge. `muted_at: null` matche aussi le champ absent.
+		bson.D{{Key: "$match", Value: bson.M{"user_id": userID, "muted_at": nil}}},
+		bson.D{{Key: "$addFields", Value: bson.M{
+			"cut": bson.M{"$max": bson.A{
+				bson.M{"$ifNull": bson.A{"$last_read_at", epoch}},
+				bson.M{"$ifNull": bson.A{"$cleared_at", epoch}},
+			}},
+		}}},
+		bson.D{{Key: "$lookup", Value: bson.M{
+			"from": "messages",
+			"let":  bson.M{"conv": "$conversation_id", "cut": "$cut"},
+			"pipeline": mongo.Pipeline{
+				bson.D{{Key: "$match", Value: bson.M{"$expr": bson.M{"$and": bson.A{
+					bson.M{"$eq": bson.A{"$conversation_id", "$$conv"}},
+					bson.M{"$ne": bson.A{"$sender_id", userID}},
+					bson.M{"$gt": bson.A{"$created_at", "$$cut"}},
+				}}}}},
+				bson.D{{Key: "$limit", Value: 1}},
+				bson.D{{Key: "$project", Value: bson.M{"_id": 1}}},
+			},
+			"as": "unread",
+		}}},
+		bson.D{{Key: "$match", Value: bson.M{"unread": bson.M{"$ne": bson.A{}}}}},
+		bson.D{{Key: "$count", Value: "count"}},
+	}
+
+	cursor, err := r.members.Aggregate(ctx, pipeline)
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = cursor.Close(ctx) }()
+
+	var rows []struct {
+		Count int `bson:"count"`
+	}
+	if err := cursor.All(ctx, &rows); err != nil {
+		return 0, err
+	}
+	if len(rows) == 0 {
+		return 0, nil
+	}
+	return rows[0].Count, nil
 }
 
 // SetMemberRole change le rôle d'un membre. mongo.ErrNoDocuments si absent.

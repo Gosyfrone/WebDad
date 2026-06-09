@@ -84,7 +84,15 @@ type Member struct {
 	KeyEnvelope    string        `bson:"key_envelope,omitempty" json:"key_envelope,omitempty"`
 	PinnedAt       *time.Time    `bson:"pinned_at,omitempty" json:"-"`
 	ClearedAt      *time.Time    `bson:"cleared_at,omitempty" json:"-"`
-	CreatedAt      time.Time     `bson:"created_at" json:"created_at"`
+	// LastReadAt : curseur de lecture de CE membre (nil = jamais lu ici). Sert au
+	// calcul du non-lu côté serveur (compteur + pastille) — métadonnée, jamais le
+	// contenu chiffré.
+	LastReadAt *time.Time `bson:"last_read_at,omitempty" json:"-"`
+	// MutedAt : mise en sourdine de la conversation par CE membre (nil = active).
+	// En sourdine, la conversation est EXCLUE du badge non-lu (mais reste « non
+	// lue » dans la liste). État par-utilisateur.
+	MutedAt   *time.Time `bson:"muted_at,omitempty" json:"-"`
+	CreatedAt time.Time  `bson:"created_at" json:"created_at"`
 }
 
 // Message — document de la collection `messages`. UNIQUEMENT du chiffré.
@@ -112,10 +120,16 @@ type ConversationView struct {
 	ContentKey string `json:"content_key,omitempty"`
 	// PinnedAt : épinglage de la conversation par CE membre (nil/omis = non
 	// épinglée). Sert au tri « épinglé d'abord » côté client.
-	PinnedAt  *time.Time `json:"pinned_at,omitempty"`
-	CreatedBy string     `json:"created_by"`
-	CreatedAt time.Time  `json:"created_at"`
-	UpdatedAt time.Time  `json:"updated_at"`
+	PinnedAt *time.Time `json:"pinned_at,omitempty"`
+	// LastReadAt : curseur de lecture de CE membre (nil/omis = jamais lu). Sert à
+	// la pastille « non-lu » de la liste et à l'ancre « Nouveaux messages ».
+	LastReadAt *time.Time `json:"last_read_at,omitempty"`
+	// Muted : la conversation est-elle en sourdine pour CE membre ? (exclue du
+	// badge non-lu app-wide, mais toujours « non lue » dans la liste).
+	Muted     bool      `json:"muted"`
+	CreatedBy string    `json:"created_by"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // MemberView — un membre exposé dans la liste des membres (sans son enveloppe :

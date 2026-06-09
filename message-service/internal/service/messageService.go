@@ -584,6 +584,49 @@ func (s *MessageService) ClearConversation(ctx context.Context, conversationID, 
 	return nil
 }
 
+// MuteConversation met en sourdine (`mute=true`) ou réactive (`mute=false`) une
+// conversation pour le membre courant, et renvoie sa vue à jour. Membre requis.
+func (s *MessageService) MuteConversation(ctx context.Context, conversationID, userID string, mute bool) (*models.ConversationView, error) {
+	if _, err := s.requireMember(ctx, conversationID, userID); err != nil {
+		return nil, err
+	}
+	var at *time.Time
+	if mute {
+		now := time.Now()
+		at = &now
+	}
+	if err := s.repo.SetMemberMuted(ctx, conversationID, userID, at); err != nil {
+		return nil, translateNotFound(err)
+	}
+	oid, err := parseID(conversationID)
+	if err != nil {
+		return nil, err
+	}
+	conv, err := s.repo.GetConversation(ctx, oid)
+	if err != nil {
+		return nil, translateNotFound(err)
+	}
+	return s.viewFor(ctx, conv, userID)
+}
+
+// MarkRead avance le curseur de lecture du membre courant à maintenant (la
+// conversation est désormais « lue jusqu'ici »). Membre requis.
+func (s *MessageService) MarkRead(ctx context.Context, conversationID, userID string) error {
+	if _, err := s.requireMember(ctx, conversationID, userID); err != nil {
+		return err
+	}
+	if err := s.repo.SetMemberRead(ctx, conversationID, userID, time.Now()); err != nil {
+		return translateNotFound(err)
+	}
+	return nil
+}
+
+// UnreadCount renvoie le nombre de conversations de l'utilisateur ayant au moins
+// un message non lu (calcul serveur, sans lire le contenu chiffré).
+func (s *MessageService) UnreadCount(ctx context.Context, userID string) (int, error) {
+	return s.repo.CountUnreadConversations(ctx, userID)
+}
+
 // GetConversation renvoie la vue d'une conversation pour un membre (403 sinon).
 func (s *MessageService) GetConversation(ctx context.Context, conversationID, userID string) (*models.ConversationView, error) {
 	oid, err := parseID(conversationID)
@@ -786,6 +829,8 @@ func buildView(conv *models.Conversation, m *models.Member) models.ConversationV
 		MyRole:     m.Role,
 		MyEnvelope: m.KeyEnvelope,
 		PinnedAt:   m.PinnedAt,
+		LastReadAt: m.LastReadAt,
+		Muted:      m.MutedAt != nil,
 		CreatedBy:  conv.CreatedBy,
 		CreatedAt:  conv.CreatedAt,
 		UpdatedAt:  conv.UpdatedAt,

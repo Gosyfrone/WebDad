@@ -7,6 +7,8 @@ import { Bell, Mail, Search } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import { ROUTES } from '@/lib/routes'
+import { useNotifications } from '@/components/notifications-provider'
+import { useMessages } from '@/components/messages-provider'
 import { useT } from '@/components/language-provider'
 
 interface TabItem {
@@ -31,6 +33,8 @@ const TABS: TabItem[] = [
 export function MobileTabBar() {
   const t = useT()
   const pathname = usePathname()
+  const { unreadCount } = useNotifications()
+  const { unreadCount: msgUnread } = useMessages()
 
   return (
     <nav
@@ -40,6 +44,17 @@ export function MobileTabBar() {
       {TABS.map((tab) => {
         const active = pathname === tab.href
         const Icon = tab.icon
+        const badgeCount =
+          tab.href === ROUTES.notifications
+            ? unreadCount
+            : tab.href === ROUTES.messages
+              ? msgUnread
+              : 0
+        const showBadge = badgeCount > 0
+        const badgeAria =
+          tab.href === ROUTES.messages
+            ? t('messages.badge_aria', { count: badgeCount })
+            : t('notifications.unread_aria', { count: badgeCount })
 
         return (
           <Link
@@ -50,10 +65,20 @@ export function MobileTabBar() {
             className="flex flex-1 items-center justify-center transition-colors hover:bg-accent"
           >
             {Icon ? (
-              <Icon
-                className={cn('h-6 w-6', active ? 'text-primary' : 'text-muted-foreground')}
-                aria-hidden
-              />
+              <span className="relative">
+                <Icon
+                  className={cn('h-6 w-6', active ? 'text-primary' : 'text-muted-foreground')}
+                  aria-hidden
+                />
+                {showBadge && (
+                  <span
+                    aria-label={badgeAria}
+                    className="absolute -right-2 -top-1.5 flex h-[16px] min-w-[16px] items-center justify-center rounded-full bg-gradient-to-r from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] px-1 text-[10px] font-bold leading-none text-white shadow"
+                  >
+                    {badgeCount > 99 ? '99+' : badgeCount}
+                  </span>
+                )}
+              </span>
             ) : (
               <Image
                 src="/logo_only.png"

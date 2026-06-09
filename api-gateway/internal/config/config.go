@@ -32,11 +32,12 @@ func Load() *Config {
 		GinMode:        getEnv("GIN_MODE", "debug"),
 		AllowedOrigins: splitCSV(getEnv("CORS_ALLOWED_ORIGINS", "http://localhost:3000")),
 		Services: map[string]string{
-			"/auth":     getEnv("AUTH_SERVICE_URL", "http://localhost:8081"),
-			"/users":    getEnv("USER_SERVICE_URL", "http://localhost:8082"),
-			"/profils":  getEnv("PROFIL_SERVICE_URL", "http://localhost:8083"),
-			"/posts":    getEnv("POST_SERVICE_URL", "http://localhost:8084"),
-			"/messages": getEnv("MESSAGE_SERVICE_URL", "http://localhost:8085"),
+			"/auth":          getEnv("AUTH_SERVICE_URL", "http://localhost:8081"),
+			"/users":         getEnv("USER_SERVICE_URL", "http://localhost:8082"),
+			"/profils":       getEnv("PROFIL_SERVICE_URL", "http://localhost:8083"),
+			"/posts":         getEnv("POST_SERVICE_URL", "http://localhost:8084"),
+			"/messages":      getEnv("MESSAGE_SERVICE_URL", "http://localhost:8085"),
+			"/notifications": getEnv("NOTIFICATION_SERVICE_URL", "http://localhost:8086"),
 		},
 	}
 }

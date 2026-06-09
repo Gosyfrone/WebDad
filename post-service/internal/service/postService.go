@@ -12,6 +12,7 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo"
 
 	"github.com/webdad/post-service/internal/models"
+	"github.com/webdad/post-service/internal/notifier"
 	"github.com/webdad/post-service/internal/repository"
 )
 
@@ -33,23 +34,37 @@ const (
 
 type PostService struct {
 	repo *repository.PostRepository
+	// notif émet les événements de notification (like, commentaire, mention…).
+	// Par défaut un no-op : le post-service reste autonome si le
+	// notification-service n'est pas configuré. Câblé via SetNotifier au boot.
+	notif notifier.Notifier
 }
 
 func NewPostService(r *repository.PostRepository) *PostService {
-	return &PostService{repo: r}
+	return &PostService{repo: r, notif: notifier.Noop{}}
+}
+
+// SetNotifier branche l'émetteur d'événements de notification (best-effort).
+func (s *PostService) SetNotifier(n notifier.Notifier) {
+	if n != nil {
+		s.notif = n
+	}
 }
 
 // CreatePost crée un post pour authorID (dérivé du JWT) et renvoie le document
 // créé (avec son id généré). Les compteurs sont posés à 0 explicitement.
 func (s *PostService) CreatePost(ctx context.Context, authorID, content, quotePostID string) (*models.Post, error) {
+	quotedAuthorID := "" // auteur du post cité (destinataire de la notif « citation »)
 	if quotePostID != "" {
 		quoteOID, err := parseID(quotePostID)
 		if err != nil {
 			return nil, err
 		}
-		if _, err := s.repo.Get(ctx, quoteOID); err != nil {
+		quoted, err := s.repo.Get(ctx, quoteOID)
+		if err != nil {
 			return nil, translateNotFound(err)
 		}
+		quotedAuthorID = quoted.AuthorID
 	}
 	now := time.Now()
 	post := &models.Post{
@@ -64,6 +79,26 @@ func (s *PostService) CreatePost(ctx context.Context, authorID, content, quotePo
 	}
 	if err := s.repo.Create(ctx, post); err != nil {
 		return nil, err
+	}
+	// Citation = tag implicite de l'auteur cité → notif (navigation vers le post
+	// citant). Une notif par citation (façon mention, pas d'agrégation). La
+	// suppression du post citant la purge via la cascade post_deleted.
+	if quotePostID != "" {
+		s.notif.Emit(notifier.Event{
+			Type:        notifier.TypeQuote,
+			ActorID:     authorID,
+			RecipientID: quotedAuthorID,
+			PostID:      post.ID.Hex(),
+		})
+	}
+	// Notifie les utilisateurs mentionnés (@handle) dans le post.
+	if handles := notifier.ParseMentions(content); len(handles) > 0 {
+		s.notif.Emit(notifier.Event{
+			Type:           notifier.TypeMention,
+			ActorID:        authorID,
+			PostID:         post.ID.Hex(),
+			MentionHandles: handles,
+		})
 	}
 	return post, nil
 }
@@ -160,6 +195,13 @@ func (s *PostService) DeletePost(ctx context.Context, id, actorID, actorRole str
 	_ = s.repo.DeleteLikesByPost(ctx, id)
 	_ = s.repo.DeleteCommentsByPost(ctx, id)
 	_ = s.repo.DeleteRepostsByPost(ctx, id)
+	// Purge en cascade les notifications pointant vers ce post (likes,
+	// commentaires, mentions) — plus de notification orpheline vers un post mort.
+	s.notif.Emit(notifier.Event{
+		Type:    notifier.EventPostDeleted,
+		ActorID: actorID,
+		PostID:  id,
+	})
 	return nil
 }
 
@@ -201,6 +243,13 @@ func (s *PostService) LikePost(ctx context.Context, id, actorID string) (int32, 
 	if err != nil {
 		return 0, err
 	}
+	// Notifie l'auteur du post (agrégé : 300 likes = une seule notification).
+	s.notif.Emit(notifier.Event{
+		Type:        notifier.TypeLike,
+		ActorID:     actorID,
+		RecipientID: post.AuthorID,
+		PostID:      id,
+	})
 	return updated.LikesCount, nil
 }
 
@@ -226,6 +275,14 @@ func (s *PostService) UnlikePost(ctx context.Context, id, actorID string) (int32
 	if err != nil {
 		return 0, err
 	}
+	// Défait la notification de like correspondante (décrément / suppression).
+	s.notif.Emit(notifier.Event{
+		Type:        notifier.TypeLike,
+		ActorID:     actorID,
+		RecipientID: post.AuthorID,
+		PostID:      id,
+		Retract:     true,
+	})
 	return updated.LikesCount, nil
 }
 
@@ -262,6 +319,14 @@ func (s *PostService) RepostPost(ctx context.Context, id, actorID string) (*mode
 		if err != nil {
 			return nil, err
 		}
+		// Repost = tag implicite de l'auteur → notif agrégée (« X et N autres
+		// ont reposté votre publication »), navigation vers le post original.
+		s.notif.Emit(notifier.Event{
+			Type:        notifier.TypeRepost,
+			ActorID:     actorID,
+			RecipientID: post.AuthorID,
+			PostID:      id,
+		})
 	}
 	post.RepostedByID = actorID
 	post.RepostedAt = &repost.CreatedAt
@@ -289,6 +354,14 @@ func (s *PostService) UnrepostPost(ctx context.Context, id, actorID string) (int
 	if err != nil {
 		return 0, err
 	}
+	// Défait la notification de repost correspondante (décrément / suppression).
+	s.notif.Emit(notifier.Event{
+		Type:        notifier.TypeRepost,
+		ActorID:     actorID,
+		RecipientID: post.AuthorID,
+		PostID:      id,
+		Retract:     true,
+	})
 	return updated.RepostsCount, nil
 }
 
@@ -305,11 +378,13 @@ func (s *PostService) CreateComment(ctx context.Context, postID, authorID, conte
 	if err != nil {
 		return nil, err
 	}
-	if _, err := s.repo.Get(ctx, oid); err != nil {
+	post, err := s.repo.Get(ctx, oid)
+	if err != nil {
 		return nil, translateNotFound(err)
 	}
 
 	rootID := ""
+	rootAuthorID := "" // auteur du commentaire racine du fil (destinataire de la notif « réponse »)
 	if parentID != "" {
 		pcoid, err := parseID(parentID)
 		if err != nil {
@@ -323,6 +398,14 @@ func (s *PostService) CreateComment(ctx context.Context, postID, authorID, conte
 			return nil, ErrPostNotFound // parent rattaché à un autre post
 		}
 		rootID = resolveParentID(parent, parentID)
+		// Le threading est à plat sous la racine : la notif de réponse va à
+		// l'auteur de la RACINE du fil (clé d'agrégation = la racine), ce qui
+		// reste cohérent à la suppression (où seul `parent_id`=racine est stocké).
+		if parent.ParentID == "" {
+			rootAuthorID = parent.AuthorID // parent est déjà la racine
+		} else {
+			rootAuthorID = s.commentAuthor(ctx, rootID)
+		}
 	}
 
 	now := time.Now()
@@ -345,7 +428,76 @@ func (s *PostService) CreateComment(ctx context.Context, postID, authorID, conte
 			_ = s.repo.IncReplyCount(ctx, rcoid, 1)
 		}
 	}
+	s.emitCommentEvents(post.AuthorID, rootID, rootAuthorID, authorID, postID, comment.ID.Hex(), content, false)
 	return comment, nil
+}
+
+// emitCommentEvents émet les notifications liées à un commentaire (à sa création
+// comme à sa suppression, via `retract`). Règles :
+//   - commentaire RACINE (`rootID` vide) → notifie l'auteur du POST ;
+//   - RÉPONSE (`rootID` non vide) → notifie l'auteur du commentaire RACINE du fil
+//     (« réponse à ton commentaire »), agrégée par cette racine ;
+//   - mentions (@handle) dans le contenu → notifie les mentionnés.
+//
+// `commentID` est l'id du commentaire lui-même (source d'agrégation des mentions,
+// stable entre création et suppression).
+func (s *PostService) emitCommentEvents(postAuthorID, rootID, rootAuthorID, actorID, postID, commentID, content string, retract bool) {
+	if rootID == "" {
+		// Commentaire racine → l'auteur du post.
+		s.notif.Emit(notifier.Event{
+			Type:        notifier.TypeComment,
+			ActorID:     actorID,
+			RecipientID: postAuthorID,
+			PostID:      postID,
+			Retract:     retract,
+		})
+	} else {
+		// Réponse → l'auteur de la racine du fil (agrégée par cette racine).
+		s.notif.Emit(notifier.Event{
+			Type:        notifier.TypeReply,
+			ActorID:     actorID,
+			RecipientID: rootAuthorID,
+			PostID:      postID,
+			CommentID:   rootID,
+			Retract:     retract,
+		})
+	}
+	if handles := notifier.ParseMentions(content); len(handles) > 0 {
+		s.notif.Emit(notifier.Event{
+			Type:           notifier.TypeMention,
+			ActorID:        actorID,
+			PostID:         postID,
+			CommentID:      commentID,
+			MentionHandles: handles,
+			Retract:        retract,
+		})
+	}
+}
+
+// commentAuthor renvoie l'auteur d'un commentaire (best-effort, "" si absent).
+func (s *PostService) commentAuthor(ctx context.Context, id string) string {
+	oid, err := parseID(id)
+	if err != nil {
+		return ""
+	}
+	c, err := s.repo.GetComment(ctx, oid)
+	if err != nil {
+		return ""
+	}
+	return c.AuthorID
+}
+
+// postAuthor renvoie l'auteur d'un post (best-effort, "" si absent).
+func (s *PostService) postAuthor(ctx context.Context, id string) string {
+	oid, err := parseID(id)
+	if err != nil {
+		return ""
+	}
+	p, err := s.repo.Get(ctx, oid)
+	if err != nil {
+		return ""
+	}
+	return p.AuthorID
 }
 
 // ListComments renvoie les commentaires RACINE d'un post (chronologiques, paginés).
@@ -398,6 +550,16 @@ func (s *PostService) DeleteComment(ctx context.Context, commentID, actorID, act
 	if poid, err := parseID(comment.PostID); err == nil {
 		_, _ = s.repo.IncCounter(ctx, poid, "comments_count", -removed)
 	}
+
+	// Défait les notifications du commentaire (symétrique de la création).
+	postAuthorID := ""
+	rootAuthorID := ""
+	if comment.ParentID == "" {
+		postAuthorID = s.postAuthor(ctx, comment.PostID)
+	} else {
+		rootAuthorID = s.commentAuthor(ctx, comment.ParentID)
+	}
+	s.emitCommentEvents(postAuthorID, comment.ParentID, rootAuthorID, comment.AuthorID, comment.PostID, commentID, comment.Content, true)
 	return nil
 }
 

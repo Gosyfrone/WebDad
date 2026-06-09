@@ -25,7 +25,8 @@ interface ChatPaneProps {
   myId: string
   /** Dernier message reçu en temps réel pour CETTE conversation (ou null). */
   liveMessage: ChatMessage | null
-  /** Id du dernier message LU capturé à l'ouverture (ancre « Nouveaux messages »). */
+  /** Curseur de lecture (`lastReadAt` ISO) capturé à l'ouverture (ancre
+   *  « Nouveaux messages ») ; null si jamais lu. */
   dividerAnchor: string | null
   /** Retour à la liste (mobile). */
   onBack: () => void
