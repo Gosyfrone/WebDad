@@ -125,7 +125,11 @@ func (s *PostService) CreatePost(ctx context.Context, authorID, content, quotePo
 
 // GetPosts renvoie le fil global, du plus récent au plus ancien, paginé.
 func (s *PostService) GetPosts(ctx context.Context, limit, offset int64) ([]models.Post, error) {
-	return s.repo.GetAll(ctx, clampLimit(limit), clampOffset(offset))
+	posts, err := s.repo.GetAll(ctx, clampLimit(limit), clampOffset(offset))
+	if err != nil {
+		return nil, err
+	}
+	return withoutProfilePins(posts), nil
 }
 
 // GetPost renvoie un post par son id.
@@ -239,7 +243,11 @@ func (s *PostService) GetFeed(ctx context.Context, authorIDs []string, limit, of
 	if len(authorIDs) == 0 {
 		return []models.Post{}, nil
 	}
-	return s.repo.GetByAuthors(ctx, authorIDs, clampLimit(limit), clampOffset(offset))
+	posts, err := s.repo.GetByAuthors(ctx, authorIDs, clampLimit(limit), clampOffset(offset))
+	if err != nil {
+		return nil, err
+	}
+	return withoutProfilePins(posts), nil
 }
 
 // LikePost enregistre un like de actorID sur un post et renvoie le nombre de
@@ -615,6 +623,20 @@ func canAct(authorID, actorID, actorRole string) bool {
 	return authorID == actorID ||
 		actorRole == models.RoleModerator ||
 		actorRole == models.RoleAdmin
+}
+
+// withoutProfilePins masque l'état d'épinglage dans les feeds publics. Le pin
+// reste une information de profil, exposée uniquement par GetByProfile.
+func withoutProfilePins(posts []models.Post) []models.Post {
+	if len(posts) == 0 {
+		return posts
+	}
+	cleaned := make([]models.Post, len(posts))
+	copy(cleaned, posts)
+	for i := range cleaned {
+		cleaned[i].PinnedAt = nil
+	}
+	return cleaned
 }
 
 // parseID valide qu'un id est bien un ObjectID hexadécimal.

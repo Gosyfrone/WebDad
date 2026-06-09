@@ -5,6 +5,7 @@ import { Languages, Loader2 } from 'lucide-react'
 
 import {
   getPageLanguage,
+  isTranslationCandidate,
   translatePostContent,
   type PostTranslation,
 } from '@/lib/post-translation'
@@ -35,6 +36,14 @@ export function TranslatedContent({
 
     setTranslation(null)
     setShowOriginal(false)
+
+    if (!isTranslationCandidate(content, targetLanguage)) {
+      setTranslating(false)
+      return () => {
+        active = false
+      }
+    }
+
     setTranslating(true)
 
     translatePostContent(contentId, content, targetLanguage)

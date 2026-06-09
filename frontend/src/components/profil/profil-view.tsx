@@ -208,7 +208,13 @@ export function ProfilView({ username }: ProfilViewProps) {
         posts.length > 0 ? (
           <div className="divide-y divide-border">
             {posts.map((post) => (
-              <PostCard key={post.id} post={post} onDeleted={handleDeleted} onUpdated={handleUpdated} />
+              <PostCard
+                key={post.id}
+                post={post}
+                showPinBadge
+                onDeleted={handleDeleted}
+                onUpdated={handleUpdated}
+              />
             ))}
           </div>
         ) : (
