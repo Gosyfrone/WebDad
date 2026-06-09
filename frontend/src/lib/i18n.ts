@@ -180,6 +180,9 @@ export const messages: Record<Locale, Messages> = {
     // — Mentions (@handle) —
     'mentions.view_in_search': 'Voir dans la recherche',
     'mentions.user_not_found': 'Compte introuvable',
+    'notifications.follow_request': '{name} demande à vous suivre',
+    'notifications.accept': 'Accepter',
+    'notifications.reject': 'Refuser',
 
     // — Détail d'une publication —
     'common.back': 'Retour',
@@ -463,6 +466,9 @@ export const messages: Record<Locale, Messages> = {
     'profil.empty_posts': 'Aucun post publié pour le moment.',
     'profil.empty_replies': 'Les réponses apparaîtront ici.',
     'profil.empty_likes': 'Les posts que vous aimez apparaîtront ici.',
+    'profil.private_title': 'Ce compte est privé',
+    'profil.private_message':
+      'Suivez ce profil pour voir ses posts, ses réponses et ses mentions J’aime.',
     'profil.edit': 'Éditer le profil',
     'profil.born_on': 'Né(e) le {date}',
     'profil.joined': 'A rejoint en {date}',
@@ -472,7 +478,12 @@ export const messages: Record<Locale, Messages> = {
     // — Bouton de suivi —
     'follow.follow': 'Suivre',
     'follow.followed': 'Abonné',
+    'follow.requested': 'En attente',
     'follow.unfollow': 'Ne plus suivre',
+    'follow.private_unfollow_title': 'Ne plus suivre ce compte privé ?',
+    'follow.private_unfollow_desc':
+      'Vous perdrez l’accès à ses posts, ses réponses, ses mentions J’aime et ses listes d’abonnements.',
+    'follow.private_unfollow_confirm': 'Ne plus suivre',
     'follow.fail_title': 'Suivi impossible',
     'follow.unfail_title': 'Désabonnement impossible',
     'follow.fail_desc': 'Connectez-vous pour gérer vos abonnements.',
@@ -487,6 +498,8 @@ export const messages: Record<Locale, Messages> = {
     'relations.tab_following': '{count} Abonnements',
     'relations.empty_followers': 'Aucun abonné pour le moment.',
     'relations.empty_following': 'Aucun abonnement pour le moment.',
+    'relations.private_locked':
+      'Ce profil est privé. Les compteurs restent visibles, mais la liste détaillée est réservée aux abonnés.',
 
     // — Édition du profil —
     'editprofil.desc': 'Mettez à jour les informations visibles sur votre profil public.',
@@ -641,6 +654,9 @@ export const messages: Record<Locale, Messages> = {
     // — Mentions (@handle) —
     'mentions.view_in_search': 'View in search',
     'mentions.user_not_found': 'Account not found',
+    'notifications.follow_request': '{name} requested to follow you',
+    'notifications.accept': 'Accept',
+    'notifications.reject': 'Reject',
 
     // — Post detail —
     'common.back': 'Back',
@@ -923,6 +939,9 @@ export const messages: Record<Locale, Messages> = {
     'profil.empty_posts': 'No posts yet.',
     'profil.empty_replies': 'Replies will show up here.',
     'profil.empty_likes': 'Posts you like will show up here.',
+    'profil.private_title': 'This account is private',
+    'profil.private_message':
+      'Follow this profile to see their posts, replies, and likes.',
     'profil.edit': 'Edit profile',
     'profil.born_on': 'Born on {date}',
     'profil.joined': 'Joined {date}',
@@ -932,7 +951,12 @@ export const messages: Record<Locale, Messages> = {
     // — Follow button —
     'follow.follow': 'Follow',
     'follow.followed': 'Following',
+    'follow.requested': 'Pending',
     'follow.unfollow': 'Unfollow',
+    'follow.private_unfollow_title': 'Unfollow this private account?',
+    'follow.private_unfollow_desc':
+      'You will lose access to their posts, replies, likes, and follow lists.',
+    'follow.private_unfollow_confirm': 'Unfollow',
     'follow.fail_title': "Couldn't follow",
     'follow.unfail_title': "Couldn't unfollow",
     'follow.fail_desc': 'Sign in to manage your follows.',
@@ -947,6 +971,8 @@ export const messages: Record<Locale, Messages> = {
     'relations.tab_following': '{count} Following',
     'relations.empty_followers': 'No followers yet.',
     'relations.empty_following': 'Not following anyone yet.',
+    'relations.private_locked':
+      'This profile is private. Counts stay visible, but the detailed list is only available to followers.',
 
     // — Profile editing —
     'editprofil.desc': 'Update the information shown on your public profile.',

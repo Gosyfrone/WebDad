@@ -50,6 +50,7 @@ export interface ProfilDetails {
   joinedAt: string
   updatedAt: string
   displayNameChangedAt: string
+  visibility: 'public' | 'private'
   followersCount: number
   followingCount: number
   postsCount: number

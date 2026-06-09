@@ -9,12 +9,13 @@ import (
 
 // Types de notification (alignés sur l'enum du validateur Mongo).
 const (
-	TypeLike    = "like"
-	TypeComment = "comment"
-	TypeReply   = "reply"
-	TypeMention = "mention"
-	TypeRepost  = "repost"
-	TypeQuote   = "quote"
+	TypeLike          = "like"
+	TypeComment       = "comment"
+	TypeReply         = "reply"
+	TypeMention       = "mention"
+	TypeRepost        = "repost"
+	TypeQuote         = "quote"
+	TypeFollowRequest = "follow_request"
 	// TypeMessageMention : mention (@handle) DANS UN MESSAGE (DM / groupe /
 	// communauté). Émise par message-service avec les `recipient_id` déjà
 	// résolus (le serveur de messagerie connaît ses membres) ; agrégée par
@@ -26,7 +27,9 @@ const (
 // Types d'événement reçus de post-service (au-delà des 4 types de notification,
 // `post_deleted` déclenche une purge en cascade — il ne crée pas de notification).
 const (
-	EventPostDeleted = "post_deleted"
+	EventPostDeleted           = "post_deleted"
+	EventFollowRequestAccepted = "follow_request_accepted"
+	EventFollowRequestRejected = "follow_request_rejected"
 )
 
 // Notification — document de la collection `notifications`. Une notification est

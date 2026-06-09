@@ -14,11 +14,13 @@ import (
 
 // Config regroupe la configuration runtime du service.
 type Config struct {
-	Port      string
-	GinMode   string
-	MongoURI  string
-	MongoDB   string
-	JWTSecret string // secret partagé (validation des tokens émis par auth)
+	Port             string
+	GinMode          string
+	MongoURI         string
+	MongoDB          string
+	JWTSecret        string // secret partagé (validation des tokens émis par auth)
+	UserServiceURL   string
+	ProfilServiceURL string
 	// NotificationURL : base du notification-service, vers lequel post-service
 	// émet ses événements (like/commentaire/mention…). Vide → émission désactivée
 	// (post-service reste autonome). InternalSecret authentifie ces appels.
@@ -43,14 +45,16 @@ func Load() *Config {
 	_ = godotenv.Load("../.env")
 
 	cfg := &Config{
-		Port:            getEnv("PORT", "8084"),
-		GinMode:         getEnv("GIN_MODE", "debug"),
-		MongoURI:        buildMongoURI(),
-		MongoDB:         getEnv("MONGO_INITDB_DATABASE", "webdad_post"),
-		JWTSecret:       os.Getenv("JWT_SECRET"),
-		NotificationURL: os.Getenv("NOTIFICATION_SERVICE_URL"),
-		InternalSecret:  os.Getenv("INTERNAL_EVENT_SECRET"),
-		BookmarkWindow:  getDuration("BOOKMARK_SESSION_WINDOW", 5*time.Minute),
+		Port:             getEnv("PORT", "8084"),
+		GinMode:          getEnv("GIN_MODE", "debug"),
+		MongoURI:         buildMongoURI(),
+		MongoDB:          getEnv("MONGO_INITDB_DATABASE", "webdad_post"),
+		JWTSecret:        os.Getenv("JWT_SECRET"),
+		UserServiceURL:   getEnv("USER_SERVICE_URL", defaultServiceURL("user-service", "8082")),
+		ProfilServiceURL: getEnv("PROFIL_SERVICE_URL", defaultServiceURL("profil-service", "8083")),
+		NotificationURL:  os.Getenv("NOTIFICATION_SERVICE_URL"),
+		InternalSecret:   getEnv("INTERNAL_SECRET", os.Getenv("INTERNAL_EVENT_SECRET")),
+		BookmarkWindow:   getDuration("BOOKMARK_SESSION_WINDOW", 5*time.Minute),
 	}
 
 	if cfg.JWTSecret == "" {
@@ -95,4 +99,11 @@ func getEnv(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+func defaultServiceURL(serviceName, port string) string {
+	if _, err := os.Stat("/.dockerenv"); err == nil {
+		return fmt.Sprintf("http://%s:%s", serviceName, port)
+	}
+	return fmt.Sprintf("http://localhost:%s", port)
 }

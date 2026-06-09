@@ -62,13 +62,17 @@ func (h *PostHandler) ListPosts(c *gin.Context) {
 		posts []models.Post
 		err   error
 	)
+	viewerID := ""
+	if claims, ok := middleware.ClaimsFrom(c); ok {
+		viewerID = claims.UserID
+	}
 	switch {
 	case c.Query("author_ids") != "":
-		posts, err = h.service.GetFeed(c.Request.Context(), splitIDs(c.Query("author_ids")), pageLimit(c), pageOffset(c))
+		posts, err = h.service.GetFeed(c.Request.Context(), splitIDs(c.Query("author_ids")), viewerID, pageLimit(c), pageOffset(c))
 	case c.Query("author_id") != "":
-		posts, err = h.service.GetByProfile(c.Request.Context(), c.Query("author_id"), pageLimit(c), pageOffset(c))
+		posts, err = h.service.GetByProfile(c.Request.Context(), c.Query("author_id"), viewerID, pageLimit(c), pageOffset(c))
 	default:
-		posts, err = h.service.GetPosts(c.Request.Context(), pageLimit(c), pageOffset(c))
+		posts, err = h.service.GetPosts(c.Request.Context(), viewerID, pageLimit(c), pageOffset(c))
 	}
 	if err != nil {
 		respondPostError(c, err)
@@ -79,7 +83,11 @@ func (h *PostHandler) ListPosts(c *gin.Context) {
 
 // GetPost : GET /posts/:id (public).
 func (h *PostHandler) GetPost(c *gin.Context) {
-	post, err := h.service.GetPost(c.Request.Context(), c.Param("id"))
+	viewerID := ""
+	if claims, ok := middleware.ClaimsFrom(c); ok {
+		viewerID = claims.UserID
+	}
+	post, err := h.service.GetPost(c.Request.Context(), c.Param("id"), viewerID)
 	if err != nil {
 		respondPostError(c, err)
 		return
@@ -215,6 +223,10 @@ func respondPostError(c *gin.Context, err error) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 	case errors.Is(err, service.ErrForbidden), errors.Is(err, service.ErrDefaultCollection):
 		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+	case errors.Is(err, service.ErrPrivateProfil):
+		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+	case errors.Is(err, service.ErrDependencyUnavailable):
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": err.Error()})
 	default:
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "erreur interne"})
 	}

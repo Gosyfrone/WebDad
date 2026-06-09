@@ -55,6 +55,32 @@ func JWTAuth(secret string) gin.HandlerFunc {
 	}
 }
 
+// OptionalJWTAuth valide le bearer token s'il est présent, sans rendre la route
+// protégée. Utile pour les lectures publiques qui peuvent exposer un peu plus
+// de contenu à l'utilisateur connecté (ex. profils privés suivis).
+func OptionalJWTAuth(secret string) gin.HandlerFunc {
+	key := []byte(secret)
+	return func(c *gin.Context) {
+		header := c.GetHeader("Authorization")
+		if header == "" {
+			c.Next()
+			return
+		}
+
+		parts := strings.SplitN(header, " ", 2)
+		if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
+			c.Next()
+			return
+		}
+
+		claims, err := parseToken(parts[1], key)
+		if err == nil {
+			c.Set(contextKey, claims)
+		}
+		c.Next()
+	}
+}
+
 // ClaimsFrom récupère les claims posés par JWTAuth dans le contexte.
 func ClaimsFrom(c *gin.Context) (*Claims, bool) {
 	val, exists := c.Get(contextKey)

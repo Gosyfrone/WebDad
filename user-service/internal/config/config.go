@@ -14,10 +14,13 @@ import (
 
 // Config regroupe toute la configuration runtime du service.
 type Config struct {
-	Port        string
-	GinMode     string
-	DatabaseURL string // DSN PostgreSQL (lib/pq)
-	JWTSecret   string // secret partagé (validation des tokens émis par auth)
+	Port                   string
+	GinMode                string
+	DatabaseURL            string // DSN PostgreSQL (lib/pq)
+	JWTSecret              string // secret partagé (validation des tokens émis par auth)
+	ProfilServiceURL       string
+	NotificationServiceURL string
+	InternalSecret         string
 
 	// UsernameCooldown : délai minimal imposé entre deux changements de
 	// username. 0 = désactivé (défaut) — le timestamp est tout de même
@@ -39,11 +42,14 @@ func Load() *Config {
 	_ = godotenv.Load("../.env")
 
 	cfg := &Config{
-		Port:             getEnv("PORT", "8082"),
-		GinMode:          getEnv("GIN_MODE", "debug"),
-		DatabaseURL:      buildDSN(),
-		JWTSecret:        os.Getenv("JWT_SECRET"),
-		UsernameCooldown: parseDuration("USERNAME_CHANGE_COOLDOWN", 0),
+		Port:                   getEnv("PORT", "8082"),
+		GinMode:                getEnv("GIN_MODE", "debug"),
+		DatabaseURL:            buildDSN(),
+		JWTSecret:              os.Getenv("JWT_SECRET"),
+		ProfilServiceURL:       getEnv("PROFIL_SERVICE_URL", defaultServiceURL("profil-service", "8083")),
+		NotificationServiceURL: os.Getenv("NOTIFICATION_SERVICE_URL"),
+		InternalSecret:         getEnv("INTERNAL_SECRET", os.Getenv("INTERNAL_EVENT_SECRET")),
+		UsernameCooldown:       parseDuration("USERNAME_CHANGE_COOLDOWN", 0),
 	}
 
 	if cfg.JWTSecret == "" {
@@ -90,4 +96,11 @@ func getEnv(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+func defaultServiceURL(serviceName, port string) string {
+	if _, err := os.Stat("/.dockerenv"); err == nil {
+		return fmt.Sprintf("http://%s:%s", serviceName, port)
+	}
+	return fmt.Sprintf("http://localhost:%s", port)
 }

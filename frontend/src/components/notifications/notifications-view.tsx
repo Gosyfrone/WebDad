@@ -2,10 +2,11 @@
 
 import { useEffect } from 'react'
 import Link from 'next/link'
-import { AtSign, Bell, Heart, MessageCircle, Quote, Repeat2, Reply, Send } from 'lucide-react'
+import { AtSign, Bell, Heart, MessageCircle, Quote, Repeat2, Reply, Send, UserPlus } from 'lucide-react'
 
 import { cn, timeAgo } from '@/lib/utils'
 import { type AppNotification, type NotificationType, notificationHref } from '@/lib/notifications'
+import { acceptFollowRequest, rejectFollowRequest } from '@/lib/api'
 import { useLanguage } from '@/components/language-provider'
 import { useNotifications } from '@/components/notifications-provider'
 import { ProfilLink } from '@/components/profil/profil-link'
@@ -21,6 +22,7 @@ const TYPE_ICON: Record<NotificationType, { Icon: React.ElementType; className: 
   repost: { Icon: Repeat2, className: 'text-emerald-500' },
   quote: { Icon: Quote, className: 'text-[#8D3DFF]' },
   message_mention: { Icon: Send, className: 'text-[#8D3DFF]' },
+  follow_request: { Icon: UserPlus, className: 'text-emerald-500' },
 }
 
 export function NotificationsView() {
@@ -62,6 +64,8 @@ export function NotificationsView() {
         return count > 0
           ? t('notifications.message_mention_other', { name, count })
           : t('notifications.message_mention_one', { name })
+      case 'follow_request':
+        return t('notifications.follow_request', { name })
     }
   }
 
@@ -89,12 +93,13 @@ export function NotificationsView() {
                   !n.isRead && 'bg-[#5B6CFF]/5',
                 )}
               >
-                {/* Lien étiré : tout le bloc mène au post concerné. */}
-                <Link
-                  href={notificationHref(n)}
-                  aria-label={describe(n)}
-                  className="absolute inset-0"
-                />
+                {n.type !== 'follow_request' && (
+                  <Link
+                    href={notificationHref(n)}
+                    aria-label={describe(n)}
+                    className="absolute inset-0"
+                  />
+                )}
 
                 {/* Avatar de l'acteur (au-dessus du lien étiré → mène au profil). */}
                 <div className="relative z-10">
@@ -123,6 +128,20 @@ export function NotificationsView() {
                     </span>
                   </p>
                   <span className="text-xs text-muted-foreground">{timeAgo(n.updatedAt, locale)}</span>
+                  {n.type === 'follow_request' && (
+                    <div className="relative z-10 mt-2 flex gap-2">
+                      <Button size="sm" onClick={() => acceptFollowRequest(n.actor.id).then(loadInitial)}>
+                        {t('notifications.accept')}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => rejectFollowRequest(n.actor.id).then(loadInitial)}
+                      >
+                        {t('notifications.reject')}
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </li>
             )

@@ -28,6 +28,7 @@ type ApiProfil = {
   created_at?: string
   updated_at?: string
   display_name_changed_at?: string
+  visibility?: 'public' | 'private'
 }
 
 type JwtClaims = {
@@ -121,6 +122,7 @@ function mergeProfil(
     joinedAt: user.created_at,
     updatedAt: profil?.updated_at ?? user.updated_at ?? user.created_at,
     displayNameChangedAt: profil?.display_name_changed_at ?? '',
+    visibility: profil?.visibility === 'private' ? 'private' : 'public',
     followersCount: user.follower_count ?? 0,
     followingCount: user.following_count ?? 0,
     postsCount: 0,

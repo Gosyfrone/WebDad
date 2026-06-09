@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Loader2, Users } from 'lucide-react'
+import { Loader2, Lock, Users } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import type { RelationKind } from '@/lib/api'
@@ -27,6 +27,7 @@ interface RelationsDialogProps {
   /** Compteurs (libellés des onglets). */
   followersCount: number
   followingCount: number
+  locked?: boolean
 }
 
 /**
@@ -42,6 +43,7 @@ export function RelationsDialog({
   initialTab,
   followersCount,
   followingCount,
+  locked = false,
 }: RelationsDialogProps) {
   const t = useT()
   const [tab, setTab] = useState<RelationKind>(initialTab)
@@ -67,7 +69,7 @@ export function RelationsDialog({
 
   // Charge la liste de l'onglet actif (une seule fois, mise en cache).
   useEffect(() => {
-    if (!open || lists[tab]) return
+    if (!open || locked || lists[tab]) return
     const id = ++requestId.current
     setLoading(true)
     setError(null)
@@ -83,7 +85,7 @@ export function RelationsDialog({
       .finally(() => {
         if (id === requestId.current) setLoading(false)
       })
-  }, [open, tab, userId, lists, t])
+  }, [open, locked, tab, userId, lists, t])
 
   const current = lists[tab]
 
@@ -106,7 +108,12 @@ export function RelationsDialog({
 
         {/* Contenu */}
         <div className="max-h-[60vh] min-h-[16rem] overflow-y-auto">
-          {loading || !current ? (
+          {locked ? (
+            <CenteredState>
+              <Lock className="h-8 w-8 text-[#5B6CFF] dark:text-[#9aa6ff]" aria-hidden />
+              <p className="text-sm text-muted-foreground">{t('relations.private_locked')}</p>
+            </CenteredState>
+          ) : loading || !current ? (
             <CenteredState>
               <Loader2 className="h-6 w-6 animate-spin text-[#5B6CFF] dark:text-[#9aa6ff]" />
             </CenteredState>

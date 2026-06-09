@@ -151,10 +151,98 @@ func (r *UserRepository) Follow(followerID, followingID string) error {
 	return err
 }
 
+func (r *UserRepository) RequestFollow(followerID, followingID string) error {
+	const q = `
+		INSERT INTO follow_requests (follower_id, following_id)
+		VALUES ($1, $2)
+		ON CONFLICT (follower_id, following_id) DO NOTHING`
+	_, err := r.db.Exec(q, followerID, followingID)
+	return err
+}
+
+func (r *UserRepository) DeleteFollowRequest(followerID, followingID string) error {
+	const q = `DELETE FROM follow_requests WHERE follower_id = $1 AND following_id = $2`
+	_, err := r.db.Exec(q, followerID, followingID)
+	return err
+}
+
+func (r *UserRepository) HasFollowRequest(followerID, followingID string) (bool, error) {
+	var exists bool
+	err := r.db.QueryRow(`
+		SELECT EXISTS (
+			SELECT 1 FROM follow_requests
+			WHERE follower_id = $1 AND following_id = $2
+		)`,
+		followerID, followingID,
+	).Scan(&exists)
+	return exists, err
+}
+
+func (r *UserRepository) PendingFollowRequestIDs(followerID string) ([]string, error) {
+	rows, err := r.db.Query(`
+		SELECT following_id::text
+		FROM follow_requests
+		WHERE follower_id = $1
+		ORDER BY created_at DESC`,
+		followerID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	ids := make([]string, 0)
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
+func (r *UserRepository) AcceptFollowRequest(followerID, followingID string) (bool, error) {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	res, err := tx.Exec(`DELETE FROM follow_requests WHERE follower_id = $1 AND following_id = $2`, followerID, followingID)
+	if err != nil {
+		return false, err
+	}
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+	if affected == 0 {
+		if err := tx.Commit(); err != nil {
+			return false, err
+		}
+		return false, nil
+	}
+	if _, err := tx.Exec(`
+		INSERT INTO follows (follower_id, following_id)
+		VALUES ($1, $2)
+		ON CONFLICT (follower_id, following_id) DO NOTHING`,
+		followerID, followingID,
+	); err != nil {
+		return false, err
+	}
+	if err := tx.Commit(); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 // Unfollow supprime la relation (idempotent : aucune erreur si absente).
 func (r *UserRepository) Unfollow(followerID, followingID string) error {
-	const q = `DELETE FROM follows WHERE follower_id = $1 AND following_id = $2`
-	_, err := r.db.Exec(q, followerID, followingID)
+	_, err := r.db.Exec(`DELETE FROM follows WHERE follower_id = $1 AND following_id = $2`, followerID, followingID)
+	if err != nil {
+		return err
+	}
+	_, err = r.db.Exec(`DELETE FROM follow_requests WHERE follower_id = $1 AND following_id = $2`, followerID, followingID)
 	return err
 }
 
@@ -207,6 +295,20 @@ func (r *UserRepository) ListByFollowers(limit, offset int) ([]models.User, erro
 		         created_at DESC
 		LIMIT $1 OFFSET $2`
 	return r.queryUsers(q, limit, offset)
+}
+
+func (r *UserRepository) IsFollowing(followerID, followingID string) (bool, error) {
+	var exists bool
+	err := r.db.QueryRow(`
+        SELECT EXISTS (
+            SELECT 1 FROM follows
+            WHERE follower_id = $1
+            AND   following_id = $2
+        )`,
+		followerID, followingID,
+	).Scan(&exists)
+
+	return exists, err
 }
 
 // escapeLike neutralise les métacaractères LIKE (`%`, `_`, `\`) pour que la

@@ -219,14 +219,35 @@ export async function getFollowingIds(userId: string): Promise<Set<string>> {
   return new Set((users ?? []).map((u) => u.id))
 }
 
-/** Suit un utilisateur (`POST /users/:id/follow`, idempotent côté API). */
-export async function follow(userId: string): Promise<void> {
+export type FollowStatus = 'following' | 'pending'
+
+/** Suit un utilisateur ou crée une demande si son profil est privé. */
+export async function follow(userId: string): Promise<FollowStatus> {
   const res = await apiFetch(`/users/${userId}/follow`, { method: 'POST' })
   if (!res.ok) throw new ApiError('Suivi impossible', res.status)
+  const body = (await res.json().catch(() => null)) as { data?: { status?: FollowStatus } } | null
+  return body?.data?.status ?? 'following'
+}
+
+export async function getPendingFollowRequestIds(): Promise<Set<string>> {
+  const ids = await unwrap<string[]>(
+    await apiFetch('/users/me/follow-requests/outgoing'),
+  )
+  return new Set(ids ?? [])
 }
 
 /** Se désabonne (`DELETE /users/:id/follow`, idempotent côté API). */
 export async function unfollow(userId: string): Promise<void> {
   const res = await apiFetch(`/users/${userId}/follow`, { method: 'DELETE' })
   if (!res.ok) throw new ApiError('Désabonnement impossible', res.status)
+}
+
+export async function acceptFollowRequest(followerId: string): Promise<void> {
+  const res = await apiFetch(`/users/follow-requests/${followerId}/accept`, { method: 'POST' })
+  if (!res.ok) throw new ApiError('Acceptation impossible', res.status)
+}
+
+export async function rejectFollowRequest(followerId: string): Promise<void> {
+  const res = await apiFetch(`/users/follow-requests/${followerId}/reject`, { method: 'POST' })
+  if (!res.ok) throw new ApiError('Refus impossible', res.status)
 }

@@ -67,7 +67,18 @@ func (s *NotificationService) HandleEvent(ctx context.Context, ev models.Event) 
 		}
 		return nil
 
-	case models.TypeLike, models.TypeComment, models.TypeReply, models.TypeRepost, models.TypeQuote:
+	case models.EventFollowRequestAccepted, models.EventFollowRequestRejected:
+		if ev.RecipientID == "" || ev.ActorID == "" || ev.RecipientID == ev.ActorID {
+			return nil
+		}
+		status := "accepted"
+		if ev.Type == models.EventFollowRequestRejected {
+			status = "rejected"
+		}
+		s.pushFollowRequestDecision(ev.RecipientID, ev.ActorID, status)
+		return nil
+
+	case models.TypeLike, models.TypeComment, models.TypeReply, models.TypeRepost, models.TypeQuote, models.TypeFollowRequest:
 		recipient := ev.RecipientID
 		if recipient == "" || recipient == ev.ActorID {
 			return nil // pas de notification à soi-même
@@ -220,6 +231,16 @@ func (s *NotificationService) pushRefresh(recipientID string) {
 	s.publisher.Publish([]string{recipientID}, map[string]any{"type": "notification_refresh"})
 }
 
+func (s *NotificationService) pushFollowRequestDecision(recipientID, actorID, status string) {
+	s.publisher.Publish([]string{recipientID}, map[string]any{
+		"type": "follow_request_decision",
+		"data": map[string]string{
+			"actor_id": actorID,
+			"status":   status,
+		},
+	})
+}
+
 // --- Helpers PURS (testés) ---------------------------------------------------
 
 // groupKeyFor construit la clé d'agrégation d'un événement. C'est elle qui
@@ -271,6 +292,11 @@ func groupKeyFor(ev models.Event) (string, bool) {
 			return "", false
 		}
 		return "message_mention:" + ev.ConversationID, true
+	case models.TypeFollowRequest:
+		if ev.ActorID == "" {
+			return "", false
+		}
+		return "follow_request:" + ev.ActorID, true
 	}
 	return "", false
 }

@@ -40,9 +40,17 @@ func New(users *service.UserService, jwtSecret string) *gin.Engine {
 		u.POST("", auth, h.Create)
 		u.GET("/me", auth, h.GetMe)
 		u.PATCH("/me", auth, h.UpdateMe)
+		u.GET("/me/follow-requests/outgoing", auth, h.PendingFollowRequests)
 		u.DELETE("/:id", auth, h.Delete) // admin (vérifié dans le handler)
 		u.POST("/:id/follow", auth, h.Follow)
 		u.DELETE("/:id/follow", auth, h.Unfollow)
+		u.POST("/follow-requests/:followerId/accept", auth, h.AcceptFollowRequest)
+		u.POST("/follow-requests/:followerId/reject", auth, h.RejectFollowRequest)
+	}
+	internal := r.Group("/internal")
+	{
+		internal.GET("/:userId/is-following/:followingId", h.IsFollowing)
+		internal.GET("/follows/:userId/is-following/:followingId", h.IsFollowing)
 	}
 
 	return r

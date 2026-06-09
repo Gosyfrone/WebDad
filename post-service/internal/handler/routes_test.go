@@ -28,7 +28,10 @@ func newTestRouter(t *testing.T) *gin.Engine {
 	}
 	db := client.Database("webdad_post_test")
 	r := gin.New()
-	svc := service.NewPostService(repository.NewPostRepository(db), 5*time.Minute)
+	svc := service.NewPostService(
+		repository.NewPostRepository(db),
+		service.WithBookmarkWindow(5*time.Minute),
+	)
 	RegisterRoutes(r, "post-service", svc, "test-secret")
 	return r
 }

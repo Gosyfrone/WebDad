@@ -15,6 +15,7 @@ import (
 // lecture reste publique.
 func RegisterRoutes(r *gin.Engine, serviceName string, postService *service.PostService, jwtSecret string) {
 	auth := middleware.JWTAuth(jwtSecret)
+	optionalAuth := middleware.OptionalJWTAuth(jwtSecret)
 
 	r.GET("/health", Health(serviceName))
 	PostHandler := NewPostHandler(postService, serviceName)
@@ -27,7 +28,7 @@ func RegisterRoutes(r *gin.Engine, serviceName string, postService *service.Post
 		// Lecture publique. Le fil par auteur est un filtre de la liste :
 		// GET /posts?author_id=<id> (cf. ListPosts) — pas de préfixe séparé,
 		// pour rester sous `/posts` (le seul routé par la gateway).
-		posts.GET("", PostHandler.ListPosts)
+		posts.GET("", optionalAuth, PostHandler.ListPosts)
 		// Création authentifiée (auteur dérivé du JWT).
 		posts.POST("", auth, PostHandler.CreatePost)
 
@@ -57,7 +58,7 @@ func RegisterRoutes(r *gin.Engine, serviceName string, postService *service.Post
 
 		post := posts.Group("/:id")
 		{
-			post.GET("", PostHandler.GetPost)
+			post.GET("", optionalAuth, PostHandler.GetPost)
 			// Édition / suppression : authentifiées (auteur ou modérateur/admin).
 			post.PATCH("", auth, PostHandler.UpdatePost)
 			post.DELETE("", auth, PostHandler.DeletePost)

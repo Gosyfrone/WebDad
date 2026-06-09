@@ -10,6 +10,11 @@ const (
 	RoleAdmin     = "admin"
 )
 
+const (
+	VisibilityPublic = "public"
+	VisibilityPrivate = "private"
+)
+
 // Profil représente un document de la collection `profiles` : uniquement les
 // données « décoratives » d'un utilisateur. L'identité (username), les rôles
 // et le graphe social vivent dans user-service / le JWT — pas ici (une seule
@@ -27,7 +32,7 @@ type Profil struct {
 	Gender      string     `json:"gender,omitempty"      bson:"gender,omitempty"` // "male" | "female"
 	CreatedAt   time.Time  `json:"created_at"            bson:"created_at"`
 	UpdatedAt   time.Time  `json:"updated_at"            bson:"updated_at"`
-
+	Visibility string `json:"visibility" bson:"visibility"`
 	// DisplayNameChangedAt : date du dernier changement EFFECTIF de display_name
 	// (nil = jamais changé depuis le provisioning). Enregistrée dès aujourd'hui
 	// pour servir de base à un cooldown « X jours entre deux changements de nom »
