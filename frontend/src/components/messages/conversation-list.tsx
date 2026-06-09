@@ -1,6 +1,8 @@
 'use client'
 
 import {
+  Bell,
+  BellOff,
   Compass,
   Loader2,
   MessageSquarePlus,
@@ -45,6 +47,7 @@ interface ConversationListProps {
   unread: Record<string, boolean>
   onSelect: (id: string) => void
   onTogglePin: (conv: Conversation) => void
+  onToggleMute: (conv: Conversation) => void
   onDelete: (conv: Conversation) => void
   onNewDM: () => void
   onNewGroup: () => void
@@ -66,6 +69,7 @@ export function ConversationList({
   unread,
   onSelect,
   onTogglePin,
+  onToggleMute,
   onDelete,
   onNewDM,
   onNewGroup,
@@ -133,6 +137,7 @@ export function ConversationList({
                 unread={Boolean(unread[conv.id])}
                 onSelect={() => onSelect(conv.id)}
                 onTogglePin={() => onTogglePin(conv)}
+                onToggleMute={() => onToggleMute(conv)}
                 onDelete={() => onDelete(conv)}
               />
             ))}
@@ -151,6 +156,7 @@ function ConversationRow({
   unread,
   onSelect,
   onTogglePin,
+  onToggleMute,
   onDelete,
 }: {
   conversation: Conversation
@@ -160,6 +166,7 @@ function ConversationRow({
   unread: boolean
   onSelect: () => void
   onTogglePin: () => void
+  onToggleMute: () => void
   onDelete: () => void
 }) {
   const { t, locale } = useLanguage()
@@ -170,6 +177,7 @@ function ConversationRow({
   const peer = useResolvedUser(peerId)
   const title = conversationTitle(conversation, peer, t)
   const pinned = conversation.pinnedAt !== ''
+  const muted = conversation.muted
 
   // Sous-titre : aperçu du dernier message si dispo, sinon @handle / type.
   let subtitle: string
@@ -215,6 +223,12 @@ function ConversationRow({
           >
             {pinned && <Pin className="h-3 w-3 shrink-0 rotate-45 text-[#8D3DFF]" aria-hidden />}
             <span className="truncate">{title}</span>
+            {muted && (
+              <BellOff
+                className="h-3 w-3 shrink-0 text-muted-foreground"
+                aria-label={t('messages.muted_aria')}
+              />
+            )}
           </span>
           <span
             className={cn(
@@ -263,6 +277,19 @@ function ConversationRow({
                     <>
                       <Pin className="mr-2 h-4 w-4" />
                       {t('messages.pin')}
+                    </>
+                  )}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={onToggleMute}>
+                  {muted ? (
+                    <>
+                      <Bell className="mr-2 h-4 w-4" />
+                      {t('messages.unmute')}
+                    </>
+                  ) : (
+                    <>
+                      <BellOff className="mr-2 h-4 w-4" />
+                      {t('messages.mute')}
                     </>
                   )}
                 </DropdownMenuItem>

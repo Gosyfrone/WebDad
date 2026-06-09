@@ -213,6 +213,27 @@ func (r *MessageRepository) SetMemberPinned(ctx context.Context, conversationID,
 	return nil
 }
 
+// SetMemberMuted met en sourdine (ou réactive) une conversation pour un membre.
+// `at == nil` réactive (`$unset`), sinon pose la sourdine. mongo.ErrNoDocuments
+// si absent.
+func (r *MessageRepository) SetMemberMuted(ctx context.Context, conversationID, userID string, at *time.Time) error {
+	var update bson.M
+	if at == nil {
+		update = bson.M{"$unset": bson.M{"muted_at": ""}}
+	} else {
+		update = bson.M{"$set": bson.M{"muted_at": *at}}
+	}
+	res, err := r.members.UpdateOne(ctx,
+		bson.M{"conversation_id": conversationID, "user_id": userID}, update)
+	if err != nil {
+		return err
+	}
+	if res.MatchedCount == 0 {
+		return mongo.ErrNoDocuments
+	}
+	return nil
+}
+
 // SetMemberCleared pose la date de suppression côté user (masque + coupe
 // l'historique). mongo.ErrNoDocuments si le membre n'existe pas.
 func (r *MessageRepository) SetMemberCleared(ctx context.Context, conversationID, userID string, at time.Time) error {
@@ -263,7 +284,9 @@ func (r *MessageRepository) SetMemberRead(ctx context.Context, conversationID, u
 func (r *MessageRepository) CountUnreadConversations(ctx context.Context, userID string) (int, error) {
 	epoch := time.Unix(0, 0)
 	pipeline := mongo.Pipeline{
-		bson.D{{Key: "$match", Value: bson.M{"user_id": userID}}},
+		// On exclut d'emblée les conversations en sourdine (muted_at posé) : elles
+		// n'alimentent pas le badge. `muted_at: null` matche aussi le champ absent.
+		bson.D{{Key: "$match", Value: bson.M{"user_id": userID, "muted_at": nil}}},
 		bson.D{{Key: "$addFields", Value: bson.M{
 			"cut": bson.M{"$max": bson.A{
 				bson.M{"$ifNull": bson.A{"$last_read_at", epoch}},

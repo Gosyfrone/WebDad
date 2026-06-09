@@ -584,6 +584,31 @@ func (s *MessageService) ClearConversation(ctx context.Context, conversationID, 
 	return nil
 }
 
+// MuteConversation met en sourdine (`mute=true`) ou réactive (`mute=false`) une
+// conversation pour le membre courant, et renvoie sa vue à jour. Membre requis.
+func (s *MessageService) MuteConversation(ctx context.Context, conversationID, userID string, mute bool) (*models.ConversationView, error) {
+	if _, err := s.requireMember(ctx, conversationID, userID); err != nil {
+		return nil, err
+	}
+	var at *time.Time
+	if mute {
+		now := time.Now()
+		at = &now
+	}
+	if err := s.repo.SetMemberMuted(ctx, conversationID, userID, at); err != nil {
+		return nil, translateNotFound(err)
+	}
+	oid, err := parseID(conversationID)
+	if err != nil {
+		return nil, err
+	}
+	conv, err := s.repo.GetConversation(ctx, oid)
+	if err != nil {
+		return nil, translateNotFound(err)
+	}
+	return s.viewFor(ctx, conv, userID)
+}
+
 // MarkRead avance le curseur de lecture du membre courant à maintenant (la
 // conversation est désormais « lue jusqu'ici »). Membre requis.
 func (s *MessageService) MarkRead(ctx context.Context, conversationID, userID string) error {
@@ -805,6 +830,7 @@ func buildView(conv *models.Conversation, m *models.Member) models.ConversationV
 		MyEnvelope: m.KeyEnvelope,
 		PinnedAt:   m.PinnedAt,
 		LastReadAt: m.LastReadAt,
+		Muted:      m.MutedAt != nil,
 		CreatedBy:  conv.CreatedBy,
 		CreatedAt:  conv.CreatedAt,
 		UpdatedAt:  conv.UpdatedAt,

@@ -13,8 +13,10 @@ import {
   getConversation,
   listConversations,
   listMessagesPage,
+  muteConversation,
   pinConversation,
   startDM,
+  unmuteConversation,
   unpinConversation,
   type ChatMessage,
   type Conversation,
@@ -81,7 +83,8 @@ function isConvUnread(lastReadAt: string, last: ChatMessage | null): boolean {
 export function MessagesView() {
   const { t } = useLanguage()
   const { toast } = useToast()
-  const { markRead, setActiveConversation, subscribeMessages, subscribeEvents } = useMessages()
+  const { markRead, setActiveConversation, subscribeMessages, subscribeEvents, refresh } =
+    useMessages()
   const myId = useMemo(() => currentUserId(), [])
 
   const [conversations, setConversations] = useState<Conversation[]>([])
@@ -316,6 +319,21 @@ export function MessagesView() {
     }
   }
 
+  /** (Dé)met en sourdine — optimiste. Le badge app-wide est ré-interrogé via le
+   *  provider (`refresh`) car le serveur exclut les sourdines du non-lu. */
+  async function toggleMute(conv: Conversation) {
+    const mute = !conv.muted
+    setConversations((prev) => prev.map((c) => (c.id === conv.id ? { ...c, muted: mute } : c)))
+    try {
+      const updated = mute ? await muteConversation(conv) : await unmuteConversation(conv)
+      updateConv(updated)
+      refresh()
+    } catch {
+      toast({ title: t('messages.action_failed'), variant: 'destructive' })
+      loadConversations().catch(() => {})
+    }
+  }
+
   /** « Supprime » la conversation côté user (masque + coupe l'historique). */
   async function deleteConversation(conv: Conversation) {
     try {
@@ -347,6 +365,7 @@ export function MessagesView() {
           unread={unread}
           onSelect={selectConversation}
           onTogglePin={togglePin}
+          onToggleMute={toggleMute}
           onDelete={deleteConversation}
           onNewDM={() => setDialog('dm')}
           onNewGroup={() => setDialog('group')}

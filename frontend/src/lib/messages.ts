@@ -56,6 +56,7 @@ interface ApiConversation {
   content_key?: string // communauté : clé de contenu (base64) remise par le serveur
   pinned_at?: string // épinglage PAR-UTILISATEUR (absent = non épinglée)
   last_read_at?: string // curseur de lecture PAR-UTILISATEUR (absent = jamais lu)
+  muted?: boolean // sourdine PAR-UTILISATEUR (exclue du badge, pas de la liste)
   created_by: string
   created_at: string
   updated_at: string
@@ -108,6 +109,9 @@ export interface Conversation {
   /** Curseur de lecture (ISO) PAR CET utilisateur ; '' si jamais lu. Sert à la
    *  pastille « non-lu » et à l'ancre « Nouveaux messages ». */
   lastReadAt: string
+  /** Conversation en sourdine PAR CET utilisateur : exclue du badge non-lu
+   *  app-wide, mais toujours affichée « non lue » dans la liste. */
+  muted: boolean
   /** Clé de contenu déchiffrée ; null si l'enveloppe ne s'ouvre pas ici
    *  (clé créée sur un autre appareil). */
   contentKey: Uint8Array | null
@@ -247,6 +251,7 @@ function toConversation(api: ApiConversation, identity: KeyPair): Conversation {
     updatedAt: api.updated_at,
     pinnedAt: api.pinned_at ?? '',
     lastReadAt: api.last_read_at ?? '',
+    muted: api.muted ?? false,
     contentKey,
   }
 }
@@ -488,6 +493,25 @@ export async function unpinConversation(conv: Conversation): Promise<Conversatio
   const identity = await ensureMyKeys()
   const updated = await unwrap<ApiConversation>(
     await apiFetch(`/messages/conversations/${conv.id}/pin`, { method: 'DELETE' }),
+  )
+  return toConversation(updated, identity)
+}
+
+/** Met une conversation en sourdine : elle n'alimente plus le badge non-lu
+ *  (mais reste « non lue » dans la liste). */
+export async function muteConversation(conv: Conversation): Promise<Conversation> {
+  const identity = await ensureMyKeys()
+  const updated = await unwrap<ApiConversation>(
+    await apiFetch(`/messages/conversations/${conv.id}/mute`, { method: 'PATCH' }),
+  )
+  return toConversation(updated, identity)
+}
+
+/** Réactive une conversation mise en sourdine. */
+export async function unmuteConversation(conv: Conversation): Promise<Conversation> {
+  const identity = await ensureMyKeys()
+  const updated = await unwrap<ApiConversation>(
+    await apiFetch(`/messages/conversations/${conv.id}/mute`, { method: 'DELETE' }),
   )
   return toConversation(updated, identity)
 }

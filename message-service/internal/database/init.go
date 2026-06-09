@@ -132,6 +132,7 @@ var validators = map[string]bson.M{
 				"pinned_at":    bson.M{"bsonType": bson.A{"date", "null"}},
 				"cleared_at":   bson.M{"bsonType": bson.A{"date", "null"}},
 				"last_read_at": bson.M{"bsonType": bson.A{"date", "null"}},
+				"muted_at":     bson.M{"bsonType": bson.A{"date", "null"}},
 				"created_at":   bson.M{"bsonType": "date"},
 			},
 		},

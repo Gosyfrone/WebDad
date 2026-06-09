@@ -200,6 +200,38 @@ func (h *ConversationHandler) UnpinConversation(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": view})
 }
 
+// MuteConversation : PATCH /messages/conversations/:id/mute — met en sourdine.
+func (h *ConversationHandler) MuteConversation(c *gin.Context) {
+	claims, ok := middleware.ClaimsFrom(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "claims absents"})
+		return
+	}
+
+	view, err := h.service.MuteConversation(c.Request.Context(), c.Param("id"), claims.UserID, true)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": view})
+}
+
+// UnmuteConversation : DELETE /messages/conversations/:id/mute — réactive.
+func (h *ConversationHandler) UnmuteConversation(c *gin.Context) {
+	claims, ok := middleware.ClaimsFrom(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "claims absents"})
+		return
+	}
+
+	view, err := h.service.MuteConversation(c.Request.Context(), c.Param("id"), claims.UserID, false)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": view})
+}
+
 // ClearConversation : DELETE /messages/conversations/:id/me — « supprime » la
 // conversation côté user (masque + coupe l'historique). N'affecte pas les autres.
 func (h *ConversationHandler) ClearConversation(c *gin.Context) {
