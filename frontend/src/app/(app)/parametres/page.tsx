@@ -1,11 +1,11 @@
 'use client'
 
-import { Languages, Palette, Scale, Settings } from 'lucide-react'
+import { EyeOff, Languages, Scale, Settings } from 'lucide-react'
 
 import { useT } from '@/components/language-provider'
 import { LanguageSelector } from '@/components/language-selector'
-import { ThemeToggle } from '@/components/theme-toggle'
 import { LegalLinks } from '@/components/legal/legal-links'
+import { MutedWordsSettings } from '@/components/settings/muted-words-settings'
 
 export default function ParametresPage() {
   const t = useT()
@@ -54,19 +54,17 @@ export default function ParametresPage() {
             <div className="grid gap-4 px-4 py-4 md:grid-cols-[minmax(0,1fr)_minmax(260px,340px)] md:items-start">
               <div className="flex items-start gap-3">
                 <span className="mt-1 text-primary">
-                  <Palette className="h-5 w-5" aria-hidden />
+                  <EyeOff className="h-5 w-5" aria-hidden />
                 </span>
                 <div className="min-w-0">
-                  <h3 className="font-semibold text-foreground">{t('theme.title')}</h3>
+                  <h3 className="font-semibold text-foreground">{t('filters.title')}</h3>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    {t('theme.appearance')}
+                    {t('filters.desc')}
                   </p>
                 </div>
               </div>
 
-              <div className="panel rounded-xl border px-2 py-2 shadow-sm">
-                <ThemeToggle />
-              </div>
+              <MutedWordsSettings />
             </div>
           </div>
         </section>

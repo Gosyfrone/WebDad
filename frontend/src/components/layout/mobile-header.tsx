@@ -12,6 +12,7 @@ import { getMyProfil, subscribeProfilUpdated } from '@/lib/profil-client'
 import { ROUTES, navItemsForRole } from '@/lib/routes'
 import type { ProfilDetails, UserRole } from '@/types'
 import { useT } from '@/components/language-provider'
+import { ThemeToggle } from '@/components/theme-toggle'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
   Sheet,
@@ -189,6 +190,9 @@ export function MobileHeader({ role, username = 'Utilisateur' }: MobileHeaderPro
 
           {/* Paramètres + déconnexion */}
           <div className="border-t p-2">
+            <div className="mb-1 rounded-2xl px-2 py-2">
+              <ThemeToggle />
+            </div>
             <SheetClose asChild>
               <Link
                 href={ROUTES.parametres}

@@ -4,10 +4,17 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Loader2, Users } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
+import {
+  filterMutedPosts,
+  readMutedWords,
+  subscribeMutedWords,
+} from '@/lib/content-filters'
+import { getMe } from '@/lib/api'
 import { useInfiniteScroll } from '@/lib/use-infinite-scroll'
 import {
   listFeed,
   listFollowingFeed,
+  currentUserId,
   subscribePostCreated,
   type FeedPost,
 } from '@/lib/posts'
@@ -50,6 +57,8 @@ export function FeedView() {
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(false)
   const [error, setError] = useState('')
+  const [mutedWords, setMutedWords] = useState<string[]>([])
+  const [viewerUserId, setViewerUserId] = useState('')
   // Nombre d'éléments réellement chargés depuis le serveur (offset de pagination,
   // indépendant des insertions/suppressions locales).
   const offsetRef = useRef(0)
@@ -108,6 +117,33 @@ export function FeedView() {
     loading: loading || loadingMore,
   })
 
+  useEffect(() => {
+    let cancelled = false
+    let unsubscribe = () => {}
+
+    async function loadUserScopedFilters() {
+      let userId = currentUserId()
+      if (!userId) {
+        try {
+          userId = (await getMe()).id
+        } catch {
+          userId = ''
+        }
+      }
+
+      if (cancelled) return
+      setViewerUserId(userId)
+      setMutedWords(readMutedWords(userId))
+      unsubscribe = subscribeMutedWords(userId, setMutedWords)
+    }
+
+    void loadUserScopedFilters()
+    return () => {
+      cancelled = true
+      unsubscribe()
+    }
+  }, [])
+
   // Un nouveau post (composer inline ou popup sidebar) est prépendu au fil.
   useEffect(
     () =>
@@ -128,6 +164,8 @@ export function FeedView() {
   const handleUpdated = useCallback((post: FeedPost) => {
     setPosts((prev) => applyPostUpdate(prev, post))
   }, [])
+
+  const visiblePosts = filterMutedPosts(posts, mutedWords, viewerUserId)
 
   return (
     <div className="flex flex-col">
@@ -170,10 +208,15 @@ export function FeedView() {
             message={t('feed.empty_following')}
           />
         )
+      ) : visiblePosts.length === 0 ? (
+        <EmptyState
+          title={t('feed.filtered_empty_title')}
+          message={t('feed.filtered_empty_msg')}
+        />
       ) : (
         <>
           <div className="divide-y divide-border">
-            {posts.map((post) => (
+            {visiblePosts.map((post) => (
               <PostCard
                 key={post.id}
                 post={post}
