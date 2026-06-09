@@ -11,6 +11,17 @@ import (
 )
 
 // Login : POST /auth/login — vérifie les credentials, retourne un JWT.
+// @Summary     Se connecter
+// @Tags        auth
+// @Accept      json
+// @Produce     json
+// @Param       body body models.LoginRequest true "Credentials"
+// @Success     200 {object} models.AuthUser "Connexion réussie — data: {token, refresh_token, user}"
+// @Failure     400 {object} map[string]string "Payload invalide"
+// @Failure     401 {object} map[string]string "Credentials invalides"
+// @Failure     403 {object} map[string]string "Compte désactivé"
+// @Failure     500 {object} map[string]string "Erreur interne"
+// @Router      /auth/login [post]
 func (h *Handler) Login(c *gin.Context) {
 	var req models.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

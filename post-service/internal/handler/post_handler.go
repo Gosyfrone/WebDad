@@ -26,6 +26,16 @@ func NewPostHandler(svc *service.PostService, serviceName string) *PostHandler {
 }
 
 // CreatePost : POST /posts — l'auteur est dérivé du JWT (jamais du corps).
+// @Summary     Créer un post
+// @Tags        posts
+// @Accept      json
+// @Produce     json
+// @Security    BearerAuth
+// @Param       body body models.CreatePostRequest true "Contenu (texte et/ou médias)"
+// @Success     201 {object} models.Post
+// @Failure     400 {object} map[string]string
+// @Failure     401 {object} map[string]string
+// @Router      /posts [post]
 func (h *PostHandler) CreatePost(c *gin.Context) {
 	claims, ok := middleware.ClaimsFrom(c)
 	if !ok {
@@ -57,6 +67,17 @@ func (h *PostHandler) CreatePost(c *gin.Context) {
 //   - ?author_ids=<id,id,…>  : fil « Abonnements » (posts des comptes suivis,
 //     le front fournit les ids — seul user-service connaît le graphe) ;
 //   - sans paramètre         : fil global.
+//
+// @Summary     Fil de posts (global, profil ou abonnements)
+// @Tags        posts
+// @Produce     json
+// @Param       author_id  query string false "Fil d'un auteur"
+// @Param       author_ids query string false "Fil abonnements (IDs séparés par virgule)"
+// @Param       limit      query int    false "Nb résultats"
+// @Param       offset     query int    false "Décalage"
+// @Success     200 {array} models.Post
+// @Failure     500 {object} map[string]string
+// @Router      /posts [get]
 func (h *PostHandler) ListPosts(c *gin.Context) {
 	var (
 		posts []models.Post
@@ -82,6 +103,13 @@ func (h *PostHandler) ListPosts(c *gin.Context) {
 }
 
 // GetPost : GET /posts/:id (public).
+// @Summary     Détail d'un post
+// @Tags        posts
+// @Produce     json
+// @Param       id path string true "Post ID (ObjectID hex)"
+// @Success     200 {object} models.Post
+// @Failure     404 {object} map[string]string
+// @Router      /posts/{id} [get]
 func (h *PostHandler) GetPost(c *gin.Context) {
 	viewerID := ""
 	if claims, ok := middleware.ClaimsFrom(c); ok {
@@ -96,6 +124,19 @@ func (h *PostHandler) GetPost(c *gin.Context) {
 }
 
 // UpdatePost : PATCH /posts/:id — réservé à l'auteur (ou modérateur/admin).
+// @Summary     Modifier un post (auteur/modérateur/admin)
+// @Tags        posts
+// @Accept      json
+// @Produce     json
+// @Security    BearerAuth
+// @Param       id   path string                    true "Post ID"
+// @Param       body body models.UpdatePostRequest  true "Nouveau contenu"
+// @Success     200 {object} models.Post
+// @Failure     400 {object} map[string]string
+// @Failure     401 {object} map[string]string
+// @Failure     403 {object} map[string]string
+// @Failure     404 {object} map[string]string
+// @Router      /posts/{id} [patch]
 func (h *PostHandler) UpdatePost(c *gin.Context) {
 	claims, ok := middleware.ClaimsFrom(c)
 	if !ok {
@@ -119,6 +160,16 @@ func (h *PostHandler) UpdatePost(c *gin.Context) {
 
 // PinPost : PATCH /posts/:id/pin — réservé à l'auteur du post. L'épinglage
 // est persistant et visible par tous sur le profil public.
+// @Summary     Épingler un post (auteur uniquement)
+// @Tags        posts
+// @Produce     json
+// @Security    BearerAuth
+// @Param       id path string true "Post ID"
+// @Success     200 {object} models.Post
+// @Failure     401 {object} map[string]string
+// @Failure     403 {object} map[string]string
+// @Failure     404 {object} map[string]string
+// @Router      /posts/{id}/pin [patch]
 func (h *PostHandler) PinPost(c *gin.Context) {
 	claims, ok := middleware.ClaimsFrom(c)
 	if !ok {
@@ -135,6 +186,16 @@ func (h *PostHandler) PinPost(c *gin.Context) {
 }
 
 // UnpinPost : DELETE /posts/:id/pin — réservé à l'auteur du post.
+// @Summary     Désépingler un post
+// @Tags        posts
+// @Produce     json
+// @Security    BearerAuth
+// @Param       id path string true "Post ID"
+// @Success     200 {object} models.Post
+// @Failure     401 {object} map[string]string
+// @Failure     403 {object} map[string]string
+// @Failure     404 {object} map[string]string
+// @Router      /posts/{id}/pin [delete]
 func (h *PostHandler) UnpinPost(c *gin.Context) {
 	claims, ok := middleware.ClaimsFrom(c)
 	if !ok {
@@ -152,6 +213,15 @@ func (h *PostHandler) UnpinPost(c *gin.Context) {
 
 // RepostPost : POST /posts/:id/repost — repost simple, visible sur le profil
 // de l'acteur. Idempotent côté service.
+// @Summary     Reposter un post
+// @Tags        posts
+// @Produce     json
+// @Security    BearerAuth
+// @Param       id path string true "Post ID"
+// @Success     200 {object} models.Post
+// @Failure     401 {object} map[string]string
+// @Failure     404 {object} map[string]string
+// @Router      /posts/{id}/repost [post]
 func (h *PostHandler) RepostPost(c *gin.Context) {
 	claims, ok := middleware.ClaimsFrom(c)
 	if !ok {
@@ -168,6 +238,15 @@ func (h *PostHandler) RepostPost(c *gin.Context) {
 }
 
 // UnrepostPost : DELETE /posts/:id/repost — retire le repost simple.
+// @Summary     Retirer un repost
+// @Tags        posts
+// @Produce     json
+// @Security    BearerAuth
+// @Param       id path string true "Post ID"
+// @Success     200 {object} map[string]string "reposts_count"
+// @Failure     401 {object} map[string]string
+// @Failure     404 {object} map[string]string
+// @Router      /posts/{id}/repost [delete]
 func (h *PostHandler) UnrepostPost(c *gin.Context) {
 	claims, ok := middleware.ClaimsFrom(c)
 	if !ok {
@@ -184,6 +263,13 @@ func (h *PostHandler) UnrepostPost(c *gin.Context) {
 }
 
 // RepostedByMe : GET /posts/me/reposted-ids — état initial des boutons repost.
+// @Summary     IDs des posts que j'ai repostés
+// @Tags        posts
+// @Produce     json
+// @Security    BearerAuth
+// @Success     200 {array} string "Liste d'IDs"
+// @Failure     401 {object} map[string]string
+// @Router      /posts/me/reposted-ids [get]
 func (h *PostHandler) RepostedByMe(c *gin.Context) {
 	claims, ok := middleware.ClaimsFrom(c)
 	if !ok {
@@ -200,6 +286,15 @@ func (h *PostHandler) RepostedByMe(c *gin.Context) {
 }
 
 // DeletePost : DELETE /posts/:id — réservé à l'auteur (ou modérateur/admin).
+// @Summary     Supprimer un post (auteur/modérateur/admin)
+// @Tags        posts
+// @Security    BearerAuth
+// @Param       id path string true "Post ID"
+// @Success     204
+// @Failure     401 {object} map[string]string
+// @Failure     403 {object} map[string]string
+// @Failure     404 {object} map[string]string
+// @Router      /posts/{id} [delete]
 func (h *PostHandler) DeletePost(c *gin.Context) {
 	claims, ok := middleware.ClaimsFrom(c)
 	if !ok {

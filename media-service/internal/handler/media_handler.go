@@ -52,6 +52,18 @@ type uploadResponse struct {
 
 // Upload : POST /media (multipart, champ `file`). Valide le type réel (magic
 // bytes) + la taille, range dans MinIO sous un id aléatoire, renvoie 201.
+// @Summary     Uploader un média (image ou vidéo)
+// @Tags        media
+// @Accept      multipart/form-data
+// @Produce     json
+// @Security    BearerAuth
+// @Param       file formData file true "Fichier image (JPEG/PNG/GIF/WebP) ou vidéo (MP4/WebM)"
+// @Success     201 {object} handler.uploadResponse
+// @Failure     400 {object} map[string]string
+// @Failure     401 {object} map[string]string
+// @Failure     413 {object} map[string]string "Fichier trop volumineux"
+// @Failure     415 {object} map[string]string "Type MIME non supporté"
+// @Router      /media [post]
 func (h *MediaHandler) Upload(c *gin.Context) {
 	claims, ok := middleware.ClaimsFrom(c)
 	if !ok {
@@ -127,6 +139,16 @@ func (h *MediaHandler) Upload(c *gin.Context) {
 // On valide donc uniquement la taille (cap vidéo, le plus large) et on stocke
 // en `application/octet-stream`. La vraie nature (image/vidéo, nom, nonce) vit
 // dans l'enveloppe chiffrée du message, jamais ici → serveur aveugle.
+// @Summary     Uploader un blob chiffré E2EE
+// @Tags        media
+// @Accept      multipart/form-data
+// @Produce     json
+// @Security    BearerAuth
+// @Param       file formData file true "Blob chiffré (contenu opaque)"
+// @Success     201 {object} handler.uploadResponse
+// @Failure     400 {object} map[string]string
+// @Failure     401 {object} map[string]string
+// @Router      /media/encrypted [post]
 func (h *MediaHandler) UploadEncrypted(c *gin.Context) {
 	claims, ok := middleware.ClaimsFrom(c)
 	if !ok {
@@ -174,6 +196,14 @@ func (h *MediaHandler) UploadEncrypted(c *gin.Context) {
 // Download : GET /media/:id — public (id non devinable). Stream depuis MinIO
 // via http.ServeContent (gère Range/seek vidéo, HEAD, If-None-Match). Cache
 // long + immutable : un id correspond toujours au même contenu.
+// @Summary     Télécharger un média (lecture publique, streaming + Range)
+// @Tags        media
+// @Produce     application/octet-stream
+// @Param       id path string true "Media ID"
+// @Success     200 {file} string "Contenu binaire"
+// @Success     206 {file} string "Contenu partiel (Range)"
+// @Failure     404 {object} map[string]string
+// @Router      /media/{id} [get]
 func (h *MediaHandler) Download(c *gin.Context) {
 	id := c.Param("id")
 
@@ -201,6 +231,16 @@ func (h *MediaHandler) Download(c *gin.Context) {
 }
 
 // Delete : DELETE /media/:id — propriétaire ou admin uniquement.
+// @Summary     Supprimer un média (propriétaire ou admin)
+// @Tags        media
+// @Produce     json
+// @Security    BearerAuth
+// @Param       id path string true "Media ID"
+// @Success     204
+// @Failure     401 {object} map[string]string
+// @Failure     403 {object} map[string]string
+// @Failure     404 {object} map[string]string
+// @Router      /media/{id} [delete]
 func (h *MediaHandler) Delete(c *gin.Context) {
 	claims, ok := middleware.ClaimsFrom(c)
 	if !ok {

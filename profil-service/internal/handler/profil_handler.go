@@ -29,6 +29,14 @@ func NewProfilHandler(profils *service.ProfilService) *ProfilHandler {
 }
 
 // Search : GET /profils/search?q=&limit= — recherche par display_name (public).
+// @Summary     Rechercher des profils par display_name
+// @Tags        profils
+// @Produce     json
+// @Param       q     query string true  "Terme de recherche"
+// @Param       limit query int    false "Nb résultats (défaut 20, max 50)"
+// @Success     200 {array} models.Profil
+// @Failure     500 {object} map[string]string
+// @Router      /profils/search [get]
 func (h *ProfilHandler) Search(c *gin.Context) {
 	profils, err := h.profils.Search(c.Request.Context(), c.Query("q"), searchLimit(c))
 	if err != nil {
@@ -51,6 +59,13 @@ func searchLimit(c *gin.Context) int64 {
 }
 
 // GetByUserID : GET /profils/:userId — profil public d'un utilisateur.
+// @Summary     Profil public d'un utilisateur
+// @Tags        profils
+// @Produce     json
+// @Param       userId path string true "User ID"
+// @Success     200 {object} models.Profil
+// @Failure     404 {object} map[string]string
+// @Router      /profils/{userId} [get]
 func (h *ProfilHandler) GetByUserID(c *gin.Context) {
 	profil, err := h.profils.GetByUserID(c.Request.Context(), c.Param("userId"))
 	if err != nil {
@@ -63,6 +78,14 @@ func (h *ProfilHandler) GetByUserID(c *gin.Context) {
 // GetMe : GET /profils/me — profil de l'utilisateur courant (protégé).
 // Lecture seule : ne crée RIEN. 404 si le profil n'existe pas encore (le front
 // le crée alors via POST /profils). La création est l'apanage exclusif du POST.
+// @Summary     Profil de l'utilisateur courant
+// @Tags        profils
+// @Produce     json
+// @Security    BearerAuth
+// @Success     200 {object} models.Profil
+// @Failure     401 {object} map[string]string
+// @Failure     404 {object} map[string]string
+// @Router      /profils/me [get]
 func (h *ProfilHandler) GetMe(c *gin.Context) {
 	claims, ok := middleware.ClaimsFrom(c)
 	if !ok {
@@ -78,6 +101,18 @@ func (h *ProfilHandler) GetMe(c *gin.Context) {
 }
 
 // UpdateMe : PATCH /profils/me — modifie le profil de l'utilisateur courant.
+// @Summary     Modifier son profil
+// @Tags        profils
+// @Accept      json
+// @Produce     json
+// @Security    BearerAuth
+// @Param       body body models.UpdateProfilRequest true "Champs à modifier (tous optionnels)"
+// @Success     200 {object} models.Profil
+// @Failure     400 {object} map[string]string
+// @Failure     401 {object} map[string]string
+// @Failure     409 {object} map[string]string "birth_date déjà définie"
+// @Failure     429 {object} map[string]string "Cooldown display_name"
+// @Router      /profils/me [patch]
 func (h *ProfilHandler) UpdateMe(c *gin.Context) {
 	claims, ok := middleware.ClaimsFrom(c)
 	if !ok {
@@ -100,6 +135,17 @@ func (h *ProfilHandler) UpdateMe(c *gin.Context) {
 // Create : POST /profils — crée le profil de l'utilisateur courant (protégé).
 // L'id provient du JWT, pas du corps. Surtout utile aux tests/à l'admin ; le
 // flux normal repose sur le provisioning paresseux (cf. GetMe).
+// @Summary     Créer son profil
+// @Tags        profils
+// @Accept      json
+// @Produce     json
+// @Security    BearerAuth
+// @Param       body body models.CreateProfilRequest true "display_name obligatoire"
+// @Success     201 {object} models.Profil
+// @Failure     400 {object} map[string]string
+// @Failure     401 {object} map[string]string
+// @Failure     409 {object} map[string]string "Profil déjà existant"
+// @Router      /profils [post]
 func (h *ProfilHandler) Create(c *gin.Context) {
 	claims, ok := middleware.ClaimsFrom(c)
 	if !ok {
@@ -121,6 +167,16 @@ func (h *ProfilHandler) Create(c *gin.Context) {
 }
 
 // Delete : DELETE /profils/:userId — supprime un profil (protégé, admin).
+// @Summary     Supprimer un profil (admin)
+// @Tags        profils
+// @Produce     json
+// @Security    BearerAuth
+// @Param       userId path string true "User ID"
+// @Success     204
+// @Failure     401 {object} map[string]string
+// @Failure     403 {object} map[string]string "Réservé admin"
+// @Failure     404 {object} map[string]string
+// @Router      /profils/{userId} [delete]
 func (h *ProfilHandler) Delete(c *gin.Context) {
 	claims, ok := middleware.ClaimsFrom(c)
 	if !ok {
@@ -138,6 +194,14 @@ func (h *ProfilHandler) Delete(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
+// GetVisibility : GET /profils/:userId/visibility — visibilité d'un profil.
+// @Summary     Visibilité d'un profil (public/private)
+// @Tags        profils
+// @Produce     json
+// @Param       userId path string true "User ID"
+// @Success     200 {object} map[string]string "visibility: public|private"
+// @Failure     404 {object} map[string]string
+// @Router      /profils/{userId}/visibility [get]
 func (h *ProfilHandler) GetVisibility(c *gin.Context) {
 	userID := c.Param("userId")
 

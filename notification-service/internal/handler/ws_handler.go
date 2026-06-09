@@ -41,6 +41,11 @@ func NewWSHandler(hub *realtime.Hub, secret string, allowedOrigins []string) *WS
 // réel. Le token transite en query param car le navigateur n'autorise pas
 // d'en-tête Authorization sur une poignée de main WebSocket. L'utilisateur reçoit
 // ensuite ses notifications (créations, mises à jour, suppressions).
+// @Summary     Connexion WebSocket temps réel (notifications)
+// @Tags        notifications
+// @Param       access_token query string true "JWT access token"
+// @Success     101 {string} string "Upgrade WebSocket"
+// @Router      /notifications/ws [get]
 func (h *WSHandler) Connect(c *gin.Context) {
 	claims, err := middleware.ParseToken(c.Query("access_token"), h.secret)
 	if err != nil {
