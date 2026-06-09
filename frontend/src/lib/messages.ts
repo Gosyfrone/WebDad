@@ -55,6 +55,7 @@ interface ApiConversation {
   my_envelope: string
   content_key?: string // communauté : clé de contenu (base64) remise par le serveur
   pinned_at?: string // épinglage PAR-UTILISATEUR (absent = non épinglée)
+  last_read_at?: string // curseur de lecture PAR-UTILISATEUR (absent = jamais lu)
   created_by: string
   created_at: string
   updated_at: string
@@ -84,6 +85,11 @@ interface ApiMessage {
   created_at: string
 }
 
+/** Message brut tel que poussé par la WebSocket (chiffré). Le `MessagesProvider`
+ *  s'en sert pour le badge (métadonnées : conversation + expéditeur, pas besoin
+ *  de déchiffrer) et le redistribue à la vue qui, elle, le déchiffre. */
+export type RawMessage = ApiMessage
+
 // --- Types front -------------------------------------------------------------
 
 /** Conversation prête à l'emploi : la clé de contenu (CK) est déjà dérivée. */
@@ -99,6 +105,9 @@ export interface Conversation {
   updatedAt: string
   /** Date d'épinglage (ISO) PAR CET utilisateur ; '' si non épinglée. */
   pinnedAt: string
+  /** Curseur de lecture (ISO) PAR CET utilisateur ; '' si jamais lu. Sert à la
+   *  pastille « non-lu » et à l'ancre « Nouveaux messages ». */
+  lastReadAt: string
   /** Clé de contenu déchiffrée ; null si l'enveloppe ne s'ouvre pas ici
    *  (clé créée sur un autre appareil). */
   contentKey: Uint8Array | null
@@ -237,6 +246,7 @@ function toConversation(api: ApiConversation, identity: KeyPair): Conversation {
     createdAt: api.created_at,
     updatedAt: api.updated_at,
     pinnedAt: api.pinned_at ?? '',
+    lastReadAt: api.last_read_at ?? '',
     contentKey,
   }
 }
@@ -494,6 +504,23 @@ export async function clearConversation(conv: Conversation): Promise<void> {
   )
 }
 
+/**
+ * Marque une conversation lue côté serveur (avance `last_read_at` à maintenant).
+ * Source de vérité unique du non-lu (badge + pastille), multi-appareil.
+ */
+export async function markConversationRead(conversationId: string): Promise<void> {
+  await expectOk(
+    await apiFetch(`/messages/conversations/${conversationId}/read`, { method: 'PUT' }),
+    'Marquage lu impossible',
+  )
+}
+
+/** Nombre de conversations ayant au moins un message non lu (badge app-wide). */
+export async function getMessagesUnreadCount(): Promise<number> {
+  const data = await unwrap<{ count: number }>(await apiFetch('/messages/unread-count'))
+  return data?.count ?? 0
+}
+
 // --- Messages ----------------------------------------------------------------
 
 /** Déchiffre un message brut avec la CK d'une conversation (échec → texte vide). */
@@ -563,25 +590,19 @@ export function buildMessagePage(messages: ChatMessage[], limit: number): Messag
 
 /**
  * Position de la ligne « Nouveaux messages » dans un fil : id du 1ᵉʳ message
- * non-lu qui n'est PAS le mien, à partir de l'ancre (= dernier message lu,
- * capturé à l'ouverture). Fonction PURE (testée).
+ * non-lu qui n'est PAS le mien, à partir de l'ancre `lastReadAt` (curseur de
+ * lecture serveur, ISO, capturé à l'ouverture). Fonction PURE (testée).
  *
- *   - `null` si pas d'ancre (1re ouverture) ou si rien de nouveau ;
- *   - si l'ancre est dans la page : 1ᵉʳ message d'autrui après elle ;
- *   - sinon (ancre plus ancienne que la page) : 1ᵉʳ message d'autrui plus récent
- *     que l'ancre (les ids ObjectId sont ordonnés par création).
+ *   - `null` si pas d'ancre (jamais lu) ou si rien de nouveau ;
+ *   - sinon : 1ᵉʳ message d'autrui dont la date est strictement postérieure à
+ *     l'ancre.
  */
-export function computeDivider(messages: ChatMessage[], anchor: string | null): string | null {
-  if (!anchor) return null
-  const idx = messages.findIndex((m) => m.id === anchor)
-  if (idx >= 0) {
-    for (let j = idx + 1; j < messages.length; j++) {
-      if (!messages[j].mine) return messages[j].id
-    }
-    return null
-  }
+export function computeDivider(messages: ChatMessage[], lastReadAt: string | null): string | null {
+  if (!lastReadAt) return null
+  const anchorMs = new Date(lastReadAt).getTime()
+  if (Number.isNaN(anchorMs)) return null
   for (const m of messages) {
-    if (m.id > anchor && !m.mine) return m.id
+    if (!m.mine && new Date(m.createdAt).getTime() > anchorMs) return m.id
   }
   return null
 }

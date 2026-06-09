@@ -22,6 +22,7 @@ import { logout } from '@/lib/auth-client'
 import { getMyProfil, subscribeProfilUpdated } from '@/lib/profil-client'
 import { ROUTES } from '@/lib/routes'
 import { useNotifications } from '@/components/notifications-provider'
+import { useMessages } from '@/components/messages-provider'
 import { useT } from '@/components/language-provider'
 import type { ProfilDetails, UserRole } from '@/types'
 import { CreatePostDialog } from '@/components/feed/create-post-dialog'
@@ -73,6 +74,7 @@ export function SidebarLeft({ role, username = 'Utilisateur' }: SidebarLeftProps
   const t = useT()
   const pathname = usePathname()
   const { unreadCount } = useNotifications()
+  const { unreadCount: msgUnread } = useMessages()
   const [account, setAccount] = useState({
     displayName: username,
     username: username === 'Utilisateur' ? '' : username,
@@ -144,7 +146,17 @@ export function SidebarLeft({ role, username = 'Utilisateur' }: SidebarLeftProps
         {visibleItems.map((item) => {
           const Icon = item.icon
           const active = pathname === item.href
-          const showBadge = item.href === ROUTES.notifications && unreadCount > 0
+          const badgeCount =
+            item.href === ROUTES.notifications
+              ? unreadCount
+              : item.href === ROUTES.messages
+                ? msgUnread
+                : 0
+          const showBadge = badgeCount > 0
+          const badgeAria =
+            item.href === ROUTES.messages
+              ? t('messages.badge_aria', { count: badgeCount })
+              : t('notifications.unread_aria', { count: badgeCount })
 
           return (
             <Link
@@ -163,10 +175,10 @@ export function SidebarLeft({ role, username = 'Utilisateur' }: SidebarLeftProps
                 />
                 {showBadge && (
                   <span
-                    aria-label={t('notifications.unread_aria', { count: unreadCount })}
+                    aria-label={badgeAria}
                     className="absolute -right-2 -top-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-gradient-to-r from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] px-1 text-[11px] font-bold leading-none text-white shadow"
                   >
-                    {unreadCount > 99 ? '99+' : unreadCount}
+                    {badgeCount > 99 ? '99+' : badgeCount}
                   </span>
                 )}
               </span>

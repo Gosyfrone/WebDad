@@ -584,6 +584,24 @@ func (s *MessageService) ClearConversation(ctx context.Context, conversationID, 
 	return nil
 }
 
+// MarkRead avance le curseur de lecture du membre courant à maintenant (la
+// conversation est désormais « lue jusqu'ici »). Membre requis.
+func (s *MessageService) MarkRead(ctx context.Context, conversationID, userID string) error {
+	if _, err := s.requireMember(ctx, conversationID, userID); err != nil {
+		return err
+	}
+	if err := s.repo.SetMemberRead(ctx, conversationID, userID, time.Now()); err != nil {
+		return translateNotFound(err)
+	}
+	return nil
+}
+
+// UnreadCount renvoie le nombre de conversations de l'utilisateur ayant au moins
+// un message non lu (calcul serveur, sans lire le contenu chiffré).
+func (s *MessageService) UnreadCount(ctx context.Context, userID string) (int, error) {
+	return s.repo.CountUnreadConversations(ctx, userID)
+}
+
 // GetConversation renvoie la vue d'une conversation pour un membre (403 sinon).
 func (s *MessageService) GetConversation(ctx context.Context, conversationID, userID string) (*models.ConversationView, error) {
 	oid, err := parseID(conversationID)
@@ -786,6 +804,7 @@ func buildView(conv *models.Conversation, m *models.Member) models.ConversationV
 		MyRole:     m.Role,
 		MyEnvelope: m.KeyEnvelope,
 		PinnedAt:   m.PinnedAt,
+		LastReadAt: m.LastReadAt,
 		CreatedBy:  conv.CreatedBy,
 		CreatedAt:  conv.CreatedAt,
 		UpdatedAt:  conv.UpdatedAt,

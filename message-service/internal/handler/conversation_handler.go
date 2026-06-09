@@ -216,6 +216,40 @@ func (h *ConversationHandler) ClearConversation(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
+// MarkRead : PUT /messages/conversations/:id/read — avance le curseur de lecture
+// du membre courant (la conversation est lue jusqu'à maintenant). Personnel,
+// pas de diffusion WS.
+func (h *ConversationHandler) MarkRead(c *gin.Context) {
+	claims, ok := middleware.ClaimsFrom(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "claims absents"})
+		return
+	}
+
+	if err := h.service.MarkRead(c.Request.Context(), c.Param("id"), claims.UserID); err != nil {
+		respondError(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+// UnreadCount : GET /messages/unread-count — nombre de conversations ayant au
+// moins un message non lu (badge app-wide). Calcul serveur, sans lire le contenu.
+func (h *ConversationHandler) UnreadCount(c *gin.Context) {
+	claims, ok := middleware.ClaimsFrom(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "claims absents"})
+		return
+	}
+
+	count, err := h.service.UnreadCount(c.Request.Context(), claims.UserID)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": gin.H{"count": count}})
+}
+
 // ListMembers : GET /messages/conversations/:id/members — membres (id + rôle),
 // sans les enveloppes des autres (membre requis).
 func (h *ConversationHandler) ListMembers(c *gin.Context) {

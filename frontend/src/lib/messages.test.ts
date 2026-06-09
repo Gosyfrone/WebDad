@@ -46,32 +46,40 @@ describe('buildMessagePage (pagination par curseur)', () => {
 })
 
 describe('computeDivider (ligne « Nouveaux messages »)', () => {
-  it('pas d\'ancre (1re ouverture) → null', () => {
-    expect(computeDivider([msg('a'), msg('b')], null)).toBeNull()
+  // L'ancre est un curseur de lecture (`lastReadAt`, ISO) : le séparateur se pose
+  // avant le 1ᵉʳ message d'autrui POSTÉRIEUR à ce curseur.
+  const T1 = '2026-06-08T10:00:00Z'
+  const T2 = '2026-06-08T10:01:00Z'
+  const T3 = '2026-06-08T10:02:00Z'
+  const T4 = '2026-06-08T10:03:00Z'
+  function at(id: string, createdAt: string, mine = false): ChatMessage {
+    return { ...msg(id, mine), createdAt }
+  }
+
+  it('pas d\'ancre (jamais lu) → null', () => {
+    expect(computeDivider([at('a', T1), at('b', T2)], null)).toBeNull()
   })
 
   it('scénario A→B(moi)→C : séparateur avant C', () => {
-    // J\'ai lu A, j\'ai envoyé B (à moi), je reviens avec C (d\'autrui).
-    const messages = [msg('a'), msg('b', true), msg('c')]
-    expect(computeDivider(messages, 'b')).toBe('c')
+    // Lu jusqu'à T2 ; B (à moi) ignoré ; C (d'autrui, T3) est nouveau.
+    const messages = [at('a', T1), at('b', T2, true), at('c', T3)]
+    expect(computeDivider(messages, T2)).toBe('c')
   })
 
   it('rien de nouveau après l\'ancre → null', () => {
-    expect(computeDivider([msg('a'), msg('b')], 'b')).toBeNull()
+    expect(computeDivider([at('a', T1), at('b', T2)], T2)).toBeNull()
   })
 
   it('ignore mes propres messages après l\'ancre', () => {
-    // Après l\'ancre A, seuls mes messages → pas de « nouveaux messages ».
-    expect(computeDivider([msg('a'), msg('b', true), msg('c', true)], 'a')).toBeNull()
+    expect(computeDivider([at('a', T1), at('b', T2, true), at('c', T3, true)], T1)).toBeNull()
   })
 
   it('place le séparateur avant le 1ᵉʳ message d\'autrui après l\'ancre', () => {
-    expect(computeDivider([msg('a'), msg('b', true), msg('c'), msg('d')], 'a')).toBe('c')
+    expect(computeDivider([at('a', T1), at('b', T2, true), at('c', T3), at('d', T4)], T1)).toBe('c')
   })
 
-  it('ancre hors page → 1ᵉʳ message d\'autrui plus récent que l\'ancre', () => {
-    // L\'ancre 'a' n\'est pas dans la page chargée [b,c,d] ; b>a et d\'autrui.
-    expect(computeDivider([msg('b'), msg('c'), msg('d')], 'a')).toBe('b')
+  it('ancre invalide → null', () => {
+    expect(computeDivider([at('a', T1), at('b', T2)], 'pas-une-date')).toBeNull()
   })
 })
 

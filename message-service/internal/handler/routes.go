@@ -42,6 +42,9 @@ func RegisterRoutes(
 		// Annuaire public des communautés (découverte + recherche).
 		messages.GET("/communities", auth, convH.ListCommunities)
 
+		// Compteur de conversations non lues (badge app-wide).
+		messages.GET("/unread-count", auth, convH.UnreadCount)
+
 		// Conversations + messages.
 		conversations := messages.Group("/conversations", auth)
 		{
@@ -60,6 +63,7 @@ func RegisterRoutes(
 				conv.PATCH("/pin", convH.PinConversation)    // épingler
 				conv.DELETE("/pin", convH.UnpinConversation) // désépingler
 				conv.DELETE("/me", convH.ClearConversation)  // supprimer côté user
+				conv.PUT("/read", convH.MarkRead)            // marquer lu (curseur de lecture)
 
 				conv.GET("/messages", convH.ListMessages)
 				conv.POST("/messages", convH.SendMessage)
