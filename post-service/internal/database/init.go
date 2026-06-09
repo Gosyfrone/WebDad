@@ -10,7 +10,7 @@ import (
 )
 
 // collectionOrder fige l'ordre de création (déterministe pour les logs/tests).
-var collectionOrder = []string{"posts", "comments", "likes", "reposts", "reports"}
+var collectionOrder = []string{"posts", "comments", "likes", "reposts", "reports", "bookmark_collections", "bookmarks", "bookmark_prefs"}
 
 // EnsureSchema crée les collections (avec validateurs $jsonSchema) et les
 // index du post-service, de façon idempotente. Le service possède ainsi son
@@ -158,6 +158,46 @@ var validators = map[string]bson.M{
 			},
 		},
 	},
+	// Playlists de signets (par utilisateur). Pas de compteur stocké : il est
+	// calculé à la lecture (cf. models.BookmarkCollection).
+	"bookmark_collections": {
+		"$jsonSchema": bson.M{
+			"bsonType": "object",
+			"required": bson.A{"user_id", "name", "created_at"},
+			"properties": bson.M{
+				"user_id":    bson.M{"bsonType": "string"},
+				"name":       bson.M{"bsonType": "string", "maxLength": 60},
+				"is_default": bson.M{"bsonType": "bool"},
+				"created_at": bson.M{"bsonType": "date"},
+				"updated_at": bson.M{"bsonType": "date"},
+			},
+		},
+	},
+	// Signets (appartenance many-to-many post↔playlist).
+	"bookmarks": {
+		"$jsonSchema": bson.M{
+			"bsonType": "object",
+			"required": bson.A{"user_id", "post_id", "collection_id", "created_at"},
+			"properties": bson.M{
+				"user_id":       bson.M{"bsonType": "string"},
+				"post_id":       bson.M{"bsonType": "string"},
+				"collection_id": bson.M{"bsonType": "string"},
+				"created_at":    bson.M{"bsonType": "date"},
+			},
+		},
+	},
+	// Préférences de rafale (un doc par utilisateur).
+	"bookmark_prefs": {
+		"$jsonSchema": bson.M{
+			"bsonType": "object",
+			"required": bson.A{"user_id"},
+			"properties": bson.M{
+				"user_id":            bson.M{"bsonType": "string"},
+				"last_collection_id": bson.M{"bsonType": bson.A{"string", "null"}},
+				"last_bookmark_at":   bson.M{"bsonType": bson.A{"date", "null"}},
+			},
+		},
+	},
 }
 
 // indexes : index par collection (portés depuis post-init.js).
@@ -186,5 +226,29 @@ var indexes = map[string][]mongo.IndexModel{
 	"reports": {
 		{Keys: bson.D{{Key: "post_id", Value: 1}}},
 		{Keys: bson.D{{Key: "status", Value: 1}}},
+	},
+	"bookmark_collections": {
+		// Playlists d'un utilisateur, triées par date de création.
+		{Keys: bson.D{{Key: "user_id", Value: 1}, {Key: "created_at", Value: -1}}},
+		// Au plus UNE playlist par défaut par utilisateur (index unique partiel).
+		{
+			Keys: bson.D{{Key: "user_id", Value: 1}},
+			Options: options.Index().
+				SetUnique(true).
+				SetPartialFilterExpression(bson.M{"is_default": true}),
+		},
+	},
+	"bookmarks": {
+		// Idempotence : un post ne peut être rangé qu'une fois par playlist.
+		{Keys: bson.D{{Key: "user_id", Value: 1}, {Key: "post_id", Value: 1}, {Key: "collection_id", Value: 1}}, Options: options.Index().SetUnique(true)},
+		// Contenu d'une playlist, du plus récemment rangé au plus ancien.
+		{Keys: bson.D{{Key: "user_id", Value: 1}, {Key: "collection_id", Value: 1}, {Key: "created_at", Value: -1}}},
+		// Vue « Tous mes signets » + état des boutons (tous les signets d'un user).
+		{Keys: bson.D{{Key: "user_id", Value: 1}, {Key: "created_at", Value: -1}}},
+		// Nettoyage à la suppression d'un post (tous utilisateurs).
+		{Keys: bson.D{{Key: "post_id", Value: 1}}},
+	},
+	"bookmark_prefs": {
+		{Keys: bson.D{{Key: "user_id", Value: 1}}, Options: options.Index().SetUnique(true)},
 	},
 }

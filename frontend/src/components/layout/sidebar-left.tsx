@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   Bell,
+  Bookmark,
   Home,
   LogOut,
   Mail,
@@ -51,6 +52,7 @@ const NAV_ITEMS: NavItem[] = [
   { labelKey: 'nav.explore', href: '/explorer', icon: Search },
   { labelKey: 'nav.notifications', href: '/notifications', icon: Bell },
   { labelKey: 'nav.messages', href: '/messages', icon: Mail },
+  { labelKey: 'nav.bookmarks', href: ROUTES.bookmarks, icon: Bookmark },
   { labelKey: 'nav.profil', href: ROUTES.profil, icon: User },
   {
     labelKey: 'nav.moderation',

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/webdad/post-service/internal/models"
 )
@@ -93,10 +94,39 @@ func TestResolveParentID(t *testing.T) {
 	}
 }
 
+// TestWithinSessionWindow : un clic court range automatiquement (sans
+// redemander la playlist) seulement si l'utilisateur a une dernière playlist et
+// que son dernier signet est récent (< fenêtre). Fonction PURE.
+func TestWithinSessionWindow(t *testing.T) {
+	now := time.Date(2026, 6, 9, 12, 0, 0, 0, time.UTC)
+	window := 5 * time.Minute
+	recent := now.Add(-2 * time.Minute) // dans la fenêtre
+	stale := now.Add(-10 * time.Minute) // hors fenêtre
+
+	cases := []struct {
+		name  string
+		prefs *models.BookmarkPrefs
+		win   time.Duration
+		want  bool
+	}{
+		{"nil prefs (1er signet)", nil, window, false},
+		{"jamais signé (date nil)", &models.BookmarkPrefs{LastCollectionID: "c1"}, window, false},
+		{"sans dernière playlist", &models.BookmarkPrefs{LastBookmarkAt: &recent}, window, false},
+		{"rafale active", &models.BookmarkPrefs{LastCollectionID: "c1", LastBookmarkAt: &recent}, window, true},
+		{"fenêtre expirée", &models.BookmarkPrefs{LastCollectionID: "c1", LastBookmarkAt: &stale}, window, false},
+		{"auto désactivé (window 0)", &models.BookmarkPrefs{LastCollectionID: "c1", LastBookmarkAt: &recent}, 0, false},
+	}
+	for _, tc := range cases {
+		if got := withinSessionWindow(tc.prefs, tc.win, now); got != tc.want {
+			t.Fatalf("%s : withinSessionWindow = %v, attendu %v", tc.name, got, tc.want)
+		}
+	}
+}
+
 // TestGetFeedEmpty : sans aucun id suivi, GetFeed renvoie une liste vide SANS
 // toucher au dépôt (court-circuit) — d'où le repo nil sans panic.
 func TestGetFeedEmpty(t *testing.T) {
-	s := NewPostService(nil)
+	s := NewPostService(nil, 5*time.Minute)
 	posts, err := s.GetFeed(context.Background(), nil, 20, 0)
 	if err != nil {
 		t.Fatalf("GetFeed(nil) erreur inattendue : %v", err)

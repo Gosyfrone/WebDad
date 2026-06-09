@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   BarChart2,
+  Bookmark,
   Heart,
   Loader2,
   MessageCircle,
@@ -26,6 +27,9 @@ import {
   unpinPost,
   type FeedPost,
 } from '@/lib/posts'
+import { quickBookmark, removeBookmarkEverywhere } from '@/lib/bookmarks'
+import { BookmarkDialog } from '@/components/feed/bookmark-dialog'
+import { ToastAction } from '@/components/ui/toast'
 import { useToast } from '@/hooks/use-toast'
 import { useLanguage } from '@/components/language-provider'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -81,6 +85,17 @@ export function PostCard({ post, onDeleted, onUpdated }: PostCardProps) {
   const [reposting, setReposting] = useState(false)
   const [repostMenuOpen, setRepostMenuOpen] = useState(false)
   const [quoteOpen, setQuoteOpen] = useState(false)
+
+  const [bookmarked, setBookmarked] = useState(post.bookmarked)
+  const [bookmarking, setBookmarking] = useState(false)
+  const [pickerOpen, setPickerOpen] = useState(false)
+  // Détection de l'appui long (ouvre le sélecteur sans auto-classer).
+  const longPress = useRef(false)
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    setBookmarked(post.bookmarked)
+  }, [post.bookmarked])
 
   useEffect(() => {
     setIsPinned(post.isPinned)
@@ -162,6 +177,71 @@ export function PostCard({ post, onDeleted, onUpdated }: PostCardProps) {
     } finally {
       setPinning(false)
     }
+  }
+
+  /** Clic court : dé-signe si déjà signé, sinon laisse la rafale serveur décider. */
+  async function quickToggleBookmark() {
+    if (bookmarking) return
+    if (bookmarked) {
+      setBookmarking(true)
+      setBookmarked(false)
+      try {
+        await removeBookmarkEverywhere(post.id)
+        toast({ title: t('bookmarks.removed') })
+      } catch {
+        setBookmarked(true)
+        toast({ title: t('common.action_failed'), variant: 'destructive' })
+      } finally {
+        setBookmarking(false)
+      }
+      return
+    }
+    setBookmarking(true)
+    try {
+      const result = await quickBookmark(post.id)
+      if (result.status === 'filed') {
+        setBookmarked(true)
+        toast({
+          title: t('bookmarks.saved_to', { name: result.collection.name }),
+          action: (
+            <ToastAction altText={t('bookmarks.organize')} onClick={() => setPickerOpen(true)}>
+              {t('bookmarks.organize')}
+            </ToastAction>
+          ),
+        })
+      } else {
+        // Ouverture de rafale : on laisse l'utilisateur choisir/créer la playlist.
+        setPickerOpen(true)
+      }
+    } catch {
+      toast({ title: t('common.action_failed'), variant: 'destructive' })
+    } finally {
+      setBookmarking(false)
+    }
+  }
+
+  function startLongPress() {
+    longPress.current = false
+    longPressTimer.current = setTimeout(() => {
+      longPress.current = true
+      setPickerOpen(true)
+    }, 500)
+  }
+
+  function cancelLongPress() {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current)
+      longPressTimer.current = null
+    }
+  }
+
+  function handleBookmarkClick() {
+    // Un appui long a déjà ouvert le sélecteur → on n'enchaîne pas le clic court.
+    if (longPress.current) {
+      longPress.current = false
+      return
+    }
+    void quickToggleBookmark()
   }
 
   return (
@@ -328,6 +408,24 @@ export function PostCard({ post, onDeleted, onUpdated }: PostCardProps) {
             className="hover:text-primary hover:bg-primary/10"
           />
           <button
+            aria-label={bookmarked ? t('bookmarks.remove_aria') : t('bookmarks.add_aria')}
+            onClick={handleBookmarkClick}
+            onPointerDown={startLongPress}
+            onPointerUp={cancelLongPress}
+            onPointerLeave={cancelLongPress}
+            onContextMenu={(e) => e.preventDefault()}
+            className={cn(
+              'rounded-full p-1.5 transition-colors hover:bg-primary/10 hover:text-primary',
+              bookmarked && 'text-primary',
+            )}
+          >
+            {bookmarking ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Bookmark className={cn('h-4 w-4', bookmarked && 'fill-current')} />
+            )}
+          </button>
+          <button
             aria-label={t('post.share')}
             className="rounded-full p-1.5 transition-colors hover:bg-primary/10 hover:text-primary"
           >
@@ -358,6 +456,13 @@ export function PostCard({ post, onDeleted, onUpdated }: PostCardProps) {
             />
           </DialogContent>
         </Dialog>
+
+        <BookmarkDialog
+          postId={post.id}
+          open={pickerOpen}
+          onOpenChange={setPickerOpen}
+          onMembershipChange={setBookmarked}
+        />
       </div>
     </article>
   )

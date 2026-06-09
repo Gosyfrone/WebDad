@@ -24,6 +24,21 @@ var (
 	ErrInvalidID = errors.New("identifiant de post invalide")
 	// ErrForbidden : l'utilisateur n'est ni l'auteur ni un modérateur/admin → 403.
 	ErrForbidden = errors.New("action non autorisée sur ce post")
+	// ErrCollectionNotFound : playlist de signets absente ou n'appartenant pas à
+	// l'utilisateur (on ne distingue pas pour ne pas divulguer l'existence) → 404.
+	ErrCollectionNotFound = errors.New("playlist de signets introuvable")
+	// ErrDefaultCollection : action interdite sur la playlist par défaut
+	// (suppression / renommage) → 403.
+	ErrDefaultCollection = errors.New("playlist par défaut non modifiable")
+)
+
+// Statuts renvoyés par un clic court sur le bouton signet.
+const (
+	// BookmarkStatusFiled : le post a été rangé automatiquement (fenêtre active).
+	BookmarkStatusFiled = "filed"
+	// BookmarkStatusNeedsChoice : ouverture de rafale — le front doit proposer la
+	// playlist (1er signet ou fenêtre expirée) ; rien n'est rangé.
+	BookmarkStatusNeedsChoice = "needs_choice"
 )
 
 // Bornes de pagination des listes.
@@ -38,10 +53,15 @@ type PostService struct {
 	// Par défaut un no-op : le post-service reste autonome si le
 	// notification-service n'est pas configuré. Câblé via SetNotifier au boot.
 	notif notifier.Notifier
+	// bookmarkWindow : durée de la fenêtre glissante de rafale. Un clic court qui
+	// suit le précédent signet de moins de bookmarkWindow range automatiquement
+	// dans la dernière playlist ; au-delà, le serveur redemande la playlist.
+	// <= 0 = jamais d'auto-classement (toujours proposer).
+	bookmarkWindow time.Duration
 }
 
-func NewPostService(r *repository.PostRepository) *PostService {
-	return &PostService{repo: r, notif: notifier.Noop{}}
+func NewPostService(r *repository.PostRepository, bookmarkWindow time.Duration) *PostService {
+	return &PostService{repo: r, notif: notifier.Noop{}, bookmarkWindow: bookmarkWindow}
 }
 
 // SetNotifier branche l'émetteur d'événements de notification (best-effort).
@@ -195,6 +215,7 @@ func (s *PostService) DeletePost(ctx context.Context, id, actorID, actorRole str
 	_ = s.repo.DeleteLikesByPost(ctx, id)
 	_ = s.repo.DeleteCommentsByPost(ctx, id)
 	_ = s.repo.DeleteRepostsByPost(ctx, id)
+	_ = s.repo.DeleteBookmarksByPost(ctx, id)
 	// Purge en cascade les notifications pointant vers ce post (likes,
 	// commentaires, mentions) — plus de notification orpheline vers un post mort.
 	s.notif.Emit(notifier.Event{

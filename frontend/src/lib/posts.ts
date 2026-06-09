@@ -25,7 +25,7 @@ export class PostApiError extends Error {
 
 // --- Formes brutes (snake_case) ---------------------------------------------
 
-interface ApiPost {
+export interface ApiPost {
   id: string
   author_id: string
   content: string
@@ -89,6 +89,8 @@ export interface FeedPost {
   liked: boolean
   /** L'utilisateur courant a-t-il reposté ce post ? */
   reposted: boolean
+  /** L'utilisateur courant a-t-il signé ce post (dans au moins une playlist) ? */
+  bookmarked: boolean
   /** L'utilisateur courant peut-il supprimer (auteur ou mod/admin) ? */
   canDelete: boolean
   /** L'utilisateur courant peut-il épingler/désépingler ce post ? */
@@ -203,10 +205,13 @@ async function toFeedPost(
   p: ApiPost,
   likedIds: Set<string>,
   repostedIds: Set<string>,
+  bookmarkedIds: Set<string> = new Set(),
   depth = 0,
 ): Promise<FeedPost> {
   const quotedPost =
-    p.quote_post_id && depth < 1 ? await getPost(p.quote_post_id, likedIds, repostedIds, depth + 1) : null
+    p.quote_post_id && depth < 1
+      ? await getPost(p.quote_post_id, likedIds, repostedIds, bookmarkedIds, depth + 1)
+      : null
   return {
     id: p.id,
     author: await resolveAuthor(p.author_id),
@@ -223,6 +228,7 @@ async function toFeedPost(
     isPinned: Boolean(p.pinned_at),
     liked: likedIds.has(p.id),
     reposted: repostedIds.has(p.id),
+    bookmarked: bookmarkedIds.has(p.id),
     canDelete: !p.reposted_by_id && canDelete(p.author_id),
     canPin: currentUserId() === p.author_id,
   }
@@ -259,27 +265,49 @@ export async function getRepostedIds(): Promise<Set<string>> {
   return new Set(ids ?? [])
 }
 
+/** Ids des posts signés par l'utilisateur courant (état des boutons signet). */
+export async function getBookmarkedIds(): Promise<Set<string>> {
+  const res = await apiFetch('/posts/me/bookmarked-ids')
+  if (!res.ok) return new Set()
+  const ids = await unwrap<string[]>(res)
+  return new Set(ids ?? [])
+}
+
 async function getPost(
   id: string,
   likedIds = new Set<string>(),
   repostedIds = new Set<string>(),
+  bookmarkedIds = new Set<string>(),
   depth = 0,
 ): Promise<FeedPost | null> {
   const res = await apiFetch(`/posts/${id}`)
   if (!res.ok) return null
   const raw = await unwrap<ApiPost>(res)
-  return toFeedPost(raw, likedIds, repostedIds, depth)
+  return toFeedPost(raw, likedIds, repostedIds, bookmarkedIds, depth)
 }
 
 /** Charge un post complet par son id (page détail, lien depuis une notification). */
 export async function getPostById(id: string): Promise<FeedPost | null> {
-  const [likedIds, repostedIds] = await Promise.all([getLikedIds(), getRepostedIds()])
-  return getPost(id, likedIds, repostedIds)
+  const [likedIds, repostedIds, bookmarkedIds] = await Promise.all([
+    getLikedIds(),
+    getRepostedIds(),
+    getBookmarkedIds(),
+  ])
+  return getPost(id, likedIds, repostedIds, bookmarkedIds)
 }
 
-async function mapPosts(raw: ApiPost[]): Promise<FeedPost[]> {
-  const [likedIds, repostedIds] = await Promise.all([getLikedIds(), getRepostedIds()])
-  return Promise.all((raw ?? []).map((p) => toFeedPost(p, likedIds, repostedIds)))
+/**
+ * Mappe une liste brute de posts vers des `FeedPost` enrichis (auteur résolu +
+ * état liké/reposté/signé de l'utilisateur courant). Exporté pour les vues qui
+ * lisent des posts via d'autres endpoints du post-service (ex. signets).
+ */
+export async function mapPosts(raw: ApiPost[]): Promise<FeedPost[]> {
+  const [likedIds, repostedIds, bookmarkedIds] = await Promise.all([
+    getLikedIds(),
+    getRepostedIds(),
+    getBookmarkedIds(),
+  ])
+  return Promise.all((raw ?? []).map((p) => toFeedPost(p, likedIds, repostedIds, bookmarkedIds)))
 }
 
 /** Fil global (« Pour toi »), paginé. */
@@ -325,17 +353,23 @@ export async function createPost(content: string, quotePostId?: string): Promise
 /** Épingle un post sur le profil de l'auteur courant ; renvoie le post à jour. */
 export async function pinPost(id: string): Promise<FeedPost> {
   const updated = await unwrap<ApiPost>(await apiFetch(`/posts/${id}/pin`, { method: 'PATCH' }))
-  const likedIds = await getLikedIds()
-  const repostedIds = await getRepostedIds()
-  return toFeedPost(updated, likedIds, repostedIds)
+  const [likedIds, repostedIds, bookmarkedIds] = await Promise.all([
+    getLikedIds(),
+    getRepostedIds(),
+    getBookmarkedIds(),
+  ])
+  return toFeedPost(updated, likedIds, repostedIds, bookmarkedIds)
 }
 
 /** Désépingle un post ; renvoie le post à jour. */
 export async function unpinPost(id: string): Promise<FeedPost> {
   const updated = await unwrap<ApiPost>(await apiFetch(`/posts/${id}/pin`, { method: 'DELETE' }))
-  const likedIds = await getLikedIds()
-  const repostedIds = await getRepostedIds()
-  return toFeedPost(updated, likedIds, repostedIds)
+  const [likedIds, repostedIds, bookmarkedIds] = await Promise.all([
+    getLikedIds(),
+    getRepostedIds(),
+    getBookmarkedIds(),
+  ])
+  return toFeedPost(updated, likedIds, repostedIds, bookmarkedIds)
 }
 
 /** Supprime un post (auteur ou mod/admin côté back). */
@@ -366,8 +400,12 @@ export async function unlikePost(id: string): Promise<number> {
 /** Repost simple ; renvoie le post original annoté pour affichage profil. */
 export async function repostPost(id: string): Promise<FeedPost> {
   const updated = await unwrap<ApiPost>(await apiFetch(`/posts/${id}/repost`, { method: 'POST' }))
-  const [likedIds, repostedIds] = await Promise.all([getLikedIds(), getRepostedIds()])
-  return toFeedPost(updated, likedIds, repostedIds)
+  const [likedIds, repostedIds, bookmarkedIds] = await Promise.all([
+    getLikedIds(),
+    getRepostedIds(),
+    getBookmarkedIds(),
+  ])
+  return toFeedPost(updated, likedIds, repostedIds, bookmarkedIds)
 }
 
 /** Retire le repost ; renvoie le nombre de reposts à jour. */

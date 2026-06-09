@@ -24,14 +24,21 @@ type PostRepository struct {
 	likes    *mongo.Collection
 	comments *mongo.Collection
 	reposts  *mongo.Collection
+	// Signets : playlists + appartenances + préférences de rafale.
+	bookmarkCollections *mongo.Collection
+	bookmarks           *mongo.Collection
+	bookmarkPrefs       *mongo.Collection
 }
 
 func NewPostRepository(db *mongo.Database) *PostRepository {
 	return &PostRepository{
-		posts:    db.Collection("posts"),
-		likes:    db.Collection("likes"),
-		comments: db.Collection("comments"),
-		reposts:  db.Collection("reposts"),
+		posts:               db.Collection("posts"),
+		likes:               db.Collection("likes"),
+		comments:            db.Collection("comments"),
+		reposts:             db.Collection("reposts"),
+		bookmarkCollections: db.Collection("bookmark_collections"),
+		bookmarks:           db.Collection("bookmarks"),
+		bookmarkPrefs:       db.Collection("bookmark_prefs"),
 	}
 }
 

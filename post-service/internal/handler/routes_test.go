@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/v2/mongo"
@@ -27,7 +28,7 @@ func newTestRouter(t *testing.T) *gin.Engine {
 	}
 	db := client.Database("webdad_post_test")
 	r := gin.New()
-	svc := service.NewPostService(repository.NewPostRepository(db))
+	svc := service.NewPostService(repository.NewPostRepository(db), 5*time.Minute)
 	RegisterRoutes(r, "post-service", svc, "test-secret")
 	return r
 }
@@ -67,6 +68,16 @@ func TestProtectedRequiresToken(t *testing.T) {
 		{http.MethodPost, "/posts/507f1f77bcf86cd799439011/comments"},
 		{http.MethodDelete, "/posts/507f1f77bcf86cd799439011/comments/507f1f77bcf86cd799439012"},
 		{http.MethodGet, "/posts/me/liked-ids"},
+		{http.MethodGet, "/posts/me/bookmarked-ids"},
+		{http.MethodGet, "/posts/bookmarks"},
+		{http.MethodGet, "/posts/bookmarks/collections"},
+		{http.MethodPost, "/posts/bookmarks/collections"},
+		{http.MethodPatch, "/posts/bookmarks/collections/507f1f77bcf86cd799439011"},
+		{http.MethodDelete, "/posts/bookmarks/collections/507f1f77bcf86cd799439011"},
+		{http.MethodGet, "/posts/bookmarks/collections/507f1f77bcf86cd799439011/posts"},
+		{http.MethodPost, "/posts/507f1f77bcf86cd799439011/bookmark"},
+		{http.MethodDelete, "/posts/507f1f77bcf86cd799439011/bookmark"},
+		{http.MethodGet, "/posts/507f1f77bcf86cd799439011/bookmark/collections"},
 	}
 	r := newTestRouter(t)
 	for _, tc := range cases {
