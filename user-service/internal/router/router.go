@@ -41,6 +41,7 @@ func New(users *service.UserService, jwtSecret string) *gin.Engine {
 		u.GET("/me", auth, h.GetMe)
 		u.PATCH("/me", auth, h.UpdateMe)
 		u.GET("/me/follow-requests/outgoing", auth, h.PendingFollowRequests)
+		u.DELETE("/me/followers/:id", auth, h.RemoveFollower)
 		u.DELETE("/:id", auth, h.Delete) // admin (vérifié dans le handler)
 		u.POST("/:id/follow", auth, h.Follow)
 		u.DELETE("/:id/follow", auth, h.Unfollow)

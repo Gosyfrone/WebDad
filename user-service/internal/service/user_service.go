@@ -350,6 +350,17 @@ func (s *UserService) emitFollowRequestDecision(ownerID, followerID, eventType s
 	})
 }
 
+// RemoveFollower supprime la relation followerID → currentUserID (idempotent).
+func (s *UserService) RemoveFollower(currentUserID, followerID string) error {
+	if currentUserID == followerID {
+		return ErrSelfFollow
+	}
+	if err := s.repo.Unfollow(followerID, currentUserID); err != nil {
+		return fmt.Errorf("retrait follower : %w", err)
+	}
+	return nil
+}
+
 // ListFollowers retourne les abonnés de `id` (404 si l'utilisateur n'existe pas).
 func (s *UserService) ListFollowers(id string, limit, offset int) ([]models.User, error) {
 	if err := s.requireExists(id); err != nil {

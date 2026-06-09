@@ -5,9 +5,10 @@ import { Loader2, Lock, Users } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import type { RelationKind } from '@/lib/api'
-import { listRelations } from '@/lib/api'
-import { useFollow } from '@/lib/use-follow'
+import { listRelations, removeFollower } from '@/lib/api'
+import { emitFollowChange, useFollow } from '@/lib/use-follow'
 import type { RelationUser } from '@/types'
+import { useToast } from '@/hooks/use-toast'
 import { useT } from '@/components/language-provider'
 import {
   Dialog,
@@ -46,12 +47,14 @@ export function RelationsDialog({
   locked = false,
 }: RelationsDialogProps) {
   const t = useT()
+  const { toast } = useToast()
   const [tab, setTab] = useState<RelationKind>(initialTab)
 
   // Cache par onglet : `undefined` = pas encore chargé.
   const [lists, setLists] = useState<Partial<Record<RelationKind, RelationUser[]>>>({})
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [removing, setRemoving] = useState<Set<string>>(new Set())
 
   const { currentUserId, isFollowing, isPending, toggle } = useFollow(open)
 
@@ -88,6 +91,49 @@ export function RelationsDialog({
   }, [open, locked, tab, userId, lists, t])
 
   const current = lists[tab]
+  const canRemoveFollowers = tab === 'followers' && currentUserId === userId
+
+  async function handleRemoveFollower(user: RelationUser) {
+    if (!currentUserId) return
+
+    setRemoving((prev) => new Set(prev).add(user.id))
+    setLists((prev) => ({
+      ...prev,
+      followers: (prev.followers ?? []).filter((item) => item.id !== user.id),
+    }))
+    emitFollowChange({
+      targetUser: user,
+      followerUserId: user.id,
+      followingUserId: currentUserId,
+      following: false,
+    })
+
+    try {
+      await removeFollower(user.id)
+    } catch {
+      setLists((prev) => ({
+        ...prev,
+        followers: [user, ...(prev.followers ?? [])],
+      }))
+      emitFollowChange({
+        targetUser: user,
+        followerUserId: user.id,
+        followingUserId: currentUserId,
+        following: true,
+      })
+      toast({
+        title: t('follow.remove_follower_fail_title'),
+        description: t('follow.fail_desc'),
+        variant: 'destructive',
+      })
+    } finally {
+      setRemoving((prev) => {
+        const copy = new Set(prev)
+        copy.delete(user.id)
+        return copy
+      })
+    }
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -138,8 +184,10 @@ export function RelationsDialog({
                   user={user}
                   isFollowing={isFollowing(user.id)}
                   isSelf={user.id === currentUserId}
-                  pending={isPending(user.id)}
+                  pending={isPending(user.id) || removing.has(user.id)}
                   onToggleFollow={toggle}
+                  canRemoveFollower={canRemoveFollowers}
+                  onRemoveFollower={handleRemoveFollower}
                 />
               ))}
             </div>

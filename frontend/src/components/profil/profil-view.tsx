@@ -9,6 +9,7 @@ import { ROUTES } from '@/lib/routes'
 import { useFollow } from '@/lib/use-follow'
 import { getMyProfil, getPublicProfil, saveMyProfil } from '@/lib/profil-client'
 import { listByAuthor, subscribePostCreated, type FeedPost } from '@/lib/posts'
+import { FOLLOW_CHANGE_EVENT, type FollowChangeDetail } from '@/lib/use-follow'
 import { useToast } from '@/hooks/use-toast'
 import type { ProfilDetails, ProfilEditableFields } from '@/types'
 import { useT } from '@/components/language-provider'
@@ -141,6 +142,32 @@ export function ProfilView({ username }: ProfilViewProps) {
       cancelled = true
     }
   }, [accessPending, privateContentLocked, profil?.userId])
+
+  useEffect(() => {
+    function handleFollowChange(event: Event) {
+      const { followerUserId, followingUserId, following } = (
+        event as CustomEvent<FollowChangeDetail>
+      ).detail
+      const delta = following ? 1 : -1
+
+      setProfil((current) => {
+        if (!current) return current
+
+        const updates: Partial<ProfilDetails> = {}
+        if (followingUserId === current.userId) {
+          updates.followersCount = clampCount(current.followersCount + delta)
+        }
+        if (followerUserId === current.userId) {
+          updates.followingCount = clampCount(current.followingCount + delta)
+        }
+
+        return Object.keys(updates).length ? { ...current, ...updates } : current
+      })
+    }
+
+    window.addEventListener(FOLLOW_CHANGE_EVENT, handleFollowChange)
+    return () => window.removeEventListener(FOLLOW_CHANGE_EVENT, handleFollowChange)
+  }, [])
 
   useEffect(() => {
     if (!profil?.userId) return undefined
@@ -336,4 +363,8 @@ function CenteredTab({ children }: { children: React.ReactNode }) {
       {children}
     </div>
   )
+}
+
+function clampCount(value: number): number {
+  return Math.max(0, value)
 }

@@ -484,8 +484,10 @@ export const messages: Record<Locale, Messages> = {
     'follow.private_unfollow_desc':
       'Vous perdrez l’accès à ses posts, ses réponses, ses mentions J’aime et ses listes d’abonnements.',
     'follow.private_unfollow_confirm': 'Ne plus suivre',
+    'follow.remove_follower': 'Retirer',
     'follow.fail_title': 'Suivi impossible',
     'follow.unfail_title': 'Désabonnement impossible',
+    'follow.remove_follower_fail_title': "Retrait impossible",
     'follow.fail_desc': 'Connectez-vous pour gérer vos abonnements.',
 
     // — Liste d'utilisateurs —
@@ -960,8 +962,10 @@ export const messages: Record<Locale, Messages> = {
     'follow.private_unfollow_desc':
       'You will lose access to their posts, replies, likes, and follow lists.',
     'follow.private_unfollow_confirm': 'Unfollow',
+    'follow.remove_follower': 'Remove',
     'follow.fail_title': "Couldn't follow",
     'follow.unfail_title': "Couldn't unfollow",
+    'follow.remove_follower_fail_title': "Couldn't remove follower",
     'follow.fail_desc': 'Sign in to manage your follows.',
 
     // — User list —

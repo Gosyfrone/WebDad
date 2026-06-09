@@ -9,6 +9,14 @@ import { useToast } from '@/hooks/use-toast'
 import { useT } from '@/components/language-provider'
 
 export type FollowToggleResult = 'following' | 'pending' | 'unfollowed' | 'failed'
+export const FOLLOW_CHANGE_EVENT = 'breezy:follow-change'
+
+export interface FollowChangeDetail {
+  targetUser: RelationUser
+  followerUserId: string | null
+  followingUserId: string
+  following: boolean
+}
 
 /**
  * État de suivi partagé (modale des relations, Explorer, « Qui suivre »).
@@ -76,6 +84,12 @@ export function useFollow(enabled = true) {
 
   const toggle = useCallback(
     async (user: RelationUser, next: boolean) => {
+      const change: FollowChangeDetail = {
+        targetUser: user,
+        followerUserId: currentUserId,
+        followingUserId: user.id,
+        following: next,
+      }
       setPending((prev) => new Set(prev).add(user.id))
       setFollowingIds((prev) => {
         const copy = new Set(prev)
@@ -83,6 +97,7 @@ export function useFollow(enabled = true) {
         else copy.delete(user.id)
         return copy
       })
+      emitFollowChange(change)
       try {
         if (next) {
           const status = await follow(user.id)
@@ -98,6 +113,9 @@ export function useFollow(enabled = true) {
             else copy.delete(user.id)
             return copy
           })
+          if (status === 'pending') {
+            emitFollowChange({ ...change, following: false })
+          }
           return status
         }
         await unfollow(user.id)
@@ -114,6 +132,7 @@ export function useFollow(enabled = true) {
           else copy.add(user.id)
           return copy
         })
+        emitFollowChange({ ...change, following: !next })
         toast({
           title: next ? t('follow.fail_title') : t('follow.unfail_title'),
           description: t('follow.fail_desc'),
@@ -127,8 +146,9 @@ export function useFollow(enabled = true) {
           return copy
         })
       }
+      return 'following'
     },
-    [toast, t],
+    [currentUserId, toast, t],
   )
 
   return {
@@ -139,4 +159,9 @@ export function useFollow(enabled = true) {
     isPending: (id: string) => pending.has(id),
     toggle,
   }
+}
+
+export function emitFollowChange(detail: FollowChangeDetail) {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new CustomEvent<FollowChangeDetail>(FOLLOW_CHANGE_EVENT, { detail }))
 }

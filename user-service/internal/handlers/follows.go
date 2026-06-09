@@ -39,6 +39,21 @@ func (h *Handler) Unfollow(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
+// RemoveFollower : DELETE /users/me/followers/:id — retire `:id` de mes abonnés.
+func (h *Handler) RemoveFollower(c *gin.Context) {
+	claims, ok := middleware.ClaimsFrom(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "claims absents"})
+		return
+	}
+
+	if err := h.users.RemoveFollower(claims.UserID, c.Param("id")); err != nil {
+		respondUserError(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
 // Followers : GET /users/:id/followers — abonnés de `:id` (public, paginé).
 func (h *Handler) Followers(c *gin.Context) {
 	limit, offset := paginate(c)
