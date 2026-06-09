@@ -4,6 +4,7 @@
 package service
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -11,17 +12,24 @@ import (
 	"strings"
 	"time"
 
+	"github.com/webdad/user-service/internal/client"
 	"github.com/webdad/user-service/internal/models"
 	"github.com/webdad/user-service/internal/repository"
 )
 
 // Erreurs métier (mappées vers des codes HTTP par les handlers).
 var (
-	ErrUserNotFound     = errors.New("utilisateur introuvable")
-	ErrUsernameTaken    = errors.New("nom d'utilisateur déjà utilisé")
-	ErrInvalidUsername  = errors.New("nom d'utilisateur invalide (3-50 caractères : lettres, chiffres, _)")
-	ErrSelfFollow       = errors.New("impossible de se suivre soi-même")
-	ErrUsernameCooldown = errors.New("nom d'utilisateur modifié trop récemment")
+	ErrUserNotFound          = errors.New("utilisateur introuvable")
+	ErrUsernameTaken         = errors.New("nom d'utilisateur déjà utilisé")
+	ErrInvalidUsername       = errors.New("nom d'utilisateur invalide (3-50 caractères : lettres, chiffres, _)")
+	ErrSelfFollow            = errors.New("impossible de se suivre soi-même")
+	ErrUsernameCooldown      = errors.New("nom d'utilisateur modifié trop récemment")
+	ErrFollowRequestNotFound = errors.New("demande de suivi introuvable")
+)
+
+const (
+	FollowStatusFollowing = "following"
+	FollowStatusPending   = "pending"
 )
 
 // usernamePattern : charset autorisé pour un username (3-50, alphanum + _).
@@ -38,12 +46,36 @@ var reservedUsernames = map[string]bool{
 type UserService struct {
 	repo             *repository.UserRepository
 	usernameCooldown time.Duration
+	profilClient     profilVisibilityClient
+	notification     notificationEmitter
+}
+
+type profilVisibilityClient interface {
+	Visibility(ctx context.Context, userID string) (string, error)
+}
+
+type notificationEmitter interface {
+	Emit(ev client.Event)
+}
+
+type Option func(*UserService)
+
+func WithProfilClient(c profilVisibilityClient) Option {
+	return func(s *UserService) { s.profilClient = c }
+}
+
+func WithNotificationClient(c notificationEmitter) Option {
+	return func(s *UserService) { s.notification = c }
 }
 
 // New construit le service. usernameCooldown=0 désactive l'enforcement du
 // cooldown (le timestamp de changement reste enregistré dans tous les cas).
-func New(repo *repository.UserRepository, usernameCooldown time.Duration) *UserService {
-	return &UserService{repo: repo, usernameCooldown: usernameCooldown}
+func New(repo *repository.UserRepository, usernameCooldown time.Duration, opts ...Option) *UserService {
+	s := &UserService{repo: repo, usernameCooldown: usernameCooldown}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
 }
 
 // Create crée un utilisateur avec l'id fourni (= credentials.id du JWT).
@@ -208,24 +240,45 @@ func (s *UserService) provision(id, email string) error {
 // Follow : `followerID` (utilisateur authentifié, email pour provisioning si
 // besoin) suit `followingID`. Idempotent. Provisionne d'abord le follower
 // (il peut ne jamais avoir tapé /users/me) puis vérifie l'existence de la cible.
-func (s *UserService) Follow(followerID, followerEmail, followingID string) error {
+func (s *UserService) Follow(ctx context.Context, followerID, followerEmail, followingID string) (string, error) {
 	if followerID == followingID {
-		return ErrSelfFollow
+		return "", ErrSelfFollow
 	}
 	if _, err := s.ProvisionFromClaims(followerID, followerEmail); err != nil {
-		return err
+		return "", err
 	}
 	exists, err := s.repo.ExistsByID(followingID)
 	if err != nil {
-		return fmt.Errorf("vérification cible : %w", err)
+		return "", fmt.Errorf("vérification cible : %w", err)
 	}
 	if !exists {
-		return ErrUserNotFound
+		return "", ErrUserNotFound
+	}
+	already, err := s.repo.IsFollowing(followerID, followingID)
+	if err != nil {
+		return "", fmt.Errorf("vérification follow : %w", err)
+	}
+	if already {
+		return FollowStatusFollowing, nil
+	}
+	visibility := ""
+	if s.profilClient != nil {
+		visibility, err = s.profilClient.Visibility(ctx, followingID)
+		if err != nil {
+			return "", fmt.Errorf("vérification visibilité : %w", err)
+		}
+	}
+	if visibility == client.VisibilityPrivate {
+		if err := s.repo.RequestFollow(followerID, followingID); err != nil {
+			return "", fmt.Errorf("demande follow : %w", err)
+		}
+		s.emitFollowRequest(followerID, followingID, false)
+		return FollowStatusPending, nil
 	}
 	if err := s.repo.Follow(followerID, followingID); err != nil {
-		return fmt.Errorf("follow : %w", err)
+		return "", fmt.Errorf("follow : %w", err)
 	}
-	return nil
+	return FollowStatusFollowing, nil
 }
 
 // Unfollow supprime la relation (idempotent).
@@ -233,7 +286,68 @@ func (s *UserService) Unfollow(followerID, followingID string) error {
 	if err := s.repo.Unfollow(followerID, followingID); err != nil {
 		return fmt.Errorf("unfollow : %w", err)
 	}
+	s.emitFollowRequest(followerID, followingID, true)
 	return nil
+}
+
+func (s *UserService) AcceptFollowRequest(ownerID, followerID string) error {
+	accepted, err := s.repo.AcceptFollowRequest(followerID, ownerID)
+	if err != nil {
+		return fmt.Errorf("accept follow request : %w", err)
+	}
+	if !accepted {
+		return ErrFollowRequestNotFound
+	}
+	s.emitFollowRequest(followerID, ownerID, true)
+	s.emitFollowRequestDecision(ownerID, followerID, client.TypeFollowRequestAccepted)
+	return nil
+}
+
+func (s *UserService) RejectFollowRequest(ownerID, followerID string) error {
+	exists, err := s.repo.HasFollowRequest(followerID, ownerID)
+	if err != nil {
+		return fmt.Errorf("vérification follow request : %w", err)
+	}
+	if !exists {
+		return ErrFollowRequestNotFound
+	}
+	if err := s.repo.DeleteFollowRequest(followerID, ownerID); err != nil {
+		return fmt.Errorf("reject follow request : %w", err)
+	}
+	s.emitFollowRequest(followerID, ownerID, true)
+	s.emitFollowRequestDecision(ownerID, followerID, client.TypeFollowRequestRejected)
+	return nil
+}
+
+func (s *UserService) PendingFollowRequestIDs(followerID string) ([]string, error) {
+	ids, err := s.repo.PendingFollowRequestIDs(followerID)
+	if err != nil {
+		return nil, fmt.Errorf("demandes follow pending : %w", err)
+	}
+	return ids, nil
+}
+
+func (s *UserService) emitFollowRequest(followerID, followingID string, retract bool) {
+	if s.notification == nil {
+		return
+	}
+	s.notification.Emit(client.Event{
+		Type:        client.TypeFollowRequest,
+		ActorID:     followerID,
+		RecipientID: followingID,
+		Retract:     retract,
+	})
+}
+
+func (s *UserService) emitFollowRequestDecision(ownerID, followerID, eventType string) {
+	if s.notification == nil {
+		return
+	}
+	s.notification.Emit(client.Event{
+		Type:        eventType,
+		ActorID:     ownerID,
+		RecipientID: followerID,
+	})
 }
 
 // ListFollowers retourne les abonnés de `id` (404 si l'utilisateur n'existe pas).
@@ -270,6 +384,20 @@ func (s *UserService) requireExists(id string) error {
 		return ErrUserNotFound
 	}
 	return nil
+}
+
+func (s *UserService) IsFollowing(userId string, followingId string) bool {
+	if err := s.requireExists(userId); err != nil {
+		return false
+	}
+	if err := s.requireExists(followingId); err != nil {
+		return false
+	}
+	exists, err := s.repo.IsFollowing(userId, followingId)
+	if err != nil {
+		return false
+	}
+	return exists
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────

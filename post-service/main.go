@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/webdad/post-service/internal/client"
 	"github.com/webdad/post-service/internal/config"
 	"github.com/webdad/post-service/internal/database"
 	"github.com/webdad/post-service/internal/handler"
@@ -21,17 +22,17 @@ func main() {
 	cfg := config.Load()
 	gin.SetMode(ginMode(cfg.GinMode))
 
-	client, err := database.ConnectMongo(cfg.MongoURI)
+	mongoClient, err := database.ConnectMongo(cfg.MongoURI)
 	if err != nil {
 		log.Fatalf("[%s] connexion Mongo : %v", serviceName, err)
 	}
 	defer func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		_ = client.Disconnect(ctx)
+		_ = mongoClient.Disconnect(ctx)
 	}()
 
-	db := client.Database(cfg.MongoDB)
+	db := mongoClient.Database(cfg.MongoDB)
 
 	// Le service applique son propre schéma (collections + validateurs +
 	// index) au démarrage, de façon idempotente → autonome, sans script
@@ -43,15 +44,15 @@ func main() {
 	}
 
 	postRepo := repository.NewPostRepository(db)
-	postService := service.NewPostService(postRepo, cfg.BookmarkWindow)
-
-	// Émission des événements de notification (best-effort, fire-and-forget).
-	// Activée uniquement si le notification-service est configuré → post-service
-	// reste autonome sans lui.
-	if cfg.NotificationURL != "" && cfg.InternalSecret != "" {
-		postService.SetNotifier(notifier.New(cfg.NotificationURL, cfg.InternalSecret))
-		log.Printf("[%s] notifications activées → %s", serviceName, cfg.NotificationURL)
+	opts := []service.Option{
+		service.WithBookmarkWindow(cfg.BookmarkWindow),
+		service.WithProfilClient(client.NewProfilClient(cfg.ProfilServiceURL)),
+		service.WithFollowClient(client.NewFollowClient(cfg.UserServiceURL, cfg.InternalSecret)),
 	}
+	if cfg.NotificationURL != "" {
+		opts = append(opts, service.WithNotifier(notifier.New(cfg.NotificationURL, cfg.InternalSecret)))
+	}
+	postService := service.NewPostService(postRepo, opts...)
 
 	r := gin.Default()
 	handler.RegisterRoutes(r, serviceName, postService, cfg.JWTSecret)

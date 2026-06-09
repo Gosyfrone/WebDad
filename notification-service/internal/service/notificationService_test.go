@@ -1,10 +1,21 @@
 package service
 
 import (
+	"context"
 	"testing"
 
 	"github.com/webdad/notification-service/internal/models"
 )
+
+type capturePublisher struct {
+	userIDs []string
+	event   any
+}
+
+func (p *capturePublisher) Publish(userIDs []string, event any) {
+	p.userIDs = userIDs
+	p.event = event
+}
 
 func TestGroupKeyFor(t *testing.T) {
 	cases := []struct {
@@ -65,5 +76,36 @@ func TestClampLimit(t *testing.T) {
 		if got := clampLimit(tc.in); got != tc.want {
 			t.Errorf("clampLimit(%d) = %d ; attendu %d", tc.in, got, tc.want)
 		}
+	}
+}
+
+func TestHandleEventPublishesFollowRequestDecision(t *testing.T) {
+	pub := &capturePublisher{}
+	svc := NewNotificationService(nil, pub, nil)
+
+	err := svc.HandleEvent(context.Background(), models.Event{
+		Type:        models.EventFollowRequestAccepted,
+		ActorID:     "private-user",
+		RecipientID: "requester",
+	})
+	if err != nil {
+		t.Fatalf("HandleEvent() erreur inattendue: %v", err)
+	}
+	if len(pub.userIDs) != 1 || pub.userIDs[0] != "requester" {
+		t.Fatalf("destinataires = %#v ; attendu requester", pub.userIDs)
+	}
+	payload, ok := pub.event.(map[string]any)
+	if !ok {
+		t.Fatalf("payload type = %T ; attendu map[string]any", pub.event)
+	}
+	if payload["type"] != "follow_request_decision" {
+		t.Fatalf("type = %#v ; attendu follow_request_decision", payload["type"])
+	}
+	data, ok := payload["data"].(map[string]string)
+	if !ok {
+		t.Fatalf("data type = %T ; attendu map[string]string", payload["data"])
+	}
+	if data["actor_id"] != "private-user" || data["status"] != "accepted" {
+		t.Fatalf("data = %#v ; attendu actor/status accepted", data)
 	}
 }

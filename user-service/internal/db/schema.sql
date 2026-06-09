@@ -42,6 +42,19 @@ CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
 CREATE INDEX IF NOT EXISTS idx_follows_follower ON follows(follower_id);
 CREATE INDEX IF NOT EXISTS idx_follows_following ON follows(following_id);
 
+-- Demandes de follow vers profils privés. La relation réelle n'est créée dans
+-- `follows` qu'après acceptation par le propriétaire du profil privé.
+CREATE TABLE IF NOT EXISTS follow_requests (
+    follower_id  UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    following_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (follower_id, following_id),
+    CONSTRAINT no_self_follow_request CHECK (follower_id != following_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_follow_requests_follower ON follow_requests(follower_id);
+CREATE INDEX IF NOT EXISTS idx_follow_requests_following ON follow_requests(following_id);
+
 -- Trigger updated_at automatique (CREATE OR REPLACE → idempotent, PG ≥ 14).
 CREATE OR REPLACE FUNCTION update_updated_at()
 RETURNS TRIGGER AS $$

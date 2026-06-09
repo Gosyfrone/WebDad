@@ -6,11 +6,13 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 
+	"github.com/webdad/post-service/internal/client"
 	"github.com/webdad/post-service/internal/models"
 	"github.com/webdad/post-service/internal/notifier"
 	"github.com/webdad/post-service/internal/repository"
@@ -24,6 +26,10 @@ var (
 	ErrInvalidID = errors.New("identifiant de post invalide")
 	// ErrForbidden : l'utilisateur n'est ni l'auteur ni un modérateur/admin → 403.
 	ErrForbidden = errors.New("action non autorisée sur ce post")
+	// ErrPrivateProfil : profil privé inaccessible au visiteur courant → 403.
+	ErrPrivateProfil = errors.New("profil privé")
+	// ErrDependencyUnavailable : profil-service / user-service indisponible → 503.
+	ErrDependencyUnavailable = errors.New("service dépendant indisponible")
 	// ErrCollectionNotFound : collection de signets absente ou n'appartenant pas à
 	// l'utilisateur (on ne distingue pas pour ne pas divulguer l'existence) → 404.
 	ErrCollectionNotFound = errors.New("collection de signets introuvable")
@@ -58,10 +64,52 @@ type PostService struct {
 	// dans la dernière collection ; au-delà, le serveur redemande la collection.
 	// <= 0 = jamais d'auto-classement (toujours proposer).
 	bookmarkWindow time.Duration
+	profilClient   profilVisibilityClient
+	followClient   followStatusClient
 }
 
-func NewPostService(r *repository.PostRepository, bookmarkWindow time.Duration) *PostService {
-	return &PostService{repo: r, notif: notifier.Noop{}, bookmarkWindow: bookmarkWindow}
+type profilVisibilityClient interface {
+	Visibility(ctx context.Context, userID string) (string, error)
+}
+
+type followStatusClient interface {
+	IsFollowing(ctx context.Context, followerID, followingID string) (bool, error)
+}
+
+type Option func(*PostService)
+
+func WithProfilClient(c profilVisibilityClient) Option {
+	return func(s *PostService) {
+		s.profilClient = c
+	}
+}
+
+func WithFollowClient(c followStatusClient) Option {
+	return func(s *PostService) {
+		s.followClient = c
+	}
+}
+
+func WithNotifier(n notifier.Notifier) Option {
+	return func(s *PostService) {
+		if n != nil {
+			s.notif = n
+		}
+	}
+}
+
+func WithBookmarkWindow(window time.Duration) Option {
+	return func(s *PostService) {
+		s.bookmarkWindow = window
+	}
+}
+
+func NewPostService(r *repository.PostRepository, opts ...Option) *PostService {
+	s := &PostService{repo: r, notif: notifier.Noop{}}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
 }
 
 // SetNotifier branche l'émetteur d'événements de notification (best-effort).
@@ -125,22 +173,29 @@ func (s *PostService) CreatePost(ctx context.Context, authorID, content, quotePo
 }
 
 // GetPosts renvoie le fil global, du plus récent au plus ancien, paginé.
-func (s *PostService) GetPosts(ctx context.Context, limit, offset int64) ([]models.Post, error) {
-	posts, err := s.repo.GetAll(ctx, clampLimit(limit), clampOffset(offset))
-	if err != nil {
-		return nil, err
-	}
-	return withoutProfilePins(posts), nil
+func (s *PostService) GetPosts(ctx context.Context, viewerID string, limit, offset int64) ([]models.Post, error) {
+	return s.visibleFeedPage(ctx, viewerID, limit, offset, s.repo.GetAll)
 }
 
-// GetPost renvoie un post par son id.
-func (s *PostService) GetPost(ctx context.Context, id string) (*models.Post, error) {
+// GetPost renvoie un post par son id si le profil de l'auteur est lisible par
+// le visiteur courant.
+func (s *PostService) GetPost(ctx context.Context, id, viewerID string) (*models.Post, error) {
 	oid, err := parseID(id)
 	if err != nil {
 		return nil, err
 	}
 	post, err := s.repo.Get(ctx, oid)
-	return post, translateNotFound(err)
+	if err != nil {
+		return nil, translateNotFound(err)
+	}
+	allowed, err := s.canReadAuthor(ctx, viewerID, post.AuthorID)
+	if err != nil {
+		return nil, err
+	}
+	if !allowed {
+		return nil, ErrPrivateProfil
+	}
+	return post, nil
 }
 
 // UpdatePost modifie le contenu d'un post si l'acteur en a le droit (auteur,
@@ -232,7 +287,14 @@ func (s *PostService) DeletePost(ctx context.Context, id, actorID, actorRole str
 }
 
 // GetByProfile renvoie les posts d'un auteur, du plus récent au plus ancien.
-func (s *PostService) GetByProfile(ctx context.Context, authorID string, limit, offset int64) ([]models.Post, error) {
+func (s *PostService) GetByProfile(ctx context.Context, authorID, viewerID string, limit, offset int64) ([]models.Post, error) {
+	allowed, err := s.canReadAuthor(ctx, viewerID, authorID)
+	if err != nil {
+		return nil, err
+	}
+	if !allowed {
+		return []models.Post{}, nil
+	}
 	return s.repo.GetByProfile(ctx, authorID, clampLimit(limit), clampOffset(offset))
 }
 
@@ -240,15 +302,98 @@ func (s *PostService) GetByProfile(ctx context.Context, authorID string, limit, 
 // front fournit les ids suivis (seul le user-service connaît le graphe) ; la
 // sélection + le tri + la pagination sont faits côté DB ($in indexé). Liste
 // vide → aucun post (pas de requête inutile).
-func (s *PostService) GetFeed(ctx context.Context, authorIDs []string, limit, offset int64) ([]models.Post, error) {
+func (s *PostService) GetFeed(ctx context.Context, authorIDs []string, viewerID string, limit, offset int64) ([]models.Post, error) {
 	if len(authorIDs) == 0 {
 		return []models.Post{}, nil
 	}
-	posts, err := s.repo.GetByAuthors(ctx, authorIDs, clampLimit(limit), clampOffset(offset))
+	return s.visibleFeedPage(ctx, viewerID, limit, offset, func(ctx context.Context, pageLimit, pageOffset int64) ([]models.Post, error) {
+		return s.repo.GetByAuthors(ctx, authorIDs, pageLimit, pageOffset)
+	})
+}
+
+type postFetcher func(ctx context.Context, limit, offset int64) ([]models.Post, error)
+
+func (s *PostService) visibleFeedPage(ctx context.Context, viewerID string, limit, offset int64, fetch postFetcher) ([]models.Post, error) {
+	posts, err := s.visiblePage(ctx, viewerID, limit, offset, fetch)
 	if err != nil {
 		return nil, err
 	}
 	return withoutProfilePins(posts), nil
+}
+
+func (s *PostService) visiblePage(ctx context.Context, viewerID string, limit, offset int64, fetch postFetcher) ([]models.Post, error) {
+	limit = clampLimit(limit)
+	offset = clampOffset(offset)
+
+	visible := make([]models.Post, 0, limit)
+	seenVisible := int64(0)
+	sourceOffset := int64(0)
+	allowedByAuthor := make(map[string]bool)
+
+	for int64(len(visible)) < limit {
+		batch, err := fetch(ctx, MaxLimit, sourceOffset)
+		if err != nil {
+			return nil, err
+		}
+		if len(batch) == 0 {
+			break
+		}
+
+		for _, post := range batch {
+			allowed, ok := allowedByAuthor[post.AuthorID]
+			if !ok {
+				allowed, err = s.canReadAuthor(ctx, viewerID, post.AuthorID)
+				if err != nil {
+					return nil, err
+				}
+				allowedByAuthor[post.AuthorID] = allowed
+			}
+			if !allowed {
+				continue
+			}
+			if seenVisible < offset {
+				seenVisible++
+				continue
+			}
+			visible = append(visible, post)
+			if int64(len(visible)) == limit {
+				break
+			}
+		}
+
+		if int64(len(batch)) < MaxLimit {
+			break
+		}
+		sourceOffset += MaxLimit
+	}
+
+	return visible, nil
+}
+
+func (s *PostService) canReadAuthor(ctx context.Context, viewerID, authorID string) (bool, error) {
+	if viewerID != "" && viewerID == authorID {
+		return true, nil
+	}
+	if s.profilClient == nil {
+		return true, nil
+	}
+
+	visibility, err := s.profilClient.Visibility(ctx, authorID)
+	if err != nil {
+		return false, fmt.Errorf("%w: vérification visibilité: %v", ErrDependencyUnavailable, err)
+	}
+	if visibility != client.VisibilityPrivate {
+		return true, nil
+	}
+	if viewerID == "" || s.followClient == nil {
+		return false, nil
+	}
+
+	isFollowing, err := s.followClient.IsFollowing(ctx, viewerID, authorID)
+	if err != nil {
+		return false, fmt.Errorf("%w: vérification abonnement: %v", ErrDependencyUnavailable, err)
+	}
+	return isFollowing, nil
 }
 
 // LikePost enregistre un like de actorID sur un post et renvoie le nombre de

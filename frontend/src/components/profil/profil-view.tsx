@@ -1,11 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { ArrowLeft, FileText, Loader2 } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { ArrowLeft, FileText, Loader2, Lock } from 'lucide-react'
 import Link from 'next/link'
 
 import { cn } from '@/lib/utils'
 import { ROUTES } from '@/lib/routes'
+import { useFollow } from '@/lib/use-follow'
 import { getMyProfil, getPublicProfil, saveMyProfil } from '@/lib/profil-client'
 import { listByAuthor, subscribePostCreated, type FeedPost } from '@/lib/posts'
 import { useToast } from '@/hooks/use-toast'
@@ -60,8 +61,23 @@ export function ProfilView({ username }: ProfilViewProps) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [followOverride, setFollowOverride] = useState<boolean | null>(null)
 
   const isOwner = !username
+  const followState = useFollow(!isOwner && Boolean(profil?.userId))
+  const followsProfile = profil ? followOverride ?? followState.isFollowing(profil.userId) : false
+  const accessPending =
+    Boolean(profil?.userId) &&
+    profil?.visibility === 'private' &&
+    !isOwner &&
+    followOverride === null &&
+    !followState.loaded
+  const privateContentLocked =
+    Boolean(profil?.userId) &&
+    profil?.visibility === 'private' &&
+    !isOwner &&
+    !accessPending &&
+    !followsProfile
 
   useEffect(() => {
     let cancelled = false
@@ -90,21 +106,41 @@ export function ProfilView({ username }: ProfilViewProps) {
     }
   }, [username, t])
 
+  useEffect(() => {
+    setFollowOverride(null)
+  }, [profil?.userId])
+
+  const loadPosts = useCallback(async () => {
+    if (!profil?.userId) return
+    try {
+      const list = await listByAuthor(profil.userId)
+      setPosts(list)
+    } catch {
+      setPosts([])
+    }
+  }, [profil?.userId])
+
   // Posts de l'auteur (onglet « Posts »), chargés une fois le profil connu.
   useEffect(() => {
     if (!profil?.userId) return
+    if (accessPending) return
+    if (privateContentLocked) {
+      setPosts([])
+      return
+    }
     let cancelled = false
-    listByAuthor(profil.userId)
-      .then((list) => {
+    listByAuthor(profil.userId).then(
+      (list) => {
         if (!cancelled) setPosts(list)
-      })
-      .catch(() => {
+      },
+      () => {
         if (!cancelled) setPosts([])
-      })
+      },
+    )
     return () => {
       cancelled = true
     }
-  }, [profil?.userId])
+  }, [accessPending, privateContentLocked, profil?.userId])
 
   useEffect(() => {
     if (!profil?.userId) return undefined
@@ -150,6 +186,13 @@ export function ProfilView({ username }: ProfilViewProps) {
     }
   }
 
+  function handleFollowChanged(following: boolean) {
+    if (profil?.visibility !== 'private') return
+    setFollowOverride(following)
+    if (following) void loadPosts()
+    else setPosts([])
+  }
+
   if (loading) {
     return (
       <div className="flex min-h-[45vh] items-center justify-center">
@@ -188,7 +231,13 @@ export function ProfilView({ username }: ProfilViewProps) {
         </div>
       </div>
 
-      <ProfilHeader profil={profil} isOwner={isOwner} saving={saving} onEdit={handleEdit} />
+      <ProfilHeader
+        profil={profil}
+        isOwner={isOwner}
+        saving={saving}
+        onEdit={handleEdit}
+        onFollowChanged={handleFollowChanged}
+      />
 
       {/* Onglets */}
       <div className="panel flex border-b">
@@ -204,7 +253,13 @@ export function ProfilView({ username }: ProfilViewProps) {
       </div>
 
       {/* Contenu de l'onglet */}
-      {tab === 'posts' ? (
+      {accessPending ? (
+        <CenteredTab>
+          <Loader2 className="h-6 w-6 animate-spin text-[#5B6CFF] dark:text-[#9aa6ff]" />
+        </CenteredTab>
+      ) : privateContentLocked ? (
+        <PrivateTab />
+      ) : tab === 'posts' ? (
         posts.length > 0 ? (
           <div className="divide-y divide-border">
             {posts.map((post) => (
@@ -258,6 +313,27 @@ function EmptyTab({ message }: { message: string }) {
     <div className="glass mx-4 mt-6 flex flex-col items-center gap-2 rounded-[26px] border px-8 py-16 text-center backdrop-blur-xl">
       <FileText className="h-10 w-10 text-[#5B6CFF] dark:text-[#9aa6ff]" aria-hidden />
       <p className="max-w-sm text-sm text-muted-foreground">{message}</p>
+    </div>
+  )
+}
+
+function PrivateTab() {
+  const t = useT()
+  return (
+    <CenteredTab>
+      <Lock className="h-10 w-10 text-[#5B6CFF] dark:text-[#9aa6ff]" aria-hidden />
+      <div className="max-w-sm space-y-1">
+        <p className="text-sm font-semibold text-foreground">{t('profil.private_title')}</p>
+        <p className="text-sm text-muted-foreground">{t('profil.private_message')}</p>
+      </div>
+    </CenteredTab>
+  )
+}
+
+function CenteredTab({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="glass mx-4 mt-6 flex min-h-[14rem] flex-col items-center justify-center gap-2 rounded-[26px] border px-8 py-16 text-center backdrop-blur-xl">
+      {children}
     </div>
   )
 }

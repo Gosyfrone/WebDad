@@ -19,6 +19,7 @@ import { getAccessToken } from '@/lib/auth-client'
 import {
   type AppNotification,
   connectNotifications,
+  dispatchFollowRequestDecision,
   getUnreadCount,
   listNotifications,
   markAllRead,
@@ -132,6 +133,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
       onNotification: upsert,
       onDeleted: removeItem,
       onRefresh: () => void refresh(),
+      onFollowRequestDecision: dispatchFollowRequestDecision,
     })
     return () => handle.close()
   }, [upsert, removeItem, refresh])

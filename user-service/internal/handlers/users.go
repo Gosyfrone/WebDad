@@ -163,7 +163,7 @@ func (h *Handler) Delete(c *gin.Context) {
 // respondUserError mappe les erreurs métier vers des codes HTTP.
 func respondUserError(c *gin.Context, err error) {
 	switch {
-	case errors.Is(err, service.ErrUserNotFound):
+	case errors.Is(err, service.ErrUserNotFound), errors.Is(err, service.ErrFollowRequestNotFound):
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 	case errors.Is(err, service.ErrUsernameTaken):
 		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})

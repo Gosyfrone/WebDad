@@ -23,12 +23,43 @@ import { resolveMediaUrl } from '@/lib/media'
 
 export type NotificationType =
   | 'like'
+ 
   | 'comment'
+ 
   | 'reply'
+ 
   | 'mention'
+ 
   | 'repost'
+ 
   | 'quote'
   | 'message_mention'
+  | 'follow_request'
+
+export type FollowRequestDecisionStatus = 'accepted' | 'rejected'
+
+export interface FollowRequestDecision {
+  actorId: string
+  status: FollowRequestDecisionStatus
+}
+
+const FOLLOW_REQUEST_DECISION_EVENT = 'breezy:follow-request-decision'
+
+export function dispatchFollowRequestDecision(detail: FollowRequestDecision) {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new CustomEvent<FollowRequestDecision>(FOLLOW_REQUEST_DECISION_EVENT, { detail }))
+}
+
+export function subscribeFollowRequestDecision(
+  onDecision: (decision: FollowRequestDecision) => void,
+) {
+  if (typeof window === 'undefined') return () => {}
+  const handler = (event: Event) => {
+    onDecision((event as CustomEvent<FollowRequestDecision>).detail)
+  }
+  window.addEventListener(FOLLOW_REQUEST_DECISION_EVENT, handler)
+  return () => window.removeEventListener(FOLLOW_REQUEST_DECISION_EVENT, handler)
+}
 
 // --- Formes brutes (snake_case) de l'API ------------------------------------
 
@@ -216,6 +247,8 @@ export interface NotificationHandlers {
   onDeleted: (id: string) => void
   /** Le serveur demande un rechargement complet (purge en cascade). */
   onRefresh: () => void
+  /** Une demande de follow privée a été acceptée/refusée par son propriétaire. */
+  onFollowRequestDecision?: (decision: FollowRequestDecision) => void
 }
 
 /**
@@ -233,7 +266,10 @@ export function connectNotifications(handlers: NotificationHandlers): RealtimeHa
     socket = new WebSocket(toWebSocketUrl(API_URL, token))
 
     socket.onmessage = (event) => {
-      let payload: { type?: string; data?: ApiNotification | { id: string } }
+      let payload: {
+        type?: string
+        data?: ApiNotification | { id: string } | { actor_id?: string; status?: string }
+      }
       try {
         payload = JSON.parse(event.data as string)
       } catch {
@@ -245,6 +281,14 @@ export function connectNotifications(handlers: NotificationHandlers): RealtimeHa
         handlers.onDeleted((payload.data as { id: string }).id)
       } else if (payload.type === 'notification_refresh') {
         handlers.onRefresh()
+      } else if (payload.type === 'follow_request_decision' && payload.data) {
+        const data = payload.data as { actor_id?: string; status?: string }
+        if (
+          data.actor_id &&
+          (data.status === 'accepted' || data.status === 'rejected')
+        ) {
+          handlers.onFollowRequestDecision?.({ actorId: data.actor_id, status: data.status })
+        }
       }
     }
 

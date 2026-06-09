@@ -126,8 +126,8 @@ func TestWithinSessionWindow(t *testing.T) {
 // TestGetFeedEmpty : sans aucun id suivi, GetFeed renvoie une liste vide SANS
 // toucher au dépôt (court-circuit) — d'où le repo nil sans panic.
 func TestGetFeedEmpty(t *testing.T) {
-	s := NewPostService(nil, 5*time.Minute)
-	posts, err := s.GetFeed(context.Background(), nil, 20, 0)
+	s := NewPostService(nil, WithBookmarkWindow(5*time.Minute))
+	posts, err := s.GetFeed(context.Background(), nil, "", 20, 0)
 	if err != nil {
 		t.Fatalf("GetFeed(nil) erreur inattendue : %v", err)
 	}

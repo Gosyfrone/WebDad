@@ -13,6 +13,14 @@ import { useLanguage } from '@/components/language-provider'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { EditProfilDialog } from '@/components/profil/edit-profil-dialog'
 import { RelationsDialog } from '@/components/profil/relations-dialog'
 
@@ -23,6 +31,7 @@ interface ProfilHeaderProps {
   saving?: boolean
   /** Remontée des champs édités (consommée par le parent pour l'affichage live). */
   onEdit: (fields: ProfilEditableFields) => Promise<void>
+  onFollowChanged?: (following: boolean) => void
 }
 
 /**
@@ -30,7 +39,13 @@ interface ProfilHeaderProps {
  * date d'inscription et compteurs d'abonnés. Le propriétaire voit le bouton
  * « Éditer le profil » ; un visiteur verrait « Suivre » (à brancher).
  */
-export function ProfilHeader({ profil, isOwner, saving = false, onEdit }: ProfilHeaderProps) {
+export function ProfilHeader({
+  profil,
+  isOwner,
+  saving = false,
+  onEdit,
+  onFollowChanged,
+}: ProfilHeaderProps) {
   const { t, locale } = useLanguage()
   const initials = profil.displayName.charAt(0).toUpperCase()
   const [relationsOpen, setRelationsOpen] = useState(false)
@@ -38,8 +53,10 @@ export function ProfilHeader({ profil, isOwner, saving = false, onEdit }: Profil
 
   // État de suivi (même hook que la recherche / les suggestions). Différé pour
   // le propriétaire (pas de bouton « Suivre » sur son propre profil).
-  const { currentUserId, isFollowing, isPending, toggle } = useFollow(!isOwner)
+  const { currentUserId, isFollowing, isRequested, isPending, toggle } = useFollow(!isOwner)
   const canFollow = !isOwner && currentUserId !== null && currentUserId !== profil.userId
+  const followingProfile = isFollowing(profil.userId)
+  const relationsLocked = profil.visibility === 'private' && !isOwner && !followingProfile
 
   function openRelations(tab: RelationKind) {
     setRelationsTab(tab)
@@ -109,9 +126,15 @@ export function ProfilHeader({ profil, isOwner, saving = false, onEdit }: Profil
                   </Link>
                 </Button>
                 <FollowButton
-                  following={isFollowing(profil.userId)}
+                  following={followingProfile}
+                  requested={isRequested(profil.userId)}
                   pending={isPending(profil.userId)}
-                  onToggle={(next) => toggle(toRelationUser(profil), next)}
+                  privateProfile={profil.visibility === 'private'}
+                  onToggle={async (next) => {
+                    const result = await toggle(toRelationUser(profil), next)
+                    if (result === 'failed') return
+                    onFollowChanged?.(result === 'following')
+                  }}
                 />
               </div>
             ) : null}
@@ -184,6 +207,7 @@ export function ProfilHeader({ profil, isOwner, saving = false, onEdit }: Profil
         initialTab={relationsTab}
         followersCount={profil.followersCount}
         followingCount={profil.followingCount}
+        locked={relationsLocked}
       />
     </header>
   )
@@ -206,35 +230,75 @@ function toRelationUser(profil: ProfilDetails): RelationUser {
  */
 function FollowButton({
   following,
+  requested,
   pending,
+  privateProfile,
   onToggle,
 }: {
   following: boolean
+  requested: boolean
   pending: boolean
-  onToggle: (next: boolean) => void
+  privateProfile: boolean
+  onToggle: (next: boolean) => void | Promise<void>
 }) {
   const { t } = useLanguage()
+  const [confirmOpen, setConfirmOpen] = useState(false)
+
+  function handleClick() {
+    if (following && privateProfile) {
+      setConfirmOpen(true)
+      return
+    }
+    void onToggle(!following)
+  }
+
+  async function confirmUnfollow() {
+    await onToggle(false)
+    setConfirmOpen(false)
+  }
+
   return (
-    <Button
-      disabled={pending}
-      onClick={() => onToggle(!following)}
-      variant={following ? 'outline' : 'default'}
-      className={cn(
-        'group/btn rounded-full font-bold',
-        following
-          ? 'border-white/70 bg-white/80 backdrop-blur hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive dark:border-white/15 dark:bg-white/10 dark:hover:bg-destructive/20'
-          : 'bg-gradient-to-r from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] text-white',
-      )}
-    >
-      {following ? (
-        <>
-          <span className="group-hover/btn:hidden">{t('follow.followed')}</span>
-          <span className="hidden group-hover/btn:inline">{t('follow.unfollow')}</span>
-        </>
-      ) : (
-        t('follow.follow')
-      )}
-    </Button>
+    <>
+      <Button
+        disabled={pending || requested}
+        onClick={handleClick}
+        variant={following ? 'outline' : 'default'}
+        className={cn(
+          'group/btn rounded-full font-bold',
+          following
+            ? 'border-white/70 bg-white/80 backdrop-blur hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive dark:border-white/15 dark:bg-white/10 dark:hover:bg-destructive/20'
+            : 'bg-gradient-to-r from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] text-white',
+        )}
+      >
+        {requested ? (
+          t('follow.requested')
+        ) : following ? (
+          <>
+            <span className="group-hover/btn:hidden">{t('follow.followed')}</span>
+            <span className="hidden group-hover/btn:inline">{t('follow.unfollow')}</span>
+          </>
+        ) : (
+          t('follow.follow')
+        )}
+      </Button>
+
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent className="panel top-32 translate-y-0 border shadow-[0_28px_80px_rgba(91,108,255,0.24)] sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{t('follow.private_unfollow_title')}</DialogTitle>
+            <DialogDescription>{t('follow.private_unfollow_desc')}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setConfirmOpen(false)}>
+              {t('common.cancel')}
+            </Button>
+            <Button variant="destructive" disabled={pending} onClick={() => void confirmUnfollow()}>
+              {t('follow.private_unfollow_confirm')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
 

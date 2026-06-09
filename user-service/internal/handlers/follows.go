@@ -16,11 +16,12 @@ func (h *Handler) Follow(c *gin.Context) {
 		return
 	}
 
-	if err := h.users.Follow(claims.UserID, claims.Email, c.Param("id")); err != nil {
+	status, err := h.users.Follow(c.Request.Context(), claims.UserID, claims.Email, c.Param("id"))
+	if err != nil {
 		respondUserError(c, err)
 		return
 	}
-	c.Status(http.StatusNoContent)
+	c.JSON(http.StatusOK, gin.H{"data": gin.H{"status": status}})
 }
 
 // Unfollow : DELETE /users/:id/follow — l'utilisateur authentifié ne suit plus `:id`.
@@ -58,4 +59,52 @@ func (h *Handler) Following(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"data": users})
+}
+
+func (h *Handler) IsFollowing(c *gin.Context) {
+	userId := c.Param("userId")
+	followingId := c.Param("followingId")
+	isFollowing := h.users.IsFollowing(userId, followingId)
+
+	c.JSON(http.StatusOK, gin.H{"isFollowing": isFollowing})
+}
+
+func (h *Handler) AcceptFollowRequest(c *gin.Context) {
+	claims, ok := middleware.ClaimsFrom(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "claims absents"})
+		return
+	}
+	if err := h.users.AcceptFollowRequest(claims.UserID, c.Param("followerId")); err != nil {
+		respondUserError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": gin.H{"status": "accepted"}})
+}
+
+func (h *Handler) RejectFollowRequest(c *gin.Context) {
+	claims, ok := middleware.ClaimsFrom(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "claims absents"})
+		return
+	}
+	if err := h.users.RejectFollowRequest(claims.UserID, c.Param("followerId")); err != nil {
+		respondUserError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": gin.H{"status": "rejected"}})
+}
+
+func (h *Handler) PendingFollowRequests(c *gin.Context) {
+	claims, ok := middleware.ClaimsFrom(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "claims absents"})
+		return
+	}
+	ids, err := h.users.PendingFollowRequestIDs(claims.UserID)
+	if err != nil {
+		respondUserError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": ids})
 }

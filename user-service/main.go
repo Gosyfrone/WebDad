@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/webdad/user-service/internal/client"
 	"github.com/webdad/user-service/internal/config"
 	"github.com/webdad/user-service/internal/db"
 	"github.com/webdad/user-service/internal/repository"
@@ -28,7 +29,13 @@ func main() {
 		log.Fatalf("[%s] schéma : %v", serviceName, err)
 	}
 
-	users := service.New(repository.New(conn), cfg.UsernameCooldown)
+	opts := []service.Option{
+		service.WithProfilClient(client.NewProfilClient(cfg.ProfilServiceURL)),
+	}
+	if cfg.NotificationServiceURL != "" {
+		opts = append(opts, service.WithNotificationClient(client.NewNotificationClient(cfg.NotificationServiceURL, cfg.InternalSecret)))
+	}
+	users := service.New(repository.New(conn), cfg.UsernameCooldown, opts...)
 	r := router.New(users, cfg.JWTSecret)
 
 	log.Printf("[%s] en écoute sur le port %s", serviceName, cfg.Port)
