@@ -71,6 +71,9 @@ export const messages: Record<Locale, Messages> = {
     'common.loading': 'Chargement…',
     'common.retry': 'Réessayer',
     'common.close': 'Fermer',
+    'media.download': "Télécharger l'image",
+    'media.previous': 'Image précédente',
+    'media.next': 'Image suivante',
 
     // — Navigation —
     'nav.feed': 'Fil',
@@ -215,6 +218,7 @@ export const messages: Record<Locale, Messages> = {
     'messages.composer_placeholder': 'Écrivez un message…',
     'messages.send': 'Envoyer',
     'messages.add_attachment': 'Joindre une image ou une vidéo',
+    'messages.open_image': "Agrandir l'image",
     'messages.attachment_failed': 'Pièce jointe indisponible',
     'messages.attachment_preview': 'Pièce jointe',
     'messages.back': 'Retour',
@@ -529,6 +533,9 @@ export const messages: Record<Locale, Messages> = {
     'common.loading': 'Loading…',
     'common.retry': 'Retry',
     'common.close': 'Close',
+    'media.download': 'Download image',
+    'media.previous': 'Previous image',
+    'media.next': 'Next image',
 
     // — Navigation —
     'nav.feed': 'Feed',
@@ -669,6 +676,7 @@ export const messages: Record<Locale, Messages> = {
     'messages.composer_placeholder': 'Write a message…',
     'messages.send': 'Send',
     'messages.add_attachment': 'Attach an image or video',
+    'messages.open_image': 'View image larger',
     'messages.attachment_failed': 'Attachment unavailable',
     'messages.attachment_preview': 'Attachment',
     'messages.back': 'Back',

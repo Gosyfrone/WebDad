@@ -24,6 +24,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { MentionAutocomplete } from '@/components/mention/mention-autocomplete'
 import { MentionMessageText } from '@/components/mention/mention-text'
+import { MediaLightbox } from '@/components/ui/media-lightbox'
 import { ConversationAvatar, conversationTitle } from '@/components/messages/conversation-meta'
 
 const PAGE = 30
@@ -522,6 +523,7 @@ function AttachmentView({
   const { t } = useLanguage()
   const [url, setUrl] = useState<string | null>(null)
   const [failed, setFailed] = useState(false)
+  const [lightbox, setLightbox] = useState(false)
 
   useEffect(() => {
     let revoked = false
@@ -567,8 +569,20 @@ function AttachmentView({
       {att.type === 'video' ? (
         <video src={url} controls playsInline className="max-h-80 max-w-full" />
       ) : (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={url} alt={att.name} className="max-h-80 max-w-full object-contain" />
+        <>
+          <button type="button" onClick={() => setLightbox(true)} className="block" aria-label={t('messages.open_image')}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={url} alt={att.name} className="max-h-80 max-w-full cursor-zoom-in object-contain" />
+          </button>
+          <MediaLightbox
+            open={lightbox}
+            onClose={() => setLightbox(false)}
+            src={url}
+            type="image"
+            name={att.name}
+            downloadable
+          />
+        </>
       )}
     </div>
   )

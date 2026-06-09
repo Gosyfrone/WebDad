@@ -51,6 +51,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { CommentSection } from '@/components/feed/comment-section'
 import { PostComposer } from '@/components/feed/post-composer'
+import { PostPhotoModal } from '@/components/feed/post-photo-modal'
 import { TranslatedContent } from '@/components/feed/translated-content'
 import { ProfilLink } from '@/components/profil/profil-link'
 
@@ -83,6 +84,8 @@ export function PostCard({ post, showPinBadge = false, onDeleted, onUpdated }: P
   const [likeBurst, setLikeBurst] = useState(0)
   const [showComments, setShowComments] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  // Index du média ouvert en vue photo plein écran (null = fermé).
+  const [photoIndex, setPhotoIndex] = useState<number | null>(null)
 
   const [reposted, setReposted] = useState(post.reposted)
   const [repostedById, setRepostedById] = useState(post.repostedById)
@@ -350,7 +353,9 @@ export function PostCard({ post, showPinBadge = false, onDeleted, onUpdated }: P
           />
         )}
 
-        {post.media.length > 0 && <MediaGallery media={post.media} />}
+        {post.media.length > 0 && (
+          <MediaGallery media={post.media} onOpen={(i) => setPhotoIndex(i)} />
+        )}
 
         {post.quotedPost && (
           <QuotedPost post={post.quotedPost} />
@@ -479,6 +484,10 @@ export function PostCard({ post, showPinBadge = false, onDeleted, onUpdated }: P
           onMembershipChange={setBookmarked}
         />
       </div>
+
+      {photoIndex !== null && (
+        <PostPhotoModal post={post} index={photoIndex} onClose={() => setPhotoIndex(null)} />
+      )}
     </article>
   )
 }
@@ -489,7 +498,7 @@ export function PostCard({ post, showPinBadge = false, onDeleted, onUpdated }: P
  * absolues (résolues dans `toFeedPost`). Cache navigateur géré par le
  * media-service (`Cache-Control: immutable`) ; lazy-loading des images.
  */
-function MediaGallery({ media }: { media: PostMedia[] }) {
+function MediaGallery({ media, onOpen }: { media: PostMedia[]; onOpen?: (index: number) => void }) {
   return (
     <div
       className={cn(
@@ -497,34 +506,33 @@ function MediaGallery({ media }: { media: PostMedia[] }) {
         media.length === 1 ? 'grid-cols-1' : 'grid-cols-2',
       )}
     >
-      {media.map((m, i) =>
-        m.type === 'video' ? (
-          <video
-            key={m.url}
-            src={m.url}
-            controls
-            playsInline
-            className={cn(
-              'w-full bg-black object-cover',
-              media.length === 1 ? 'max-h-[32rem]' : 'aspect-square',
-              media.length === 3 && i === 0 && 'row-span-2 aspect-auto',
-            )}
-          />
+      {media.map((m, i) => {
+        const sizing = cn(
+          media.length === 1 ? 'max-h-[32rem]' : 'aspect-square',
+          media.length === 3 && i === 0 && 'row-span-2 aspect-auto',
+        )
+        // La vidéo garde ses contrôles natifs (pas d'ouverture en vue photo) ;
+        // l'image s'ouvre en grand au clic.
+        return m.type === 'video' ? (
+          <video key={m.url} src={m.url} controls playsInline className={cn('w-full bg-black object-cover', sizing)} />
         ) : (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
+          <button
             key={m.url}
-            src={m.url}
-            alt=""
-            loading="lazy"
-            className={cn(
-              'w-full object-cover',
-              media.length === 1 ? 'max-h-[32rem]' : 'aspect-square',
-              media.length === 3 && i === 0 && 'row-span-2 aspect-auto',
-            )}
-          />
-        ),
-      )}
+            type="button"
+            onClick={() => onOpen?.(i)}
+            className={cn('group relative block overflow-hidden', media.length === 3 && i === 0 && 'row-span-2')}
+            aria-label="Agrandir l'image"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={m.url}
+              alt=""
+              loading="lazy"
+              className={cn('h-full w-full object-cover transition group-hover:brightness-95', sizing)}
+            />
+          </button>
+        )
+      })}
     </div>
   )
 }
