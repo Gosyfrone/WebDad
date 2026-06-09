@@ -2,13 +2,22 @@
 
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Loader2, Search, UserX } from 'lucide-react'
+import { Clock3, Loader2, Search, Trash2, UserX, X } from 'lucide-react'
 
 import { searchUsers } from '@/lib/api'
+import { currentUserId as readCurrentUserId } from '@/lib/posts'
+import {
+  addSearchHistoryEntry,
+  clearSearchHistory,
+  readSearchHistory,
+  removeSearchHistoryEntry,
+  type SearchHistoryEntry,
+} from '@/lib/search-history'
 import { useFollow } from '@/lib/use-follow'
 import type { RelationUser } from '@/types'
 import { useT } from '@/components/language-provider'
 import { UserListItem } from '@/components/profil/user-list-item'
+import { Button } from '@/components/ui/button'
 
 /**
  * Recherche de comptes (Explorer). Saisie debouncée (~300ms) : recherche par
@@ -24,16 +33,23 @@ export function ExplorerView() {
   const [query, setQuery] = useState(() => searchParams.get('q') ?? '')
   const [debounced, setDebounced] = useState('')
   const [results, setResults] = useState<RelationUser[]>([])
+  const [history, setHistory] = useState<SearchHistoryEntry[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const { currentUserId, isFollowing, isPending, toggle } = useFollow()
+  const historyOwnerId = currentUserId ?? readCurrentUserId()
 
   // Debounce de la saisie.
   useEffect(() => {
     const timer = setTimeout(() => setDebounced(query.trim()), 300)
     return () => clearTimeout(timer)
   }, [query])
+
+  // Historique des profils ouverts depuis Explorer, isolé par compte.
+  useEffect(() => {
+    setHistory(readSearchHistory(historyOwnerId))
+  }, [historyOwnerId])
 
   // Recherche sur la valeur debouncée.
   useEffect(() => {
@@ -63,6 +79,16 @@ export function ExplorerView() {
 
   const visible = results.filter((u) => u.id !== currentUserId)
   const byHandle = debounced.startsWith('@')
+  const saveHistory = (user: RelationUser) => {
+    setHistory(addSearchHistoryEntry(historyOwnerId, user))
+  }
+  const removeHistory = () => {
+    clearSearchHistory(historyOwnerId)
+    setHistory([])
+  }
+  const removeHistoryEntry = (entryId: string) => {
+    setHistory(removeSearchHistoryEntry(historyOwnerId, entryId))
+  }
 
   return (
     <div className="flex flex-col">
@@ -91,11 +117,67 @@ export function ExplorerView() {
 
       {/* Résultats */}
       {!debounced ? (
-        <EmptyState
-          icon={<Search className="h-10 w-10 text-[#5B6CFF] dark:text-[#9aa6ff]" aria-hidden />}
-          title={t('explorer.empty_title')}
-          message={t('explorer.empty_msg')}
-        />
+        history.length > 0 ? (
+          <div className="divide-y divide-border">
+            <div className="flex items-center justify-between gap-3 px-4 py-3">
+              <div className="flex min-w-0 items-center gap-2">
+                <Clock3 className="h-4 w-4 shrink-0 text-[#5B6CFF] dark:text-[#9aa6ff]" />
+                <h2 className="truncate text-sm font-bold text-foreground">
+                  {t('explorer.history_title')}
+                </h2>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={removeHistory}
+                aria-label={t('explorer.history_clear')}
+                title={t('explorer.history_clear')}
+                className="h-8 w-8 shrink-0 rounded-full text-muted-foreground hover:text-destructive"
+              >
+                <Trash2 className="h-4 w-4" aria-hidden />
+              </Button>
+            </div>
+            {history.map((user) => (
+              <UserListItem
+                key={user.id}
+                user={user}
+                isFollowing={isFollowing(user.id)}
+                isSelf={user.id === currentUserId}
+                pending={isPending(user.id)}
+                onProfileOpen={saveHistory}
+                trailingAction={
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      removeHistoryEntry(user.id)
+                    }}
+                    aria-label={t('explorer.history_remove_one', {
+                      name: user.displayName,
+                    })}
+                    title={t('explorer.history_remove_one', {
+                      name: user.displayName,
+                    })}
+                    className="h-8 w-8 rounded-full text-muted-foreground hover:text-destructive"
+                  >
+                    <X className="h-4 w-4" aria-hidden />
+                  </Button>
+                }
+                onToggleFollow={toggle}
+              />
+            ))}
+          </div>
+        ) : (
+          <EmptyState
+            icon={<Search className="h-10 w-10 text-[#5B6CFF] dark:text-[#9aa6ff]" aria-hidden />}
+            title={t('explorer.empty_title')}
+            message={t('explorer.empty_msg')}
+          />
+        )
       ) : loading ? (
         <div className="flex justify-center py-16">
           <Loader2 className="h-6 w-6 animate-spin text-[#5B6CFF] dark:text-[#9aa6ff]" />
@@ -125,6 +207,7 @@ export function ExplorerView() {
               isFollowing={isFollowing(user.id)}
               isSelf={user.id === currentUserId}
               pending={isPending(user.id)}
+              onProfileOpen={saveHistory}
               onToggleFollow={toggle}
             />
           ))}

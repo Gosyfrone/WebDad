@@ -19,6 +19,10 @@ interface UserListItemProps {
   pending?: boolean
   /** Affiche la bio sous le @handle (défaut : oui). Compact en sidebar. */
   showBio?: boolean
+  /** Déclenché quand la ligne ouvre le profil. */
+  onProfileOpen?: (user: RelationUser) => void
+  /** Action compacte affichée à droite de la ligne (ex. retirer d'un historique). */
+  trailingAction?: React.ReactNode
   /** Bascule suivre / ne plus suivre. */
   onToggleFollow: (user: RelationUser, next: boolean) => void
 }
@@ -42,6 +46,8 @@ export function UserListItem({
   isSelf = false,
   pending = false,
   showBio = true,
+  onProfileOpen,
+  trailingAction,
   onToggleFollow,
 }: UserListItemProps) {
   const t = useT()
@@ -55,6 +61,7 @@ export function UserListItem({
         href={href}
         aria-label={t('list.view_profile_aria', { name: user.displayName })}
         className="absolute inset-0 z-0"
+        onClick={() => onProfileOpen?.(user)}
       />
 
       <Avatar className="h-10 w-10 shrink-0">
@@ -69,6 +76,8 @@ export function UserListItem({
           <p className="mt-0.5 line-clamp-2 text-sm text-muted-foreground">{user.bio}</p>
         )}
       </div>
+
+      {trailingAction && <div className="relative z-10 mt-0.5 shrink-0">{trailingAction}</div>}
 
       {!isSelf && (
         <Button
