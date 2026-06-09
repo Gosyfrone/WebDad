@@ -418,7 +418,7 @@ func (h *ConversationHandler) SendMessage(c *gin.Context) {
 	}
 
 	msg, memberIDs, err := h.service.SendMessage(
-		c.Request.Context(), c.Param("id"), claims.UserID, req.Ciphertext, req.Nonce,
+		c.Request.Context(), c.Param("id"), claims.UserID, req.Ciphertext, req.Nonce, req.MentionedMemberIDs,
 	)
 	if err != nil {
 		respondError(c, err)

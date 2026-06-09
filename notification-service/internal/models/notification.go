@@ -15,6 +15,12 @@ const (
 	TypeMention = "mention"
 	TypeRepost  = "repost"
 	TypeQuote   = "quote"
+	// TypeMessageMention : mention (@handle) DANS UN MESSAGE (DM / groupe /
+	// communauté). Émise par message-service avec les `recipient_id` déjà
+	// résolus (le serveur de messagerie connaît ses membres) ; agrégée par
+	// conversation (`message_mention:<conversation_id>`). Navigue vers la
+	// conversation, pas vers un post.
+	TypeMessageMention = "message_mention"
 )
 
 // Types d'événement reçus de post-service (au-delà des 4 types de notification,
@@ -38,11 +44,13 @@ type Notification struct {
 	Type        string        `bson:"type" json:"type"`
 	PostID      string        `bson:"post_id,omitempty" json:"post_id,omitempty"`
 	CommentID   string        `bson:"comment_id,omitempty" json:"comment_id,omitempty"`
-	LastActorID string        `bson:"last_actor_id" json:"last_actor_id"`
-	Count       int32         `bson:"count" json:"count"`
-	IsRead      bool          `bson:"is_read" json:"is_read"`
-	CreatedAt   time.Time     `bson:"created_at" json:"created_at"`
-	UpdatedAt   time.Time     `bson:"updated_at" json:"updated_at"`
+	// ConversationID : cible d'une mention en message (navigation vers la conv).
+	ConversationID string    `bson:"conversation_id,omitempty" json:"conversation_id,omitempty"`
+	LastActorID    string    `bson:"last_actor_id" json:"last_actor_id"`
+	Count          int32     `bson:"count" json:"count"`
+	IsRead         bool      `bson:"is_read" json:"is_read"`
+	CreatedAt      time.Time `bson:"created_at" json:"created_at"`
+	UpdatedAt      time.Time `bson:"updated_at" json:"updated_at"`
 }
 
 // Event — charge utile de POST /internal/events, émise par post-service après
@@ -53,6 +61,9 @@ type Notification struct {
 //     connaît l'auteur du post / du commentaire visé) ;
 //   - mention            : `mention_handles` est résolu par CE service via
 //     user-service (seul détenteur des handles) → un destinataire par handle ;
+//   - message_mention    : `recipient_id` + `conversation_id` sont fournis
+//     directement (message-service connaît ses membres, et le contenu reste
+//     chiffré → la résolution du handle se fait côté client/messagerie) ;
 //   - post_deleted       : purge toutes les notifications du `post_id`.
 //
 // `retract = true` défait une action (unlike, suppression de commentaire) :
@@ -64,6 +75,7 @@ type Event struct {
 	RecipientID    string   `json:"recipient_id"`
 	PostID         string   `json:"post_id"`
 	CommentID      string   `json:"comment_id"`
+	ConversationID string   `json:"conversation_id"`
 	MentionHandles []string `json:"mention_handles"`
 	Retract        bool     `json:"retract"`
 }

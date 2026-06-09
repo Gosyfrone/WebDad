@@ -169,6 +169,12 @@ export const messages: Record<Locale, Messages> = {
       '{name} et {count} autres personnes ont reposté votre publication',
     'notifications.quote': '{name} a cité votre publication',
     'notifications.mention': '{name} vous a mentionné',
+    'notifications.message_mention_one': '{name} vous a mentionné dans un message',
+    'notifications.message_mention_other': '{name} vous a mentionné dans {count} messages',
+
+    // — Mentions (@handle) —
+    'mentions.view_in_search': 'Voir dans la recherche',
+    'mentions.user_not_found': 'Compte introuvable',
 
     // — Détail d'une publication —
     'common.back': 'Retour',
@@ -231,6 +237,7 @@ export const messages: Record<Locale, Messages> = {
     'messages.no_messages_desc': 'Envoyez le premier message 👋',
     'messages.new_messages_divider': 'Nouveaux messages',
     'messages.you_prefix': 'Vous : {text}',
+    'messages.mentioned_you': '{name} vous a mentionné',
     'messages.unread_aria': 'Messages non lus',
     'messages.badge_aria': '{count} conversations avec des messages non lus',
     'messages.actions_aria': 'Actions de la conversation',
@@ -610,6 +617,12 @@ export const messages: Record<Locale, Messages> = {
     'notifications.repost_other': '{name} and {count} others reposted your post',
     'notifications.quote': '{name} quoted your post',
     'notifications.mention': '{name} mentioned you',
+    'notifications.message_mention_one': '{name} mentioned you in a message',
+    'notifications.message_mention_other': '{name} mentioned you in {count} messages',
+
+    // — Mentions (@handle) —
+    'mentions.view_in_search': 'View in search',
+    'mentions.user_not_found': 'Account not found',
 
     // — Post detail —
     'common.back': 'Back',
@@ -671,6 +684,7 @@ export const messages: Record<Locale, Messages> = {
     'messages.no_messages_desc': 'Send the first message 👋',
     'messages.new_messages_divider': 'New messages',
     'messages.you_prefix': 'You: {text}',
+    'messages.mentioned_you': '{name} mentioned you',
     'messages.unread_aria': 'Unread messages',
     'messages.badge_aria': '{count} conversations with unread messages',
     'messages.actions_aria': 'Conversation actions',

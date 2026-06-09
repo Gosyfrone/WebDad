@@ -13,10 +13,13 @@ import {
   type PostComment,
 } from '@/lib/posts'
 import { useToast } from '@/hooks/use-toast'
+import { useMention } from '@/lib/use-mention'
+import { mentionSearchGlobal } from '@/lib/mention-search'
 import { useLanguage } from '@/components/language-provider'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { EmojiPicker } from '@/components/feed/emoji-picker'
+import { MentionAutocomplete } from '@/components/mention/mention-autocomplete'
 import { TranslatedContent } from '@/components/feed/translated-content'
 import { ProfilLink } from '@/components/profil/profil-link'
 
@@ -52,6 +55,11 @@ export function CommentSection({ postId, onCountChange }: CommentSectionProps) {
   const [content, setContent] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const mention = useMention({
+    inputRef,
+    onChange: setContent,
+    search: mentionSearchGlobal,
+  })
   // Offset de pagination = nb chargé depuis le serveur (indépendant des
   // insertions/suppressions locales).
   const offsetRef = useRef(0)
@@ -135,20 +143,30 @@ export function CommentSection({ postId, onCountChange }: CommentSectionProps) {
     <div className="mt-2 border-t border-border pt-3">
       {/* Composer racine */}
       <div className="flex items-center gap-2">
-        <input
-          ref={inputRef}
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault()
-              void handleSubmit()
-            }
-          }}
-          placeholder={t('comment.placeholder')}
-          maxLength={MAX_CHARS + 20}
-          className="min-w-0 flex-1 rounded-full border border-border bg-background/60 px-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-[#5B6CFF] focus:outline-none"
-        />
+        <div className="relative min-w-0 flex-1">
+          <input
+            ref={inputRef}
+            value={content}
+            onChange={(e) => {
+              setContent(e.target.value)
+              mention.sync()
+            }}
+            onKeyUp={mention.sync}
+            onClick={mention.sync}
+            onKeyDown={(e) => {
+              mention.onKeyDown(e)
+              if (e.defaultPrevented) return
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                void handleSubmit()
+              }
+            }}
+            placeholder={t('comment.placeholder')}
+            maxLength={MAX_CHARS + 20}
+            className="w-full rounded-full border border-border bg-background/60 px-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-[#5B6CFF] focus:outline-none"
+          />
+          <MentionAutocomplete controller={mention} placement="top" />
+        </div>
         <EmojiPicker onSelect={insertEmoji}>
           <button
             type="button"
@@ -233,6 +251,11 @@ function CommentThread({ postId, comment, onRemove, onCountChange }: CommentThre
   const [content, setContent] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const replyInputRef = useRef<HTMLInputElement>(null)
+  const mention = useMention({
+    inputRef: replyInputRef,
+    onChange: setContent,
+    search: mentionSearchGlobal,
+  })
 
   const hasMoreReplies = replies.length < replyCount
   const remaining = MAX_CHARS - content.length
@@ -352,20 +375,30 @@ function CommentThread({ postId, comment, onRemove, onCountChange }: CommentThre
         <div className="ml-5 mt-2 flex flex-col gap-3 border-l border-border pl-3">
           {composerOpen && (
             <div className="flex items-center gap-2">
-              <input
-                ref={replyInputRef}
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault()
-                    void submitReply()
-                  }
-                }}
-                placeholder={t('comment.reply_placeholder')}
-                maxLength={MAX_CHARS + 20}
-                className="min-w-0 flex-1 rounded-full border border-border bg-background/60 px-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-[#5B6CFF] focus:outline-none"
-              />
+              <div className="relative min-w-0 flex-1">
+                <input
+                  ref={replyInputRef}
+                  value={content}
+                  onChange={(e) => {
+                    setContent(e.target.value)
+                    mention.sync()
+                  }}
+                  onKeyUp={mention.sync}
+                  onClick={mention.sync}
+                  onKeyDown={(e) => {
+                    mention.onKeyDown(e)
+                    if (e.defaultPrevented) return
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault()
+                      void submitReply()
+                    }
+                  }}
+                  placeholder={t('comment.reply_placeholder')}
+                  maxLength={MAX_CHARS + 20}
+                  className="w-full rounded-full border border-border bg-background/60 px-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-[#5B6CFF] focus:outline-none"
+                />
+                <MentionAutocomplete controller={mention} placement="top" />
+              </div>
               <EmojiPicker onSelect={insertReplyEmoji}>
                 <button
                   type="button"

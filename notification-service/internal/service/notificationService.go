@@ -78,6 +78,19 @@ func (s *NotificationService) HandleEvent(ctx context.Context, ev models.Event) 
 		}
 		return s.applyToGroup(ctx, recipient, gk, ev)
 
+	case models.TypeMessageMention:
+		// `recipient_id` est déjà résolu par message-service (membre mentionné) ;
+		// pas de résolution de handle ici. Agrégé par conversation.
+		recipient := ev.RecipientID
+		if recipient == "" || recipient == ev.ActorID {
+			return nil
+		}
+		gk, ok := groupKeyFor(ev)
+		if !ok {
+			return nil
+		}
+		return s.applyToGroup(ctx, recipient, gk, ev)
+
 	case models.TypeMention:
 		return s.handleMentions(ctx, ev)
 
@@ -136,12 +149,13 @@ func (s *NotificationService) applyToGroup(ctx context.Context, recipient, group
 	}
 
 	saved, err := s.repo.Upsert(ctx, &models.Notification{
-		RecipientID: recipient,
-		GroupKey:    groupKey,
-		Type:        ev.Type,
-		PostID:      ev.PostID,
-		CommentID:   ev.CommentID,
-		LastActorID: ev.ActorID,
+		RecipientID:    recipient,
+		GroupKey:       groupKey,
+		Type:           ev.Type,
+		PostID:         ev.PostID,
+		CommentID:      ev.CommentID,
+		ConversationID: ev.ConversationID,
+		LastActorID:    ev.ActorID,
 	})
 	if err != nil {
 		return err
@@ -250,6 +264,13 @@ func groupKeyFor(ev models.Event) (string, bool) {
 			return "", false
 		}
 		return "mention:" + src, true
+	case models.TypeMessageMention:
+		// Une mention en message s'agrège PAR CONVERSATION : plusieurs mentions
+		// dans la même conv = une notification (count) → pas de spam de chat.
+		if ev.ConversationID == "" {
+			return "", false
+		}
+		return "message_mention:" + ev.ConversationID, true
 	}
 	return "", false
 }

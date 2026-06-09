@@ -4,6 +4,10 @@
 
 ---
 
+*Last updated: 09/06/2026 — feat(settings/feed) : **mots filtrés par utilisateur** dans `/parametres` sous la langue. UI champ + bouton icône + chips supprimables, zone scrollable après ~3 lignes. Persistance locale scopée compte (`breezy-muted-words:<user_id>`, résolution via `getMe()` après reconnexion), filtrage feed côté front sur contenu/post cité/hashtags, avec exception pour les propres posts de l'utilisateur. Vérifs : lint/tsc/localhost:3000 OK.*
+
+*Last updated: 09/06/2026 — feat(signets) : **enregistrement de posts en collections (back + front)** + **collection par défaut non supprimable**, branche `116-signets` (rebasée sur `origin/develop` = notifications #138 puis mots filtrés #140). Back post-service : 3 collections (`bookmark_collections`/`bookmarks` many-to-many/`bookmark_prefs`), collection `is_default` (en tête, non supprimable/renommable → 403), modèle de rafale `BOOKMARK_SESSION_WINDOW` (`filed`/`needs_choice`), vue « Tous » dédupliquée, nettoyage à la suppression post/collection. Front : `lib/bookmarks.ts` + `FeedPost.bookmarked`, bouton signet `PostCard` (clic court / appui long / dé-signer + toast « Ranger… »), `BookmarkDialog`, page `/signets` (`BookmarksView`), nav + i18n FR/EN (23 clés). Détails §5 « Signets — collections & rafale ». **Vérifié** : back gofmt/build/`go test` + e2e gateway 24/24 ; front tsc/lint/vitest + parité i18n.*
+
 *Last updated: 08/06/2026 — fix(legal) : « Retour à Breezy » revient à la dernière page Breezy (non légale) mémorisée dans `sessionStorage` (`RouteOriginTracker` + `LegalBackButton` via `router.push`), pas un `router.back()`. tsc/lint OK.*
 
 *Last updated: 08/06/2026 — chore(rebase) + feat(legal i18n) : branche pages légales rebasée sur `origin/develop` (reposts #133, messagerie #134). Pages légales `(legal)` rendues bilingues FR/EN (`lib/legal-content.ts` + `LegalDocView` client) et adaptées aux fonctionnalités réelles (E2EE, posts/reposts/communautés, profil, follow). Parité i18n 310/310, vitest 31/31, pages → 200.*

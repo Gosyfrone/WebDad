@@ -202,7 +202,13 @@ type SetMemberRoleRequest struct {
 }
 
 // SendMessageRequest : corps de POST .../messages. Déjà chiffré côté client.
+//
+// MentionedMemberIDs : ids des membres mentionnés (@handle) DANS ce message,
+// résolus côté client (le serveur ne lit pas le ciphertext). Métadonnée
+// d'appartenance uniquement (jamais de texte) → sert à notifier les membres
+// mentionnés sans casser l'E2EE. Les ids non-membres sont ignorés côté serveur.
 type SendMessageRequest struct {
-	Ciphertext string `json:"ciphertext" binding:"required"`
-	Nonce      string `json:"nonce" binding:"required"`
+	Ciphertext         string   `json:"ciphertext" binding:"required"`
+	Nonce              string   `json:"nonce" binding:"required"`
+	MentionedMemberIDs []string `json:"mentioned_member_ids"`
 }

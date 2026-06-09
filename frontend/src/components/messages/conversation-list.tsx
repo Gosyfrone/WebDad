@@ -34,6 +34,10 @@ export interface ConversationPreview {
   text: string
   mine: boolean
   decrypted: boolean
+  /** Expéditeur du dernier message (pour « X vous a mentionné »). */
+  senderId: string
+  /** Le dernier message (d'autrui) me mentionne → libellé « X vous a mentionné ». */
+  mentionsMe: boolean
 }
 
 interface ConversationListProps {
@@ -179,9 +183,18 @@ function ConversationRow({
   const pinned = conversation.pinnedAt !== ''
   const muted = conversation.muted
 
-  // Sous-titre : aperçu du dernier message si dispo, sinon @handle / type.
+  // Si le dernier message me mentionne (et n'est pas le mien), on résout son
+  // expéditeur pour afficher « X vous a mentionné ».
+  const mentionHighlight = Boolean(preview?.mentionsMe && !preview.mine)
+  const mentionSender = useResolvedUser(mentionHighlight ? (preview?.senderId ?? null) : null)
+
+  // Sous-titre : « X vous a mentionné » prioritaire, sinon aperçu du dernier
+  // message si dispo, sinon @handle / type.
   let subtitle: string
-  if (preview) {
+  if (mentionHighlight) {
+    const who = mentionSender?.displayName || (peer?.username ? `@${peer.username}` : '…')
+    subtitle = t('messages.mentioned_you', { name: who })
+  } else if (preview) {
     const body = preview.decrypted ? preview.text : t('messages.decrypt_failed')
     subtitle = preview.mine ? t('messages.you_prefix', { text: body }) : body
   } else if (conversation.type === 'dm') {
@@ -233,7 +246,11 @@ function ConversationRow({
           <span
             className={cn(
               'truncate text-xs',
-              unread ? 'font-semibold text-foreground' : 'text-muted-foreground',
+              mentionHighlight
+                ? 'font-semibold text-[#8D3DFF] dark:text-[#c9a3ff]'
+                : unread
+                  ? 'font-semibold text-foreground'
+                  : 'text-muted-foreground',
             )}
           >
             {subtitle}

@@ -33,12 +33,13 @@ func (r *NotificationRepository) Upsert(ctx context.Context, n *models.Notificat
 	filter := bson.M{"recipient_id": n.RecipientID, "group_key": n.GroupKey}
 	update := bson.M{
 		"$set": bson.M{
-			"type":          n.Type,
-			"post_id":       n.PostID,
-			"comment_id":    n.CommentID,
-			"last_actor_id": n.LastActorID,
-			"is_read":       false,
-			"updated_at":    now,
+			"type":            n.Type,
+			"post_id":         n.PostID,
+			"comment_id":      n.CommentID,
+			"conversation_id": n.ConversationID,
+			"last_actor_id":   n.LastActorID,
+			"is_read":         false,
+			"updated_at":      now,
 		},
 		"$inc":         bson.M{"count": int32(1)},
 		"$setOnInsert": bson.M{"recipient_id": n.RecipientID, "group_key": n.GroupKey, "created_at": now},

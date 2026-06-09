@@ -252,6 +252,9 @@ services:
     environment:
       MONGO_HOST: mongo-message       # override : nom du conteneur dans le réseau
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET requis}
+      # Émission des mentions en message (serveur-à-serveur, best-effort).
+      NOTIFICATION_SERVICE_URL: http://notification-service:8086
+      INTERNAL_EVENT_SECRET: ${INTERNAL_EVENT_SECRET:?INTERNAL_EVENT_SECRET requis}
     ports:
       - "8085:8085"
     networks:

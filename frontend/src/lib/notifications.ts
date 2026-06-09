@@ -20,7 +20,14 @@
 import { apiFetch, getAccessToken } from '@/lib/auth-client'
 import { API_URL } from '@/lib/config'
 
-export type NotificationType = 'like' | 'comment' | 'reply' | 'mention' | 'repost' | 'quote'
+export type NotificationType =
+  | 'like'
+  | 'comment'
+  | 'reply'
+  | 'mention'
+  | 'repost'
+  | 'quote'
+  | 'message_mention'
 
 // --- Formes brutes (snake_case) de l'API ------------------------------------
 
@@ -29,6 +36,7 @@ interface ApiNotification {
   type: NotificationType
   post_id?: string
   comment_id?: string
+  conversation_id?: string
   last_actor_id: string
   count: number
   is_read: boolean
@@ -63,6 +71,8 @@ export interface AppNotification {
   /** Post cible (navigation au clic). */
   postId: string
   commentId: string
+  /** Conversation cible (mention en message → navigation vers /messages). */
+  conversationId: string
   actor: NotificationActor
   /** Nombre TOTAL d'acteurs/événements agrégés (≥ 1). */
   count: number
@@ -126,6 +136,7 @@ export function buildNotification(api: ApiNotification, actor: NotificationActor
     type: api.type,
     postId: api.post_id ?? '',
     commentId: api.comment_id ?? '',
+    conversationId: api.conversation_id ?? '',
     actor,
     count,
     othersCount: Math.max(0, count - 1),
@@ -139,8 +150,16 @@ async function toAppNotification(api: ApiNotification): Promise<AppNotification>
   return buildNotification(api, await resolveActor(api.last_actor_id))
 }
 
-/** Lien de navigation d'une notification (le post concerné). */
-export function notificationHref(n: { postId: string }): string {
+/** Lien de navigation d'une notification : la conversation (mention en message)
+ *  ou le post concerné. */
+export function notificationHref(n: {
+  type: NotificationType
+  postId: string
+  conversationId: string
+}): string {
+  if (n.type === 'message_mention') {
+    return n.conversationId ? `/messages?conv=${encodeURIComponent(n.conversationId)}` : '/messages'
+  }
   return n.postId ? `/posts/${n.postId}` : '/feed'
 }
 

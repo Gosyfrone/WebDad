@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react'
 import Link from 'next/link'
-import { AtSign, Bell, Heart, MessageCircle, Quote, Repeat2, Reply } from 'lucide-react'
+import { AtSign, Bell, Heart, MessageCircle, Quote, Repeat2, Reply, Send } from 'lucide-react'
 
 import { cn, timeAgo } from '@/lib/utils'
 import { type AppNotification, type NotificationType, notificationHref } from '@/lib/notifications'
@@ -20,6 +20,7 @@ const TYPE_ICON: Record<NotificationType, { Icon: React.ElementType; className: 
   mention: { Icon: AtSign, className: 'text-[#47D9FF]' },
   repost: { Icon: Repeat2, className: 'text-emerald-500' },
   quote: { Icon: Quote, className: 'text-[#8D3DFF]' },
+  message_mention: { Icon: Send, className: 'text-[#8D3DFF]' },
 }
 
 export function NotificationsView() {
@@ -57,6 +58,10 @@ export function NotificationsView() {
         return t('notifications.mention', { name })
       case 'quote':
         return t('notifications.quote', { name })
+      case 'message_mention':
+        return count > 0
+          ? t('notifications.message_mention_other', { name, count })
+          : t('notifications.message_mention_one', { name })
     }
   }
 

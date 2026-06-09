@@ -22,6 +22,8 @@ func TestGroupKeyFor(t *testing.T) {
 		{"reply sans commentaire → invalide", models.Event{Type: models.TypeReply, PostID: "p1"}, "", false},
 		{"repost agrège par post original", models.Event{Type: models.TypeRepost, PostID: "p1"}, "repost:p1", true},
 		{"quote agrège par post citant", models.Event{Type: models.TypeQuote, PostID: "p2"}, "quote:p2", true},
+		{"mention en message agrège par conversation", models.Event{Type: models.TypeMessageMention, ConversationID: "cv1"}, "message_mention:cv1", true},
+		{"mention en message sans conversation → invalide", models.Event{Type: models.TypeMessageMention}, "", false},
 		{"type inconnu → invalide", models.Event{Type: "bogus"}, "", false},
 	}
 

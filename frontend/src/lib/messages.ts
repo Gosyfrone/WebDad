@@ -647,16 +647,26 @@ export async function listMessagesPage(
 }
 
 /** Chiffre et envoie un message ; renvoie le message (déchiffré localement). */
-export async function sendMessage(conv: Conversation, text: string): Promise<ChatMessage> {
+export async function sendMessage(
+  conv: Conversation,
+  text: string,
+  mentionedMemberIds: string[] = [],
+): Promise<ChatMessage> {
   if (!conv.contentKey) {
     throw new MessageApiError('clé de conversation indisponible sur cet appareil', 412)
   }
   const { ciphertext, nonce } = encryptText(conv.contentKey, text)
+  const body: { ciphertext: string; nonce: string; mentioned_member_ids?: string[] } = {
+    ciphertext,
+    nonce,
+  }
+  // Métadonnée d'appartenance uniquement (ids), jamais le texte → E2EE intact.
+  if (mentionedMemberIds.length > 0) body.mentioned_member_ids = mentionedMemberIds
   const created = await unwrap<ApiMessage>(
     await apiFetch(`/messages/conversations/${conv.id}/messages`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ciphertext, nonce }),
+      body: JSON.stringify(body),
     }),
   )
   return decryptMessage(conv, created, currentUserId())

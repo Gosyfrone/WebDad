@@ -20,6 +20,13 @@ type Config struct {
 	MongoDB        string
 	JWTSecret      string   // secret partagé (validation des tokens émis par auth)
 	AllowedOrigins []string // origines acceptées pour l'upgrade WebSocket
+
+	// NotificationURL : base du notification-service (mentions en message).
+	// Vide → émission désactivée (le service reste autonome).
+	NotificationURL string
+	// InternalSecret : secret partagé pour l'appel serveur-à-serveur
+	// /internal/events (en-tête X-Internal-Secret).
+	InternalSecret string
 }
 
 // Load construit la config. Charge les .env best-effort (ignorés s'ils
@@ -34,12 +41,14 @@ func Load() *Config {
 	_ = godotenv.Load("../.env")
 
 	cfg := &Config{
-		Port:           getEnv("PORT", "8085"),
-		GinMode:        getEnv("GIN_MODE", "debug"),
-		MongoURI:       buildMongoURI(),
-		MongoDB:        getEnv("MONGO_INITDB_DATABASE", "webdad_message"),
-		JWTSecret:      os.Getenv("JWT_SECRET"),
-		AllowedOrigins: splitCSV(getEnv("CORS_ALLOWED_ORIGINS", "http://localhost:3000")),
+		Port:            getEnv("PORT", "8085"),
+		GinMode:         getEnv("GIN_MODE", "debug"),
+		MongoURI:        buildMongoURI(),
+		MongoDB:         getEnv("MONGO_INITDB_DATABASE", "webdad_message"),
+		JWTSecret:       os.Getenv("JWT_SECRET"),
+		AllowedOrigins:  splitCSV(getEnv("CORS_ALLOWED_ORIGINS", "http://localhost:3000")),
+		NotificationURL: os.Getenv("NOTIFICATION_SERVICE_URL"),
+		InternalSecret:  os.Getenv("INTERNAL_EVENT_SECRET"),
 	}
 
 	if cfg.JWTSecret == "" {

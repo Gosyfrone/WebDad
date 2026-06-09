@@ -22,6 +22,8 @@ import {
   type Conversation,
   type RealtimeEvent,
 } from '@/lib/messages'
+import { textMentionsUser } from '@/lib/mentions'
+import { resolveUser } from '@/lib/user-cache'
 import { useToast } from '@/hooks/use-toast'
 import { useMessages } from '@/components/messages-provider'
 import { useLanguage } from '@/components/language-provider'
@@ -55,8 +57,16 @@ function touchAndSort(list: Conversation[], id: string, updatedAt: string): Conv
   return sortConversations(list.map((c) => (c.id === id ? { ...c, updatedAt } : c)))
 }
 
-function toPreview(m: ChatMessage): ConversationPreview {
-  return { messageId: m.id, text: m.text, mine: m.mine, decrypted: m.decrypted }
+function toPreview(m: ChatMessage, myUsername: string): ConversationPreview {
+  return {
+    messageId: m.id,
+    text: m.text,
+    mine: m.mine,
+    decrypted: m.decrypted,
+    senderId: m.senderId,
+    // « X vous a mentionné » : dernier message d'autrui, déchiffré, citant mon handle.
+    mentionsMe: !m.mine && m.decrypted && textMentionsUser(m.text, myUsername),
+  }
 }
 
 /**
@@ -86,6 +96,16 @@ export function MessagesView() {
   const { markRead, setActiveConversation, subscribeMessages, subscribeEvents, refresh } =
     useMessages()
   const myId = useMemo(() => currentUserId(), [])
+  // Mon handle, résolu une fois : sert à détecter « X vous a mentionné » dans
+  // l'aperçu (le dernier message est déjà déchiffré côté destinataire → E2EE).
+  const myUsernameRef = useRef('')
+  useEffect(() => {
+    resolveUser(myId)
+      .then((u) => {
+        myUsernameRef.current = u.username
+      })
+      .catch(() => {})
+  }, [myId])
 
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -110,7 +130,7 @@ export function MessagesView() {
   /** Intègre un message (WS, envoi local, ou aperçu) : aperçu + ordre + pastille.
    *  Le marquage « lu » serveur d'une conv ouverte est géré par le provider. */
   const ingest = useCallback((conversationId: string, msg: ChatMessage, seen: boolean) => {
-    setPreviews((p) => ({ ...p, [conversationId]: toPreview(msg) }))
+    setPreviews((p) => ({ ...p, [conversationId]: toPreview(msg, myUsernameRef.current) }))
     setConversations((prev) => touchAndSort(prev, conversationId, msg.createdAt))
     if (seen || msg.mine) {
       setUnread((u) => (u[conversationId] ? { ...u, [conversationId]: false } : u))
@@ -142,7 +162,7 @@ export function MessagesView() {
     )
     setPreviews((prev) => {
       const next = { ...prev }
-      for (const [id, last] of entries) if (last) next[id] = toPreview(last)
+      for (const [id, last] of entries) if (last) next[id] = toPreview(last, myUsernameRef.current)
       return next
     })
     const readById = new Map(list.map((c) => [c.id, c.lastReadAt]))
@@ -268,6 +288,23 @@ export function MessagesView() {
       .catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dmTarget])
+
+  // Point d'entrée depuis une notification de mention : /messages?conv=<id> →
+  // ouvre la conversation existante.
+  const convTarget = searchParams.get('conv')
+  const handledConvRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!convTarget || handledConvRef.current === convTarget) return
+    handledConvRef.current = convTarget
+    ensureMyKeys()
+      .then(() => getConversation(convTarget))
+      .then((conv) => {
+        upsertAndSelect(conv)
+        router.replace('/messages', { scroll: false })
+      })
+      .catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [convTarget])
 
   /** Marque une conversation lue : serveur (`markRead`) + état local optimiste
    *  (curseur `lastReadAt` avancé + pastille effacée), après capture de l'ancre. */
