@@ -50,6 +50,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { CommentSection } from '@/components/feed/comment-section'
+import { FeedVideo } from '@/components/feed/feed-video'
 import { PostComposer } from '@/components/feed/post-composer'
 import { PostPhotoModal } from '@/components/feed/post-photo-modal'
 import { TranslatedContent } from '@/components/feed/translated-content'
@@ -511,10 +512,16 @@ function MediaGallery({ media, onOpen }: { media: PostMedia[]; onOpen?: (index: 
           media.length === 1 ? 'max-h-[32rem]' : 'aspect-square',
           media.length === 3 && i === 0 && 'row-span-2 aspect-auto',
         )
-        // La vidéo garde ses contrôles natifs (pas d'ouverture en vue photo) ;
-        // l'image s'ouvre en grand au clic.
+        // Cellule vidéo : un ratio défini est nécessaire (le `<video>` interne
+        // est en `h-full`). 1 média = 16:9 ; sinon carré (grille).
+        const videoCell = cn(
+          media.length === 1 ? 'aspect-video' : 'aspect-square',
+          media.length === 3 && i === 0 && 'row-span-2 aspect-auto',
+        )
+        // Vidéo : lecture auto en muet + boucle + vitesse (cf. FeedVideo), pas
+        // d'ouverture en vue photo. L'image s'ouvre en grand au clic.
         return m.type === 'video' ? (
-          <video key={m.url} src={m.url} controls playsInline className={cn('w-full bg-black object-cover', sizing)} />
+          <FeedVideo key={m.url} src={m.url} className={videoCell} />
         ) : (
           <button
             key={m.url}

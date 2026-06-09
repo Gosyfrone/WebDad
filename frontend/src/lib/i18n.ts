@@ -74,6 +74,8 @@ export const messages: Record<Locale, Messages> = {
     'media.download': "Télécharger l'image",
     'media.previous': 'Image précédente',
     'media.next': 'Image suivante',
+    'media.speed': 'Vitesse de lecture',
+    'media.speed_normal': 'Normal',
 
     // — Navigation —
     'nav.feed': 'Fil',
@@ -536,6 +538,8 @@ export const messages: Record<Locale, Messages> = {
     'media.download': 'Download image',
     'media.previous': 'Previous image',
     'media.next': 'Next image',
+    'media.speed': 'Playback speed',
+    'media.speed_normal': 'Normal',
 
     // — Navigation —
     'nav.feed': 'Feed',
