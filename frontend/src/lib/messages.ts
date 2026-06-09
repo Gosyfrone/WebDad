@@ -18,7 +18,9 @@
 import { apiFetch, getAccessToken } from '@/lib/auth-client'
 import { API_URL } from '@/lib/config'
 import {
+  decryptSymmetric,
   decryptText,
+  encryptSymmetric,
   encryptText,
   fromBase64,
   generateContentKey,
@@ -27,6 +29,7 @@ import {
   toBase64,
   type KeyPair,
 } from '@/lib/crypto'
+import { fetchMediaBytes, uploadEncryptedMedia } from '@/lib/media'
 import { loadOrCreateIdentity } from '@/lib/key-store'
 
 export class MessageApiError extends Error {
@@ -134,16 +137,49 @@ export interface CommunitySummary {
   updatedAt: string
 }
 
+/** Pièce jointe chiffrée d'un message. Les octets vivent dans le media-service
+ *  (blob CHIFFRÉ avec la clé de contenu) ; ces métadonnées voyagent DANS
+ *  l'enveloppe chiffrée du message (le serveur ne les voit jamais en clair). */
+export interface ChatAttachment {
+  /** Id du blob côté media-service (`GET /media/<id>` = ciphertext). */
+  id: string
+  /** Nonce (base64) pour déchiffrer le blob avec la clé de contenu. */
+  nonce: string
+  mime: string
+  name: string
+  size: number
+  /** Nature dérivée du MIME (pour choisir `<img>`/`<video>`). */
+  type: 'image' | 'video' | 'file'
+}
+
+/** Forme « fil » (dans l'enveloppe JSON chiffrée) d'une pièce jointe. */
+interface WireAttachment {
+  id: string
+  nonce: string
+  mime: string
+  name: string
+  size: number
+}
+
 /** Message déchiffré pour l'affichage. */
 export interface ChatMessage {
   id: string
   conversationId: string
   senderId: string
   text: string
+  /** Pièces jointes (images/vidéos chiffrées) ; vide pour un message texte. */
+  media: ChatAttachment[]
   /** false si le déchiffrement a échoué (clé absente sur cet appareil). */
   decrypted: boolean
   createdAt: string
   mine: boolean
+}
+
+/** Nature d'un média d'après son type MIME. */
+export function mediaKind(mime: string): ChatAttachment['type'] {
+  if (mime.startsWith('image/')) return 'image'
+  if (mime.startsWith('video/')) return 'video'
+  return 'file'
 }
 
 // --- Enveloppe d'API ---------------------------------------------------------
@@ -547,13 +583,44 @@ export async function getMessagesUnreadCount(): Promise<number> {
 
 // --- Messages ----------------------------------------------------------------
 
+/**
+ * Encode le corps en clair d'un message AVANT chiffrement. Fonction PURE.
+ *   - sans pièce jointe → la chaîne brute (format historique, rétrocompatible :
+ *     un message texte reste identique à ce qu'il a toujours été) ;
+ *   - avec pièce(s) jointe(s) → enveloppe JSON versionnée `{v:1,text,media}`.
+ */
+export function encodeMessageBody(text: string, media: WireAttachment[]): string {
+  if (media.length === 0) return text
+  return JSON.stringify({ v: 1, text, media })
+}
+
+/**
+ * Décode le corps en clair d'un message APRÈS déchiffrement. Fonction PURE.
+ * Détecte l'enveloppe `{v:1,…}` ; toute autre chaîne est traitée comme du
+ * texte brut (messages historiques).
+ */
+export function decodeMessageBody(body: string): { text: string; media: WireAttachment[] } {
+  try {
+    const parsed = JSON.parse(body) as { v?: number; text?: string; media?: WireAttachment[] }
+    if (parsed && typeof parsed === 'object' && parsed.v === 1) {
+      return { text: parsed.text ?? '', media: Array.isArray(parsed.media) ? parsed.media : [] }
+    }
+  } catch {
+    // pas du JSON → texte brut (cas nominal des messages texte)
+  }
+  return { text: body, media: [] }
+}
+
 /** Déchiffre un message brut avec la CK d'une conversation (échec → texte vide). */
 export function decryptMessage(conv: Conversation, api: ApiMessage, myId: string): ChatMessage {
   let text = ''
+  let media: ChatAttachment[] = []
   let decrypted = false
   if (conv.contentKey) {
     try {
-      text = decryptText(conv.contentKey, api.ciphertext, api.nonce)
+      const body = decodeMessageBody(decryptText(conv.contentKey, api.ciphertext, api.nonce))
+      text = body.text
+      media = body.media.map((m) => ({ ...m, type: mediaKind(m.mime) }))
       decrypted = true
     } catch {
       decrypted = false
@@ -564,6 +631,7 @@ export function decryptMessage(conv: Conversation, api: ApiMessage, myId: string
     conversationId: api.conversation_id,
     senderId: api.sender_id,
     text,
+    media,
     decrypted,
     createdAt: api.created_at,
     mine: api.sender_id === myId,
@@ -646,20 +714,51 @@ export async function listMessagesPage(
   return buildMessagePage(await listMessages(conv, limit, beforeId), limit)
 }
 
-/** Chiffre et envoie un message ; renvoie le message (déchiffré localement). */
+/**
+ * Chiffre un fichier avec la clé de contenu de la conversation, uploade le
+ * CIPHERTEXT au media-service (qui ne voit qu'un blob opaque) et renvoie sa
+ * métadonnée « fil » (id + nonce + mime/nom/taille). Le serveur reste aveugle.
+ */
+async function encryptAndUpload(contentKey: Uint8Array, file: File): Promise<WireAttachment> {
+  const plaintext = new Uint8Array(await file.arrayBuffer())
+  const { nonce, ciphertext } = encryptSymmetric(contentKey, plaintext)
+  const { id } = await uploadEncryptedMedia(new Blob([ciphertext as BlobPart]))
+  return { id, nonce: toBase64(nonce), mime: file.type || 'application/octet-stream', name: file.name, size: file.size }
+}
+
+/**
+ * Télécharge et déchiffre une pièce jointe → `Blob` (type MIME d'origine), prêt
+ * pour un `objectURL`. Le blob distant est du ciphertext ; on le déchiffre avec
+ * la clé de contenu et le nonce porté par le message.
+ */
+export async function decryptAttachment(
+  contentKey: Uint8Array,
+  att: ChatAttachment,
+): Promise<Blob> {
+  const ciphertext = await fetchMediaBytes(att.id)
+  const plaintext = decryptSymmetric(contentKey, fromBase64(att.nonce), ciphertext)
+  return new Blob([plaintext as BlobPart], { type: att.mime })
+}
+
+/**
+ * Chiffre et envoie un message (texte, pièces jointes et/ou mentions) ; renvoie
+ * le message déchiffré localement. Les fichiers sont chiffrés + uploadés AVANT
+ * l'envoi, leurs métadonnées voyagent dans l'enveloppe chiffrée
+ * (`encodeMessageBody`). `mentionedMemberIds` = ids only (jamais le texte) →
+ * notifications de mention, E2EE intact.
+ */
 export async function sendMessage(
   conv: Conversation,
   text: string,
+  files: File[] = [],
   mentionedMemberIds: string[] = [],
 ): Promise<ChatMessage> {
   if (!conv.contentKey) {
     throw new MessageApiError('clé de conversation indisponible sur cet appareil', 412)
   }
-  const { ciphertext, nonce } = encryptText(conv.contentKey, text)
-  const body: { ciphertext: string; nonce: string; mentioned_member_ids?: string[] } = {
-    ciphertext,
-    nonce,
-  }
+  const attachments = await Promise.all(files.map((f) => encryptAndUpload(conv.contentKey!, f)))
+  const { ciphertext, nonce } = encryptText(conv.contentKey, encodeMessageBody(text, attachments))
+  const body: { ciphertext: string; nonce: string; mentioned_member_ids?: string[] } = { ciphertext, nonce }
   // Métadonnée d'appartenance uniquement (ids), jamais le texte → E2EE intact.
   if (mentionedMemberIds.length > 0) body.mentioned_member_ids = mentionedMemberIds
   const created = await unwrap<ApiMessage>(

@@ -96,10 +96,12 @@ export async function uploadEncryptedMedia(blob: Blob): Promise<{ id: string }> 
 
 /**
  * Télécharge le contenu brut d'un média (utilisé pour les pièces jointes
- * chiffrées : on récupère le ciphertext puis on déchiffre côté client).
+ * chiffrées : on récupère le ciphertext puis on déchiffre côté client). Le
+ * download est PUBLIC (id non devinable) → `fetch` simple sans Bearer : pas
+ * d'en-tête custom donc pas de preflight CORS, juste un GET cross-origin.
  */
 export async function fetchMediaBytes(id: string): Promise<Uint8Array> {
-  const res = await apiFetch(`/media/${id}`)
+  const res = await fetch(mediaUrl(id))
   if (!res.ok) throw new Error(`média introuvable (${res.status})`)
   const buf = await res.arrayBuffer()
   return new Uint8Array(buf)

@@ -3,6 +3,9 @@ import { describe, it, expect } from 'vitest'
 import {
   buildMessagePage,
   computeDivider,
+  decodeMessageBody,
+  encodeMessageBody,
+  mediaKind,
   searchMessages,
   toWebSocketUrl,
   type ChatMessage,
@@ -14,6 +17,7 @@ function msg(id: string, mine = false): ChatMessage {
     conversationId: 'c',
     senderId: mine ? 'me' : 's',
     text: 'x',
+    media: [],
     decrypted: true,
     createdAt: '2026-06-08T00:00:00Z',
     mine,
@@ -131,5 +135,39 @@ describe('toWebSocketUrl', () => {
 
   it('encode les caractères spéciaux du token', () => {
     expect(toWebSocketUrl('http://h', 'a b/c+d')).toContain('access_token=a%20b%2Fc%2Bd')
+  })
+})
+
+describe('encodeMessageBody / decodeMessageBody (enveloppe pièces jointes)', () => {
+  const att = { id: 'm1', nonce: 'bm9uY2U=', mime: 'image/png', name: 'a.png', size: 12 }
+
+  it('sans média → texte brut (rétrocompatible, pas de JSON)', () => {
+    expect(encodeMessageBody('coucou', [])).toBe('coucou')
+  })
+
+  it('avec média → enveloppe JSON v1', () => {
+    const body = encodeMessageBody('légende', [att])
+    expect(JSON.parse(body)).toEqual({ v: 1, text: 'légende', media: [att] })
+  })
+
+  it('round-trip avec média', () => {
+    const decoded = decodeMessageBody(encodeMessageBody('cap', [att]))
+    expect(decoded).toEqual({ text: 'cap', media: [att] })
+  })
+
+  it('message texte historique (chaîne brute) → texte, aucun média', () => {
+    expect(decodeMessageBody('un vieux message')).toEqual({ text: 'un vieux message', media: [] })
+  })
+
+  it("texte ressemblant à du JSON mais sans v:1 → traité comme texte brut", () => {
+    expect(decodeMessageBody('{"foo":1}')).toEqual({ text: '{"foo":1}', media: [] })
+  })
+})
+
+describe('mediaKind', () => {
+  it('classe par préfixe MIME', () => {
+    expect(mediaKind('image/jpeg')).toBe('image')
+    expect(mediaKind('video/mp4')).toBe('video')
+    expect(mediaKind('application/pdf')).toBe('file')
   })
 })
