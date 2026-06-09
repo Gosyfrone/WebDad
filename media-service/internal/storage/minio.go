@@ -101,7 +101,7 @@ func (s *Store) Remove(ctx context.Context, id string) error {
 
 // OwnerOf extrait l'id du propriétaire depuis les métadonnées d'un ObjectInfo.
 func OwnerOf(info minio.ObjectInfo) string {
-	return info.Metadata.Get(http.CanonicalHeaderKey("X-Amz-Meta-" + ownerMetaKey))
+	return info.Metadata.Get("X-Amz-Meta-" + ownerMetaKey)
 }
 
 // isNotFound reconnaît l'erreur « clé inexistante » de MinIO.
