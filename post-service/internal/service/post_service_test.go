@@ -136,6 +136,24 @@ func TestGetFeedEmpty(t *testing.T) {
 	}
 }
 
+// TestWithoutProfilePins : les feeds ne doivent pas divulguer l'état
+// d'épinglage d'un profil, et la liste source ne doit pas être mutée.
+func TestWithoutProfilePins(t *testing.T) {
+	pinnedAt := time.Date(2026, 6, 9, 12, 0, 0, 0, time.UTC)
+	posts := []models.Post{
+		{AuthorID: "author-1", PinnedAt: &pinnedAt},
+		{AuthorID: "author-2"},
+	}
+
+	cleaned := withoutProfilePins(posts)
+	if cleaned[0].PinnedAt != nil {
+		t.Fatal("un post de feed ne doit pas exposer pinned_at")
+	}
+	if posts[0].PinnedAt == nil {
+		t.Fatal("withoutProfilePins ne doit pas muter la liste source")
+	}
+}
+
 // TestParseID : un hex valide passe, le reste donne ErrInvalidID.
 func TestParseID(t *testing.T) {
 	if _, err := parseID("507f1f77bcf86cd799439011"); err != nil {

@@ -17,6 +17,7 @@ import {
 
 import { cn, initialOf, timeAgo } from '@/lib/utils'
 import {
+  currentUserId,
   deletePost,
   likePost,
   notifyPostCreated,
@@ -54,6 +55,8 @@ import { ProfilLink } from '@/components/profil/profil-link'
 
 interface PostCardProps {
   post: FeedPost
+  /** Affiche le badge public "Épinglé" (profil uniquement). */
+  showPinBadge?: boolean
   /** Appelé après une suppression réussie (le parent retire le post du fil). */
   onDeleted?: (id: string) => void
   /** Appelé après une mise à jour réussie (pin/unpin, etc.). */
@@ -67,7 +70,7 @@ interface PostCardProps {
  * Like et suppression sont câblés sur le post-service (optimistes + rollback).
  * Repost simple et citation sont câblés sur le post-service.
  */
-export function PostCard({ post, onDeleted, onUpdated }: PostCardProps) {
+export function PostCard({ post, showPinBadge = false, onDeleted, onUpdated }: PostCardProps) {
   const { toast } = useToast()
   const { t, locale } = useLanguage()
 
@@ -81,6 +84,7 @@ export function PostCard({ post, onDeleted, onUpdated }: PostCardProps) {
   const [deleting, setDeleting] = useState(false)
 
   const [reposted, setReposted] = useState(post.reposted)
+  const [repostedById, setRepostedById] = useState(post.repostedById)
   const [repostCount, setRepostCount] = useState(post.repostsCount)
   const [reposting, setReposting] = useState(false)
   const [repostMenuOpen, setRepostMenuOpen] = useState(false)
@@ -89,6 +93,7 @@ export function PostCard({ post, onDeleted, onUpdated }: PostCardProps) {
   const [bookmarked, setBookmarked] = useState(post.bookmarked)
   const [bookmarking, setBookmarking] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
+  const displayPinBadge = isPinned && (showPinBadge || post.canPin)
   // Détection de l'appui long (ouvre le sélecteur sans auto-classer).
   const longPress = useRef(false)
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -103,8 +108,9 @@ export function PostCard({ post, onDeleted, onUpdated }: PostCardProps) {
 
   useEffect(() => {
     setReposted(post.reposted)
+    setRepostedById(post.repostedById)
     setRepostCount(post.repostsCount)
-  }, [post.reposted, post.repostsCount])
+  }, [post.reposted, post.repostedById, post.repostsCount])
 
   async function toggleLike() {
     const next = !liked
@@ -126,6 +132,7 @@ export function PostCard({ post, onDeleted, onUpdated }: PostCardProps) {
   async function toggleRepost() {
     if (reposting) return
     const next = !reposted
+    const previousRepostedById = repostedById
     setReposting(true)
     setReposted(next)
     setRepostCount((prev) => Math.max(0, prev + (next ? 1 : -1)))
@@ -133,15 +140,18 @@ export function PostCard({ post, onDeleted, onUpdated }: PostCardProps) {
     try {
       if (next) {
         const updated = await repostPost(post.id)
+        setRepostedById(updated.repostedById)
         setRepostCount(updated.repostsCount)
         notifyPostCreated(updated)
         toast({ title: 'Post reposté sur votre profil' })
       } else {
         const count = await unrepostPost(post.id)
+        if (repostedById === currentUserId()) setRepostedById('')
         setRepostCount(count)
       }
     } catch {
       setReposted(!next)
+      setRepostedById(previousRepostedById)
       setRepostCount((prev) => Math.max(0, prev + (next ? -1 : 1)))
       toast({ title: 'Repost impossible', variant: 'destructive' })
     } finally {
@@ -313,15 +323,15 @@ export function PostCard({ post, onDeleted, onUpdated }: PostCardProps) {
           )}
         </div>
 
-        {(isPinned || post.repostedById) && (
+        {(displayPinBadge || repostedById) && (
           <div className="mb-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold">
-            {isPinned && (
+            {displayPinBadge && (
               <div className="flex items-center gap-1 text-primary">
                 <Pin className="h-3.5 w-3.5 fill-current" />
                 <span>Épinglé</span>
               </div>
             )}
-            {post.repostedById && (
+            {repostedById && (
               <div className="flex items-center gap-1 text-green-500">
                 <Repeat2 className="h-3.5 w-3.5" />
                 <span>Reposté</span>
