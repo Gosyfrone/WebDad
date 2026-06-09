@@ -82,12 +82,13 @@ var validators = map[string]bson.M{
 			"bsonType": "object",
 			"required": bson.A{"recipient_id", "group_key", "type", "last_actor_id", "count", "is_read", "created_at", "updated_at"},
 			"properties": bson.M{
-				"recipient_id":  bson.M{"bsonType": "string"},
-				"group_key":     bson.M{"bsonType": "string"},
-				"type":          bson.M{"bsonType": "string", "enum": bson.A{"like", "comment", "reply", "mention", "repost", "quote"}},
-				"post_id":       bson.M{"bsonType": bson.A{"string", "null"}},
-				"comment_id":    bson.M{"bsonType": bson.A{"string", "null"}},
-				"last_actor_id": bson.M{"bsonType": "string"},
+				"recipient_id":    bson.M{"bsonType": "string"},
+				"group_key":       bson.M{"bsonType": "string"},
+				"type":            bson.M{"bsonType": "string", "enum": bson.A{"like", "comment", "reply", "mention", "repost", "quote", "message_mention"}},
+				"post_id":         bson.M{"bsonType": bson.A{"string", "null"}},
+				"comment_id":      bson.M{"bsonType": bson.A{"string", "null"}},
+				"conversation_id": bson.M{"bsonType": bson.A{"string", "null"}},
+				"last_actor_id":   bson.M{"bsonType": "string"},
 				// count = nombre d'événements agrégés (likes, commentaires…). int32
 				// pour respecter le validateur Mongo (bsonType "int"), maintenu par $inc.
 				"count":      bson.M{"bsonType": "int"},

@@ -57,11 +57,17 @@ describe('buildNotification (agrégation → affichage)', () => {
 
 describe('notificationHref', () => {
   it('pointe vers le post quand postId présent', () => {
-    expect(notificationHref({ postId: 'abc' })).toBe('/posts/abc')
+    expect(notificationHref({ type: 'like', postId: 'abc', conversationId: '' })).toBe('/posts/abc')
   })
 
   it('repli sur le fil sans postId', () => {
-    expect(notificationHref({ postId: '' })).toBe('/feed')
+    expect(notificationHref({ type: 'like', postId: '', conversationId: '' })).toBe('/feed')
+  })
+
+  it('pointe vers la conversation pour une mention en message', () => {
+    expect(notificationHref({ type: 'message_mention', postId: '', conversationId: 'cv1' })).toBe(
+      '/messages?conv=cv1',
+    )
   })
 })
 

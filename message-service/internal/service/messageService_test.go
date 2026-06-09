@@ -144,3 +144,35 @@ func TestConvLess_PinnedFirstThenActivity(t *testing.T) {
 		t.Error("la non-épinglée la plus active doit passer en premier")
 	}
 }
+
+func TestMentionedTargets(t *testing.T) {
+	members := []string{"u1", "u2", "u3"}
+
+	cases := []struct {
+		name      string
+		mentioned []string
+		sender    string
+		want      []string
+	}{
+		{"garde les membres réels hors expéditeur", []string{"u2", "u3"}, "u1", []string{"u2", "u3"}},
+		{"ignore l'expéditeur", []string{"u1", "u2"}, "u1", []string{"u2"}},
+		{"ignore les non-membres", []string{"u2", "ghost"}, "u1", []string{"u2"}},
+		{"déduplique", []string{"u2", "u2"}, "u1", []string{"u2"}},
+		{"ignore les vides", []string{"", "u3"}, "u1", []string{"u3"}},
+		{"aucune mention → nil", nil, "u1", nil},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := mentionedTargets(tc.mentioned, members, tc.sender)
+			if len(got) != len(tc.want) {
+				t.Fatalf("mentionedTargets = %v ; attendu %v", got, tc.want)
+			}
+			for i := range got {
+				if got[i] != tc.want[i] {
+					t.Fatalf("mentionedTargets = %v ; attendu %v", got, tc.want)
+				}
+			}
+		})
+	}
+}

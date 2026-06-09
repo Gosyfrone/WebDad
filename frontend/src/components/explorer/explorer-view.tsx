@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Loader2, Search, UserX } from 'lucide-react'
 
 import { searchUsers } from '@/lib/api'
@@ -17,7 +18,10 @@ import { UserListItem } from '@/components/profil/user-list-item'
  */
 export function ExplorerView() {
   const t = useT()
-  const [query, setQuery] = useState('')
+  // Point d'entrée depuis une mention de non-membre (carte d'aperçu en
+  // messagerie) : /explorer?q=@handle pré-remplit la recherche.
+  const searchParams = useSearchParams()
+  const [query, setQuery] = useState(() => searchParams.get('q') ?? '')
   const [debounced, setDebounced] = useState('')
   const [results, setResults] = useState<RelationUser[]>([])
   const [loading, setLoading] = useState(false)

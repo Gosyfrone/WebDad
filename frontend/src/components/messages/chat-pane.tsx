@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeft, Info, Loader2, Lock, Send } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
@@ -11,11 +11,17 @@ import {
   type ChatMessage,
   type Conversation,
 } from '@/lib/messages'
+import { extractMentionHandles, type MentionCandidate } from '@/lib/mentions'
+import { makeMemberFirstSearch } from '@/lib/mention-search'
+import { useMention } from '@/lib/use-mention'
+import { resolveUsers } from '@/lib/user-cache'
 import { useResolvedUser } from '@/lib/use-resolved-user'
 import { useToast } from '@/hooks/use-toast'
 import { useLanguage } from '@/components/language-provider'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
+import { MentionAutocomplete } from '@/components/mention/mention-autocomplete'
+import { MentionMessageText } from '@/components/mention/mention-text'
 import { ConversationAvatar, conversationTitle } from '@/components/messages/conversation-meta'
 
 const PAGE = 30
@@ -77,9 +83,47 @@ export function ChatPane({
   const oldestIdRef = useRef<string | null>(null)
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const topSentinelRef = useRef<HTMLDivElement | null>(null)
+  const composerRef = useRef<HTMLTextAreaElement | null>(null)
   // Référence à la conversation courante (clé à jour pour chiffrer/déchiffrer).
   const convRef = useRef(conversation)
   convRef.current = conversation
+
+  // Membres résolus (username + décoratif) : autocomplétion des mentions,
+  // rendu des @handle (membre → profil ; non-membre → carte d'aperçu) et calcul
+  // des ids mentionnés à l'envoi (notifications).
+  const memberKey = conversation.memberIds.join(',')
+  const [members, setMembers] = useState<MentionCandidate[]>([])
+  useEffect(() => {
+    let cancelled = false
+    resolveUsers(conversation.memberIds)
+      .then((list) => {
+        if (!cancelled) setMembers(list)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [memberKey])
+
+  const memberUsernames = useMemo(
+    () => new Set(members.map((m) => m.username.toLowerCase()).filter(Boolean)),
+    [members],
+  )
+  const memberByUsername = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const m of members) if (m.username) map.set(m.username.toLowerCase(), m.id)
+    return map
+  }, [members])
+  const mentionSearch = useMemo(
+    () => makeMemberFirstSearch(members.filter((m) => m.id !== myId)),
+    [members, myId],
+  )
+  const mention = useMention({
+    inputRef: composerRef,
+    onChange: setDraft,
+    search: mentionSearch,
+  })
 
   const keyMissing = conversation.contentKey === null
   const readOnly =
@@ -173,7 +217,16 @@ export function ChatPane({
     if (!text || sending || !canSend) return
     setSending(true)
     try {
-      const msg = await sendMessage(convRef.current, text)
+      // Résout les @handle mentionnés en ids de MEMBRES (hors soi) → notifications.
+      // Le serveur ne reçoit que des ids (jamais le texte) : E2EE intact.
+      const mentionedIds = [
+        ...new Set(
+          extractMentionHandles(text)
+            .map((h) => memberByUsername.get(h))
+            .filter((id): id is string => Boolean(id) && id !== myId),
+        ),
+      ]
+      const msg = await sendMessage(convRef.current, text, mentionedIds)
       setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]))
       onLocalMessage(msg)
       setDraft('')
@@ -223,6 +276,7 @@ export function ChatPane({
                 <MessageBubble
                   message={m}
                   conversation={conversation}
+                  memberUsernames={memberUsernames}
                   // Affiche l'avatar/nom de l'expéditeur si l'auteur change (groupes/communautés).
                   showSender={
                     conversation.type !== 'dm' &&
@@ -242,20 +296,31 @@ export function ChatPane({
           <p className="py-2 text-center text-sm text-muted-foreground">{t('messages.read_only')}</p>
         ) : (
           <div className="flex items-end gap-2">
-            <textarea
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault()
-                  handleSend()
-                }
-              }}
-              disabled={!canSend || sending}
-              rows={1}
-              placeholder={t('messages.composer_placeholder')}
-              className="glass max-h-32 min-h-[44px] flex-1 resize-none rounded-2xl border px-4 py-2.5 text-sm backdrop-blur placeholder:text-muted-foreground focus:border-[#5B6CFF] focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
-            />
+            <div className="relative flex-1">
+              <textarea
+                ref={composerRef}
+                value={draft}
+                onChange={(e) => {
+                  setDraft(e.target.value)
+                  mention.sync()
+                }}
+                onKeyUp={mention.sync}
+                onClick={mention.sync}
+                onKeyDown={(e) => {
+                  mention.onKeyDown(e)
+                  if (e.defaultPrevented) return
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault()
+                    handleSend()
+                  }
+                }}
+                disabled={!canSend || sending}
+                rows={1}
+                placeholder={t('messages.composer_placeholder')}
+                className="glass max-h-32 min-h-[44px] w-full resize-none rounded-2xl border px-4 py-2.5 text-sm backdrop-blur placeholder:text-muted-foreground focus:border-[#5B6CFF] focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+              />
+              <MentionAutocomplete controller={mention} placement="top" />
+            </div>
             <Button
               type="button"
               size="icon"
@@ -337,10 +402,12 @@ function ChatHeader({
 function MessageBubble({
   message,
   conversation,
+  memberUsernames,
   showSender,
 }: {
   message: ChatMessage
   conversation: Conversation
+  memberUsernames: Set<string>
   showSender: boolean
 }) {
   const { t, locale } = useLanguage()
@@ -371,7 +438,12 @@ function MessageBubble({
         )}
       >
         {message.decrypted ? (
-          <p className="whitespace-pre-wrap break-words">{message.text}</p>
+          <MentionMessageText
+            text={message.text}
+            memberUsernames={memberUsernames}
+            onAccent={message.mine}
+            className="block whitespace-pre-wrap break-words"
+          />
         ) : (
           <p className="flex items-center gap-1.5 italic opacity-80">
             <Lock className="h-3.5 w-3.5" aria-hidden />

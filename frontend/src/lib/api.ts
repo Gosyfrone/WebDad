@@ -184,6 +184,21 @@ export async function searchUsers(query: string): Promise<RelationUser[]> {
   return enriched.filter((u): u is RelationUser => u !== null)
 }
 
+/**
+ * Résout un utilisateur par son handle exact (`GET /users/by-username`), enrichi
+ * du décoratif. `null` si le handle n'existe pas (404). Sert à la carte d'aperçu
+ * d'une mention de non-membre dans la messagerie.
+ */
+export async function getUserByUsername(username: string): Promise<RelationUser | null> {
+  const handle = username.trim()
+  if (!handle) return null
+  const res = await apiFetch(`/users/by-username/${encodeURIComponent(handle)}`)
+  if (!res.ok) return null
+  const body = (await res.json().catch(() => null)) as { data?: ApiUser } | null
+  if (!body?.data) return null
+  return enrichFromUser(body.data)
+}
+
 /** Comptes les plus suivis (« Qui suivre »), enrichis du décoratif. */
 export async function getSuggestions(limit = 10): Promise<RelationUser[]> {
   const users = await unwrap<ApiUser[]>(

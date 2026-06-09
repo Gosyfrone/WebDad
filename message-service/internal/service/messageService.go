@@ -15,6 +15,7 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo"
 
 	"github.com/webdad/message-service/internal/models"
+	"github.com/webdad/message-service/internal/notifier"
 	"github.com/webdad/message-service/internal/repository"
 )
 
@@ -52,11 +53,20 @@ const (
 const MaxTalkers = 32
 
 type MessageService struct {
-	repo *repository.MessageRepository
+	repo     *repository.MessageRepository
+	notifier notifier.Notifier
 }
 
 func NewMessageService(r *repository.MessageRepository) *MessageService {
-	return &MessageService{repo: r}
+	return &MessageService{repo: r, notifier: notifier.Noop{}}
+}
+
+// SetNotifier branche l'émission d'événements vers le notification-service
+// (best-effort). Sans appel, le service reste autonome (Noop).
+func (s *MessageService) SetNotifier(n notifier.Notifier) {
+	if n != nil {
+		s.notifier = n
+	}
 }
 
 // --- Clés publiques ----------------------------------------------------------
@@ -664,7 +674,11 @@ func (s *MessageService) ListMessages(ctx context.Context, conversationID, userI
 
 // SendMessage persiste un message chiffré (membre + droit d'écriture requis) et
 // renvoie le message créé ainsi que les ids des membres (pour la diffusion WS).
-func (s *MessageService) SendMessage(ctx context.Context, conversationID, senderID, ciphertext, nonce string) (*models.Message, []string, error) {
+//
+// `mentionedIDs` (fournis par le client : ids des membres mentionnés @handle —
+// le serveur ne lit pas le contenu chiffré) déclenchent une notification
+// `message_mention` par membre réellement présent (hors l'expéditeur).
+func (s *MessageService) SendMessage(ctx context.Context, conversationID, senderID, ciphertext, nonce string, mentionedIDs []string) (*models.Message, []string, error) {
 	member, err := s.requireMember(ctx, conversationID, senderID)
 	if err != nil {
 		return nil, nil, err
@@ -695,7 +709,42 @@ func (s *MessageService) SendMessage(ctx context.Context, conversationID, sender
 		// Le message est persisté ; l'échec de diffusion n'est pas fatal.
 		memberIDs = nil
 	}
+
+	// Notifie les membres mentionnés (best-effort, fire-and-forget). On ne
+	// notifie QUE des membres réels (≠ l'expéditeur) : un id non-membre fourni
+	// par le client est ignoré (pas de fuite, pas de notif parasite).
+	for _, rid := range mentionedTargets(mentionedIDs, memberIDs, senderID) {
+		s.notifier.Emit(notifier.Event{
+			Type:           notifier.TypeMessageMention,
+			ActorID:        senderID,
+			RecipientID:    rid,
+			ConversationID: conversationID,
+		})
+	}
+
 	return msg, memberIDs, nil
+}
+
+// mentionedTargets filtre les ids mentionnés pour ne garder que des membres
+// réels, distincts, et différents de l'expéditeur. Fonction PURE (testée).
+func mentionedTargets(mentioned, memberIDs []string, senderID string) []string {
+	if len(mentioned) == 0 || len(memberIDs) == 0 {
+		return nil
+	}
+	members := make(map[string]bool, len(memberIDs))
+	for _, m := range memberIDs {
+		members[m] = true
+	}
+	seen := make(map[string]bool, len(mentioned))
+	out := make([]string, 0, len(mentioned))
+	for _, id := range mentioned {
+		if id == "" || id == senderID || seen[id] || !members[id] {
+			continue
+		}
+		seen[id] = true
+		out = append(out, id)
+	}
+	return out
 }
 
 // IsMember indique si un utilisateur est membre (utilisé par le handler WS pour

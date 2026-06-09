@@ -8,11 +8,14 @@ import { getMyProfil, subscribeProfilUpdated } from '@/lib/profil-client'
 import { createPost, notifyPostCreated, pinPost, type FeedPost } from '@/lib/posts'
 import { useToast } from '@/hooks/use-toast'
 import type { ProfilDetails } from '@/types'
+import { useMention } from '@/lib/use-mention'
+import { mentionSearchGlobal } from '@/lib/mention-search'
 import { useT } from '@/components/language-provider'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { EmojiPicker } from '@/components/feed/emoji-picker'
+import { MentionAutocomplete } from '@/components/mention/mention-autocomplete'
 
 const MAX_CHARS = 280
 
@@ -52,6 +55,11 @@ export function PostComposer({
   const [submitting, setSubmitting] = useState(false)
   const [pinOnProfile, setPinOnProfile] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const mention = useMention({
+    inputRef: textareaRef,
+    onChange: setContent,
+    search: mentionSearchGlobal,
+  })
   const remaining = MAX_CHARS - content.length
   const isEmpty = content.trim().length === 0
   const isOver = remaining < 0
@@ -115,15 +123,24 @@ export function PostComposer({
       </Avatar>
 
       <div className="flex min-w-0 flex-1 flex-col gap-3">
-        <textarea
-          ref={textareaRef}
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          placeholder={t('composer.placeholder')}
-          rows={3}
-          autoFocus={autoFocus}
-          className="w-full cursor-text resize-none bg-transparent text-xl text-foreground caret-[#5B6CFF] placeholder:text-muted-foreground focus:outline-none"
-        />
+        <div className="relative">
+          <textarea
+            ref={textareaRef}
+            value={content}
+            onChange={(e) => {
+              setContent(e.target.value)
+              mention.sync()
+            }}
+            onKeyDown={mention.onKeyDown}
+            onKeyUp={mention.sync}
+            onClick={mention.sync}
+            placeholder={t('composer.placeholder')}
+            rows={3}
+            autoFocus={autoFocus}
+            className="w-full cursor-text resize-none bg-transparent text-xl text-foreground caret-[#5B6CFF] placeholder:text-muted-foreground focus:outline-none"
+          />
+          <MentionAutocomplete controller={mention} placement="bottom" />
+        </div>
 
         {quotePost && (
           <QuotePreview post={quotePost} />

@@ -10,6 +10,7 @@ import {
   type PostTranslation,
 } from '@/lib/post-translation'
 import { cn } from '@/lib/utils'
+import { MentionText } from '@/components/mention/mention-text'
 
 interface TranslatedContentProps {
   contentId: string
@@ -63,7 +64,7 @@ export function TranslatedContent({
 
   return (
     <>
-      <p className={className}>{displayedContent}</p>
+      <MentionText text={displayedContent} className={cn('block', className)} />
 
       {(translation || translating) && (
         <div

@@ -10,6 +10,7 @@ import (
 	"github.com/webdad/message-service/internal/config"
 	"github.com/webdad/message-service/internal/database"
 	"github.com/webdad/message-service/internal/handler"
+	"github.com/webdad/message-service/internal/notifier"
 	"github.com/webdad/message-service/internal/realtime"
 	"github.com/webdad/message-service/internal/repository"
 	"github.com/webdad/message-service/internal/service"
@@ -43,6 +44,15 @@ func main() {
 
 	repo := repository.NewMessageRepository(db)
 	svc := service.NewMessageService(repo)
+
+	// Émission des mentions en message vers le notification-service (best-effort,
+	// fire-and-forget). Activée uniquement si le service est configuré → le
+	// message-service reste autonome sans lui.
+	if cfg.NotificationURL != "" && cfg.InternalSecret != "" {
+		svc.SetNotifier(notifier.New(cfg.NotificationURL, cfg.InternalSecret))
+		log.Printf("[%s] notifications activées → %s", serviceName, cfg.NotificationURL)
+	}
+
 	hub := realtime.NewHub()
 
 	r := gin.Default()
