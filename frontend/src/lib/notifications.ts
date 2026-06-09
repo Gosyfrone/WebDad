@@ -22,7 +22,6 @@ import { API_URL } from '@/lib/config'
 import { resolveMediaUrl } from '@/lib/media'
 
 export type NotificationType =
-  |
   | 'like'
  
   | 'comment'
