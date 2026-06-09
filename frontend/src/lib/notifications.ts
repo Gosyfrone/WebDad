@@ -19,6 +19,7 @@
 
 import { apiFetch, getAccessToken } from '@/lib/auth-client'
 import { API_URL } from '@/lib/config'
+import { resolveMediaUrl } from '@/lib/media'
 
 export type NotificationType =
   | 'like'
@@ -118,7 +119,7 @@ function resolveActor(userId: string): Promise<NotificationActor> {
       id: userId,
       username: user?.username ?? '',
       displayName: profil?.display_name?.trim() || user?.username || 'Utilisateur',
-      avatarUrl: profil?.avatar_url ?? '',
+      avatarUrl: resolveMediaUrl(profil?.avatar_url),
     }
   })()
 

@@ -66,6 +66,7 @@ function toPreview(m: ChatMessage, myUsername: string): ConversationPreview {
     senderId: m.senderId,
     // « X vous a mentionné » : dernier message d'autrui, déchiffré, citant mon handle.
     mentionsMe: !m.mine && m.decrypted && textMentionsUser(m.text, myUsername),
+    hasMedia: m.media.length > 0,
   }
 }
 

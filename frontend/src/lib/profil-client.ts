@@ -1,6 +1,7 @@
 'use client'
 
 import { apiFetch, getAccessToken } from '@/lib/auth-client'
+import { resolveMediaUrl, toStoredMedia } from '@/lib/media'
 import type { ProfilDetails, ProfilEditableFields, UserRole } from '@/types'
 
 type ApiEnvelope<T> = { data?: T; error?: string; message?: string }
@@ -111,8 +112,8 @@ function mergeProfil(
     username: user.username,
     role,
     bio: profil?.bio ?? '',
-    avatarUrl: profil?.avatar_url ?? '',
-    bannerUrl: profil?.banner_url ?? '',
+    avatarUrl: resolveMediaUrl(profil?.avatar_url),
+    bannerUrl: resolveMediaUrl(profil?.banner_url),
     website: profil?.website ?? '',
     location: profil?.location ?? '',
     birthDate: profil?.birth_date ?? '',
@@ -155,8 +156,8 @@ function toUpdatePayload(fields: ProfilEditableFields) {
   return {
     display_name: fields.displayName,
     bio: fields.bio,
-    avatar_url: fields.avatarUrl,
-    banner_url: fields.bannerUrl,
+    avatar_url: toStoredMedia(fields.avatarUrl),
+    banner_url: toStoredMedia(fields.bannerUrl),
     website: fields.website,
     location: fields.location,
     gender: fields.gender || undefined,

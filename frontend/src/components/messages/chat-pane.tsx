@@ -1,13 +1,15 @@
 'use client'
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, Info, Loader2, Lock, Send } from 'lucide-react'
+import { ArrowLeft, ImageOff, Info, Loader2, Lock, Paperclip, Send, X } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import {
   computeDivider,
+  decryptAttachment,
   listMessagesPage,
   sendMessage,
+  type ChatAttachment,
   type ChatMessage,
   type Conversation,
 } from '@/lib/messages'
@@ -22,6 +24,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { MentionAutocomplete } from '@/components/mention/mention-autocomplete'
 import { MentionMessageText } from '@/components/mention/mention-text'
+import { MediaLightbox } from '@/components/ui/media-lightbox'
 import { ConversationAvatar, conversationTitle } from '@/components/messages/conversation-meta'
 
 const PAGE = 30
@@ -76,7 +79,9 @@ export function ChatPane({
   const [initialLoading, setInitialLoading] = useState(true)
   const [loadingOlder, setLoadingOlder] = useState(false)
   const [draft, setDraft] = useState('')
+  const [attachments, setAttachments] = useState<File[]>([])
   const [sending, setSending] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   // Id du message devant lequel afficher « Nouveaux messages » (gelé à l'ouverture).
   const [dividerBeforeId, setDividerBeforeId] = useState<string | null>(null)
 
@@ -214,7 +219,7 @@ export function ChatPane({
 
   async function handleSend() {
     const text = draft.trim()
-    if (!text || sending || !canSend) return
+    if ((!text && attachments.length === 0) || sending || !canSend) return
     setSending(true)
     try {
       // Résout les @handle mentionnés en ids de MEMBRES (hors soi) → notifications.
@@ -226,16 +231,23 @@ export function ChatPane({
             .filter((id): id is string => Boolean(id) && id !== myId),
         ),
       ]
-      const msg = await sendMessage(convRef.current, text, mentionedIds)
+      const msg = await sendMessage(convRef.current, text, attachments, mentionedIds)
       setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]))
       onLocalMessage(msg)
       setDraft('')
+      setAttachments([])
       requestAnimationFrame(() => scrollToBottom('smooth'))
     } catch {
       toast({ title: t('messages.send_failed'), variant: 'destructive' })
     } finally {
       setSending(false)
     }
+  }
+
+  function handlePickFiles(e: React.ChangeEvent<HTMLInputElement>) {
+    const picked = Array.from(e.target.files ?? [])
+    e.target.value = ''
+    if (picked.length > 0) setAttachments((prev) => [...prev, ...picked])
   }
 
   return (
@@ -295,43 +307,71 @@ export function ChatPane({
         {readOnly ? (
           <p className="py-2 text-center text-sm text-muted-foreground">{t('messages.read_only')}</p>
         ) : (
-          <div className="flex items-end gap-2">
-            <div className="relative flex-1">
-              <textarea
-                ref={composerRef}
-                value={draft}
-                onChange={(e) => {
-                  setDraft(e.target.value)
-                  mention.sync()
-                }}
-                onKeyUp={mention.sync}
-                onClick={mention.sync}
-                onKeyDown={(e) => {
-                  mention.onKeyDown(e)
-                  if (e.defaultPrevented) return
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault()
-                    handleSend()
-                  }
-                }}
-                disabled={!canSend || sending}
-                rows={1}
-                placeholder={t('messages.composer_placeholder')}
-                className="glass max-h-32 min-h-[44px] w-full resize-none rounded-2xl border px-4 py-2.5 text-sm backdrop-blur placeholder:text-muted-foreground focus:border-[#5B6CFF] focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+          <>
+            {attachments.length > 0 && (
+              <PendingAttachments
+                files={attachments}
+                onRemove={(i) => setAttachments((prev) => prev.filter((_, idx) => idx !== i))}
+                removeLabel={t('composer.media_remove')}
               />
-              <MentionAutocomplete controller={mention} placement="top" />
+            )}
+            <div className="flex items-end gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*,video/*"
+                multiple
+                onChange={handlePickFiles}
+                className="sr-only"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={!canSend || sending}
+                aria-label={t('messages.add_attachment')}
+                className="h-11 w-11 shrink-0 rounded-full text-[#5B6CFF]"
+              >
+                <Paperclip className="h-5 w-5" />
+              </Button>
+              <div className="relative flex-1">
+                <textarea
+                  ref={composerRef}
+                  value={draft}
+                  onChange={(e) => {
+                    setDraft(e.target.value)
+                    mention.sync()
+                  }}
+                  onKeyUp={mention.sync}
+                  onClick={mention.sync}
+                  onKeyDown={(e) => {
+                    mention.onKeyDown(e)
+                    if (e.defaultPrevented) return
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault()
+                      handleSend()
+                    }
+                  }}
+                  disabled={!canSend || sending}
+                  rows={1}
+                  placeholder={t('messages.composer_placeholder')}
+                  className="glass max-h-32 min-h-[44px] w-full resize-none rounded-2xl border px-4 py-2.5 text-sm backdrop-blur placeholder:text-muted-foreground focus:border-[#5B6CFF] focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                />
+                <MentionAutocomplete controller={mention} placement="top" />
+              </div>
+              <Button
+                type="button"
+                size="icon"
+                onClick={handleSend}
+                disabled={!canSend || sending || (!draft.trim() && attachments.length === 0)}
+                aria-label={t('messages.send')}
+                className="h-11 w-11 shrink-0 rounded-full bg-gradient-to-r from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] text-white"
+              >
+                {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              </Button>
             </div>
-            <Button
-              type="button"
-              size="icon"
-              onClick={handleSend}
-              disabled={!canSend || sending || !draft.trim()}
-              aria-label={t('messages.send')}
-              className="h-11 w-11 shrink-0 rounded-full bg-gradient-to-r from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] text-white"
-            >
-              {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-            </Button>
-          </div>
+          </>
         )}
       </div>
     </div>
@@ -429,30 +469,177 @@ function MessageBubble({
           </span>
         </div>
       )}
-      <div
-        className={cn(
-          'max-w-[78%] rounded-2xl px-3.5 py-2 text-sm shadow-sm',
-          message.mine
-            ? 'bg-gradient-to-r from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] text-white'
-            : 'glass border text-foreground',
-        )}
-      >
-        {message.decrypted ? (
-          <MentionMessageText
-            text={message.text}
-            memberUsernames={memberUsernames}
-            onAccent={message.mine}
-            className="block whitespace-pre-wrap break-words"
-          />
-        ) : (
-          <p className="flex items-center gap-1.5 italic opacity-80">
-            <Lock className="h-3.5 w-3.5" aria-hidden />
-            {t('messages.decrypt_failed')}
-          </p>
-        )}
-      </div>
+      {/* Pièces jointes (déchiffrées à la volée), hors bulle texte. */}
+      {message.decrypted && message.media.length > 0 && (
+        <div className={cn('flex max-w-[78%] flex-col gap-1.5', message.mine ? 'items-end' : 'items-start')}>
+          {message.media.map((att) => (
+            <AttachmentView key={att.id} contentKey={conversation.contentKey} att={att} />
+          ))}
+        </div>
+      )}
+
+      {/* Bulle texte : seulement s'il y a du texte, ou si le déchiffrement a échoué. */}
+      {(!message.decrypted || message.text) && (
+        <div
+          className={cn(
+            'mt-1 max-w-[78%] rounded-2xl px-3.5 py-2 text-sm shadow-sm',
+            message.mine
+              ? 'bg-gradient-to-r from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] text-white'
+              : 'glass border text-foreground',
+          )}
+        >
+          {message.decrypted ? (
+            <MentionMessageText
+              text={message.text}
+              memberUsernames={memberUsernames}
+              onAccent={message.mine}
+              className="block whitespace-pre-wrap break-words"
+            />
+          ) : (
+            <p className="flex items-center gap-1.5 italic opacity-80">
+              <Lock className="h-3.5 w-3.5" aria-hidden />
+              {t('messages.decrypt_failed')}
+            </p>
+          )}
+        </div>
+      )}
       <span className="mt-0.5 px-1 text-[11px] text-muted-foreground">{time}</span>
     </li>
+  )
+}
+
+/**
+ * Pièce jointe reçue : télécharge le blob CHIFFRÉ et le déchiffre localement
+ * (avec la clé de contenu) en un `objectURL`, révoqué au démontage. Affiche un
+ * spinner pendant, une icône si la clé manque / le déchiffrement échoue.
+ */
+function AttachmentView({
+  contentKey,
+  att,
+}: {
+  contentKey: Uint8Array | null
+  att: ChatAttachment
+}) {
+  const { t } = useLanguage()
+  const [url, setUrl] = useState<string | null>(null)
+  const [failed, setFailed] = useState(false)
+  const [lightbox, setLightbox] = useState(false)
+
+  useEffect(() => {
+    let revoked = false
+    let objectUrl = ''
+    if (!contentKey) {
+      setFailed(true)
+      return
+    }
+    setFailed(false)
+    setUrl(null)
+    decryptAttachment(contentKey, att)
+      .then((blob) => {
+        if (revoked) return
+        objectUrl = URL.createObjectURL(blob)
+        setUrl(objectUrl)
+      })
+      .catch(() => {
+        if (!revoked) setFailed(true)
+      })
+    return () => {
+      revoked = true
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
+  }, [contentKey, att])
+
+  if (failed) {
+    return (
+      <div className="glass flex items-center gap-2 rounded-2xl border px-3 py-2 text-xs italic text-muted-foreground">
+        <ImageOff className="h-4 w-4 shrink-0" aria-hidden />
+        {t('messages.attachment_failed')}
+      </div>
+    )
+  }
+  if (!url) {
+    return (
+      <div className="glass flex h-40 w-40 items-center justify-center rounded-2xl border">
+        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+  return (
+    <div className="overflow-hidden rounded-2xl border border-border">
+      {att.type === 'video' ? (
+        <video src={url} controls playsInline className="max-h-80 max-w-full" />
+      ) : (
+        <>
+          <button type="button" onClick={() => setLightbox(true)} className="block" aria-label={t('messages.open_image')}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={url} alt={att.name} className="max-h-80 max-w-full cursor-zoom-in object-contain" />
+          </button>
+          <MediaLightbox
+            open={lightbox}
+            onClose={() => setLightbox(false)}
+            src={url}
+            type="image"
+            name={att.name}
+            downloadable
+          />
+        </>
+      )}
+    </div>
+  )
+}
+
+/** Aperçus des pièces jointes en attente d'envoi (avant chiffrement/upload). */
+function PendingAttachments({
+  files,
+  onRemove,
+  removeLabel,
+}: {
+  files: File[]
+  onRemove: (index: number) => void
+  removeLabel: string
+}) {
+  return (
+    <div className="mb-2 flex flex-wrap gap-2">
+      {files.map((file, i) => (
+        <PendingThumb key={`${file.name}-${i}`} file={file} onRemove={() => onRemove(i)} removeLabel={removeLabel} />
+      ))}
+    </div>
+  )
+}
+
+function PendingThumb({
+  file,
+  onRemove,
+  removeLabel,
+}: {
+  file: File
+  onRemove: () => void
+  removeLabel: string
+}) {
+  const [url, setUrl] = useState('')
+  useEffect(() => {
+    const objectUrl = URL.createObjectURL(file)
+    setUrl(objectUrl)
+    return () => URL.revokeObjectURL(objectUrl)
+  }, [file])
+
+  return (
+    <div className="group relative h-20 w-20 overflow-hidden rounded-xl border border-border bg-background/45">
+      {file.type.startsWith('video/') ? (
+        <video src={url} className="h-full w-full object-cover" muted playsInline />
+      ) : (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={url} alt="" className="h-full w-full object-cover" />
+      )}
+      <button
+        type="button"
+        aria-label={removeLabel}
+        onClick={onRemove}
+        className="absolute right-1 top-1 rounded-full bg-black/60 p-0.5 text-white transition hover:bg-black/80"
+      >
+        <X className="h-3.5 w-3.5" />
+      </button>
+    </div>
   )
 }
 

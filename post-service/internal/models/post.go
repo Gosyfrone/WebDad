@@ -24,6 +24,7 @@ type Post struct {
 	ID            bson.ObjectID `bson:"_id,omitempty" json:"id"`
 	AuthorID      string        `bson:"author_id" json:"author_id"`
 	Content       string        `bson:"content" json:"content"`
+	Media         []MediaRef    `bson:"media,omitempty" json:"media,omitempty"`
 	QuotePostID   string        `bson:"quote_post_id,omitempty" json:"quote_post_id,omitempty"`
 	LikesCount    int32         `bson:"likes_count" json:"likes_count"`
 	CommentsCount int32         `bson:"comments_count" json:"comments_count"`
@@ -64,11 +65,24 @@ type Comment struct {
 	UpdatedAt  time.Time     `bson:"updated_at" json:"updated_at"`
 }
 
+// MediaRef : pièce jointe d'un post (image ou vidéo). Le post-service est
+// agnostique du contenu : il ne stocke que l'URL (chemin relatif `/media/<id>`
+// servi par le media-service via la gateway) et la nature (image/vidéo, pour
+// que le front choisisse `<img>` ou `<video>`). Sert à la fois de modèle DB et
+// de payload de requête (tags `binding` ignorés hors ShouldBindJSON).
+type MediaRef struct {
+	URL  string `bson:"url" json:"url" binding:"required"`
+	Type string `bson:"type" json:"type" binding:"oneof=image video"`
+}
+
 // CreatePostRequest : corps de POST /posts. L'auteur n'est PAS dans le corps —
-// il est dérivé du JWT (un utilisateur ne poste que pour lui-même).
+// il est dérivé du JWT (un utilisateur ne poste que pour lui-même). `content`
+// est optionnel SI au moins un média est joint (vérifié dans le handler) ;
+// jusqu'à 4 médias.
 type CreatePostRequest struct {
-	Content     string `json:"content" binding:"required,max=280"`
-	QuotePostID string `json:"quote_post_id"`
+	Content     string     `json:"content" binding:"max=280"`
+	Media       []MediaRef `json:"media" binding:"max=4,dive"`
+	QuotePostID string     `json:"quote_post_id"`
 }
 
 // UpdatePostRequest : corps de PATCH /posts/:id.

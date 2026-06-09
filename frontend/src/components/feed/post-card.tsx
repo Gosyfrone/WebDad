@@ -27,6 +27,7 @@ import {
   unrepostPost,
   unpinPost,
   type FeedPost,
+  type PostMedia,
 } from '@/lib/posts'
 import { quickBookmark, removeBookmarkEverywhere } from '@/lib/bookmarks'
 import { BookmarkDialog } from '@/components/feed/bookmark-dialog'
@@ -49,7 +50,9 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { CommentSection } from '@/components/feed/comment-section'
+import { FeedVideo } from '@/components/feed/feed-video'
 import { PostComposer } from '@/components/feed/post-composer'
+import { PostPhotoModal } from '@/components/feed/post-photo-modal'
 import { TranslatedContent } from '@/components/feed/translated-content'
 import { ProfilLink } from '@/components/profil/profil-link'
 
@@ -82,6 +85,8 @@ export function PostCard({ post, showPinBadge = false, onDeleted, onUpdated }: P
   const [likeBurst, setLikeBurst] = useState(0)
   const [showComments, setShowComments] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  // Index du média ouvert en vue photo plein écran (null = fermé).
+  const [photoIndex, setPhotoIndex] = useState<number | null>(null)
 
   const [reposted, setReposted] = useState(post.reposted)
   const [repostedById, setRepostedById] = useState(post.repostedById)
@@ -341,11 +346,17 @@ export function PostCard({ post, showPinBadge = false, onDeleted, onUpdated }: P
         )}
 
         {/* Content */}
-        <TranslatedContent
-          contentId={`post:${post.id}`}
-          content={post.content}
-          className="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/80"
-        />
+        {post.content && (
+          <TranslatedContent
+            contentId={`post:${post.id}`}
+            content={post.content}
+            className="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/80"
+          />
+        )}
+
+        {post.media.length > 0 && (
+          <MediaGallery media={post.media} onOpen={(i) => setPhotoIndex(i)} />
+        )}
 
         {post.quotedPost && (
           <QuotedPost post={post.quotedPost} />
@@ -474,7 +485,62 @@ export function PostCard({ post, showPinBadge = false, onDeleted, onUpdated }: P
           onMembershipChange={setBookmarked}
         />
       </div>
+
+      {photoIndex !== null && (
+        <PostPhotoModal post={post} index={photoIndex} onClose={() => setPhotoIndex(null)} />
+      )}
     </article>
+  )
+}
+
+/**
+ * Galerie des médias d'un post (images + vidéos). Disposition façon X :
+ * 1 média = pleine largeur ; 2-4 = grille 2 colonnes. Les URLs sont déjà
+ * absolues (résolues dans `toFeedPost`). Cache navigateur géré par le
+ * media-service (`Cache-Control: immutable`) ; lazy-loading des images.
+ */
+function MediaGallery({ media, onOpen }: { media: PostMedia[]; onOpen?: (index: number) => void }) {
+  return (
+    <div
+      className={cn(
+        'mt-2 grid gap-1.5 overflow-hidden rounded-2xl border border-border',
+        media.length === 1 ? 'grid-cols-1' : 'grid-cols-2',
+      )}
+    >
+      {media.map((m, i) => {
+        const sizing = cn(
+          media.length === 1 ? 'max-h-[32rem]' : 'aspect-square',
+          media.length === 3 && i === 0 && 'row-span-2 aspect-auto',
+        )
+        // Cellule vidéo : un ratio défini est nécessaire (le `<video>` interne
+        // est en `h-full`). 1 média = 16:9 ; sinon carré (grille).
+        const videoCell = cn(
+          media.length === 1 ? 'aspect-video' : 'aspect-square',
+          media.length === 3 && i === 0 && 'row-span-2 aspect-auto',
+        )
+        // Vidéo : lecture auto en muet + boucle + vitesse (cf. FeedVideo), pas
+        // d'ouverture en vue photo. L'image s'ouvre en grand au clic.
+        return m.type === 'video' ? (
+          <FeedVideo key={m.url} src={m.url} className={videoCell} />
+        ) : (
+          <button
+            key={m.url}
+            type="button"
+            onClick={() => onOpen?.(i)}
+            className={cn('group relative block overflow-hidden', media.length === 3 && i === 0 && 'row-span-2')}
+            aria-label="Agrandir l'image"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={m.url}
+              alt=""
+              loading="lazy"
+              className={cn('h-full w-full object-cover transition group-hover:brightness-95', sizing)}
+            />
+          </button>
+        )
+      })}
+    </div>
   )
 }
 

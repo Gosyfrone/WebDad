@@ -38,6 +38,8 @@ export interface ConversationPreview {
   senderId: string
   /** Le dernier message (d'autrui) me mentionne → libellé « X vous a mentionné ». */
   mentionsMe: boolean
+  /** Le dernier message porte au moins une pièce jointe (aperçu « média »). */
+  hasMedia: boolean
 }
 
 interface ConversationListProps {
@@ -195,7 +197,9 @@ function ConversationRow({
     const who = mentionSender?.displayName || (peer?.username ? `@${peer.username}` : '…')
     subtitle = t('messages.mentioned_you', { name: who })
   } else if (preview) {
-    const body = preview.decrypted ? preview.text : t('messages.decrypt_failed')
+    const body = preview.decrypted
+      ? preview.text || (preview.hasMedia ? t('messages.attachment_preview') : '')
+      : t('messages.decrypt_failed')
     subtitle = preview.mine ? t('messages.you_prefix', { text: body }) : body
   } else if (conversation.type === 'dm') {
     subtitle = peer?.username ? `@${peer.username}` : ''

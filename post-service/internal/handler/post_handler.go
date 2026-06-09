@@ -38,8 +38,13 @@ func (h *PostHandler) CreatePost(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "payload invalide : " + err.Error()})
 		return
 	}
+	// Un post doit porter du texte OU au moins un média (pas les deux vides).
+	if strings.TrimSpace(req.Content) == "" && len(req.Media) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "post vide : texte ou média requis"})
+		return
+	}
 
-	post, err := h.service.CreatePost(c.Request.Context(), claims.UserID, req.Content, req.QuotePostID)
+	post, err := h.service.CreatePost(c.Request.Context(), claims.UserID, req.Content, req.QuotePostID, req.Media)
 	if err != nil {
 		respondPostError(c, err)
 		return

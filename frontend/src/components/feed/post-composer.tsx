@@ -1,11 +1,12 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Image as ImageIcon, Smile, BarChart2, Loader2, Pin } from 'lucide-react'
+import { Image as ImageIcon, Smile, BarChart2, Loader2, Pin, X } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import { getMyProfil, subscribeProfilUpdated } from '@/lib/profil-client'
-import { createPost, notifyPostCreated, pinPost, type FeedPost } from '@/lib/posts'
+import { resolveMediaUrl, uploadMedia } from '@/lib/media'
+import { createPost, notifyPostCreated, pinPost, type FeedPost, type PostMedia } from '@/lib/posts'
 import { useToast } from '@/hooks/use-toast'
 import type { ProfilDetails } from '@/types'
 import { useMention } from '@/lib/use-mention'
@@ -18,6 +19,8 @@ import { EmojiPicker } from '@/components/feed/emoji-picker'
 import { MentionAutocomplete } from '@/components/mention/mention-autocomplete'
 
 const MAX_CHARS = 280
+/** Nombre maximal de médias par post (aligné sur le validateur post-service). */
+const MAX_MEDIA = 4
 
 interface PostComposerProps {
   /** Classes du conteneur externe (padding/bordure gérés par le parent). */
@@ -50,18 +53,21 @@ export function PostComposer({
   const { toast } = useToast()
   const label = submitLabel ?? t('nav.post')
   const [content, setContent] = useState('')
+  const [media, setMedia] = useState<PostMedia[]>([])
+  const [uploadingMedia, setUploadingMedia] = useState(false)
   const [avatarUrl, setAvatarUrl] = useState('')
   const [initial, setInitial] = useState('U')
   const [submitting, setSubmitting] = useState(false)
   const [pinOnProfile, setPinOnProfile] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const mention = useMention({
     inputRef: textareaRef,
     onChange: setContent,
     search: mentionSearchGlobal,
   })
   const remaining = MAX_CHARS - content.length
-  const isEmpty = content.trim().length === 0
+  const isEmpty = content.trim().length === 0 && media.length === 0
   const isOver = remaining < 0
 
   // Avatar de l'utilisateur courant (resync sur édition du profil, comme la
@@ -82,20 +88,53 @@ export function PostComposer({
   }, [])
 
   async function handleSubmit() {
-    if (isEmpty || isOver || submitting) return
+    if (isEmpty || isOver || submitting || uploadingMedia) return
     setSubmitting(true)
     try {
-      const created = await createPost(content.trim(), quotePost?.id)
+      const created = await createPost(content.trim(), media, quotePost?.id)
       const post = pinOnProfile ? await pinPost(created.id) : created
       notifyPostCreated(post) // le fil prépend sans refetch
       onPosted?.(content)
       setContent('')
+      setMedia([])
       setPinOnProfile(false)
     } catch {
       toast({ title: t('composer.post_failed'), variant: 'destructive' })
     } finally {
       setSubmitting(false)
     }
+  }
+
+  /** Uploade les fichiers choisis au media-service et les ajoute aux médias joints. */
+  async function handleFiles(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? [])
+    e.target.value = '' // permet de re-sélectionner les mêmes fichiers
+    if (files.length === 0) return
+
+    const room = MAX_MEDIA - media.length
+    if (room <= 0) {
+      toast({ title: t('composer.media_max', { count: MAX_MEDIA }), variant: 'destructive' })
+      return
+    }
+
+    setUploadingMedia(true)
+    try {
+      const uploaded = await Promise.all(
+        files.slice(0, room).map(async (file) => {
+          const { url, kind } = await uploadMedia(file)
+          return { url, type: kind } as PostMedia
+        }),
+      )
+      setMedia((prev) => [...prev, ...uploaded])
+    } catch {
+      toast({ title: t('composer.media_failed'), variant: 'destructive' })
+    } finally {
+      setUploadingMedia(false)
+    }
+  }
+
+  function removeMedia(index: number) {
+    setMedia((prev) => prev.filter((_, i) => i !== index))
   }
 
   /** Insère l'emoji à la position du curseur (ou à la fin) et restaure le focus. */
@@ -142,6 +181,10 @@ export function PostComposer({
           <MentionAutocomplete controller={mention} placement="bottom" />
         </div>
 
+        {media.length > 0 && (
+          <MediaPreviews media={media} onRemove={removeMedia} removeLabel={t('composer.media_remove')} />
+        )}
+
         {quotePost && (
           <QuotePreview post={quotePost} />
         )}
@@ -151,7 +194,27 @@ export function PostComposer({
         {/* Toolbar */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1 text-[#5B6CFF]">
-            <ActionIcon icon={ImageIcon} label={t('composer.add_image')} />
+            <button
+              type="button"
+              aria-label={t('composer.add_image')}
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadingMedia || media.length >= MAX_MEDIA}
+              className="rounded-full p-2 transition-colors hover:bg-primary/10 disabled:opacity-40"
+            >
+              {uploadingMedia ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <ImageIcon className="h-5 w-5" />
+              )}
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*,video/*"
+              multiple
+              onChange={handleFiles}
+              className="sr-only"
+            />
             <EmojiPicker onSelect={insertEmoji}>
               <button
                 type="button"
@@ -203,6 +266,47 @@ export function PostComposer({
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+function MediaPreviews({
+  media,
+  onRemove,
+  removeLabel,
+}: {
+  media: PostMedia[]
+  onRemove: (index: number) => void
+  removeLabel: string
+}) {
+  return (
+    <div className={cn('grid gap-2', media.length > 1 ? 'grid-cols-2' : 'grid-cols-1')}>
+      {media.map((m, i) => (
+        <div
+          key={m.url}
+          className="group relative overflow-hidden rounded-xl border border-border bg-background/45"
+        >
+          {m.type === 'video' ? (
+            <video
+              src={resolveMediaUrl(m.url)}
+              className="max-h-72 w-full object-cover"
+              muted
+              playsInline
+            />
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={resolveMediaUrl(m.url)} alt="" className="max-h-72 w-full object-cover" />
+          )}
+          <button
+            type="button"
+            aria-label={removeLabel}
+            onClick={() => onRemove(i)}
+            className="absolute right-1.5 top-1.5 rounded-full bg-black/60 p-1 text-white transition hover:bg-black/80"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      ))}
     </div>
   )
 }

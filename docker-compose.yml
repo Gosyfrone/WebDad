@@ -9,6 +9,7 @@ volumes:
   mongo-post-data:
   mongo-message-data:
   mongo-notification-data:
+  minio-data:
 
 # ────────────────────────────────────────────────────────────────────
 # Convention de config :
@@ -137,6 +138,26 @@ services:
       - webdad-net
     healthcheck:
       test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # ─── Stockage objet (MinIO) ──────────────────────────────────────
+  minio:
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    env_file:
+      - ./media-service/.env         # MINIO_ROOT_USER / MINIO_ROOT_PASSWORD
+    volumes:
+      - minio-data:/data
+    ports:
+      - "9000:9000"                  # API S3
+      - "9001:9001"                  # console web (dev)
+    networks:
+      - webdad-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -296,6 +317,30 @@ services:
       retries: 5
       start_period: 5s
 
+  media-service:
+    build:
+      context: ./media-service
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./media-service/.env
+    environment:
+      MINIO_ENDPOINT: minio:9000     # override : nom du conteneur dans le réseau
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET requis}
+    ports:
+      - "8087:8087"
+    networks:
+      - webdad-net
+    depends_on:
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8087/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
   api-gateway:
     build:
       context: ./api-gateway
@@ -311,6 +356,7 @@ services:
       POST_SERVICE_URL: http://post-service:8084
       MESSAGE_SERVICE_URL: http://message-service:8085
       NOTIFICATION_SERVICE_URL: http://notification-service:8086
+      MEDIA_SERVICE_URL: http://media-service:8087
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET requis}
     ports:
       - "8080:8080"
@@ -328,6 +374,8 @@ services:
       message-service:
         condition: service_healthy
       notification-service:
+        condition: service_healthy
+      media-service:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]

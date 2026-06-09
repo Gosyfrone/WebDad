@@ -14,6 +14,7 @@
  */
 
 import { apiFetch } from '@/lib/auth-client'
+import { resolveMediaUrl } from '@/lib/media'
 import type { RelationUser } from '@/types'
 
 /** Erreur d'appel API portant le code HTTP (pour distinguer 401/404/…). */
@@ -94,8 +95,8 @@ export async function getProfilMe(): Promise<MyProfil | null> {
   return {
     displayName: p.display_name,
     bio: p.bio,
-    avatarUrl: p.avatar_url,
-    bannerUrl: p.banner_url,
+    avatarUrl: resolveMediaUrl(p.avatar_url),
+    bannerUrl: resolveMediaUrl(p.banner_url),
   }
 }
 
@@ -123,7 +124,7 @@ async function enrichFromUser(u: ApiUser): Promise<RelationUser> {
     username: u.username,
     displayName: p?.display_name?.trim() || u.username,
     bio: p?.bio ?? '',
-    avatarUrl: p?.avatar_url ?? '',
+    avatarUrl: resolveMediaUrl(p?.avatar_url),
   }
 }
 
@@ -136,7 +137,7 @@ async function enrichFromProfil(p: ApiProfil): Promise<RelationUser | null> {
     username: u.username,
     displayName: p.display_name?.trim() || u.username,
     bio: p.bio ?? '',
-    avatarUrl: p.avatar_url ?? '',
+    avatarUrl: resolveMediaUrl(p.avatar_url),
   }
 }
 
