@@ -24,6 +24,7 @@ import { ROUTES } from '@/lib/routes'
 import { useNotifications } from '@/components/notifications-provider'
 import { useMessages } from '@/components/messages-provider'
 import { useT } from '@/components/language-provider'
+import { ThemeToggle } from '@/components/theme-toggle'
 import type { ProfilDetails, UserRole } from '@/types'
 import { CreatePostDialog } from '@/components/feed/create-post-dialog'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -228,6 +229,8 @@ export function SidebarLeft({ role, username = 'Utilisateur' }: SidebarLeftProps
                 {displayedRole ? t(`role.${displayedRole}`) : t('common.not_connected')}
               </span>
             </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <ThemeToggle />
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
               <Link href={ROUTES.parametres}>

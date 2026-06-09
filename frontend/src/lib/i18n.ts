@@ -108,7 +108,15 @@ export const messages: Record<Locale, Messages> = {
     'settings.title': 'Paramètres',
     'settings.account_title': 'Paramètres du compte',
     'settings.account_desc':
-      'Le thème, la langue et les préférences de confidentialité arriveront ici.',
+      'Personnalisez votre expérience Breezy.',
+    'filters.title': 'Mots filtrés',
+    'filters.desc':
+      "Masquez les posts du fil qui contiennent un mot ou une expression que vous ne voulez pas voir.",
+    'filters.placeholder': 'Ex. one piece',
+    'filters.input_aria': 'Mot ou expression à filtrer',
+    'filters.add': 'Ajouter le filtre',
+    'filters.remove_aria': 'Retirer le filtre {word}',
+    'filters.empty': 'Aucun mot filtré pour le moment.',
 
     // — Pages légales —
     'legal.badge': 'Informations légales',
@@ -358,6 +366,9 @@ export const messages: Record<Locale, Messages> = {
     'feed.empty_for_you': 'Soyez le premier à publier quelque chose sur Breezy.',
     'feed.empty_following':
       'Les posts des comptes que vous suivez apparaîtront ici. Abonnez-vous à des profils pour personnaliser ce fil.',
+    'feed.filtered_empty_title': 'Tous les posts visibles sont filtrés',
+    'feed.filtered_empty_msg':
+      'Modifiez vos mots filtrés dans les paramètres pour les revoir dans le fil.',
 
     // — Composer —
     'composer.placeholder': 'Ça breez ? 🌴',
@@ -517,7 +528,15 @@ export const messages: Record<Locale, Messages> = {
     'settings.title': 'Settings',
     'settings.account_title': 'Account settings',
     'settings.account_desc':
-      'Theme, language and privacy preferences will live here.',
+      'Customize your Breezy experience.',
+    'filters.title': 'Muted words',
+    'filters.desc':
+      "Hide feed posts containing a word or phrase you don't want to see.",
+    'filters.placeholder': 'E.g. one piece',
+    'filters.input_aria': 'Word or phrase to mute',
+    'filters.add': 'Add filter',
+    'filters.remove_aria': 'Remove filter {word}',
+    'filters.empty': 'No muted words yet.',
 
     // — Legal pages —
     'legal.badge': 'Legal information',
@@ -763,6 +782,9 @@ export const messages: Record<Locale, Messages> = {
     'feed.empty_for_you': 'Be the first to post something on Breezy.',
     'feed.empty_following':
       'Posts from accounts you follow will show up here. Follow some profiles to personalize this feed.',
+    'feed.filtered_empty_title': 'All visible posts are muted',
+    'feed.filtered_empty_msg':
+      'Edit your muted words in settings to show them in the feed again.',
 
     // — Composer —
     'composer.placeholder': "What's breezing? 🌴",
