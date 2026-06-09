@@ -61,3 +61,7 @@ Thumbs.db
 # Divers
 .tmp/
 tmp/
+
+# graphify — artefact généré local (lourd, churn, périmable, conflits en équipe).
+# Chacun (re)génère son graphe en local : `graphify .` au clone, puis `graphify update .`.
+graphify-out/
