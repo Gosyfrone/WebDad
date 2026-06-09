@@ -12,6 +12,7 @@
  */
 
 import { apiFetch } from '@/lib/auth-client'
+import { resolveMediaUrl } from '@/lib/media'
 
 /** Identité résolue, prête à l'affichage (repli sur le username puis un libellé). */
 export interface ResolvedUser {
@@ -59,7 +60,7 @@ export function resolveUser(userId: string): Promise<ResolvedUser> {
       id: userId,
       username: user?.username ?? '',
       displayName: profil?.display_name?.trim() || user?.username || 'Utilisateur',
-      avatarUrl: profil?.avatar_url ?? '',
+      avatarUrl: resolveMediaUrl(profil?.avatar_url),
     }
   })()
 

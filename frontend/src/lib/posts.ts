@@ -12,6 +12,7 @@
  */
 
 import { apiFetch, getAccessToken } from '@/lib/auth-client'
+import { resolveMediaUrl } from '@/lib/media'
 
 /** Erreur d'appel API portant le code HTTP. */
 export class PostApiError extends Error {
@@ -191,7 +192,7 @@ function resolveAuthor(userId: string): Promise<PostAuthor> {
       id: userId,
       username: user?.username ?? '',
       displayName: profil?.display_name?.trim() || user?.username || 'Utilisateur',
-      avatarUrl: profil?.avatar_url ?? '',
+      avatarUrl: resolveMediaUrl(profil?.avatar_url),
     }
   })()
 

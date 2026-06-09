@@ -1,10 +1,12 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { Camera } from 'lucide-react'
+import { Camera, Loader2 } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
+import { mediaUrl, uploadMedia } from '@/lib/media'
 import type { ProfilEditableFields } from '@/types'
+import { useToast } from '@/hooks/use-toast'
 import { useLanguage } from '@/components/language-provider'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -40,9 +42,9 @@ interface EditProfilDialogProps {
 /**
  * Popup d'édition du profil : bannière, avatar, nom affiché et bio.
  *
- * La bannière et l'avatar se changent via un sélecteur de fichier avec aperçu
- * immédiat (lu en data URL, sans dépendance). Tant que le stockage côté serveur
- * n'existe pas, l'aperçu est local : il ne survit pas à un rechargement.
+ * La bannière et l'avatar se changent via un sélecteur de fichier : le fichier
+ * est **uploadé au media-service** (`uploadMedia`) et son URL est stockée puis
+ * persistée par `PATCH /profils/me` → l'image survit au rechargement.
  * Le formulaire est réinitialisé aux valeurs courantes à chaque ouverture.
  */
 export function EditProfilDialog({
@@ -55,6 +57,7 @@ export function EditProfilDialog({
   onSave,
 }: EditProfilDialogProps) {
   const { t, locale } = useLanguage()
+  const { toast } = useToast()
   const [open, setOpen] = useState(false)
   const [displayName, setDisplayName] = useState(initial.displayName)
   const [bio, setBio] = useState(initial.bio)
@@ -123,6 +126,7 @@ export function EditProfilDialog({
         <ImagePicker
           label={t('editprofil.change_banner')}
           onPick={setBannerUrl}
+          onError={() => toast({ title: t('editprofil.upload_failed'), variant: 'destructive' })}
           className={cn(
             'relative flex h-36 w-full items-center justify-center overflow-hidden bg-cover bg-center',
             !bannerUrl &&
@@ -137,6 +141,7 @@ export function EditProfilDialog({
             <ImagePicker
               label={t('editprofil.change_avatar')}
               onPick={setAvatarUrl}
+              onError={() => toast({ title: t('editprofil.upload_failed'), variant: 'destructive' })}
               className="relative rounded-full"
             >
               <Avatar className="h-24 w-24 border-4 border-[#F8F3FF] shadow-[0_18px_44px_rgba(91,108,255,0.22)] dark:border-[#171026]">
@@ -268,8 +273,10 @@ export function EditProfilDialog({
 interface ImagePickerProps {
   /** Libellé accessible du bouton de sélection. */
   label: string
-  /** Reçoit l'aperçu (data URL) du fichier choisi. */
-  onPick: (dataUrl: string) => void
+  /** Reçoit l'URL (absolue, gateway) du média uploadé. */
+  onPick: (url: string) => void
+  /** Appelé si l'upload échoue (pour afficher un toast côté parent). */
+  onError?: (message: string) => void
   className?: string
   style?: React.CSSProperties
   /** Contenu superposé (ex. l'avatar). */
@@ -277,35 +284,54 @@ interface ImagePickerProps {
 }
 
 /**
- * Zone cliquable qui ouvre un sélecteur de fichier image et restitue le
- * fichier choisi en data URL (aperçu local). Affiche une pastille « appareil
- * photo » au survol, par-dessus un contenu optionnel.
+ * Zone cliquable qui ouvre un sélecteur de fichier image, **uploade** le fichier
+ * choisi au media-service et restitue son URL (prête à l'affichage). Affiche un
+ * voile « appareil photo » au survol et un spinner pendant l'upload.
  */
-function ImagePicker({ label, onPick, className, style, children }: ImagePickerProps) {
+function ImagePicker({ label, onPick, onError, className, style, children }: ImagePickerProps) {
   const inputRef = useRef<HTMLInputElement>(null)
+  const [uploading, setUploading] = useState(false)
 
-  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
-    if (!file) return
-    const reader = new FileReader()
-    reader.onload = () => onPick(reader.result as string)
-    reader.readAsDataURL(file)
     // Permet de re-sélectionner le même fichier deux fois de suite.
     e.target.value = ''
+    if (!file) return
+
+    setUploading(true)
+    try {
+      const { id } = await uploadMedia(file)
+      onPick(mediaUrl(id))
+    } catch (err) {
+      onError?.(err instanceof Error ? err.message : 'upload failed')
+    } finally {
+      setUploading(false)
+    }
   }
 
   return (
     <button
       type="button"
       aria-label={label}
+      aria-busy={uploading}
+      disabled={uploading}
       onClick={() => inputRef.current?.click()}
       className={cn('group cursor-pointer', className)}
       style={style}
     >
       {children}
-      {/* Voile + icône appareil photo */}
-      <span className="absolute inset-0 flex items-center justify-center rounded-[inherit] bg-black/30 opacity-0 transition-opacity group-hover:opacity-100">
-        <Camera className="h-6 w-6 text-white" aria-hidden />
+      {/* Voile + icône appareil photo (ou spinner pendant l'upload) */}
+      <span
+        className={cn(
+          'absolute inset-0 flex items-center justify-center rounded-[inherit] bg-black/30 transition-opacity',
+          uploading ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
+        )}
+      >
+        {uploading ? (
+          <Loader2 className="h-6 w-6 animate-spin text-white" aria-hidden />
+        ) : (
+          <Camera className="h-6 w-6 text-white" aria-hidden />
+        )}
       </span>
       <input
         ref={inputRef}
