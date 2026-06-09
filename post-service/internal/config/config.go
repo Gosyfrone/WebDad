@@ -26,7 +26,7 @@ type Config struct {
 	InternalSecret  string
 	// BookmarkWindow : fenêtre glissante de « rafale » des signets. Un clic court
 	// qui suit le précédent de moins de cette durée range automatiquement dans la
-	// dernière playlist ; au-delà, le serveur redemande la playlist. Défaut 5m,
+	// dernière collection ; au-delà, le serveur redemande la collection. Défaut 5m,
 	// configurable via BOOKMARK_SESSION_WINDOW (format durée Go, ex. « 10m »).
 	BookmarkWindow time.Duration
 }

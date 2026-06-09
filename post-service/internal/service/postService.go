@@ -24,12 +24,12 @@ var (
 	ErrInvalidID = errors.New("identifiant de post invalide")
 	// ErrForbidden : l'utilisateur n'est ni l'auteur ni un modérateur/admin → 403.
 	ErrForbidden = errors.New("action non autorisée sur ce post")
-	// ErrCollectionNotFound : playlist de signets absente ou n'appartenant pas à
+	// ErrCollectionNotFound : collection de signets absente ou n'appartenant pas à
 	// l'utilisateur (on ne distingue pas pour ne pas divulguer l'existence) → 404.
-	ErrCollectionNotFound = errors.New("playlist de signets introuvable")
-	// ErrDefaultCollection : action interdite sur la playlist par défaut
+	ErrCollectionNotFound = errors.New("collection de signets introuvable")
+	// ErrDefaultCollection : action interdite sur la collection par défaut
 	// (suppression / renommage) → 403.
-	ErrDefaultCollection = errors.New("playlist par défaut non modifiable")
+	ErrDefaultCollection = errors.New("collection par défaut non modifiable")
 )
 
 // Statuts renvoyés par un clic court sur le bouton signet.
@@ -37,7 +37,7 @@ const (
 	// BookmarkStatusFiled : le post a été rangé automatiquement (fenêtre active).
 	BookmarkStatusFiled = "filed"
 	// BookmarkStatusNeedsChoice : ouverture de rafale — le front doit proposer la
-	// playlist (1er signet ou fenêtre expirée) ; rien n'est rangé.
+	// collection (1er signet ou fenêtre expirée) ; rien n'est rangé.
 	BookmarkStatusNeedsChoice = "needs_choice"
 )
 
@@ -55,7 +55,7 @@ type PostService struct {
 	notif notifier.Notifier
 	// bookmarkWindow : durée de la fenêtre glissante de rafale. Un clic court qui
 	// suit le précédent signet de moins de bookmarkWindow range automatiquement
-	// dans la dernière playlist ; au-delà, le serveur redemande la playlist.
+	// dans la dernière collection ; au-delà, le serveur redemande la collection.
 	// <= 0 = jamais d'auto-classement (toujours proposer).
 	bookmarkWindow time.Duration
 }

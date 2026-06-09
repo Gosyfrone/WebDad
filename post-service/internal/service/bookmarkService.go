@@ -15,16 +15,16 @@ import (
 // signet, renvoyé au front.
 //   - Status "filed"        : le post a été rangé dans Collection.
 //   - Status "needs_choice" : ouverture de rafale → le front ouvre le sélecteur
-//     (Collections = playlists existantes proposées) ; rien n'a été rangé.
+//     (Collections = collections existantes proposées) ; rien n'a été rangé.
 type BookmarkResult struct {
 	Status      string                      `json:"status"`
 	Collection  *models.BookmarkCollection  `json:"collection,omitempty"`
 	Collections []models.BookmarkCollection `json:"collections,omitempty"`
 }
 
-// --- Playlists ---------------------------------------------------------------
+// --- Collections ---------------------------------------------------------------
 
-// CreateBookmarkCollection crée une playlist pour l'utilisateur.
+// CreateBookmarkCollection crée une collection pour l'utilisateur.
 func (s *PostService) CreateBookmarkCollection(ctx context.Context, userID, name string) (*models.BookmarkCollection, error) {
 	now := time.Now()
 	coll := &models.BookmarkCollection{
@@ -40,8 +40,8 @@ func (s *PostService) CreateBookmarkCollection(ctx context.Context, userID, name
 	return coll, nil
 }
 
-// ListBookmarkCollections renvoie les playlists de l'utilisateur, chacune
-// enrichie de son compteur d'items (calculé à la lecture). La playlist par
+// ListBookmarkCollections renvoie les collections de l'utilisateur, chacune
+// enrichie de son compteur d'items (calculé à la lecture). La collection par
 // défaut est garantie présente (créée à la volée) et placée en tête.
 func (s *PostService) ListBookmarkCollections(ctx context.Context, userID string) ([]models.BookmarkCollection, error) {
 	if _, err := s.repo.EnsureDefaultCollection(ctx, userID); err != nil {
@@ -61,8 +61,8 @@ func (s *PostService) ListBookmarkCollections(ctx context.Context, userID string
 	return colls, nil
 }
 
-// RenameBookmarkCollection renomme une playlist appartenant à l'utilisateur.
-// La playlist par défaut n'est pas renommable.
+// RenameBookmarkCollection renomme une collection appartenant à l'utilisateur.
+// La collection par défaut n'est pas renommable.
 func (s *PostService) RenameBookmarkCollection(ctx context.Context, collectionID, userID, name string) (*models.BookmarkCollection, error) {
 	coll, err := s.getOwnedCollection(ctx, collectionID, userID)
 	if err != nil {
@@ -83,8 +83,8 @@ func (s *PostService) RenameBookmarkCollection(ctx context.Context, collectionID
 	return updated, nil
 }
 
-// DeleteBookmarkCollection supprime une playlist de l'utilisateur et ses signets.
-// La playlist par défaut n'est pas supprimable.
+// DeleteBookmarkCollection supprime une collection de l'utilisateur et ses signets.
+// La collection par défaut n'est pas supprimable.
 func (s *PostService) DeleteBookmarkCollection(ctx context.Context, collectionID, userID string) error {
 	coll, err := s.getOwnedCollection(ctx, collectionID, userID)
 	if err != nil {
@@ -104,9 +104,9 @@ func (s *PostService) DeleteBookmarkCollection(ctx context.Context, collectionID
 
 // Bookmark range un post côté utilisateur. Deux modes :
 //   - collectionID fourni (appui long / sélecteur) → ajout explicite dans cette
-//     playlist, statut "filed".
+//     collection, statut "filed".
 //   - collectionID vide (clic court) → résolution de la fenêtre de rafale :
-//     fenêtre active → range dans la dernière playlist (statut "filed") ; sinon
+//     fenêtre active → range dans la dernière collection (statut "filed") ; sinon
 //     statut "needs_choice" (le front ouvre le sélecteur, rien n'est rangé).
 func (s *PostService) Bookmark(ctx context.Context, userID, postID, collectionID string) (*BookmarkResult, error) {
 	if _, err := s.requirePost(ctx, postID); err != nil {
@@ -127,7 +127,7 @@ func (s *PostService) Bookmark(ctx context.Context, userID, postID, collectionID
 		return nil, err
 	}
 	if withinSessionWindow(prefs, s.bookmarkWindow, time.Now()) {
-		// La dernière playlist doit toujours exister et appartenir à l'utilisateur.
+		// La dernière collection doit toujours exister et appartenir à l'utilisateur.
 		if coll, err := s.getOwnedCollection(ctx, prefs.LastCollectionID, userID); err == nil {
 			filed, err := s.fileBookmark(ctx, userID, postID, coll.ID.Hex())
 			if err != nil {
@@ -135,7 +135,7 @@ func (s *PostService) Bookmark(ctx context.Context, userID, postID, collectionID
 			}
 			return &BookmarkResult{Status: BookmarkStatusFiled, Collection: filed}, nil
 		}
-		// Playlist disparue → on retombe sur le choix.
+		// Collection disparue → on retombe sur le choix.
 	}
 
 	colls, err := s.ListBookmarkCollections(ctx, userID)
@@ -145,8 +145,8 @@ func (s *PostService) Bookmark(ctx context.Context, userID, postID, collectionID
 	return &BookmarkResult{Status: BookmarkStatusNeedsChoice, Collections: colls}, nil
 }
 
-// fileBookmark range le post dans une playlist (idempotent) et repousse la
-// fenêtre de rafale (UpsertPrefs). Renvoie la playlist avec son compteur à jour.
+// fileBookmark range le post dans une collection (idempotent) et repousse la
+// fenêtre de rafale (UpsertPrefs). Renvoie la collection avec son compteur à jour.
 func (s *PostService) fileBookmark(ctx context.Context, userID, postID, collectionID string) (*models.BookmarkCollection, error) {
 	coll, err := s.getOwnedCollection(ctx, collectionID, userID)
 	if err != nil {
@@ -166,8 +166,8 @@ func (s *PostService) fileBookmark(ctx context.Context, userID, postID, collecti
 	return coll, nil
 }
 
-// Unbookmark retire un post d'une playlist précise (collectionID fourni) ou de
-// TOUTES les playlists (collectionID vide → dé-signer complet).
+// Unbookmark retire un post d'une collection précise (collectionID fourni) ou de
+// TOUTES les collections (collectionID vide → dé-signer complet).
 func (s *PostService) Unbookmark(ctx context.Context, userID, postID, collectionID string) error {
 	if collectionID == "" {
 		_, err := s.repo.RemoveAllBookmarksForPost(ctx, userID, postID)
@@ -187,7 +187,7 @@ func (s *PostService) BookmarkedPostIDs(ctx context.Context, userID string) ([]s
 	return s.repo.BookmarkedPostIDs(ctx, userID)
 }
 
-// PostBookmarkCollectionIDs renvoie les ids des playlists contenant un post
+// PostBookmarkCollectionIDs renvoie les ids des collections contenant un post
 // (coche le sélecteur « Ranger dans… »).
 func (s *PostService) PostBookmarkCollectionIDs(ctx context.Context, userID, postID string) ([]string, error) {
 	if _, err := parseID(postID); err != nil {
@@ -206,7 +206,7 @@ func (s *PostService) ListAllBookmarkedPosts(ctx context.Context, userID string,
 	return s.resolvePosts(ctx, ids), nil
 }
 
-// ListBookmarksInCollection renvoie les posts d'une playlist de l'utilisateur
+// ListBookmarksInCollection renvoie les posts d'une collection de l'utilisateur
 // (du plus récemment rangé au plus ancien).
 func (s *PostService) ListBookmarksInCollection(ctx context.Context, collectionID, userID string, limit, offset int64) ([]models.Post, error) {
 	coll, err := s.getOwnedCollection(ctx, collectionID, userID)
@@ -253,9 +253,9 @@ func (s *PostService) requirePost(ctx context.Context, postID string) (*models.P
 	return post, nil
 }
 
-// getOwnedCollection valide l'id, charge la playlist et vérifie qu'elle
+// getOwnedCollection valide l'id, charge la collection et vérifie qu'elle
 // appartient à l'utilisateur (ErrCollectionNotFound si absente OU non possédée :
-// on ne divulgue pas l'existence d'une playlist d'autrui).
+// on ne divulgue pas l'existence d'une collection d'autrui).
 func (s *PostService) getOwnedCollection(ctx context.Context, collectionID, userID string) (*models.BookmarkCollection, error) {
 	oid, err := bson.ObjectIDFromHex(collectionID)
 	if err != nil {
@@ -272,7 +272,7 @@ func (s *PostService) getOwnedCollection(ctx context.Context, collectionID, user
 }
 
 // withinSessionWindow : un clic court range automatiquement (sans redemander la
-// playlist) si l'utilisateur a déjà une dernière playlist et que son dernier
+// collection) si l'utilisateur a déjà une dernière collection et que son dernier
 // signet date de moins de `window`. Fonction PURE (testée). window <= 0
 // désactive l'auto-classement (toujours proposer).
 func withinSessionWindow(prefs *models.BookmarkPrefs, window time.Duration, now time.Time) bool {

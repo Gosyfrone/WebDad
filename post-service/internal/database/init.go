@@ -158,7 +158,7 @@ var validators = map[string]bson.M{
 			},
 		},
 	},
-	// Playlists de signets (par utilisateur). Pas de compteur stocké : il est
+	// Collections de signets (par utilisateur). Pas de compteur stocké : il est
 	// calculé à la lecture (cf. models.BookmarkCollection).
 	"bookmark_collections": {
 		"$jsonSchema": bson.M{
@@ -173,7 +173,7 @@ var validators = map[string]bson.M{
 			},
 		},
 	},
-	// Signets (appartenance many-to-many post↔playlist).
+	// Signets (appartenance many-to-many post↔collection).
 	"bookmarks": {
 		"$jsonSchema": bson.M{
 			"bsonType": "object",
@@ -228,9 +228,9 @@ var indexes = map[string][]mongo.IndexModel{
 		{Keys: bson.D{{Key: "status", Value: 1}}},
 	},
 	"bookmark_collections": {
-		// Playlists d'un utilisateur, triées par date de création.
+		// Collections d'un utilisateur, triées par date de création.
 		{Keys: bson.D{{Key: "user_id", Value: 1}, {Key: "created_at", Value: -1}}},
-		// Au plus UNE playlist par défaut par utilisateur (index unique partiel).
+		// Au plus UNE collection par défaut par utilisateur (index unique partiel).
 		{
 			Keys: bson.D{{Key: "user_id", Value: 1}},
 			Options: options.Index().
@@ -239,9 +239,9 @@ var indexes = map[string][]mongo.IndexModel{
 		},
 	},
 	"bookmarks": {
-		// Idempotence : un post ne peut être rangé qu'une fois par playlist.
+		// Idempotence : un post ne peut être rangé qu'une fois par collection.
 		{Keys: bson.D{{Key: "user_id", Value: 1}, {Key: "post_id", Value: 1}, {Key: "collection_id", Value: 1}}, Options: options.Index().SetUnique(true)},
-		// Contenu d'une playlist, du plus récemment rangé au plus ancien.
+		// Contenu d'une collection, du plus récemment rangé au plus ancien.
 		{Keys: bson.D{{Key: "user_id", Value: 1}, {Key: "collection_id", Value: 1}, {Key: "created_at", Value: -1}}},
 		// Vue « Tous mes signets » + état des boutons (tous les signets d'un user).
 		{Keys: bson.D{{Key: "user_id", Value: 1}, {Key: "created_at", Value: -1}}},

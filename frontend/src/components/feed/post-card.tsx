@@ -210,7 +210,7 @@ export function PostCard({ post, onDeleted, onUpdated }: PostCardProps) {
           ),
         })
       } else {
-        // Ouverture de rafale : on laisse l'utilisateur choisir/créer la playlist.
+        // Ouverture de rafale : on laisse l'utilisateur choisir/créer la collection.
         setPickerOpen(true)
       }
     } catch {

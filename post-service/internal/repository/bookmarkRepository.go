@@ -11,9 +11,9 @@ import (
 	"github.com/webdad/post-service/internal/models"
 )
 
-// --- Playlists de signets (bookmark_collections) -----------------------------
+// --- Collections de signets (bookmark_collections) -----------------------------
 
-// CreateCollection insère une playlist et renseigne coll.ID.
+// CreateCollection insère une collection et renseigne coll.ID.
 func (r *PostRepository) CreateCollection(ctx context.Context, coll *models.BookmarkCollection) error {
 	res, err := r.bookmarkCollections.InsertOne(ctx, coll)
 	if err != nil {
@@ -25,7 +25,7 @@ func (r *PostRepository) CreateCollection(ctx context.Context, coll *models.Book
 	return nil
 }
 
-// GetCollection renvoie une playlist par son ObjectID (mongo.ErrNoDocuments si absente).
+// GetCollection renvoie une collection par son ObjectID (mongo.ErrNoDocuments si absente).
 func (r *PostRepository) GetCollection(ctx context.Context, id bson.ObjectID) (*models.BookmarkCollection, error) {
 	var coll models.BookmarkCollection
 	if err := r.bookmarkCollections.FindOne(ctx, bson.M{"_id": id}).Decode(&coll); err != nil {
@@ -34,14 +34,14 @@ func (r *PostRepository) GetCollection(ctx context.Context, id bson.ObjectID) (*
 	return &coll, nil
 }
 
-// DefaultCollectionName : nom stocké de la playlist par défaut. Le front affiche
-// un libellé localisé pour les playlists `is_default` (cf. `bookmarks.default_name`),
+// DefaultCollectionName : nom stocké de la collection par défaut. Le front affiche
+// un libellé localisé pour les collections `is_default` (cf. `bookmarks.default_name`),
 // cette valeur n'est qu'un repli.
 const DefaultCollectionName = "Mes signets"
 
-// EnsureDefaultCollection renvoie la playlist par défaut de l'utilisateur, en la
+// EnsureDefaultCollection renvoie la collection par défaut de l'utilisateur, en la
 // créant si elle n'existe pas encore (idempotent, protégé par l'index unique
-// partiel sur `is_default`). Permet d'enregistrer sans avoir à créer de playlist.
+// partiel sur `is_default`). Permet d'enregistrer sans avoir à créer de collection.
 func (r *PostRepository) EnsureDefaultCollection(ctx context.Context, userID string) (*models.BookmarkCollection, error) {
 	existing, err := r.findDefaultCollection(ctx, userID)
 	if err == nil {
@@ -76,7 +76,7 @@ func (r *PostRepository) findDefaultCollection(ctx context.Context, userID strin
 	return &coll, nil
 }
 
-// ListCollections renvoie les playlists d'un utilisateur : la playlist par défaut
+// ListCollections renvoie les collections d'un utilisateur : la collection par défaut
 // d'abord (`is_default`), puis de la plus récente à la plus ancienne. (Le
 // compteur d'items est calculé par la couche service.)
 func (r *PostRepository) ListCollections(ctx context.Context, userID string) ([]models.BookmarkCollection, error) {
@@ -94,7 +94,7 @@ func (r *PostRepository) ListCollections(ctx context.Context, userID string) ([]
 	return colls, nil
 }
 
-// RenameCollection renomme une playlist et renvoie le document à jour.
+// RenameCollection renomme une collection et renvoie le document à jour.
 func (r *PostRepository) RenameCollection(ctx context.Context, id bson.ObjectID, name string) (*models.BookmarkCollection, error) {
 	update := bson.M{"$set": bson.M{"name": name, "updated_at": time.Now()}}
 	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
@@ -106,7 +106,7 @@ func (r *PostRepository) RenameCollection(ctx context.Context, id bson.ObjectID,
 	return &coll, nil
 }
 
-// DeleteCollection supprime une playlist (mongo.ErrNoDocuments si rien supprimé).
+// DeleteCollection supprime une collection (mongo.ErrNoDocuments si rien supprimé).
 func (r *PostRepository) DeleteCollection(ctx context.Context, id bson.ObjectID) error {
 	res, err := r.bookmarkCollections.DeleteOne(ctx, bson.M{"_id": id})
 	if err != nil {
@@ -118,14 +118,14 @@ func (r *PostRepository) DeleteCollection(ctx context.Context, id bson.ObjectID)
 	return nil
 }
 
-// CountBookmarks compte les signets d'une playlist (compteur calculé à la lecture).
+// CountBookmarks compte les signets d'une collection (compteur calculé à la lecture).
 func (r *PostRepository) CountBookmarks(ctx context.Context, userID, collectionID string) (int64, error) {
 	return r.bookmarks.CountDocuments(ctx, bson.M{"user_id": userID, "collection_id": collectionID})
 }
 
 // --- Signets (bookmarks) -----------------------------------------------------
 
-// AddBookmark range un post dans une playlist (idempotent grâce à l'index
+// AddBookmark range un post dans une collection (idempotent grâce à l'index
 // unique user_id+post_id+collection_id). Renvoie true si le signet a été créé,
 // false s'il existait déjà.
 func (r *PostRepository) AddBookmark(ctx context.Context, userID, postID, collectionID string) (bool, error) {
@@ -144,7 +144,7 @@ func (r *PostRepository) AddBookmark(ctx context.Context, userID, postID, collec
 	return true, nil
 }
 
-// RemoveBookmark retire un post d'une playlist précise. Renvoie true si un
+// RemoveBookmark retire un post d'une collection précise. Renvoie true si un
 // signet a effectivement été supprimé.
 func (r *PostRepository) RemoveBookmark(ctx context.Context, userID, postID, collectionID string) (bool, error) {
 	res, err := r.bookmarks.DeleteOne(ctx, bson.M{
@@ -158,7 +158,7 @@ func (r *PostRepository) RemoveBookmark(ctx context.Context, userID, postID, col
 	return res.DeletedCount > 0, nil
 }
 
-// RemoveAllBookmarksForPost retire un post de TOUTES les playlists de
+// RemoveAllBookmarksForPost retire un post de TOUTES les collections de
 // l'utilisateur (« dé-signer » complet). Renvoie le nombre de signets supprimés.
 func (r *PostRepository) RemoveAllBookmarksForPost(ctx context.Context, userID, postID string) (int64, error) {
 	res, err := r.bookmarks.DeleteMany(ctx, bson.M{"user_id": userID, "post_id": postID})
@@ -168,9 +168,9 @@ func (r *PostRepository) RemoveAllBookmarksForPost(ctx context.Context, userID, 
 	return res.DeletedCount, nil
 }
 
-// BookmarkedPostIDs renvoie les ids des posts signés (au moins une playlist) par
+// BookmarkedPostIDs renvoie les ids des posts signés (au moins une collection) par
 // un utilisateur — initialise l'état des boutons signet côté front, façon
-// LikedPostIDs. Dédupliqué : un post rangé dans plusieurs playlists ne doit
+// LikedPostIDs. Dédupliqué : un post rangé dans plusieurs collections ne doit
 // apparaître qu'une fois (Distinct côté Mongo, contrairement à distinctStrings
 // qui projette sans dédupliquer).
 func (r *PostRepository) BookmarkedPostIDs(ctx context.Context, userID string) ([]string, error) {
@@ -181,13 +181,13 @@ func (r *PostRepository) BookmarkedPostIDs(ctx context.Context, userID string) (
 	return ids, nil
 }
 
-// PostBookmarkCollectionIDs renvoie les ids des playlists d'un utilisateur qui
+// PostBookmarkCollectionIDs renvoie les ids des collections d'un utilisateur qui
 // contiennent un post (coche le sélecteur « Ranger dans… »).
 func (r *PostRepository) PostBookmarkCollectionIDs(ctx context.Context, userID, postID string) ([]string, error) {
 	return r.distinctStrings(ctx, r.bookmarks, bson.M{"user_id": userID, "post_id": postID}, "collection_id")
 }
 
-// BookmarksByCollection renvoie les post_ids d'une playlist, du plus récemment
+// BookmarksByCollection renvoie les post_ids d'une collection, du plus récemment
 // rangé au plus ancien, paginés.
 func (r *PostRepository) BookmarksByCollection(ctx context.Context, userID, collectionID string, limit, skip int64) ([]string, error) {
 	opts := options.Find().
@@ -210,8 +210,8 @@ func (r *PostRepository) BookmarksByCollection(ctx context.Context, userID, coll
 }
 
 // AllBookmarkedPostIDs renvoie la vue « Tous mes signets » : les posts signés au
-// moins une fois (peu importe la playlist), dédupliqués et triés par signet le
-// plus récent, paginés. Un post rangé dans 2 playlists n'apparaît qu'une fois.
+// moins une fois (peu importe la collection), dédupliqués et triés par signet le
+// plus récent, paginés. Un post rangé dans 2 collections n'apparaît qu'une fois.
 func (r *PostRepository) AllBookmarkedPostIDs(ctx context.Context, userID string, limit, skip int64) ([]string, error) {
 	pipeline := mongo.Pipeline{
 		{{Key: "$match", Value: bson.M{"user_id": userID}}},
@@ -247,7 +247,7 @@ func (r *PostRepository) DeleteBookmarksByPost(ctx context.Context, postID strin
 	return err
 }
 
-// DeleteBookmarksByCollection purge les signets d'une playlist (à sa suppression).
+// DeleteBookmarksByCollection purge les signets d'une collection (à sa suppression).
 func (r *PostRepository) DeleteBookmarksByCollection(ctx context.Context, collectionID string) error {
 	_, err := r.bookmarks.DeleteMany(ctx, bson.M{"collection_id": collectionID})
 	return err
@@ -269,7 +269,7 @@ func (r *PostRepository) GetPrefs(ctx context.Context, userID string) (*models.B
 	return &prefs, nil
 }
 
-// UpsertPrefs pose la dernière playlist utilisée + la date du dernier signet
+// UpsertPrefs pose la dernière collection utilisée + la date du dernier signet
 // (repousse la fenêtre glissante).
 func (r *PostRepository) UpsertPrefs(ctx context.Context, userID, collectionID string, at time.Time) error {
 	_, err := r.bookmarkPrefs.UpdateOne(

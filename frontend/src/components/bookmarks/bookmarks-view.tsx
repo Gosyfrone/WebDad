@@ -44,8 +44,8 @@ function mergeUnique(current: FeedPost[], incoming: FeedPost[]): FeedPost[] {
 }
 
 /**
- * Page « Signets » : barre de playlists (Tous + playlists nommées), gestion des
- * playlists (créer / renommer / supprimer) et liste des posts de la playlist
+ * Page « Signets » : barre de collections (Tous + collections nommées), gestion des
+ * collections (créer / renommer / supprimer) et liste des posts de la collection
  * active (défilement infini, réutilise `PostCard`).
  */
 export function BookmarksView() {
@@ -60,7 +60,7 @@ export function BookmarksView() {
   const [hasMore, setHasMore] = useState(false)
   const offsetRef = useRef(0)
 
-  // Édition de playlist (création / renommage / suppression).
+  // Édition de collection (création / renommage / suppression).
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<BookmarkCollection | null>(null)
   const [name, setName] = useState('')
@@ -83,7 +83,7 @@ export function BookmarksView() {
     loadCollections()
   }, [loadCollections])
 
-  // Chargement initial / changement de playlist active.
+  // Chargement initial / changement de collection active.
   useEffect(() => {
     let cancelled = false
     setLoading(true)
@@ -181,7 +181,7 @@ export function BookmarksView() {
 
   return (
     <div className="flex flex-col">
-      {/* En-tête + barre de playlists */}
+      {/* En-tête + barre de collections */}
       <div className="panel z-10 border-b lg:sticky lg:top-0">
         <div className="flex items-center justify-between gap-2 px-4 py-3">
           <h1 className="brand-text flex items-center gap-2 text-xl font-bold">
@@ -226,11 +226,11 @@ export function BookmarksView() {
           <button
             type="button"
             onClick={openCreate}
-            aria-label={t('bookmarks.new_playlist')}
+            aria-label={t('bookmarks.new_collection')}
             className="flex shrink-0 items-center gap-1 rounded-full border border-dashed border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:border-primary hover:text-primary"
           >
             <Plus className="h-4 w-4" />
-            {t('bookmarks.new_playlist')}
+            {t('bookmarks.new_collection')}
           </button>
         </div>
       </div>
@@ -243,7 +243,7 @@ export function BookmarksView() {
       ) : posts.length === 0 ? (
         <EmptyState
           title={t('bookmarks.empty_title')}
-          message={active === ALL ? t('bookmarks.empty_message') : t('bookmarks.empty_playlist')}
+          message={active === ALL ? t('bookmarks.empty_message') : t('bookmarks.empty_collection')}
         />
       ) : (
         <>
@@ -260,13 +260,13 @@ export function BookmarksView() {
         </>
       )}
 
-      {/* Dialogue créer / renommer une playlist */}
+      {/* Dialogue créer / renommer une collection */}
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
         <DialogContent className="panel top-32 translate-y-0 border shadow-[0_28px_80px_rgba(91,108,255,0.24)] sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>{editing ? t('bookmarks.rename') : t('bookmarks.new_playlist')}</DialogTitle>
+            <DialogTitle>{editing ? t('bookmarks.rename') : t('bookmarks.new_collection')}</DialogTitle>
             <DialogDescription className="sr-only">
-              {editing ? t('bookmarks.rename') : t('bookmarks.new_playlist')}
+              {editing ? t('bookmarks.rename') : t('bookmarks.new_collection')}
             </DialogDescription>
           </DialogHeader>
           <Input
@@ -280,7 +280,7 @@ export function BookmarksView() {
                 void submitForm()
               }
             }}
-            placeholder={t('bookmarks.new_playlist_placeholder')}
+            placeholder={t('bookmarks.new_collection_placeholder')}
           />
           <DialogFooter>
             <Button

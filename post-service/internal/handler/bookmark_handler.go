@@ -10,8 +10,8 @@ import (
 	"github.com/webdad/post-service/internal/service"
 )
 
-// BookmarkHandler porte les routes des signets : playlists (CRUD), ajout/retrait
-// d'un post dans une playlist, et vues de lecture. Toutes les routes sont
+// BookmarkHandler porte les routes des signets : collections (CRUD), ajout/retrait
+// d'un post dans une collection, et vues de lecture. Toutes les routes sont
 // protégées par JWT (les signets sont strictement privés).
 type BookmarkHandler struct {
 	service *service.PostService
@@ -22,9 +22,9 @@ func NewBookmarkHandler(svc *service.PostService, serviceName string) *BookmarkH
 	return &BookmarkHandler{service: svc, name: serviceName}
 }
 
-// --- Playlists ---------------------------------------------------------------
+// --- Collections ---------------------------------------------------------------
 
-// ListCollections : GET /posts/bookmarks/collections — playlists de l'utilisateur.
+// ListCollections : GET /posts/bookmarks/collections — collections de l'utilisateur.
 func (h *BookmarkHandler) ListCollections(c *gin.Context) {
 	claims, ok := middleware.ClaimsFrom(c)
 	if !ok {
@@ -39,7 +39,7 @@ func (h *BookmarkHandler) ListCollections(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": colls})
 }
 
-// CreateCollection : POST /posts/bookmarks/collections — crée une playlist.
+// CreateCollection : POST /posts/bookmarks/collections — crée une collection.
 func (h *BookmarkHandler) CreateCollection(c *gin.Context) {
 	claims, ok := middleware.ClaimsFrom(c)
 	if !ok {
@@ -59,7 +59,7 @@ func (h *BookmarkHandler) CreateCollection(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"data": coll})
 }
 
-// RenameCollection : PATCH /posts/bookmarks/collections/:cid — renomme une playlist.
+// RenameCollection : PATCH /posts/bookmarks/collections/:cid — renomme une collection.
 func (h *BookmarkHandler) RenameCollection(c *gin.Context) {
 	claims, ok := middleware.ClaimsFrom(c)
 	if !ok {
@@ -79,7 +79,7 @@ func (h *BookmarkHandler) RenameCollection(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": coll})
 }
 
-// DeleteCollection : DELETE /posts/bookmarks/collections/:cid — supprime une playlist.
+// DeleteCollection : DELETE /posts/bookmarks/collections/:cid — supprime une collection.
 func (h *BookmarkHandler) DeleteCollection(c *gin.Context) {
 	claims, ok := middleware.ClaimsFrom(c)
 	if !ok {
@@ -93,7 +93,7 @@ func (h *BookmarkHandler) DeleteCollection(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
-// ListCollectionPosts : GET /posts/bookmarks/collections/:cid/posts — posts d'une playlist.
+// ListCollectionPosts : GET /posts/bookmarks/collections/:cid/posts — posts d'une collection.
 func (h *BookmarkHandler) ListCollectionPosts(c *gin.Context) {
 	claims, ok := middleware.ClaimsFrom(c)
 	if !ok {
@@ -147,7 +147,7 @@ func (h *BookmarkHandler) Bookmark(c *gin.Context) {
 }
 
 // Unbookmark : DELETE /posts/:id/bookmark — retire un post. `collection_id`
-// fourni → retire de cette playlist ; absent → retire de toutes (dé-signer).
+// fourni → retire de cette collection ; absent → retire de toutes (dé-signer).
 func (h *BookmarkHandler) Unbookmark(c *gin.Context) {
 	claims, ok := middleware.ClaimsFrom(c)
 	if !ok {
@@ -164,7 +164,7 @@ func (h *BookmarkHandler) Unbookmark(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": gin.H{"bookmarked": false}})
 }
 
-// PostCollections : GET /posts/:id/bookmark/collections — ids des playlists de
+// PostCollections : GET /posts/:id/bookmark/collections — ids des collections de
 // l'utilisateur contenant ce post (coche le sélecteur).
 func (h *BookmarkHandler) PostCollections(c *gin.Context) {
 	claims, ok := middleware.ClaimsFrom(c)

@@ -89,7 +89,7 @@ export interface FeedPost {
   liked: boolean
   /** L'utilisateur courant a-t-il reposté ce post ? */
   reposted: boolean
-  /** L'utilisateur courant a-t-il signé ce post (dans au moins une playlist) ? */
+  /** L'utilisateur courant a-t-il signé ce post (dans au moins une collection) ? */
   bookmarked: boolean
   /** L'utilisateur courant peut-il supprimer (auteur ou mod/admin) ? */
   canDelete: boolean

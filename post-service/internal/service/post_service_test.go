@@ -95,7 +95,7 @@ func TestResolveParentID(t *testing.T) {
 }
 
 // TestWithinSessionWindow : un clic court range automatiquement (sans
-// redemander la playlist) seulement si l'utilisateur a une dernière playlist et
+// redemander la collection) seulement si l'utilisateur a une dernière collection et
 // que son dernier signet est récent (< fenêtre). Fonction PURE.
 func TestWithinSessionWindow(t *testing.T) {
 	now := time.Date(2026, 6, 9, 12, 0, 0, 0, time.UTC)
@@ -111,7 +111,7 @@ func TestWithinSessionWindow(t *testing.T) {
 	}{
 		{"nil prefs (1er signet)", nil, window, false},
 		{"jamais signé (date nil)", &models.BookmarkPrefs{LastCollectionID: "c1"}, window, false},
-		{"sans dernière playlist", &models.BookmarkPrefs{LastBookmarkAt: &recent}, window, false},
+		{"sans dernière collection", &models.BookmarkPrefs{LastBookmarkAt: &recent}, window, false},
 		{"rafale active", &models.BookmarkPrefs{LastCollectionID: "c1", LastBookmarkAt: &recent}, window, true},
 		{"fenêtre expirée", &models.BookmarkPrefs{LastCollectionID: "c1", LastBookmarkAt: &stale}, window, false},
 		{"auto désactivé (window 0)", &models.BookmarkPrefs{LastCollectionID: "c1", LastBookmarkAt: &recent}, 0, false},

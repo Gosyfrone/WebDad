@@ -28,14 +28,14 @@ interface BookmarkDialogProps {
   postId: string
   open: boolean
   onOpenChange: (open: boolean) => void
-  /** Appelé quand l'appartenance change : true si le post est dans ≥1 playlist. */
+  /** Appelé quand l'appartenance change : true si le post est dans ≥1 collection. */
   onMembershipChange?: (bookmarkedAnywhere: boolean) => void
 }
 
 /**
- * Sélecteur « Ranger dans… » : liste les playlists de l'utilisateur avec une
+ * Sélecteur « Ranger dans… » : liste les collections de l'utilisateur avec une
  * case cochée pour celles contenant le post, permet d'ajouter/retirer le post
- * par playlist (optimiste) et d'en créer une nouvelle à la volée.
+ * par collection (optimiste) et d'en créer une nouvelle à la volée.
  */
 export function BookmarkDialog({ postId, open, onOpenChange, onMembershipChange }: BookmarkDialogProps) {
   const t = useT()
@@ -48,7 +48,7 @@ export function BookmarkDialog({ postId, open, onOpenChange, onMembershipChange 
   const [newName, setNewName] = useState('')
   const [creating, setCreating] = useState(false)
 
-  // (Re)charge playlists + appartenance à chaque ouverture.
+  // (Re)charge collections + appartenance à chaque ouverture.
   useEffect(() => {
     if (!open) return
     let cancelled = false
@@ -145,7 +145,7 @@ export function BookmarkDialog({ postId, open, onOpenChange, onMembershipChange 
             </div>
           ) : collections.length === 0 ? (
             <p className="px-3 py-6 text-center text-sm text-muted-foreground">
-              {t('bookmarks.no_playlists')}
+              {t('bookmarks.no_collections')}
             </p>
           ) : (
             <ul className="flex flex-col">
@@ -185,7 +185,7 @@ export function BookmarkDialog({ postId, open, onOpenChange, onMembershipChange 
           )}
         </div>
 
-        {/* Créer une playlist */}
+        {/* Créer une collection */}
         <div className="flex items-center gap-2 border-t px-4 py-3">
           <Input
             value={newName}
@@ -197,7 +197,7 @@ export function BookmarkDialog({ postId, open, onOpenChange, onMembershipChange 
                 void handleCreate()
               }
             }}
-            placeholder={t('bookmarks.new_playlist_placeholder')}
+            placeholder={t('bookmarks.new_collection_placeholder')}
             className="h-9 flex-1"
           />
           <Button

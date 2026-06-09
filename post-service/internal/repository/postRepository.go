@@ -24,7 +24,7 @@ type PostRepository struct {
 	likes    *mongo.Collection
 	comments *mongo.Collection
 	reposts  *mongo.Collection
-	// Signets : playlists + appartenances + préférences de rafale.
+	// Signets : collections + appartenances + préférences de rafale.
 	bookmarkCollections *mongo.Collection
 	bookmarks           *mongo.Collection
 	bookmarkPrefs       *mongo.Collection
