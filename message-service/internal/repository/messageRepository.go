@@ -428,6 +428,40 @@ func (r *MessageRepository) InsertMessage(ctx context.Context, msg *models.Messa
 	return nil
 }
 
+// GetMessage renvoie un message par id dans une conversation donnée.
+func (r *MessageRepository) GetMessage(ctx context.Context, conversationID string, id bson.ObjectID) (*models.Message, error) {
+	var msg models.Message
+	if err := r.messages.FindOne(ctx, bson.M{"_id": id, "conversation_id": conversationID}).Decode(&msg); err != nil {
+		return nil, err
+	}
+	return &msg, nil
+}
+
+// UpdateMessageCiphertext remplace la version courante par une nouvelle version
+// chiffrée, en conservant la version originale chiffrée au premier edit.
+func (r *MessageRepository) UpdateMessageCiphertext(ctx context.Context, msg *models.Message, ciphertext, nonce string, editedAt time.Time) (*models.Message, error) {
+	originalCiphertext := msg.OriginalCiphertext
+	originalNonce := msg.OriginalNonce
+	if originalCiphertext == "" || originalNonce == "" {
+		originalCiphertext = msg.Ciphertext
+		originalNonce = msg.Nonce
+	}
+
+	update := bson.M{"$set": bson.M{
+		"ciphertext":          ciphertext,
+		"nonce":               nonce,
+		"original_ciphertext": originalCiphertext,
+		"original_nonce":      originalNonce,
+		"edited_at":           editedAt,
+	}}
+	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
+	var updated models.Message
+	if err := r.messages.FindOneAndUpdate(ctx, bson.M{"_id": msg.ID, "conversation_id": msg.ConversationID}, update, opts).Decode(&updated); err != nil {
+		return nil, err
+	}
+	return &updated, nil
+}
+
 // ListMessages renvoie une page de messages d'une conversation, du plus ancien
 // au plus récent (ordre d'affichage). `before` (ObjectID, optionnel) pagine vers
 // l'arrière : on renvoie les messages ANTÉRIEURS à ce curseur (scroll vers le

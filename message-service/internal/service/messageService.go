@@ -39,6 +39,8 @@ var (
 	ErrOwnerOnly            = errors.New("action réservée au créateur")
 	ErrOwnerCannotLeave     = errors.New("le créateur ne peut pas quitter (le supprimer à la place)")
 	ErrTargetNotMember      = errors.New("cet utilisateur n'est pas membre")
+	ErrMessageNotFound      = errors.New("message introuvable")
+	ErrNotMessageOwner      = errors.New("seul l'expéditeur peut modifier ce message")
 )
 
 // Bornes de pagination des messages.
@@ -723,6 +725,53 @@ func (s *MessageService) SendMessage(ctx context.Context, conversationID, sender
 	}
 
 	return msg, memberIDs, nil
+}
+
+// EditMessage remplace la version chiffrée d'un message. Le serveur ne lit
+// jamais le clair : il conserve la version originale chiffrée et diffuse la
+// nouvelle version chiffrée aux membres.
+func (s *MessageService) EditMessage(ctx context.Context, conversationID, messageID, actorID, ciphertext, nonce string, mentionedIDs []string) (*models.Message, []string, error) {
+	member, err := s.requireMember(ctx, conversationID, actorID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if !canWrite(member.Role) {
+		return nil, nil, ErrCannotWrite
+	}
+	oid, err := parseID(messageID)
+	if err != nil {
+		return nil, nil, err
+	}
+	msg, err := s.repo.GetMessage(ctx, conversationID, oid)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return nil, nil, ErrMessageNotFound
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+	if msg.SenderID != actorID {
+		return nil, nil, ErrNotMessageOwner
+	}
+
+	updated, err := s.repo.UpdateMessageCiphertext(ctx, msg, ciphertext, nonce, time.Now())
+	if err != nil {
+		return nil, nil, translateNotFound(err)
+	}
+
+	memberIDs, err := s.repo.MemberIDs(ctx, conversationID)
+	if err != nil {
+		memberIDs = nil
+	}
+	for _, rid := range mentionedTargets(mentionedIDs, memberIDs, actorID) {
+		s.notifier.Emit(notifier.Event{
+			Type:           notifier.TypeMessageMention,
+			ActorID:        actorID,
+			RecipientID:    rid,
+			ConversationID: conversationID,
+		})
+	}
+
+	return updated, memberIDs, nil
 }
 
 // mentionedTargets filtre les ids mentionnés pour ne garder que des membres

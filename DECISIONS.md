@@ -95,8 +95,10 @@
   unlimited viewers, **clear name** + public directory (name needed for discovery before joining).
 - **Cursor pagination** (`before=<messageId>` on `_id`, not offset): stable on a live chat (new messages arrive via WS at
   the bottom without disturbing backward paging).
-- **Schema materializes "no plaintext at rest":** `messages` have only `ciphertext`+`nonce`; `user_keys` stores only the
-  public key; `conversations.content_key` only for communities.
+- **Schema materializes "no plaintext at rest":** `messages` have only `ciphertext`+`nonce` and, after edit,
+  `original_ciphertext`+`original_nonce`; `user_keys` stores only the public key; `conversations.content_key` only for communities.
+- **Message edit stays E2EE:** owner-only `PATCH /messages/conversations/:id/messages/:messageId` replaces the
+  ciphertext, preserves the first encrypted version for subdued display, and broadcasts `message_updated` over WS.
 - **Pin/clear are per-user, on the `members` collection** (not the shared conversation), no WS broadcast (personal).
   `cleared_at` = reversible cutoff (reappears on next message, WhatsApp-style) vs destructive delete.
 - **"Read" state is server data** (`members.last_read_at`), multi-device; `GET /unread-count` computes from metadata only

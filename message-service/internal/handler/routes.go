@@ -69,6 +69,7 @@ func RegisterRoutes(
 
 				conv.GET("/messages", convH.ListMessages)
 				conv.POST("/messages", convH.SendMessage)
+				conv.PATCH("/messages/:messageId", convH.EditMessage)
 
 				members := conv.Group("/members")
 				{

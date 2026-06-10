@@ -8,6 +8,7 @@
 > - **[CHANGELOG.md](CHANGELOG.md)** — session work log · **[CHANGELOG_ARCHIVE.md](CHANGELOG_ARCHIVE.md)** — resolved issues / debugging history.
 > - **[PROMPTING.md](PROMPTING.md)** — token-efficient workflow + prompt templates (read on demand, NOT auto-loaded; user may say *"from PROMPTING.md, write me the prompt for: …"*).
 > - Knowledge graph in `graphify-out/` — query it before reading source (see Operating Rules).
+> - Latest session note: 10/06/2026 — message edit security review found no plaintext leak or auth bypass; remaining watchpoints are payload/rate limits; details in `CHANGELOG.md`.
 
 ---
 

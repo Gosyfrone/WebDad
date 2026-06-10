@@ -1,12 +1,13 @@
 'use client'
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, ImageOff, Info, Loader2, Lock, Paperclip, Send, X } from 'lucide-react'
+import { ArrowLeft, ImageOff, Info, Loader2, Lock, Paperclip, Pencil, Send, X } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import {
   computeDivider,
   decryptAttachment,
+  editMessage,
   listMessagesPage,
   sendMessage,
   type ChatAttachment,
@@ -34,6 +35,8 @@ interface ChatPaneProps {
   myId: string
   /** Dernier message reçu en temps réel pour CETTE conversation (ou null). */
   liveMessage: ChatMessage | null
+  /** Message modifié reçu en temps réel pour CETTE conversation (ou null). */
+  liveUpdatedMessage: ChatMessage | null
   /** Curseur de lecture (`lastReadAt` ISO) capturé à l'ouverture (ancre
    *  « Nouveaux messages ») ; null si jamais lu. */
   dividerAnchor: string | null
@@ -41,8 +44,8 @@ interface ChatPaneProps {
   onBack: () => void
   /** Ouvre le panneau d'infos / gestion (membres, renommer, quitter…). */
   onOpenInfo: () => void
-  /** Notifie le parent d'un message envoyé d'ici (aperçu + ordre de la liste). */
-  onLocalMessage: (msg: ChatMessage) => void
+  /** Notifie le parent d'un message envoyé ou modifié d'ici. */
+  onLocalMessage: (msg: ChatMessage, edited?: boolean) => void
 }
 
 /** Fusionne des messages plus anciens en tête, en dédupliquant par id. */
@@ -66,6 +69,7 @@ export function ChatPane({
   conversation,
   myId,
   liveMessage,
+  liveUpdatedMessage,
   dividerAnchor,
   onBack,
   onOpenInfo,
@@ -81,6 +85,7 @@ export function ChatPane({
   const [draft, setDraft] = useState('')
   const [attachments, setAttachments] = useState<File[]>([])
   const [sending, setSending] = useState(false)
+  const [editingMessage, setEditingMessage] = useState<ChatMessage | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   // Id du message devant lequel afficher « Nouveaux messages » (gelé à l'ouverture).
   const [dividerBeforeId, setDividerBeforeId] = useState<string | null>(null)
@@ -134,6 +139,7 @@ export function ChatPane({
   const readOnly =
     conversation.type === 'community' && conversation.myRole === 'viewer'
   const canSend = !keyMissing && !readOnly
+  const isEditing = editingMessage !== null
 
   const scrollToBottom = useCallback((behavior: ScrollBehavior = 'auto') => {
     const el = scrollRef.current
@@ -146,6 +152,9 @@ export function ChatPane({
     setInitialLoading(true)
     setMessages([])
     setHasMore(false)
+    setEditingMessage(null)
+    setDraft('')
+    setAttachments([])
     oldestIdRef.current = null
 
     listMessagesPage(convRef.current, PAGE)
@@ -217,9 +226,17 @@ export function ChatPane({
     if (nearBottom) requestAnimationFrame(() => scrollToBottom('smooth'))
   }, [liveMessage, conversation.id, scrollToBottom])
 
-  async function handleSend() {
+  // Message modifié en temps réel : on remplace la version locale.
+  useEffect(() => {
+    if (!liveUpdatedMessage || liveUpdatedMessage.conversationId !== conversation.id) return
+    setMessages((prev) => prev.map((m) => (m.id === liveUpdatedMessage.id ? liveUpdatedMessage : m)))
+  }, [liveUpdatedMessage, conversation.id])
+
+  async function handleSubmit() {
     const text = draft.trim()
-    if ((!text && attachments.length === 0) || sending || !canSend) return
+    if (sending || !canSend) return
+    if (isEditing && (!editingMessage || !text)) return
+    if (!isEditing && !text && attachments.length === 0) return
     setSending(true)
     try {
       // Résout les @handle mentionnés en ids de MEMBRES (hors soi) → notifications.
@@ -231,17 +248,40 @@ export function ChatPane({
             .filter((id): id is string => Boolean(id) && id !== myId),
         ),
       ]
-      const msg = await sendMessage(convRef.current, text, attachments, mentionedIds)
-      setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]))
-      onLocalMessage(msg)
+      const msg = editingMessage
+        ? await editMessage(convRef.current, editingMessage, text, mentionedIds)
+        : await sendMessage(convRef.current, text, attachments, mentionedIds)
+      setMessages((prev) =>
+        editingMessage
+          ? prev.map((m) => (m.id === msg.id ? msg : m))
+          : prev.some((m) => m.id === msg.id)
+            ? prev
+            : [...prev, msg],
+      )
+      onLocalMessage(msg, Boolean(editingMessage))
       setDraft('')
       setAttachments([])
+      setEditingMessage(null)
       requestAnimationFrame(() => scrollToBottom('smooth'))
     } catch {
-      toast({ title: t('messages.send_failed'), variant: 'destructive' })
+      toast({ title: t(isEditing ? 'messages.edit_failed' : 'messages.send_failed'), variant: 'destructive' })
     } finally {
       setSending(false)
     }
+  }
+
+  function startEdit(message: ChatMessage) {
+    if (!message.mine || !message.decrypted || sending || !canSend) return
+    setEditingMessage(message)
+    setDraft(message.text)
+    setAttachments([])
+    requestAnimationFrame(() => composerRef.current?.focus())
+  }
+
+  function cancelEdit() {
+    setEditingMessage(null)
+    setDraft('')
+    setAttachments([])
   }
 
   function handlePickFiles(e: React.ChangeEvent<HTMLInputElement>) {
@@ -295,6 +335,7 @@ export function ChatPane({
                     !m.mine &&
                     (i === 0 || messages[i - 1].senderId !== m.senderId)
                   }
+                  onEditStart={startEdit}
                 />
               </Fragment>
             ))}
@@ -308,7 +349,20 @@ export function ChatPane({
           <p className="py-2 text-center text-sm text-muted-foreground">{t('messages.read_only')}</p>
         ) : (
           <>
-            {attachments.length > 0 && (
+            {isEditing && (
+              <div className="mb-2 flex items-center justify-between gap-2 rounded-xl border border-[#5B6CFF]/20 bg-[#5B6CFF]/10 px-3 py-2 text-xs text-foreground">
+                <span className="truncate font-semibold">{t('messages.editing')}</span>
+                <button
+                  type="button"
+                  onClick={cancelEdit}
+                  className="rounded-full p-1 text-muted-foreground transition hover:bg-background/60 hover:text-foreground"
+                  aria-label={t('messages.cancel_edit')}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )}
+            {!isEditing && attachments.length > 0 && (
               <PendingAttachments
                 files={attachments}
                 onRemove={(i) => setAttachments((prev) => prev.filter((_, idx) => idx !== i))}
@@ -329,7 +383,7 @@ export function ChatPane({
                 variant="ghost"
                 size="icon"
                 onClick={() => fileInputRef.current?.click()}
-                disabled={!canSend || sending}
+                disabled={!canSend || sending || isEditing}
                 aria-label={t('messages.add_attachment')}
                 className="h-11 w-11 shrink-0 rounded-full text-[#5B6CFF]"
               >
@@ -350,7 +404,7 @@ export function ChatPane({
                     if (e.defaultPrevented) return
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault()
-                      handleSend()
+                      handleSubmit()
                     }
                   }}
                   disabled={!canSend || sending}
@@ -363,9 +417,9 @@ export function ChatPane({
               <Button
                 type="button"
                 size="icon"
-                onClick={handleSend}
-                disabled={!canSend || sending || (!draft.trim() && attachments.length === 0)}
-                aria-label={t('messages.send')}
+                onClick={handleSubmit}
+                disabled={!canSend || sending || (isEditing ? !draft.trim() : !draft.trim() && attachments.length === 0)}
+                aria-label={t(isEditing ? 'messages.save_edit' : 'messages.send')}
                 className="h-11 w-11 shrink-0 rounded-full bg-gradient-to-r from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] text-white"
               >
                 {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
@@ -444,15 +498,20 @@ function MessageBubble({
   conversation,
   memberUsernames,
   showSender,
+  onEditStart,
 }: {
   message: ChatMessage
   conversation: Conversation
   memberUsernames: Set<string>
   showSender: boolean
+  onEditStart: (message: ChatMessage) => void
 }) {
   const { t, locale } = useLanguage()
   const sender = useResolvedUser(showSender ? message.senderId : null)
   const time = formatTime(message.createdAt, locale)
+  const canEdit = message.mine && message.decrypted
+  const [showOriginal, setShowOriginal] = useState(false)
+  const hasOriginal = message.decrypted && Boolean(message.originalText)
 
   return (
     <li className={cn('flex flex-col', message.mine ? 'items-end' : 'items-start')}>
@@ -480,26 +539,66 @@ function MessageBubble({
 
       {/* Bulle texte : seulement s'il y a du texte, ou si le déchiffrement a échoué. */}
       {(!message.decrypted || message.text) && (
-        <div
-          className={cn(
-            'mt-1 max-w-[78%] rounded-2xl px-3.5 py-2 text-sm shadow-sm',
-            message.mine
-              ? 'bg-gradient-to-r from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] text-white'
-              : 'glass border text-foreground',
-          )}
-        >
-          {message.decrypted ? (
-            <MentionMessageText
-              text={message.text}
-              memberUsernames={memberUsernames}
-              onAccent={message.mine}
-              className="block whitespace-pre-wrap break-words"
-            />
-          ) : (
-            <p className="flex items-center gap-1.5 italic opacity-80">
-              <Lock className="h-3.5 w-3.5" aria-hidden />
-              {t('messages.decrypt_failed')}
-            </p>
+        <div className={cn('group mt-1 flex max-w-[78%] items-end gap-1.5', message.mine && 'flex-row-reverse')}>
+          <div className="flex min-w-0 flex-col gap-1">
+            {hasOriginal && (
+              <button
+                type="button"
+                onClick={() => setShowOriginal((open) => !open)}
+                className={cn(
+                  'w-fit rounded-full px-2 py-0.5 text-[11px] font-semibold text-muted-foreground transition hover:bg-background/70 hover:text-foreground',
+                  message.mine ? 'self-end' : 'self-start',
+                )}
+                aria-expanded={showOriginal}
+              >
+                {t(showOriginal ? 'messages.hide_original' : 'messages.edited')}
+              </button>
+            )}
+            {hasOriginal && showOriginal && (
+              <div className="max-w-full rounded-2xl border border-dashed border-border bg-background/55 px-3 py-1.5 text-xs italic text-muted-foreground opacity-60 shadow-none">
+                <MentionMessageText
+                  text={message.originalText}
+                  memberUsernames={memberUsernames}
+                  onAccent={false}
+                  className="block whitespace-pre-wrap break-words"
+                />
+              </div>
+            )}
+            <div
+              className={cn(
+                'max-w-full rounded-2xl px-3.5 py-2 text-sm shadow-sm',
+                message.mine
+                  ? 'bg-gradient-to-r from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] text-white'
+                  : 'glass border text-foreground',
+              )}
+            >
+              {message.decrypted ? (
+                <>
+                  <MentionMessageText
+                    text={message.text}
+                    memberUsernames={memberUsernames}
+                    onAccent={message.mine}
+                    className="block whitespace-pre-wrap break-words"
+                  />
+                </>
+              ) : (
+                <p className="flex items-center gap-1.5 italic opacity-80">
+                  <Lock className="h-3.5 w-3.5" aria-hidden />
+                  {t('messages.decrypt_failed')}
+                </p>
+              )}
+            </div>
+          </div>
+          {canEdit && (
+            <button
+              type="button"
+              onClick={() => onEditStart(message)}
+              className="mb-1 rounded-full p-1.5 text-muted-foreground opacity-0 transition hover:bg-background/70 hover:text-foreground group-focus-within:opacity-100 group-hover:opacity-100"
+              aria-label={t('messages.edit')}
+              title={t('messages.edit')}
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
           )}
         </div>
       )}

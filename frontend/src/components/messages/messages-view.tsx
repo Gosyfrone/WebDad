@@ -20,6 +20,7 @@ import {
   unpinConversation,
   type ChatMessage,
   type Conversation,
+  type RawMessage,
   type RealtimeEvent,
 } from '@/lib/messages'
 import { textMentionsUser } from '@/lib/mentions'
@@ -112,6 +113,7 @@ export function MessagesView() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [liveMessage, setLiveMessage] = useState<ChatMessage | null>(null)
+  const [liveUpdatedMessage, setLiveUpdatedMessage] = useState<ChatMessage | null>(null)
   const [dialog, setDialog] = useState<DialogKind>(null)
   const [previews, setPreviews] = useState<Record<string, ConversationPreview>>({})
   const [unread, setUnread] = useState<Record<string, boolean>>({})
@@ -221,6 +223,19 @@ export function MessagesView() {
       }
 
       switch (evt.type) {
+        case 'message_updated': {
+          const raw = data as unknown as RawMessage
+          const conv = conversationsRef.current.find((c) => c.id === raw.conversation_id)
+          if (!conv) return
+          const msg = decryptMessage(conv, raw, myId)
+          setLiveUpdatedMessage(msg)
+          setPreviews((prev) =>
+            prev[conv.id]?.messageId === msg.id
+              ? { ...prev, [conv.id]: toPreview(msg, myUsernameRef.current) }
+              : prev,
+          )
+          break
+        }
         case 'conversation_deleted':
           dropIt()
           break
@@ -425,10 +440,21 @@ export function MessagesView() {
             conversation={selected}
             myId={myId}
             liveMessage={liveMessage}
+            liveUpdatedMessage={liveUpdatedMessage}
             dividerAnchor={anchorForSelected}
             onBack={() => setSelectedId(null)}
             onOpenInfo={() => setDialog('info')}
-            onLocalMessage={(msg) => ingest(selected.id, msg, true)}
+            onLocalMessage={(msg, edited) => {
+              if (!edited) {
+                ingest(selected.id, msg, true)
+                return
+              }
+              setPreviews((prev) =>
+                prev[selected.id]?.messageId === msg.id
+                  ? { ...prev, [selected.id]: toPreview(msg, myUsernameRef.current) }
+                  : prev,
+              )
+            }}
           />
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-2 px-8 text-center">
