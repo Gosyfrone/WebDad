@@ -61,6 +61,19 @@ type RequestVerifyRequest struct {
 	Email string `json:"email" binding:"required,email"`
 }
 
+// ForgotPasswordRequest : payload de POST /auth/password/forgot. Réponse
+// TOUJOURS générique (anti-énumération), que le compte existe ou non.
+type ForgotPasswordRequest struct {
+	Email string `json:"email" binding:"required,email"`
+}
+
+// ResetPasswordRequest : payload de POST /auth/password/reset (token en clair
+// extrait du lien reçu par e-mail + nouveau mot de passe).
+type ResetPasswordRequest struct {
+	Token       string `json:"token" binding:"required"`
+	NewPassword string `json:"new_password" binding:"required,min=8"`
+}
+
 // RefreshRequest : payload de POST /auth/refresh et /auth/logout. Le refresh
 // token transite dans le corps (transmis par le BFF Next depuis le cookie
 // httpOnly) — pas de binding `required` pour que /logout reste best-effort.

@@ -44,7 +44,9 @@ var (
 // Usages des account_tokens + TTL de la vérification d'e-mail.
 const (
 	purposeVerify  = "verify"
+	purposeReset   = "reset"
 	verifyTokenTTL = 24 * time.Hour
+	resetTokenTTL  = 1 * time.Hour
 )
 
 // defaultAdminID : UUID figé de l'admin par défaut, partagé avec les autres
@@ -282,6 +284,101 @@ func (s *AuthService) sendVerificationMail(u *models.User) {
 
 	if err := s.mailer.Send(u.Email, subject, html, text); err != nil {
 		log.Printf("[auth-service] envoi mail vérif à %s : %v", u.Email, err)
+	}
+}
+
+// ForgotPassword déclenche l'envoi d'un mail de réinitialisation. ANTI-
+// ÉNUMÉRATION : renvoie TOUJOURS nil — l'appelant ne peut pas distinguer un
+// compte inexistant ou inactif. Le mail n'est envoyé que pour un compte actif.
+func (s *AuthService) ForgotPassword(email string) error {
+	const q = `
+		SELECT id, email, role, is_active, email_verified, created_at
+		FROM credentials WHERE email = $1`
+
+	u := &models.User{}
+	err := s.db.QueryRow(q, email).
+		Scan(&u.ID, &u.Email, &u.Role, &u.IsActive, &u.EmailVerified, &u.CreatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil // compte inexistant : no-op silencieux (anti-énumération).
+	}
+	if err != nil {
+		log.Printf("[auth-service] forgot password (lecture) pour %s : %v", email, err)
+		return nil
+	}
+	if !u.IsActive {
+		return nil // compte désactivé : pas de reset.
+	}
+
+	s.sendResetMail(u)
+	return nil
+}
+
+// ResetPassword consomme un token de reset puis remplace le mot de passe. Le
+// lien reset prouvant la possession de l'adresse, on en profite pour marquer
+// l'e-mail vérifié (débloque un compte non vérifié). Toutes les sessions sont
+// révoquées (DELETE refresh_tokens). Renvoie ErrInvalidToken si le token est
+// inconnu / expiré / déjà utilisé.
+func (s *AuthService) ResetPassword(rawToken, newPassword string) error {
+	userID, err := s.consumeAccountToken(rawToken, purposeReset)
+	if err != nil {
+		return err
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("hash du nouveau mot de passe : %w", err)
+	}
+
+	if _, err := s.db.Exec(
+		`UPDATE credentials SET password = $1, email_verified = true WHERE id = $2`,
+		string(hash), userID,
+	); err != nil {
+		return fmt.Errorf("mise à jour du mot de passe : %w", err)
+	}
+
+	// Révoque toutes les sessions ouvertes : un reset doit déconnecter partout.
+	if _, err := s.db.Exec(`DELETE FROM refresh_tokens WHERE user_id = $1`, userID); err != nil {
+		return fmt.Errorf("révocation des sessions : %w", err)
+	}
+	return nil
+}
+
+// sendResetMail crée un token de reset (TTL 1h) et envoie le lien par mail.
+// Best-effort : toute erreur est loggée, jamais propagée (ne casse pas le flux
+// forgot, qui reste anti-énumération).
+func (s *AuthService) sendResetMail(u *models.User) {
+	if s.mailer == nil {
+		log.Printf("[auth-service] mail désactivé : reset pour %s non envoyé", u.Email)
+		return
+	}
+
+	raw, err := s.createAccountToken(u.ID, purposeReset, resetTokenTTL)
+	if err != nil {
+		log.Printf("[auth-service] création token reset pour %s : %v", u.Email, err)
+		return
+	}
+
+	link := fmt.Sprintf("%s/reset-password?token=%s",
+		strings.TrimRight(s.appBaseURL, "/"), url.QueryEscape(raw))
+
+	subject := "Réinitialise ton mot de passe — Breezy"
+	text := fmt.Sprintf(
+		"Tu as demandé à réinitialiser ton mot de passe Breezy.\n\n"+
+			"Choisis un nouveau mot de passe en ouvrant ce lien :\n%s\n\n"+
+			"Ce lien expire dans 1 heure. Si tu n'es pas à l'origine de cette "+
+			"demande, ignore ce message : ton mot de passe reste inchangé.",
+		link)
+	html := fmt.Sprintf(
+		`<p>Tu as demandé à réinitialiser ton mot de passe <strong>Breezy</strong>.</p>`+
+			`<p>Choisis un nouveau mot de passe en cliquant sur le bouton ci-dessous :</p>`+
+			`<p><a href="%s">Réinitialiser mon mot de passe</a></p>`+
+			`<p>Ou copie ce lien dans ton navigateur :<br>%s</p>`+
+			`<p>Ce lien expire dans 1 heure. Si tu n'es pas à l'origine de cette `+
+			`demande, ignore ce message : ton mot de passe reste inchangé.</p>`,
+		link, link)
+
+	if err := s.mailer.Send(u.Email, subject, html, text); err != nil {
+		log.Printf("[auth-service] envoi mail reset à %s : %v", u.Email, err)
 	}
 }
 

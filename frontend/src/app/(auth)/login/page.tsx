@@ -429,7 +429,7 @@ export default function LoginPage() {
 
               <div className="flex items-center justify-between text-sm">
                 <Link
-                  href={ROUTES.home}
+                  href={ROUTES.forgotPassword}
                   className="font-medium text-[#5B6CFF] underline-offset-4 transition hover:text-[#8D3DFF] hover:underline"
                 >
                   {t('auth.login.forgot')}

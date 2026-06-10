@@ -37,7 +37,15 @@
   vérif 24h / reset 1h.** Réutilise le pattern refresh-token : révocables sans denylist (vs JWT
   auto-portant), une fuite de table ne livre aucun token. Table unique `account_tokens(purpose enum
   'verify'|'reset', …)`. Toute nouvelle demande invalide les précédents du même `(user_id, purpose)` ;
-  un reset réussi **révoque toutes les sessions** (`DELETE refresh_tokens`).
+  un reset réussi **révoque toutes les sessions** (`DELETE refresh_tokens`) — un changement de
+  mot de passe doit déconnecter partout. **Un reset réussi pose aussi `email_verified=true` :**
+  cliquer le lien (envoyé à l'adresse du compte, TTL 1h) prouve la possession de la boîte, donc
+  débloque un compte non vérifié sans vérification séparée — le reset est un second chemin de
+  preuve d'adresse, équivalent au lien de vérification.
+- **`forgot-password` = anti-énumération stricte** : `ForgotPassword(email)` renvoie TOUJOURS `nil`
+  et le handler répond TOUJOURS `200` générique, que le compte existe, soit actif, ou non ; le mail
+  n'est envoyé (best-effort) que pour un compte existant ET actif. La page front affiche le même
+  écran de confirmation dans tous les cas.
 - **Login non-vérifié = blocage dur** (`403 email_not_verified`, aucun token émis), vérifié
   *après* le bcrypt pour ne pas révéler l'existence du compte.
 - **Provisioning préservé au register, sans session client (décision Phase 1).** `auth/register`
@@ -51,7 +59,6 @@
   et fragile.* **Admin seedé forcé `email_verified=true`** (pas de vraie boîte) pour garder un compte
   démo. Le renvoi de mail de vérif est accessible depuis la page login (les users existants passent
   `email_verified=false` et doivent se vérifier).
-- **Anti-énumération** sur `forgot-password` (réponse `200` générique, que l'email existe ou non).
 - **Liens dans le mail → pages front** (`APP_BASE_URL/verify-email|reset-password?token=…`), pas
   l'API directement : maîtrise de l'UX (succès/expiré/erreur), API qui reste JSON-only.
 - **Dev sans SMTP configuré = transport console** : le mailer logge le mail + le lien sur stdout au

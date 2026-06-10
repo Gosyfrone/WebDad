@@ -120,6 +120,105 @@
         }
       }
     },
+    "/auth/password/forgot": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "auth"
+        ],
+        "summary": "Demander une réinitialisation de mot de passe",
+        "parameters": [
+          {
+            "description": "Adresse e-mail",
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/models.ForgotPasswordRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Réponse générique — data: {message}",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "400": {
+            "description": "Payload invalide",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/password/reset": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "auth"
+        ],
+        "summary": "Réinitialiser le mot de passe",
+        "parameters": [
+          {
+            "description": "Token de reset (issu du lien e-mail) + nouveau mot de passe",
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/models.ResetPasswordRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Mot de passe réinitialisé — data: {message}",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "400": {
+            "description": "Token invalide ou expiré (code: invalid_token) / payload invalide",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "500": {
+            "description": "Erreur interne",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
     "/auth/refresh": {
       "post": {
         "consumes": [
@@ -4532,6 +4631,17 @@
         }
       }
     },
+    "models.ForgotPasswordRequest": {
+      "type": "object",
+      "required": [
+        "email"
+      ],
+      "properties": {
+        "email": {
+          "type": "string"
+        }
+      }
+    },
     "models.LoginRequest": {
       "type": "object",
       "required": [
@@ -4600,6 +4710,22 @@
       ],
       "properties": {
         "email": {
+          "type": "string"
+        }
+      }
+    },
+    "models.ResetPasswordRequest": {
+      "type": "object",
+      "required": [
+        "new_password",
+        "token"
+      ],
+      "properties": {
+        "new_password": {
+          "type": "string",
+          "minLength": 8
+        },
+        "token": {
           "type": "string"
         }
       }
