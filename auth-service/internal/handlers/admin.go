@@ -21,6 +21,18 @@ const (
 // ListUsers : GET /auth/users — annuaire des comptes (admin).
 // Source faisant autorité pour le rôle + l'état du compte ; le front enrichit
 // avec username/avatar (user-service + profil-service). `?q=` filtre par email.
+// @Summary     Lister les comptes (modérateur/admin)
+// @Tags        admin
+// @Produce     json
+// @Security    BearerAuth
+// @Param       q      query  string false "Filtre email (sous-chaîne)"
+// @Param       limit  query  int    false "Nombre de résultats (défaut 20, max 100)"
+// @Param       offset query  int    false "Décalage de pagination"
+// @Success     200 {object} map[string]interface{} "data: []User"
+// @Failure     401 {object} map[string]string "Non authentifié"
+// @Failure     403 {object} map[string]string "Rôle insuffisant"
+// @Failure     500 {object} map[string]string "Erreur interne"
+// @Router      /auth/users [get]
 func (h *Handler) ListUsers(c *gin.Context) {
 	limit, offset := paginate(c)
 	users, err := h.auth.ListUsers(limit, offset, c.Query("q"))
@@ -34,6 +46,20 @@ func (h *Handler) ListUsers(c *gin.Context) {
 // SetRole : PATCH /auth/users/:id/role — change le rôle d'un compte (admin).
 // Un admin ne peut pas changer son PROPRE rôle (anti-verrouillage / anti
 // auto-rétrogradation accidentelle).
+// @Summary     Changer le rôle d'un compte (admin)
+// @Tags        admin
+// @Accept      json
+// @Produce     json
+// @Security    BearerAuth
+// @Param       id   path string                         true "ID de l'utilisateur cible"
+// @Param       body body models.UpdateRoleRequest       true "Nouveau rôle"
+// @Success     200 {object} map[string]interface{} "data: {id, role}"
+// @Failure     400 {object} map[string]string "Payload invalide ou auto-modification"
+// @Failure     401 {object} map[string]string "Non authentifié"
+// @Failure     403 {object} map[string]string "Rôle insuffisant"
+// @Failure     404 {object} map[string]string "Compte introuvable"
+// @Failure     500 {object} map[string]string "Erreur interne"
+// @Router      /auth/users/{id}/role [patch]
 func (h *Handler) SetRole(c *gin.Context) {
 	claims, ok := middleware.ClaimsFrom(c)
 	if !ok {
@@ -62,6 +88,20 @@ func (h *Handler) SetRole(c *gin.Context) {
 // SetStatus : PATCH /auth/users/:id/status — bannit/réactive un compte (admin).
 // is_active=false bloque login + refresh et révoque les refresh tokens. Un
 // admin ne peut pas se bannir lui-même.
+// @Summary     Bannir / réactiver un compte (modérateur/admin)
+// @Tags        admin
+// @Accept      json
+// @Produce     json
+// @Security    BearerAuth
+// @Param       id   path string                           true "ID de l'utilisateur cible"
+// @Param       body body models.UpdateStatusRequest       true "Nouvel état actif"
+// @Success     200 {object} map[string]interface{} "data: {id, is_active}"
+// @Failure     400 {object} map[string]string "Payload invalide ou auto-modification"
+// @Failure     401 {object} map[string]string "Non authentifié"
+// @Failure     403 {object} map[string]string "Rôle insuffisant"
+// @Failure     404 {object} map[string]string "Compte introuvable"
+// @Failure     500 {object} map[string]string "Erreur interne"
+// @Router      /auth/users/{id}/status [patch]
 func (h *Handler) SetStatus(c *gin.Context) {
 	claims, ok := middleware.ClaimsFrom(c)
 	if !ok {
@@ -105,6 +145,18 @@ func (h *Handler) SetStatus(c *gin.Context) {
 // DeleteUser : DELETE /auth/users/:id — efface DÉFINITIVEMENT les identifiants
 // d'un compte (effacement RGPD, admin). Un admin ne peut pas s'effacer lui-même.
 // La purge des autres services est orchestrée côté appelant.
+// @Summary     Supprimer définitivement un compte (admin, RGPD)
+// @Tags        admin
+// @Produce     json
+// @Security    BearerAuth
+// @Param       id path string true "ID de l'utilisateur cible"
+// @Success     204 "Compte supprimé"
+// @Failure     400 {object} map[string]string "Auto-suppression interdite"
+// @Failure     401 {object} map[string]string "Non authentifié"
+// @Failure     403 {object} map[string]string "Rôle insuffisant"
+// @Failure     404 {object} map[string]string "Compte introuvable"
+// @Failure     500 {object} map[string]string "Erreur interne"
+// @Router      /auth/users/{id} [delete]
 func (h *Handler) DeleteUser(c *gin.Context) {
 	claims, ok := middleware.ClaimsFrom(c)
 	if !ok {
