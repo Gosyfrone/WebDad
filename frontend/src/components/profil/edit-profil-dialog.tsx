@@ -114,149 +114,151 @@ export function EditProfilDialog({
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="panel gap-0 overflow-hidden border p-0 shadow-[0_28px_80px_rgba(91,108,255,0.24)] sm:max-w-lg">
-        <DialogHeader className="border-b p-4">
+      <DialogContent className="panel grid max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] grid-rows-[auto,minmax(0,1fr),auto] gap-0 overflow-hidden border p-0 shadow-[0_28px_80px_rgba(91,108,255,0.24)] sm:max-h-[calc(100dvh-3rem)] sm:max-w-lg">
+        <DialogHeader className="shrink-0 border-b p-4">
           <DialogTitle className="brand-text">{t('profil.edit')}</DialogTitle>
           <DialogDescription className="text-muted-foreground">
             {t('editprofil.desc')}
           </DialogDescription>
         </DialogHeader>
 
-        {/* Bannière éditable */}
-        <ImagePicker
-          label={t('editprofil.change_banner')}
-          onPick={setBannerUrl}
-          onError={() => toast({ title: t('editprofil.upload_failed'), variant: 'destructive' })}
-          className={cn(
-            'relative flex h-36 w-full items-center justify-center overflow-hidden bg-cover bg-center',
-            !bannerUrl &&
-              'bg-gradient-to-r from-[#8D3DFF]/35 via-[#EADCFF] to-[#47D9FF]/25 dark:from-[#8D3DFF]/45 dark:via-[#1c1338] dark:to-[#47D9FF]/35',
-          )}
-          style={bannerUrl ? { backgroundImage: `url(${bannerUrl})` } : undefined}
-        />
+        <div className="min-h-0 overflow-y-auto overscroll-contain">
+          {/* Bannière éditable */}
+          <ImagePicker
+            label={t('editprofil.change_banner')}
+            onPick={setBannerUrl}
+            onError={() => toast({ title: t('editprofil.upload_failed'), variant: 'destructive' })}
+            className={cn(
+              'relative flex h-36 w-full items-center justify-center overflow-hidden bg-cover bg-center',
+              !bannerUrl &&
+                'bg-gradient-to-r from-[#8D3DFF]/35 via-[#EADCFF] to-[#47D9FF]/25 dark:from-[#8D3DFF]/45 dark:via-[#1c1338] dark:to-[#47D9FF]/35',
+            )}
+            style={bannerUrl ? { backgroundImage: `url(${bannerUrl})` } : undefined}
+          />
 
-        {/* Avatar éditable, superposé à la bannière */}
-        <div className="px-4">
-          <div className="-mt-12 w-fit">
-            <ImagePicker
-              label={t('editprofil.change_avatar')}
-              onPick={setAvatarUrl}
-              onError={() => toast({ title: t('editprofil.upload_failed'), variant: 'destructive' })}
-              className="relative rounded-full"
-            >
-              <Avatar className="h-24 w-24 border-4 border-[#F8F3FF] shadow-[0_18px_44px_rgba(91,108,255,0.22)] dark:border-[#171026]">
-                {avatarUrl && <AvatarImage src={avatarUrl} alt="" />}
-                <AvatarFallback className="bg-gradient-to-br from-[#F8F3FF] via-white to-[#EEF9FF] text-2xl text-slate-950 dark:from-[#1c1338] dark:via-[#171026] dark:to-[#141a2e] dark:text-white">
-                  {trimmedName.charAt(0).toUpperCase() || '?'}
-                </AvatarFallback>
-              </Avatar>
-            </ImagePicker>
+          {/* Avatar éditable, superposé à la bannière */}
+          <div className="px-4">
+            <div className="-mt-12 w-fit">
+              <ImagePicker
+                label={t('editprofil.change_avatar')}
+                onPick={setAvatarUrl}
+                onError={() => toast({ title: t('editprofil.upload_failed'), variant: 'destructive' })}
+                className="relative rounded-full"
+              >
+                <Avatar className="h-24 w-24 border-4 border-[#F8F3FF] shadow-[0_18px_44px_rgba(91,108,255,0.22)] dark:border-[#171026]">
+                  {avatarUrl && <AvatarImage src={avatarUrl} alt="" />}
+                  <AvatarFallback className="bg-gradient-to-br from-[#F8F3FF] via-white to-[#EEF9FF] text-2xl text-slate-950 dark:from-[#1c1338] dark:via-[#171026] dark:to-[#141a2e] dark:text-white">
+                    {trimmedName.charAt(0).toUpperCase() || '?'}
+                  </AvatarFallback>
+                </Avatar>
+              </ImagePicker>
+            </div>
           </div>
-        </div>
 
-        {/* Champs texte */}
-        <div className="flex flex-col gap-4 p-4 pt-2">
-          <Field label={t('editprofil.name_label')} htmlFor="profil-name">
-            <Input
-              id="profil-name"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              placeholder={t('editprofil.name_placeholder')}
-              aria-invalid={nameTooLong}
-              className="rounded-2xl border-white/70 bg-white/82 shadow-sm shadow-slate-200/50 transition-all placeholder:text-slate-400 hover:border-[#47D9FF]/70 focus-visible:border-[#5B6CFF] focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15 dark:border-white/15 dark:bg-white/5 dark:placeholder:text-muted-foreground"
-            />
-            {nameTooLong && (
-              <p className="text-xs text-destructive">
-                {t('editprofil.name_max', { count: MAX_NAME })}
-              </p>
-            )}
-            {displayNameLocked && (
-              <p className="text-xs text-destructive">
-                {t('editprofil.name_locked', { date: formatDate(nextDisplayNameDate, locale) })}
-              </p>
-            )}
-          </Field>
-
-          <Field label={t('editprofil.bio_label')} htmlFor="profil-bio">
-            <textarea
-              id="profil-bio"
-              value={bio}
-              onChange={(e) => setBio(e.target.value)}
-              placeholder={t('editprofil.bio_placeholder')}
-              rows={3}
-              className="flex w-full resize-none rounded-2xl border border-white/70 bg-white/82 px-3 py-2 text-sm shadow-sm shadow-slate-200/50 transition-all placeholder:text-slate-400 hover:border-[#47D9FF]/70 focus-visible:border-[#5B6CFF] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15 dark:border-white/15 dark:bg-white/5 dark:placeholder:text-muted-foreground"
-            />
-            <span
-              className={cn(
-                'self-end text-xs',
-                bioTooLong ? 'font-bold text-destructive' : 'text-muted-foreground',
+          {/* Champs texte */}
+          <div className="flex flex-col gap-4 p-4 pt-2">
+            <Field label={t('editprofil.name_label')} htmlFor="profil-name">
+              <Input
+                id="profil-name"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                placeholder={t('editprofil.name_placeholder')}
+                aria-invalid={nameTooLong}
+                className="rounded-2xl border-white/70 bg-white/82 shadow-sm shadow-slate-200/50 transition-all placeholder:text-slate-400 hover:border-[#47D9FF]/70 focus-visible:border-[#5B6CFF] focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15 dark:border-white/15 dark:bg-white/5 dark:placeholder:text-muted-foreground"
+              />
+              {nameTooLong && (
+                <p className="text-xs text-destructive">
+                  {t('editprofil.name_max', { count: MAX_NAME })}
+                </p>
               )}
-            >
-              {bioRemaining}
-            </span>
-          </Field>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label={t('editprofil.location_label')} htmlFor="profil-location">
-              <Input
-                id="profil-location"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                placeholder={t('editprofil.location_placeholder')}
-                className="rounded-2xl border-white/70 bg-white/82 shadow-sm shadow-slate-200/50 transition-all placeholder:text-slate-400 hover:border-[#47D9FF]/70 focus-visible:border-[#5B6CFF] focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15"
-              />
+              {displayNameLocked && (
+                <p className="text-xs text-destructive">
+                  {t('editprofil.name_locked', { date: formatDate(nextDisplayNameDate, locale) })}
+                </p>
+              )}
             </Field>
 
-            <Field label={t('editprofil.website_label')} htmlFor="profil-website">
-              <Input
-                id="profil-website"
-                value={website}
-                onChange={(e) => setWebsite(e.target.value)}
-                placeholder="https://..."
-                className="rounded-2xl border-white/70 bg-white/82 shadow-sm shadow-slate-200/50 transition-all placeholder:text-slate-400 hover:border-[#47D9FF]/70 focus-visible:border-[#5B6CFF] focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15"
+            <Field label={t('editprofil.bio_label')} htmlFor="profil-bio">
+              <textarea
+                id="profil-bio"
+                value={bio}
+                onChange={(e) => setBio(e.target.value)}
+                placeholder={t('editprofil.bio_placeholder')}
+                rows={3}
+                className="flex w-full resize-none rounded-2xl border border-white/70 bg-white/82 px-3 py-2 text-sm shadow-sm shadow-slate-200/50 transition-all placeholder:text-slate-400 hover:border-[#47D9FF]/70 focus-visible:border-[#5B6CFF] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15 dark:border-white/15 dark:bg-white/5 dark:placeholder:text-muted-foreground"
               />
-            </Field>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label={t('auth.register.birthdate_label')} htmlFor="profil-birth-date">
-              <Input
-                id="profil-birth-date"
-                type="date"
-                value={birthDate}
-                onChange={(e) => setBirthDate(e.target.value)}
-                disabled={birthDateLocked}
-                title={birthDateLocked ? t('editprofil.birthdate_locked') : undefined}
+              <span
                 className={cn(
-                  'rounded-2xl border-white/70 bg-white/82 shadow-sm shadow-slate-200/50 transition-all hover:border-[#47D9FF]/70 focus-visible:border-[#5B6CFF] focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15',
-                  birthDateLocked &&
-                    'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-500 hover:border-slate-200',
-                )}
-              />
-            </Field>
-
-            <Field label={t('auth.register.gender_label')} htmlFor="profil-gender">
-              <select
-                id="profil-gender"
-                value={gender}
-                onChange={(e) => setGender(e.target.value as ProfilEditableFields['gender'])}
-                disabled={genderLocked}
-                title={genderLocked ? t('editprofil.gender_locked') : undefined}
-                className={cn(
-                  'flex h-10 w-full rounded-2xl border border-white/70 bg-white/82 px-3 py-2 text-sm shadow-sm shadow-slate-200/50 transition-all hover:border-[#47D9FF]/70 focus-visible:border-[#5B6CFF] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15',
-                  genderLocked &&
-                    'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-500 hover:border-slate-200',
+                  'self-end text-xs',
+                  bioTooLong ? 'font-bold text-destructive' : 'text-muted-foreground',
                 )}
               >
-                <option value="">{t('editprofil.gender_none')}</option>
-                <option value="female">{t('auth.register.gender_female')}</option>
-                <option value="male">{t('auth.register.gender_male')}</option>
-              </select>
+                {bioRemaining}
+              </span>
             </Field>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label={t('editprofil.location_label')} htmlFor="profil-location">
+                <Input
+                  id="profil-location"
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  placeholder={t('editprofil.location_placeholder')}
+                  className="rounded-2xl border-white/70 bg-white/82 shadow-sm shadow-slate-200/50 transition-all placeholder:text-slate-400 hover:border-[#47D9FF]/70 focus-visible:border-[#5B6CFF] focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15"
+                />
+              </Field>
+
+              <Field label={t('editprofil.website_label')} htmlFor="profil-website">
+                <Input
+                  id="profil-website"
+                  value={website}
+                  onChange={(e) => setWebsite(e.target.value)}
+                  placeholder="https://..."
+                  className="rounded-2xl border-white/70 bg-white/82 shadow-sm shadow-slate-200/50 transition-all placeholder:text-slate-400 hover:border-[#47D9FF]/70 focus-visible:border-[#5B6CFF] focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15"
+                />
+              </Field>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label={t('auth.register.birthdate_label')} htmlFor="profil-birth-date">
+                <Input
+                  id="profil-birth-date"
+                  type="date"
+                  value={birthDate}
+                  onChange={(e) => setBirthDate(e.target.value)}
+                  disabled={birthDateLocked}
+                  title={birthDateLocked ? t('editprofil.birthdate_locked') : undefined}
+                  className={cn(
+                    'rounded-2xl border-white/70 bg-white/82 shadow-sm shadow-slate-200/50 transition-all hover:border-[#47D9FF]/70 focus-visible:border-[#5B6CFF] focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15',
+                    birthDateLocked &&
+                      'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-500 hover:border-slate-200',
+                  )}
+                />
+              </Field>
+
+              <Field label={t('auth.register.gender_label')} htmlFor="profil-gender">
+                <select
+                  id="profil-gender"
+                  value={gender}
+                  onChange={(e) => setGender(e.target.value as ProfilEditableFields['gender'])}
+                  disabled={genderLocked}
+                  title={genderLocked ? t('editprofil.gender_locked') : undefined}
+                  className={cn(
+                    'flex h-10 w-full rounded-2xl border border-white/70 bg-white/82 px-3 py-2 text-sm shadow-sm shadow-slate-200/50 transition-all hover:border-[#47D9FF]/70 focus-visible:border-[#5B6CFF] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15',
+                    genderLocked &&
+                      'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-500 hover:border-slate-200',
+                  )}
+                >
+                  <option value="">{t('editprofil.gender_none')}</option>
+                  <option value="female">{t('auth.register.gender_female')}</option>
+                  <option value="male">{t('auth.register.gender_male')}</option>
+                </select>
+              </Field>
+            </div>
           </div>
         </div>
 
-        <DialogFooter className="border-t p-4">
+        <DialogFooter className="shrink-0 border-t p-4">
           <Button
             className="w-full rounded-full bg-gradient-to-r from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] font-bold text-white shadow-[0_18px_44px_rgba(91,108,255,0.3)] transition hover:scale-[1.01] sm:w-auto"
             disabled={!canSave || saving}
