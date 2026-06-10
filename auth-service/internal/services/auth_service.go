@@ -209,17 +209,33 @@ func (s *AuthService) Logout(rawToken string) error {
 	return nil
 }
 
-// VerifyEmail consomme un token de vérification et marque l'adresse vérifiée.
-// Renvoie ErrInvalidToken si le token est inconnu / expiré / déjà utilisé.
-func (s *AuthService) VerifyEmail(rawToken string) error {
+// VerifyEmail consomme un token de vérification, marque l'adresse vérifiée et
+// ouvre une session dans la foulée (access + refresh) : cliquer le lien prouve
+// la possession de la boîte, l'utilisateur entre donc directement dans l'app
+// sans se reconnecter. Renvoie ErrInvalidToken si le token est inconnu /
+// expiré / déjà utilisé, ErrUserInactive si le compte a été désactivé entre-temps.
+func (s *AuthService) VerifyEmail(rawToken string) (string, string, *models.User, error) {
 	userID, err := s.consumeAccountToken(rawToken, purposeVerify)
 	if err != nil {
-		return err
+		return "", "", nil, err
 	}
-	if _, err := s.db.Exec(`UPDATE credentials SET email_verified = true WHERE id = $1`, userID); err != nil {
-		return fmt.Errorf("activation email_verified : %w", err)
+
+	// UPDATE ... RETURNING : on marque vérifié ET on récupère l'utilisateur en
+	// une requête, pour pouvoir lui émettre une session immédiatement.
+	const q = `
+		UPDATE credentials SET email_verified = true
+		WHERE id = $1
+		RETURNING id, email, role, is_active, email_verified, created_at`
+	u := &models.User{}
+	if err := s.db.QueryRow(q, userID).
+		Scan(&u.ID, &u.Email, &u.Role, &u.IsActive, &u.EmailVerified, &u.CreatedAt); err != nil {
+		return "", "", nil, fmt.Errorf("activation email_verified : %w", err)
 	}
-	return nil
+	if !u.IsActive {
+		return "", "", nil, ErrUserInactive // compte banni : pas de session.
+	}
+
+	return s.issueTokens(u)
 }
 
 // ResendVerification renvoie un mail de vérification. ANTI-ÉNUMÉRATION : renvoie
@@ -273,16 +289,13 @@ func (s *AuthService) sendVerificationMail(u *models.User) {
 			"Ce lien expire dans 24 heures. Si tu n'es pas à l'origine de cette "+
 			"inscription, ignore ce message.",
 		link)
-	html := fmt.Sprintf(
-		`<p>Bienvenue sur <strong>Breezy</strong> !</p>`+
-			`<p>Confirme ton adresse e-mail en cliquant sur le bouton ci-dessous :</p>`+
-			`<p><a href="%s">Vérifier mon adresse e-mail</a></p>`+
-			`<p>Ou copie ce lien dans ton navigateur :<br>%s</p>`+
-			`<p>Ce lien expire dans 24 heures. Si tu n'es pas à l'origine de cette `+
-			`inscription, ignore ce message.</p>`,
-		link, link)
+	htmlBody := brandedEmailHTML(s.appBaseURL,
+		"Bienvenue sur Breezy 👋",
+		"Plus qu'une étape : confirme ton adresse e-mail pour activer ton compte et rejoindre la conversation.",
+		"Vérifier mon adresse e-mail", link,
+		"Ce lien expire dans 24 heures. Si tu n'es pas à l'origine de cette inscription, ignore simplement ce message.")
 
-	if err := s.mailer.Send(u.Email, subject, html, text); err != nil {
+	if err := s.mailer.Send(u.Email, subject, htmlBody, text); err != nil {
 		log.Printf("[auth-service] envoi mail vérif à %s : %v", u.Email, err)
 	}
 }
@@ -368,16 +381,13 @@ func (s *AuthService) sendResetMail(u *models.User) {
 			"Ce lien expire dans 1 heure. Si tu n'es pas à l'origine de cette "+
 			"demande, ignore ce message : ton mot de passe reste inchangé.",
 		link)
-	html := fmt.Sprintf(
-		`<p>Tu as demandé à réinitialiser ton mot de passe <strong>Breezy</strong>.</p>`+
-			`<p>Choisis un nouveau mot de passe en cliquant sur le bouton ci-dessous :</p>`+
-			`<p><a href="%s">Réinitialiser mon mot de passe</a></p>`+
-			`<p>Ou copie ce lien dans ton navigateur :<br>%s</p>`+
-			`<p>Ce lien expire dans 1 heure. Si tu n'es pas à l'origine de cette `+
-			`demande, ignore ce message : ton mot de passe reste inchangé.</p>`,
-		link, link)
+	htmlBody := brandedEmailHTML(s.appBaseURL,
+		"Réinitialise ton mot de passe 🔒",
+		"Tu as demandé à changer ton mot de passe Breezy. Choisis-en un nouveau en un clic — c'est rapide et sécurisé.",
+		"Choisir un nouveau mot de passe", link,
+		"Ce lien expire dans 1 heure. Si tu n'es pas à l'origine de cette demande, ignore ce message : ton mot de passe reste inchangé.")
 
-	if err := s.mailer.Send(u.Email, subject, html, text); err != nil {
+	if err := s.mailer.Send(u.Email, subject, htmlBody, text); err != nil {
 		log.Printf("[auth-service] envoi mail reset à %s : %v", u.Email, err)
 	}
 }

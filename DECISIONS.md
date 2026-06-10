@@ -48,6 +48,14 @@
   écran de confirmation dans tous les cas.
 - **Login non-vérifié = blocage dur** (`403 email_not_verified`, aucun token émis), vérifié
   *après* le bcrypt pour ne pas révéler l'existence du compte.
+- **Vérification d'e-mail = auto-login (révise la position « pas de session avant login »).**
+  `POST /auth/verify-email/confirm` consomme le token, pose `email_verified=true` *et* émet une
+  session (access + refresh, comme `/login`) ; le BFF Next pose le cookie refresh httpOnly et renvoie
+  l'access token, la page `verify-email` stocke ce dernier et redirige vers le **feed**. Justifié par
+  la même logique que le lien de reset : cliquer le lien (token usage unique, TTL 24h, envoyé à
+  l'adresse du compte) **prouve la possession de la boîte** → facteur d'authentification suffisant.
+  Garde : un compte désactivé (`is_active=false`) reste bloqué (`403`, aucune session). Le no-session
+  ne vaut donc plus que pour le **register** (provisioning serveur, ci-dessous), pas pour la vérif.
 - **Provisioning préservé au register, sans session client (décision Phase 1).** `auth/register`
   continue d'émettre les tokens, mais le BFF Next s'en sert **uniquement côté serveur** pour
   provisionner l'identité (`POST /users` + `POST /profils`, avec `username`/`birth_date`/`gender`
@@ -61,6 +69,11 @@
   `email_verified=false` et doivent se vérifier).
 - **Liens dans le mail → pages front** (`APP_BASE_URL/verify-email|reset-password?token=…`), pas
   l'API directement : maîtrise de l'UX (succès/expiré/erreur), API qui reste JSON-only.
+- **Corps HTML des e-mails = coquille de marque partagée** (`services/mail_template.go`,
+  `brandedEmailHTML`, pure & testée) : layout table + styles inline (compat Outlook/Gmail/Apple Mail),
+  direction graphique clear mode (dégradé `#8D3DFF→#5B6CFF→#47D9FF`, logo via `APP_BASE_URL`), bouton
+  « bulletproof » (repli couleur solide). Vérif et reset la réutilisent → cohérence visuelle, un seul
+  point de maintenance. La version **texte** reste sobre (délivrabilité).
 - **Dev sans SMTP configuré = transport console** : le mailer logge le mail + le lien sur stdout au
   lieu d'envoyer (zéro dépendance Gmail en dev, on clique le lien depuis les logs).
 

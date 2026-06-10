@@ -1,12 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 import { apiUrl } from '@/lib/config'
+import { provisionUser } from '@/lib/provision'
+import { setRefreshCookie } from '@/lib/server/auth-cookie'
+
+type AuthPayload = {
+  data?: {
+    message?: string
+    token?: string
+    refresh_token?: string
+    user?: unknown
+  }
+  error?: string
+  code?: string
+}
 
 /**
- * POST /api/auth/verify-email — passthrough vers /auth/verify-email/confirm.
- * Consomme le token reçu par e-mail. Aucun cookie ni session à gérer : le
- * compte reste à connecter ensuite. Relaie tel quel le statut + le corps
- * (succès {data:{message}} ou {error, code:'invalid_token'}).
+ * POST /api/auth/verify-email — confirme le token reçu par e-mail PUIS ouvre la
+ * session : pose le cookie refresh httpOnly et renvoie l'access token au client
+ * (→ localStorage). Cliquer le lien prouve la possession de la boîte, donc
+ * l'utilisateur entre directement dans l'app sans se reconnecter. Symétrique du
+ * BFF /api/auth/login.
  */
 export async function POST(request: NextRequest) {
   let body: { token?: string }
@@ -41,6 +55,35 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const payload = await upstreamResponse.json().catch(() => null)
-  return NextResponse.json(payload ?? {}, { status: upstreamResponse.status })
+  const payload = (await upstreamResponse.json().catch(() => null)) as AuthPayload | null
+
+  if (!upstreamResponse.ok) {
+    const message = payload?.error ?? 'La vérification a échoué.'
+    return NextResponse.json(
+      { error: message, code: payload?.code },
+      { status: upstreamResponse.status }
+    )
+  }
+
+  const accessToken = payload?.data?.token ?? null
+  const refreshToken = payload?.data?.refresh_token ?? null
+
+  // L'access token repart au client (→ localStorage) ; le refresh token reste
+  // dans un cookie httpOnly posé ici (jamais exposé au JS).
+  const nextResponse = NextResponse.json(
+    { accessToken, user: payload?.data?.user, message: 'Adresse vérifiée.' },
+    { status: upstreamResponse.status }
+  )
+
+  if (refreshToken) {
+    setRefreshCookie(nextResponse, refreshToken)
+  }
+
+  // Provisioning paresseux best-effort (idempotent) : l'identité a déjà été
+  // créée au register, on s'aligne sur le flux login par robustesse.
+  if (accessToken) {
+    await provisionUser(accessToken)
+  }
+
+  return nextResponse
 }

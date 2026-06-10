@@ -491,8 +491,8 @@ export const messages: Record<Locale, Messages> = {
     'auth.verify.loading_desc': 'Un instant, on confirme ton adresse e-mail.',
     'auth.verify.success_title': 'Adresse vérifiée !',
     'auth.verify.success_desc':
-      'Ton compte est activé. Tu peux maintenant te connecter.',
-    'auth.verify.go_to_login': 'Se connecter',
+      'Ton compte est activé et te voilà connecté. Bienvenue sur Breezy !',
+    'auth.verify.go_to_app': 'Accéder à Breezy',
     'auth.verify.invalid_title': 'Lien invalide ou expiré',
     'auth.verify.invalid_desc':
       "Ce lien de vérification est invalide ou a expiré. Demande-en un nouveau ci-dessous.",
@@ -1103,8 +1103,8 @@ export const messages: Record<Locale, Messages> = {
     'auth.verify.loading_desc': 'One moment, we are confirming your email address.',
     'auth.verify.success_title': 'Email verified!',
     'auth.verify.success_desc':
-      'Your account is now active. You can sign in.',
-    'auth.verify.go_to_login': 'Sign in',
+      'Your account is active and you are now signed in. Welcome to Breezy!',
+    'auth.verify.go_to_app': 'Enter Breezy',
     'auth.verify.invalid_title': 'Invalid or expired link',
     'auth.verify.invalid_desc':
       'This verification link is invalid or has expired. Request a new one below.',

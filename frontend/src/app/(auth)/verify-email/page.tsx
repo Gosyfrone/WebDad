@@ -15,6 +15,7 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { setAccessToken } from '@/lib/auth-client'
 import { ROUTES } from '@/lib/routes'
 import { useT } from '@/components/language-provider'
 
@@ -29,12 +30,18 @@ function VerifyEmailContent() {
   const [email, setEmail] = React.useState('')
   const [isResending, setIsResending] = React.useState(false)
   const [resendNotice, setResendNotice] = React.useState<string | null>(null)
+  // Le token de vérification est à usage unique : on garantit un seul POST
+  // (sinon le double-rendu de React StrictMode en dev consommerait le token au
+  // 1er appel et afficherait « invalide » au 2nd).
+  const verifyOnce = React.useRef(false)
 
   React.useEffect(() => {
     if (!token) {
       setStatus('invalid')
       return
     }
+    if (verifyOnce.current) return
+    verifyOnce.current = true
 
     let cancelled = false
     ;(async () => {
@@ -44,8 +51,16 @@ function VerifyEmailContent() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ token }),
         })
+        const payload = await response.json().catch(() => null)
         if (cancelled) return
-        setStatus(response.ok ? 'success' : 'invalid')
+        if (response.ok) {
+          // Session ouverte par le BFF (cookie refresh httpOnly) : on stocke
+          // l'access token pour entrer directement dans l'app, sans reconnexion.
+          if (payload?.accessToken) setAccessToken(payload.accessToken)
+          setStatus('success')
+        } else {
+          setStatus('invalid')
+        }
       } catch {
         if (!cancelled) setStatus('invalid')
       }
@@ -129,7 +144,7 @@ function VerifyEmailContent() {
       <CardContent className="relative space-y-4 px-6 pb-7 pt-2">
         {status === 'success' ? (
           <Button asChild className="h-11 w-full rounded-2xl bg-gradient-to-r from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] text-base font-semibold text-white">
-            <Link href={ROUTES.login}>{t('auth.verify.go_to_login')}</Link>
+            <Link href={ROUTES.feed}>{t('auth.verify.go_to_app')}</Link>
           </Button>
         ) : null}
 
@@ -170,7 +185,7 @@ function VerifyEmailContent() {
           )
         ) : null}
 
-        {status !== 'loading' ? (
+        {status === 'invalid' ? (
           <Link
             href={ROUTES.login}
             className="block text-center text-sm font-semibold text-[#5B6CFF] underline-offset-4 transition hover:text-[#8D3DFF] hover:underline"

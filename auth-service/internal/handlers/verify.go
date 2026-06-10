@@ -17,8 +17,9 @@ import (
 // @Accept      json
 // @Produce     json
 // @Param       body body models.VerifyEmailRequest true "Token de vérification (issu du lien e-mail)"
-// @Success     200 {object} map[string]string "Adresse vérifiée — data: {message}"
+// @Success     200 {object} models.AuthUser "Adresse vérifiée et session ouverte — data: {message, token, refresh_token, user}"
 // @Failure     400 {object} map[string]string "Token invalide ou expiré (code: invalid_token)"
+// @Failure     403 {object} map[string]string "Compte désactivé"
 // @Failure     500 {object} map[string]string "Erreur interne"
 // @Router      /auth/verify-email/confirm [post]
 func (h *Handler) ConfirmVerifyEmail(c *gin.Context) {
@@ -28,19 +29,30 @@ func (h *Handler) ConfirmVerifyEmail(c *gin.Context) {
 		return
 	}
 
-	if err := h.auth.VerifyEmail(req.Token); err != nil {
-		if errors.Is(err, services.ErrInvalidToken) {
+	token, refresh, user, err := h.auth.VerifyEmail(req.Token)
+	if err != nil {
+		switch {
+		case errors.Is(err, services.ErrInvalidToken):
 			c.JSON(http.StatusBadRequest, gin.H{
 				"error": "lien de vérification invalide ou expiré",
 				"code":  "invalid_token",
 			})
-			return
+		case errors.Is(err, services.ErrUserInactive):
+			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "vérification impossible"})
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "vérification impossible"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"data": gin.H{"message": "Adresse e-mail vérifiée."}})
+	// Session émise (comme /login) : le BFF posera le cookie refresh et renverra
+	// l'access token au client → l'utilisateur entre directement dans l'app.
+	c.JSON(http.StatusOK, gin.H{"data": gin.H{
+		"message":       "Adresse e-mail vérifiée.",
+		"token":         token,
+		"refresh_token": refresh,
+		"user":          models.NewAuthUser(user),
+	}})
 }
 
 // RequestVerifyEmail : POST /auth/verify-email/request — (ré)envoie le mail de
