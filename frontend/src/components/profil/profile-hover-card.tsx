@@ -51,6 +51,7 @@ export function ProfileHoverCard({
   const triggerRef = useRef<HTMLAnchorElement | null>(null)
   const triggerHovered = useRef(false)
   const contentHovered = useRef(false)
+  const pointerTriggered = useRef(false)
   const loadSeq = useRef(0)
 
   useEffect(() => {
@@ -133,6 +134,7 @@ export function ProfileHoverCard({
 
   function scheduleOpen(event: React.MouseEvent<HTMLAnchorElement>) {
     linkProps.onMouseEnter?.(event)
+    pointerTriggered.current = true
     beginOpen()
   }
 
@@ -143,7 +145,10 @@ export function ProfileHoverCard({
 
   function schedulePointerOpen(event: React.PointerEvent<HTMLAnchorElement>) {
     linkProps.onPointerEnter?.(event)
-    if (event.pointerType === 'mouse') beginOpen()
+    if (event.pointerType === 'mouse') {
+      pointerTriggered.current = true
+      beginOpen()
+    }
   }
 
   function schedulePointerClose(event: React.PointerEvent<HTMLAnchorElement>) {
@@ -163,6 +168,7 @@ export function ProfileHoverCard({
 
   function endTriggerHover() {
     triggerHovered.current = false
+    blurTriggerIfPointerDriven(pointerTriggered, triggerRef)
     scheduleClose()
   }
 
@@ -194,6 +200,7 @@ export function ProfileHoverCard({
     clearOpenTimer()
     clearCloseTimer()
     setOpen(false)
+    blurTriggerIfPointerDriven(pointerTriggered, triggerRef)
   }
 
   function handleOpenChange(nextOpen: boolean) {
@@ -207,7 +214,7 @@ export function ProfileHoverCard({
           {...linkProps}
           ref={triggerRef}
           href={href}
-          className={cn('inline-flex rounded-sm', className)}
+          className={cn('inline-flex rounded-sm focus:outline-none focus-visible:outline-none', className)}
           onMouseEnter={scheduleOpen}
           onMouseLeave={scheduleTriggerClose}
           onPointerEnter={schedulePointerOpen}
@@ -221,6 +228,16 @@ export function ProfileHoverCard({
         align="start"
         side="bottom"
         sideOffset={10}
+        onOpenAutoFocus={(event) => {
+          event.preventDefault()
+        }}
+        onCloseAutoFocus={(event) => {
+          event.preventDefault()
+          requestAnimationFrame(() => {
+            blurActiveElement(triggerRef.current)
+            pointerTriggered.current = false
+          })
+        }}
         onMouseEnter={() => {
           contentHovered.current = true
           clearCloseTimer()
@@ -397,6 +414,20 @@ function formatCount(n: number): string {
 function canHoverPreview(): boolean {
   if (typeof window === 'undefined') return false
   return window.matchMedia('(hover: hover) and (pointer: fine)').matches
+}
+
+function blurActiveElement(element: HTMLAnchorElement | null): void {
+  if (!element || document.activeElement !== element) return
+  element.blur()
+}
+
+function blurTriggerIfPointerDriven(
+  pointerTriggered: React.MutableRefObject<boolean>,
+  triggerRef: React.MutableRefObject<HTMLAnchorElement | null>,
+): void {
+  if (!pointerTriggered.current) return
+  pointerTriggered.current = false
+  blurActiveElement(triggerRef.current)
 }
 
 async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
