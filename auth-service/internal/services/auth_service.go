@@ -242,7 +242,7 @@ func (s *AuthService) ListUsers(limit, offset int, query string) ([]models.User,
 	if err != nil {
 		return nil, fmt.Errorf("liste comptes : %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	users := make([]models.User, 0, limit)
 	for rows.Next() {
@@ -349,7 +349,7 @@ func (s *AuthService) ListBannedBefore(before time.Time, limit int) ([]models.Us
 	if err != nil {
 		return nil, fmt.Errorf("liste comptes bannis : %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	users := make([]models.User, 0, limit)
 	for rows.Next() {
