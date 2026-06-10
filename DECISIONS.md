@@ -29,6 +29,20 @@
 - **Username login orchestration stays in the BFF.** `username` remains owned by user-service:
   the Next BFF resolves `username -> user_id` through the gateway, then calls auth-service with
   `user_id + password`. Auth-service still owns only credentials/JWT and never joins user data.
+- **Login with Google/Microsoft = OIDC Authorization Code, code→tokens exchanged server-side in auth-service**
+  (`golang.org/x/oauth2` + `go-oidc/v3`). The front only obtains the authorization URL and relays the callback
+  `code`; the ID token (signature via JWKS, issuer, audience=client_id) is verified **server-side** — never trusting
+  a front-supplied token. Anti-CSRF `state` is server-generated, stored by the front, re-checked at callback.
+  Unverified `email_verified` is rejected (blocks account takeover by email matching).
+- **Generic provider registry** (`internal/oauth`, map `{google, microsoft}` = issuer + scopes): adding Microsoft is
+  one map entry + env vars (`MICROSOFT_CLIENT_ID/SECRET/TENANT`); a provider with no `CLIENT_ID` is skipped (→ 404).
+  Providers are **lazily** built (OIDC discovery at first use, not at boot) so the service starts offline-resilient.
+  *Caveat:* Microsoft multi-tenant (`common`) emits per-tenant issuers — single-tenant works out of the box; broad
+  multi-tenant would need relaxed issuer verification (not enabled). Google is the delivered provider.
+- **Account reconciliation by email:** existing account → connect + fill `provider_subject` (only if unset, no
+  hijack); absent → create with `password NULL`. Classic login on a password-less account is refused with a clear
+  409 (`ErrNoLocalPassword`) steering the user to the external provider. Schema migrated via idempotent `ALTER`
+  (`provider` enum default `'local'`, `provider_subject`, `password` nullable) — `'local'` keeps prior behavior intact.
 
 ## Email (vérification & reset)
 

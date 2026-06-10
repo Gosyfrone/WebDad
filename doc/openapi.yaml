@@ -7,8 +7,6 @@ info:
 paths:
   /auth/login:
     post:
-      description: Accepte `email` pour le login classique, ou `user_id` quand le
-        BFF a résolu un username via user-service. `password` est toujours requis.
       consumes:
       - application/json
       produces:
@@ -17,7 +15,7 @@ paths:
       - auth
       summary: Se connecter
       parameters:
-      - description: Credentials (email ou user_id + password)
+      - description: Credentials
         name: body
         in: body
         required: true
@@ -41,7 +39,13 @@ paths:
             additionalProperties:
               type: string
         '403':
-          description: 'Compte désactivé ou e-mail non vérifié (code: email_not_verified)'
+          description: Compte désactivé
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '409':
+          description: Compte sans mot de passe (connexion via Google/Microsoft)
           schema:
             type: object
             additionalProperties:
@@ -80,7 +84,7 @@ paths:
             type: object
             additionalProperties:
               type: string
-  /auth/password/forgot:
+  /auth/oauth/{provider}/exchange:
     post:
       consumes:
       - application/json
@@ -88,52 +92,82 @@ paths:
       - application/json
       tags:
       - auth
-      summary: Demander une réinitialisation de mot de passe
+      summary: Finaliser une connexion OAuth (Google/Microsoft)
       parameters:
-      - description: Adresse e-mail
+      - enum:
+        - google
+        - microsoft
+        type: string
+        description: Fournisseur OIDC
+        name: provider
+        in: path
+        required: true
+      - description: Code d'autorisation
         name: body
         in: body
         required: true
         schema:
-          $ref: '#/definitions/models.ForgotPasswordRequest'
+          $ref: '#/definitions/models.OAuthExchangeRequest'
       responses:
         '200':
-          description: 'Réponse générique — data: {message}'
+          description: 'Connexion réussie — data: {token, refresh_token, user}'
           schema:
-            type: object
-            additionalProperties:
-              type: string
+            $ref: '#/definitions/models.AuthUser'
         '400':
           description: Payload invalide
           schema:
             type: object
             additionalProperties:
               type: string
-  /auth/password/reset:
-    post:
-      consumes:
-      - application/json
-      produces:
-      - application/json
-      tags:
-      - auth
-      summary: Réinitialiser le mot de passe
-      parameters:
-      - description: Token de reset (issu du lien e-mail) + nouveau mot de passe
-        name: body
-        in: body
-        required: true
-        schema:
-          $ref: '#/definitions/models.ResetPasswordRequest'
-      responses:
-        '200':
-          description: 'Mot de passe réinitialisé — data: {message}'
+        '401':
+          description: Échange/vérification OAuth échoué ou email non vérifié
           schema:
             type: object
             additionalProperties:
               type: string
-        '400':
-          description: 'Token invalide ou expiré (code: invalid_token) / payload invalide'
+        '403':
+          description: Compte désactivé
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '404':
+          description: Provider non supporté/configuré
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '500':
+          description: Erreur interne
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /auth/oauth/{provider}/url:
+    get:
+      produces:
+      - application/json
+      tags:
+      - auth
+      summary: Démarrer une connexion OAuth (Google/Microsoft)
+      parameters:
+      - enum:
+        - google
+        - microsoft
+        type: string
+        description: Fournisseur OIDC
+        name: provider
+        in: path
+        required: true
+      responses:
+        '200':
+          description: 'data: {url, state}'
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '404':
+          description: Provider non supporté/configuré
           schema:
             type: object
             additionalProperties:
@@ -201,8 +235,7 @@ paths:
           $ref: '#/definitions/models.RegisterRequest'
       responses:
         '201':
-          description: 'Compte créé, mail de vérification envoyé (best-effort) — data:
-            {token, refresh_token, user}'
+          description: 'Compte créé — data: {token, refresh_token, user}'
           schema:
             $ref: '#/definitions/models.AuthUser'
         '400':
@@ -213,218 +246,6 @@ paths:
               type: string
         '409':
           description: Email déjà utilisé
-          schema:
-            type: object
-            additionalProperties:
-              type: string
-        '500':
-          description: Erreur interne
-          schema:
-            type: object
-            additionalProperties:
-              type: string
-  /auth/users:
-    get:
-      security:
-      - BearerAuth: []
-      produces:
-      - application/json
-      tags:
-      - admin
-      summary: Lister les comptes (modérateur/admin)
-      parameters:
-      - type: string
-        description: Filtre email (sous-chaîne)
-        name: q
-        in: query
-      - type: integer
-        description: Nombre de résultats (défaut 20, max 100)
-        name: limit
-        in: query
-      - type: integer
-        description: Décalage de pagination
-        name: offset
-        in: query
-      responses:
-        '200':
-          description: 'data: []User'
-          schema:
-            type: object
-            additionalProperties: true
-        '401':
-          description: Non authentifié
-          schema:
-            type: object
-            additionalProperties:
-              type: string
-        '403':
-          description: Rôle insuffisant
-          schema:
-            type: object
-            additionalProperties:
-              type: string
-        '500':
-          description: Erreur interne
-          schema:
-            type: object
-            additionalProperties:
-              type: string
-  /auth/users/{id}:
-    delete:
-      security:
-      - BearerAuth: []
-      produces:
-      - application/json
-      tags:
-      - admin
-      summary: Supprimer définitivement un compte (admin, RGPD)
-      parameters:
-      - type: string
-        description: ID de l'utilisateur cible
-        name: id
-        in: path
-        required: true
-      responses:
-        '204':
-          description: Compte supprimé
-        '400':
-          description: Auto-suppression interdite
-          schema:
-            type: object
-            additionalProperties:
-              type: string
-        '401':
-          description: Non authentifié
-          schema:
-            type: object
-            additionalProperties:
-              type: string
-        '403':
-          description: Rôle insuffisant
-          schema:
-            type: object
-            additionalProperties:
-              type: string
-        '404':
-          description: Compte introuvable
-          schema:
-            type: object
-            additionalProperties:
-              type: string
-        '500':
-          description: Erreur interne
-          schema:
-            type: object
-            additionalProperties:
-              type: string
-  /auth/users/{id}/role:
-    patch:
-      security:
-      - BearerAuth: []
-      consumes:
-      - application/json
-      produces:
-      - application/json
-      tags:
-      - admin
-      summary: Changer le rôle d'un compte (admin)
-      parameters:
-      - type: string
-        description: ID de l'utilisateur cible
-        name: id
-        in: path
-        required: true
-      - description: Nouveau rôle
-        name: body
-        in: body
-        required: true
-        schema:
-          $ref: '#/definitions/models.UpdateRoleRequest'
-      responses:
-        '200':
-          description: 'data: {id, role}'
-          schema:
-            type: object
-            additionalProperties: true
-        '400':
-          description: Payload invalide ou auto-modification
-          schema:
-            type: object
-            additionalProperties:
-              type: string
-        '401':
-          description: Non authentifié
-          schema:
-            type: object
-            additionalProperties:
-              type: string
-        '403':
-          description: Rôle insuffisant
-          schema:
-            type: object
-            additionalProperties:
-              type: string
-        '404':
-          description: Compte introuvable
-          schema:
-            type: object
-            additionalProperties:
-              type: string
-        '500':
-          description: Erreur interne
-          schema:
-            type: object
-            additionalProperties:
-              type: string
-  /auth/users/{id}/status:
-    patch:
-      security:
-      - BearerAuth: []
-      consumes:
-      - application/json
-      produces:
-      - application/json
-      tags:
-      - admin
-      summary: Bannir / réactiver un compte (modérateur/admin)
-      parameters:
-      - type: string
-        description: ID de l'utilisateur cible
-        name: id
-        in: path
-        required: true
-      - description: Nouvel état actif
-        name: body
-        in: body
-        required: true
-        schema:
-          $ref: '#/definitions/models.UpdateStatusRequest'
-      responses:
-        '200':
-          description: 'data: {id, is_active}'
-          schema:
-            type: object
-            additionalProperties: true
-        '400':
-          description: Payload invalide ou auto-modification
-          schema:
-            type: object
-            additionalProperties:
-              type: string
-        '401':
-          description: Non authentifié
-          schema:
-            type: object
-            additionalProperties:
-              type: string
-        '403':
-          description: Rôle insuffisant
-          schema:
-            type: object
-            additionalProperties:
-              type: string
-        '404':
-          description: Compte introuvable
           schema:
             type: object
             additionalProperties:
@@ -459,75 +280,6 @@ paths:
               type: string
         '500':
           description: Erreur interne
-          schema:
-            type: object
-            additionalProperties:
-              type: string
-  /auth/verify-email/confirm:
-    post:
-      consumes:
-      - application/json
-      produces:
-      - application/json
-      tags:
-      - auth
-      summary: Confirmer la vérification d'e-mail
-      parameters:
-      - description: Token de vérification (issu du lien e-mail)
-        name: body
-        in: body
-        required: true
-        schema:
-          $ref: '#/definitions/models.VerifyEmailRequest'
-      responses:
-        '200':
-          description: 'Adresse vérifiée et session ouverte — data: {message, token,
-            refresh_token, user}'
-          schema:
-            $ref: '#/definitions/models.AuthUser'
-        '400':
-          description: 'Token invalide ou expiré (code: invalid_token)'
-          schema:
-            type: object
-            additionalProperties:
-              type: string
-        '403':
-          description: Compte désactivé
-          schema:
-            type: object
-            additionalProperties:
-              type: string
-        '500':
-          description: Erreur interne
-          schema:
-            type: object
-            additionalProperties:
-              type: string
-  /auth/verify-email/request:
-    post:
-      consumes:
-      - application/json
-      produces:
-      - application/json
-      tags:
-      - auth
-      summary: Renvoyer le mail de vérification
-      parameters:
-      - description: Adresse e-mail
-        name: body
-        in: body
-        required: true
-        schema:
-          $ref: '#/definitions/models.RequestVerifyRequest'
-      responses:
-        '200':
-          description: 'Réponse générique — data: {message}'
-          schema:
-            type: object
-            additionalProperties:
-              type: string
-        '400':
-          description: Payload invalide
           schema:
             type: object
             additionalProperties:
@@ -1912,7 +1664,7 @@ paths:
         name: id
         in: path
         required: true
-      - description: Contenu texte et/ou médias + parent_id optionnel
+      - description: Contenu + parent_id optionnel
         name: body
         in: body
         required: true
@@ -2503,64 +2255,6 @@ paths:
             type: object
             additionalProperties:
               type: string
-  /messages/conversations/{id}/messages/{messageId}:
-    patch:
-      security:
-      - BearerAuth: []
-      consumes:
-      - application/json
-      produces:
-      - application/json
-      tags:
-      - messages
-      summary: Modifier un message chiffré
-      parameters:
-      - type: string
-        description: Conversation ID
-        name: id
-        in: path
-        required: true
-      - type: string
-        description: Message ID
-        name: messageId
-        in: path
-        required: true
-      - description: Nouvelle version chiffrée + nonce
-        name: body
-        in: body
-        required: true
-        schema:
-          $ref: '#/definitions/models.EditMessageRequest'
-      responses:
-        '200':
-          description: Message modifié
-          schema:
-            type: object
-            additionalProperties: true
-        '400':
-          description: Bad Request
-          schema:
-            type: object
-            additionalProperties:
-              type: string
-        '401':
-          description: Unauthorized
-          schema:
-            type: object
-            additionalProperties:
-              type: string
-        '403':
-          description: Forbidden
-          schema:
-            type: object
-            additionalProperties:
-              type: string
-        '404':
-          description: Not Found
-          schema:
-            type: object
-            additionalProperties:
-              type: string
   /messages/keys:
     put:
       security:
@@ -2592,88 +2286,6 @@ paths:
             type: object
             additionalProperties:
               type: string
-        '401':
-          description: Unauthorized
-          schema:
-            type: object
-            additionalProperties:
-              type: string
-  /messages/keys/backup:
-    get:
-      security:
-      - BearerAuth: []
-      produces:
-      - application/json
-      tags:
-      - messages
-      summary: Récupérer la sauvegarde chiffrée de sa clé privée
-      responses:
-        '200':
-          description: OK
-          schema:
-            $ref: '#/definitions/models.KeyBackup'
-        '401':
-          description: Unauthorized
-          schema:
-            type: object
-            additionalProperties:
-              type: string
-        '404':
-          description: Not Found
-          schema:
-            type: object
-            additionalProperties:
-              type: string
-    put:
-      security:
-      - BearerAuth: []
-      consumes:
-      - application/json
-      produces:
-      - application/json
-      tags:
-      - messages
-      summary: Enregistrer la sauvegarde chiffrée de sa clé privée
-      parameters:
-      - description: Sauvegarde chiffrée (blobs base64)
-        name: body
-        in: body
-        required: true
-        schema:
-          $ref: '#/definitions/models.PutBackupRequest'
-      responses:
-        '200':
-          description: OK
-          schema:
-            type: object
-            additionalProperties:
-              type: string
-        '400':
-          description: Bad Request
-          schema:
-            type: object
-            additionalProperties:
-              type: string
-        '401':
-          description: Unauthorized
-          schema:
-            type: object
-            additionalProperties:
-              type: string
-  /messages/keys/backup/status:
-    get:
-      security:
-      - BearerAuth: []
-      produces:
-      - application/json
-      tags:
-      - messages
-      summary: Savoir si une sauvegarde chiffrée existe
-      responses:
-        '200':
-          description: OK
-          schema:
-            $ref: '#/definitions/models.BackupStatusResponse'
         '401':
           description: Unauthorized
           schema:
@@ -3041,23 +2653,24 @@ definitions:
         type: string
       role:
         type: string
-  models.ForgotPasswordRequest:
-    type: object
-    required:
-    - email
-    properties:
-      email:
-        type: string
   models.LoginRequest:
     type: object
     required:
+    - email
     - password
     properties:
       email:
         type: string
       password:
         type: string
-      user_id:
+  models.OAuthExchangeRequest:
+    type: object
+    required:
+    - code
+    properties:
+      code:
+        type: string
+      state:
         type: string
   models.RefreshRequest:
     type: object
@@ -3075,45 +2688,6 @@ definitions:
       password:
         type: string
         minLength: 8
-  models.RequestVerifyRequest:
-    type: object
-    required:
-    - email
-    properties:
-      email:
-        type: string
-  models.ResetPasswordRequest:
-    type: object
-    required:
-    - new_password
-    - token
-    properties:
-      new_password:
-        type: string
-        minLength: 8
-      token:
-        type: string
-  models.UpdateRoleRequest:
-    type: object
-    required:
-    - role
-    properties:
-      role:
-        type: string
-  models.UpdateStatusRequest:
-    type: object
-    required:
-    - is_active
-    properties:
-      is_active:
-        type: boolean
-  models.VerifyEmailRequest:
-    type: object
-    required:
-    - token
-    properties:
-      token:
-        type: string
   models.CreateUserRequest:
     type: object
     required:
@@ -3296,10 +2870,6 @@ definitions:
         type: string
       id:
         type: string
-      media:
-        type: array
-        items:
-          $ref: '#/definitions/models.MediaRef'
       parent_id:
         type: string
       post_id:
@@ -3318,15 +2888,12 @@ definitions:
         maxLength: 60
   models.CreateCommentRequest:
     type: object
+    required:
+    - content
     properties:
       content:
         type: string
         maxLength: 280
-      media:
-        type: array
-        maxItems: 4
-        items:
-          $ref: '#/definitions/models.MediaRef'
       parent_id:
         type: string
   models.CreatePostRequest:
@@ -3365,25 +2932,8 @@ definitions:
         type: string
       created_at:
         type: string
-      hidden_at:
-        type: string
-      hidden_by:
-        type: string
       id:
         type: string
-      is_hidden:
-        description: 'Suppression « douce » par la modération : un modérateur/admin
-          qui retire le
-
-          post d''autrui le MASQUE (is_hidden) au lieu de l''effacer → il sort des
-          fils
-
-          publics mais reste restaurable depuis la corbeille de modération. HiddenAt
-
-          sert aussi de point de départ à la purge RGPD (5 ans). L''auteur qui supprime
-
-          SON post déclenche, lui, une vraie suppression (hard), pas un masquage.'
-        type: boolean
       likes_count:
         type: integer
       media:
@@ -3391,12 +2941,6 @@ definitions:
         items:
           $ref: '#/definitions/models.MediaRef'
       pinned_at:
-        type: string
-      purge_at:
-        description: 'PurgeAt : date prévue de purge définitive (transient = hidden_at
-          + rétention),
-
-          calculée à la lecture de la corbeille pour l''affichage front. NON stockée.'
         type: string
       quote_post_id:
         type: string
@@ -3424,11 +2968,6 @@ definitions:
       content:
         type: string
         maxLength: 280
-  models.BackupStatusResponse:
-    type: object
-    properties:
-      exists:
-        type: boolean
   models.ConversationView:
     type: object
     properties:
@@ -3495,71 +3034,12 @@ definitions:
         type: string
       type:
         type: string
-  models.EditMessageRequest:
-    type: object
-    required:
-    - ciphertext
-    - nonce
-    properties:
-      ciphertext:
-        type: string
-      mentioned_member_ids:
-        type: array
-        items:
-          type: string
-      nonce:
-        type: string
-  models.KeyBackup:
-    type: object
-    properties:
-      created_at:
-        type: string
-      id:
-        type: string
-      kdf_params:
-        description: 'paramètres Argon2id (JSON: m,t,p)'
-        type: string
-      nonce:
-        description: nonce XChaCha20 de l'emballage (base64)
-        type: string
-      public_key:
-        description: clé publique associée (vérif. post-déballage)
-        type: string
-      salt:
-        description: sel Argon2id (base64)
-        type: string
-      updated_at:
-        type: string
-      user_id:
-        type: string
-      wrapped_private_key:
-        description: clé privée emballée (base64)
-        type: string
   models.PublishKeyRequest:
     type: object
     required:
     - public_key
     properties:
       public_key:
-        type: string
-  models.PutBackupRequest:
-    type: object
-    required:
-    - kdf_params
-    - nonce
-    - public_key
-    - salt
-    - wrapped_private_key
-    properties:
-      kdf_params:
-        type: string
-      nonce:
-        type: string
-      public_key:
-        type: string
-      salt:
-        type: string
-      wrapped_private_key:
         type: string
   models.SendMessageRequest:
     type: object

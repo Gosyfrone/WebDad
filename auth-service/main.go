@@ -10,6 +10,7 @@ import (
 	"github.com/webdad/auth-service/internal/db"
 	"github.com/webdad/auth-service/internal/eraser"
 	"github.com/webdad/auth-service/internal/notify"
+	"github.com/webdad/auth-service/internal/oauth"
 	"github.com/webdad/auth-service/internal/router"
 	"github.com/webdad/auth-service/internal/services"
 )
@@ -62,7 +63,24 @@ func main() {
 	})
 	go auth.RunAccountPurgeSweeper(sweepCtx, acctEraser, cfg.AccountPurgeAfter, cfg.AccountPurgeSweepInterval)
 
-	r := router.New(auth)
+	// Providers OAuth (Login with Google/Microsoft). Construction paresseuse :
+	// le discovery OIDC se fait au premier usage, pas au boot.
+	oauthReg := oauth.NewRegistry(context.Background(), oauth.Options{
+		RedirectBaseURL: cfg.OAuthRedirectBaseURL,
+		Providers: map[string]oauth.Credentials{
+			"google": {
+				ClientID:     cfg.GoogleClientID,
+				ClientSecret: cfg.GoogleClientSecret,
+			},
+			"microsoft": {
+				ClientID:     cfg.MicrosoftClientID,
+				ClientSecret: cfg.MicrosoftClientSecret,
+				Issuer:       cfg.MicrosoftIssuer(),
+			},
+		},
+	})
+
+	r := router.New(auth, oauthReg)
 
 	log.Printf("[%s] en écoute sur le port %s", serviceName, cfg.Port)
 	if err := r.Run(":" + cfg.Port); err != nil {
