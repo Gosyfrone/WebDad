@@ -7,6 +7,8 @@ info:
 paths:
   /auth/login:
     post:
+      description: Accepte `email` pour le login classique, ou `user_id` quand le
+        BFF a résolu un username via user-service. `password` est toujours requis.
       consumes:
       - application/json
       produces:
@@ -15,7 +17,7 @@ paths:
       - auth
       summary: Se connecter
       parameters:
-      - description: Credentials
+      - description: Credentials (email ou user_id + password)
         name: body
         in: body
         required: true
@@ -2967,12 +2969,13 @@ definitions:
   models.LoginRequest:
     type: object
     required:
-    - email
     - password
     properties:
       email:
         type: string
       password:
+        type: string
+      user_id:
         type: string
   models.RefreshRequest:
     type: object

@@ -25,7 +25,7 @@
 
 | Feature | Type | Status |
 |---|---|---|
-| Registration / Login | Primary | 🟢 End-to-end (UI→BFF→gateway→auth), provisioning, username pre-check, logout + session guard. |
+| Registration / Login | Primary | 🟢 End-to-end (UI→BFF→gateway→auth), login by email or username, provisioning, username pre-check, logout + session guard. |
 | JWT auth + protected routes | Primary | 🟢 access 15m + refresh 24h + `/auth/validate`, front single-flight refresh + `(app)` guard. **TODO:** gateway JWT middleware. |
 | Role management (User/Mod/Admin) | Primary | 🟡 Role in JWT, user-service enforces admin delete, role-based nav. **TODO:** generalize to other services, real role front. |
 | Post creation/reading | Primary | 🟢 End-to-end, infinite feed (For you / Following), visibility-filtered, likes, threaded comments, reposts/quotes, pin, emoji, images/videos. **TODO:** post edit. |

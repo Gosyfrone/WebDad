@@ -54,7 +54,9 @@ composed by the **caller** (front/BFF).
   response intact; prefix is preserved (`/auth/...` → auth-service `/auth/...`).
 - **Auth:** access token (15m, localStorage, sent as `Authorization: Bearer` by the client
   directly to the gateway) + refresh token (24h, httpOnly cookie `breezy-refresh`, managed by
-  the Next BFF same-origin). Refresh is single-flight on 401.
+  the Next BFF same-origin). Login accepts email directly; username login is resolved by the
+  BFF through `GET /users/by-username/:username`, then auth-service checks credentials by
+  `user_id`. Refresh is single-flight on 401.
 - **Cross-service reads (privacy):** post-service calls profil-service (`visibility`) and
   user-service (follow status) to filter post visibility; clients have no-op fallbacks for autonomy.
 - **Notifications (server→server):** post/message/user-service POST best-effort fire-and-forget

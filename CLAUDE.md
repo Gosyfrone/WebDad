@@ -8,9 +8,9 @@
 > - **[CHANGELOG.md](CHANGELOG.md)** — session work log · **[CHANGELOG_ARCHIVE.md](CHANGELOG_ARCHIVE.md)** — resolved issues / debugging history.
 > - **[PROMPTING.md](PROMPTING.md)** — token-efficient workflow + prompt templates (read on demand, NOT auto-loaded; user may say *"from PROMPTING.md, write me the prompt for: …"*).
 > - Knowledge graph in `graphify-out/` — query it before reading source (see Operating Rules).
-> - Latest session note: 10/06/2026 — message edit security review found no plaintext leak or auth bypass; remaining watchpoints are payload/rate limits; details in `CHANGELOG.md`.
+> - Latest session note: 10/06/2026 — login now accepts email or username in one field; BFF resolves username through user-service then auth-service checks credentials by user_id; Swagger regenerated; details in `CHANGELOG.md`.
 
-*Last Codex sync: 10/06/2026 — commit naming requested for the live feed/profile identity propagation fix.*
+*Last Codex sync: 10/06/2026 — email-or-username login implemented and documented.*
 
 ---
 
@@ -151,6 +151,9 @@ several well-chosen secondary features · **all 3 roles functional** · pro slid
 
 ## 9. Current handoff
 
+- 2026-06-10: login page now uses one "Adresse e-mail ou Username" field; username login is resolved by the Next BFF through user-service, then auth-service authenticates by `user_id`.
+- 2026-06-10: Swagger annotation/docs updated for the new login contract; local `make swagger` still fails on Windows bash, so the aggregate spec was regenerated in a temporary Go Linux container with `GOBIN` aligned to the script.
+- 2026-06-10: suggested commit message for this change: `feat(auth): allow login with email or username`.
 - 2026-06-10: register birth date input now clamps future dates to today's local date across browsers/mobile pickers, while keeping the 13+ validation at submit time.
 - 2026-06-10: suggested commit message for this change: `fix(auth): cap register birth date to today`.
 - 2026-06-10: quote/repost media rendering implemented on the frontend; quoted posts now show image/video previews, and Docker exposes the app on port 3000.
