@@ -161,6 +161,27 @@ export async function listRelations(
 }
 
 /**
+ * Aperçu des abonnés communs : personnes qui suivent `targetUserId` et que
+ * l'utilisateur courant suit aussi. Composition front sur les routes existantes.
+ */
+export async function getCommonFollowers(
+  targetUserId: string,
+  limit = 3,
+): Promise<RelationUser[]> {
+  const me = await getMe()
+  if (me.id === targetUserId) return []
+
+  const [followers, myFollowingIds] = await Promise.all([
+    listRelations(targetUserId, 'followers'),
+    getFollowingIds(me.id),
+  ])
+
+  return followers
+    .filter((user) => user.id !== me.id && myFollowingIds.has(user.id))
+    .slice(0, limit)
+}
+
+/**
  * Recherche d'utilisateurs. Le préfixe `@` bascule sur la recherche par
  * identifiant (user-service) ; sinon recherche par nom affiché (profil-service).
  * Dans les deux cas, le résultat est enrichi pour porter username + décoratif.

@@ -493,6 +493,12 @@ export const messages: Record<Locale, Messages> = {
     // — Liste d'utilisateurs —
     'list.view_profile_aria': 'Voir le profil de {name}',
 
+    // — Carte de survol profil —
+    'profile_hover.follow': "S'abonner",
+    'profile_hover.following': 'Abonné',
+    'profile_hover.load_error': "Aperçu du profil indisponible.",
+    'profile_hover.followed_by': 'Suivi par {names}',
+
     // — Modale des relations —
     'relations.title': 'Connexions',
     'relations.load_error': 'Impossible de charger la liste.',
@@ -970,6 +976,12 @@ export const messages: Record<Locale, Messages> = {
 
     // — User list —
     'list.view_profile_aria': "View {name}'s profile",
+
+    // — Profile hover card —
+    'profile_hover.follow': 'Follow',
+    'profile_hover.following': 'Following',
+    'profile_hover.load_error': "Profile preview isn't available.",
+    'profile_hover.followed_by': 'Followed by {names}',
 
     // — Relations dialog —
     'relations.title': 'Connections',

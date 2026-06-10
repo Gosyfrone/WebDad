@@ -87,7 +87,7 @@ message 8085 · notification 8086 · media 8087 · MinIO API 9000 / console 9001
 - Frontend: business clients (`lib/{api,posts,bookmarks,messages,notifications,media}.ts`) layer over
   `apiFetch` (Bearer + single-flight refresh inherited); no hardcoded URLs (`lib/config.ts`/`lib/routes.ts`).
 - i18n: every UI string via `useT()`, keys `namespace.key`, FR is the reference, EN parity required.
-- Identity (avatar/name) is always clickable → the person's profile.
+- Identity (avatar/name) is always clickable → the person's profile, with a web hover preview.
 - Pure, testable functions for non-trivial logic (e.g. `planUpdate`, `convLess`, `withinSessionWindow`,
   `computeDivider`, mention/translation helpers) — Go tests + vitest.
 - Secrets only via `.env` (root = cross-cutting + interpolable by compose; `<service>/.env` = own config).

@@ -1,13 +1,11 @@
 'use client'
 
-import Link from 'next/link'
-
 import { cn } from '@/lib/utils'
-import { ROUTES } from '@/lib/routes'
 import type { RelationUser } from '@/types'
 import { useT } from '@/components/language-provider'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
+import { ProfilLink } from '@/components/profil/profil-link'
 
 interface UserListItemProps {
   user: RelationUser
@@ -58,26 +56,46 @@ export function UserListItem({
 }: UserListItemProps) {
   const t = useT()
   const initials = (user.displayName.charAt(0) || user.username.charAt(0) || '?').toUpperCase()
-  const href = isSelf ? ROUTES.profil : `${ROUTES.profil}/${user.username}`
 
   return (
     <div className="relative flex items-start gap-3 px-4 py-3 transition-colors hover:bg-accent">
       {/* Lien « étiré » : rend toute la ligne cliquable vers le profil. */}
-      <Link
-        href={href}
+      <ProfilLink
+        author={{ id: user.id, username: user.username }}
+        preview={false}
         aria-label={t('list.view_profile_aria', { name: user.displayName })}
         className="absolute inset-0 z-0"
         onClick={() => onProfileOpen?.(user)}
-      />
+      >
+        <span className="sr-only">{t('list.view_profile_aria', { name: user.displayName })}</span>
+      </ProfilLink>
 
-      <Avatar className="h-10 w-10 shrink-0">
-        {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user.displayName} />}
-        <AvatarFallback>{initials}</AvatarFallback>
-      </Avatar>
+      <ProfilLink
+        author={{ id: user.id, username: user.username }}
+        className="relative z-10 shrink-0"
+        onClick={() => onProfileOpen?.(user)}
+      >
+        <Avatar className="h-10 w-10">
+          {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user.displayName} />}
+          <AvatarFallback>{initials}</AvatarFallback>
+        </Avatar>
+      </ProfilLink>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate text-sm font-bold text-foreground">{user.displayName}</span>
-        <span className="truncate text-sm text-muted-foreground">@{user.username}</span>
+        <ProfilLink
+          author={{ id: user.id, username: user.username }}
+          className="relative z-10 truncate text-sm font-bold text-foreground hover:underline"
+          onClick={() => onProfileOpen?.(user)}
+        >
+          {user.displayName}
+        </ProfilLink>
+        <ProfilLink
+          author={{ id: user.id, username: user.username }}
+          className="relative z-10 truncate text-sm text-muted-foreground hover:underline"
+          onClick={() => onProfileOpen?.(user)}
+        >
+          @{user.username}
+        </ProfilLink>
         {showBio && user.bio && (
           <p className="mt-0.5 line-clamp-2 text-sm text-muted-foreground">{user.bio}</p>
         )}
