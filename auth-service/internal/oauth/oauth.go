@@ -15,6 +15,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 	"sync"
 
@@ -31,6 +32,10 @@ var ErrUnknownProvider = errors.New("provider OAuth inconnu ou non configuré")
 type providerDef struct {
 	issuer string   // URL de l'émetteur (sert au discovery .well-known/openid-configuration)
 	scopes []string // scopes OAuth demandés (openid + identité)
+	// Microsoft n'émet pas toujours le claim `email_verified` (v2.0) ; quand il
+	// est ABSENT, on considère l'email vérifié si ce flag est posé. Un claim
+	// présent à false reste refusé.
+	assumeEmailVerified bool
 }
 
 // defs : config générique des providers. Microsoft = une entrée, comme Google.
@@ -41,9 +46,44 @@ var defs = map[string]providerDef{
 	},
 	"microsoft": {
 		// issuer par défaut (multi-tenant) ; surchargé par MICROSOFT_TENANT.
-		issuer: "https://login.microsoftonline.com/common/v2.0",
-		scopes: []string{oidc.ScopeOpenID, "email", "profile"},
+		issuer:              "https://login.microsoftonline.com/common/v2.0",
+		scopes:              []string{oidc.ScopeOpenID, "email", "profile"},
+		assumeEmailVerified: true,
 	},
+}
+
+// ─── Multi-tenant Microsoft ──────────────────────────────────────────────────
+// Les endpoints 'common' / 'organizations' / 'consumers' acceptent n'importe
+// quel tenant : leur document de discovery déclare l'issuer LITTÉRAL
+// "https://login.microsoftonline.com/{tenantid}/v2.0", que go-oidc ne peut pas
+// comparer à l'issuer réel des tokens. Pour ces endpoints on désactive la
+// vérification automatique de l'issuer et on la refait manuellement après
+// Verify : forme stricte de l'URL + cohérence avec le claim `tid`.
+
+// microsoftIssuerPlaceholder : issuer tel que déclaré par le discovery multi-tenant.
+const microsoftIssuerPlaceholder = "https://login.microsoftonline.com/{tenantid}/v2.0"
+
+var microsoftMultiTenantIssuers = map[string]bool{
+	"https://login.microsoftonline.com/common/v2.0":        true,
+	"https://login.microsoftonline.com/organizations/v2.0": true,
+	"https://login.microsoftonline.com/consumers/v2.0":     true,
+}
+
+var microsoftIssuerRe = regexp.MustCompile(
+	`^https://login\.microsoftonline\.com/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})/v2\.0$`)
+
+// checkMicrosoftIssuer revalide manuellement l'issuer d'un id_token
+// multi-tenant : URL de forme stricte (host Microsoft + tenant UUID) et tenant
+// identique au claim `tid`. Fonction pure → testée unitairement.
+func checkMicrosoftIssuer(iss, tid string) error {
+	m := microsoftIssuerRe.FindStringSubmatch(iss)
+	if m == nil {
+		return fmt.Errorf("issuer Microsoft inattendu : %q", iss)
+	}
+	if !strings.EqualFold(m[1], tid) {
+		return fmt.Errorf("claim tid (%q) incohérent avec l'issuer %q", tid, iss)
+	}
+	return nil
 }
 
 // Credentials : secrets d'un provider (issus de la config/env). Issuer permet
@@ -63,9 +103,13 @@ type Identity struct {
 
 // Provider : un provider OIDC prêt à l'emploi (config OAuth + vérificateur JWKS).
 type Provider struct {
-	name     string
-	oauth    *oauth2.Config
-	verifier *oidc.IDTokenVerifier
+	name                string
+	oauth               *oauth2.Config
+	verifier            *oidc.IDTokenVerifier
+	assumeEmailVerified bool
+	// checkIssuer : vérification manuelle de l'issuer (multi-tenant Microsoft),
+	// nil quand go-oidc la fait déjà (issuer fixe).
+	checkIssuer func(iss, tid string) error
 }
 
 // AuthURL construit l'URL d'autorisation pour le `state` donné (anti-CSRF).
@@ -94,16 +138,28 @@ func (p *Provider) Exchange(ctx context.Context, code string) (*Identity, error)
 
 	var claims struct {
 		Email         string `json:"email"`
-		EmailVerified bool   `json:"email_verified"`
+		EmailVerified *bool  `json:"email_verified"` // pointeur : absent ≠ false
+		TenantID      string `json:"tid"`
 	}
 	if err := idToken.Claims(&claims); err != nil {
 		return nil, fmt.Errorf("lecture des claims id_token : %w", err)
 	}
 
+	if p.checkIssuer != nil {
+		if err := p.checkIssuer(idToken.Issuer, claims.TenantID); err != nil {
+			return nil, fmt.Errorf("vérification issuer : %w", err)
+		}
+	}
+
+	verified := p.assumeEmailVerified // défaut quand le claim est absent
+	if claims.EmailVerified != nil {
+		verified = *claims.EmailVerified
+	}
+
 	return &Identity{
 		Subject:       idToken.Subject,
 		Email:         claims.Email,
-		EmailVerified: claims.EmailVerified,
+		EmailVerified: verified,
 	}, nil
 }
 
@@ -166,7 +222,19 @@ func (r *Registry) Get(name string) (*Provider, error) {
 		issuer = cred.Issuer
 	}
 
-	oidcProvider, err := oidc.NewProvider(r.ctx, issuer)
+	discoveryCtx := r.ctx
+	// audience = ClientID : rejette un id_token émis pour une autre app.
+	verifierCfg := &oidc.Config{ClientID: cred.ClientID}
+	var checkIssuer func(iss, tid string) error
+	if microsoftMultiTenantIssuers[issuer] {
+		// cf. bloc "Multi-tenant Microsoft" : issuer placeholder accepté au
+		// discovery, vérification d'issuer reportée après Verify.
+		discoveryCtx = oidc.InsecureIssuerURLContext(r.ctx, microsoftIssuerPlaceholder)
+		verifierCfg.SkipIssuerCheck = true
+		checkIssuer = checkMicrosoftIssuer
+	}
+
+	oidcProvider, err := oidc.NewProvider(discoveryCtx, issuer)
 	if err != nil {
 		return nil, fmt.Errorf("discovery OIDC %s : %w", name, err)
 	}
@@ -182,8 +250,9 @@ func (r *Registry) Get(name string) (*Provider, error) {
 			RedirectURL: r.redirectBase + "/auth/callback/" + name,
 			Scopes:      def.scopes,
 		},
-		// audience = ClientID : rejette un id_token émis pour une autre app.
-		verifier: oidcProvider.Verifier(&oidc.Config{ClientID: cred.ClientID}),
+		verifier:            oidcProvider.Verifier(verifierCfg),
+		assumeEmailVerified: def.assumeEmailVerified,
+		checkIssuer:         checkIssuer,
 	}
 	r.cache[name] = p
 	return p, nil
