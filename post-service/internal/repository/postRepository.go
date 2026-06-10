@@ -44,6 +44,12 @@ func NewPostRepository(db *mongo.Database) *PostRepository {
 
 // --- Posts -------------------------------------------------------------------
 
+// notHidden renvoie la condition « post non masqué par la modération »
+// (is_hidden absent ou false). Fusionnée dans tous les filtres de lecture
+// publique pour que les posts retirés en suppression douce sortent des fils
+// sans être effacés. Une nouvelle map à chaque appel (pas d'aliasing).
+func notHidden() bson.M { return bson.M{"is_hidden": bson.M{"$ne": true}} }
+
 // Create insère le post et renseigne post.ID avec l'identifiant généré.
 func (r *PostRepository) Create(ctx context.Context, post *models.Post) error {
 	res, err := r.posts.InsertOne(ctx, post)
@@ -57,8 +63,9 @@ func (r *PostRepository) Create(ctx context.Context, post *models.Post) error {
 }
 
 // GetAll renvoie le fil global trié du plus récent au plus ancien, paginé.
+// Les posts masqués par la modération sont exclus.
 func (r *PostRepository) GetAll(ctx context.Context, limit, skip int64) ([]models.Post, error) {
-	return r.find(ctx, bson.M{}, limit, skip)
+	return r.find(ctx, notHidden(), limit, skip)
 }
 
 // GetByProfile renvoie les posts d'un auteur, triés du plus récent au plus ancien.
@@ -67,7 +74,9 @@ func (r *PostRepository) GetByProfile(ctx context.Context, authorID string, limi
 		SetSort(bson.D{{Key: "pinned_at", Value: -1}, {Key: "created_at", Value: -1}}).
 		SetLimit(limit + skip)
 
-	cursor, err := r.posts.Find(ctx, bson.M{"author_id": authorID}, opts)
+	filter := notHidden()
+	filter["author_id"] = authorID
+	cursor, err := r.posts.Find(ctx, filter, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -91,6 +100,11 @@ func (r *PostRepository) GetByProfile(ctx context.Context, authorID string, limi
 		if err != nil {
 			continue
 		}
+		// Un repost pointant un post masqué par la modération ne réapparaît pas
+		// par la bande sur le profil de celui qui l'a reposté.
+		if post.IsHidden {
+			continue
+		}
 		post.RepostedByID = repost.UserID
 		post.RepostedAt = &repost.CreatedAt
 		posts = append(posts, *post)
@@ -111,7 +125,9 @@ func (r *PostRepository) GetByProfile(ctx context.Context, authorID string, limi
 // triés du plus récent au plus ancien. Une seule requête indexée (`$in` sur
 // author_id) : la sélection est faite côté DB, pas côté client.
 func (r *PostRepository) GetByAuthors(ctx context.Context, authorIDs []string, limit, skip int64) ([]models.Post, error) {
-	return r.find(ctx, bson.M{"author_id": bson.M{"$in": authorIDs}}, limit, skip)
+	filter := notHidden()
+	filter["author_id"] = bson.M{"$in": authorIDs}
+	return r.find(ctx, filter, limit, skip)
 }
 
 // find factorise la lecture paginée + triée des posts.
@@ -153,6 +169,129 @@ func (r *PostRepository) Delete(ctx context.Context, id bson.ObjectID) error {
 		return mongo.ErrNoDocuments
 	}
 	return nil
+}
+
+// Hide masque un post (suppression douce de modération) : il sort des fils
+// publics mais reste en base, restaurable. Pose is_hidden/hidden_by/hidden_at
+// et renvoie le document à jour (mongo.ErrNoDocuments si absent).
+func (r *PostRepository) Hide(ctx context.Context, id bson.ObjectID, byUserID string, at time.Time) (*models.Post, error) {
+	update := bson.M{
+		"$set": bson.M{
+			"is_hidden":  true,
+			"hidden_by":  byUserID,
+			"hidden_at":  at,
+			"updated_at": at,
+		},
+	}
+	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
+
+	var post models.Post
+	if err := r.posts.FindOneAndUpdate(ctx, bson.M{"_id": id}, update, opts).Decode(&post); err != nil {
+		return nil, err
+	}
+	return &post, nil
+}
+
+// RestoreHidden lève le masquage d'un post (retour dans les fils publics) et
+// efface les métadonnées de modération. Renvoie le document à jour.
+func (r *PostRepository) RestoreHidden(ctx context.Context, id bson.ObjectID) (*models.Post, error) {
+	update := bson.M{
+		"$set":   bson.M{"is_hidden": false, "updated_at": time.Now()},
+		"$unset": bson.M{"hidden_by": "", "hidden_at": ""},
+	}
+	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
+
+	var post models.Post
+	if err := r.posts.FindOneAndUpdate(ctx, bson.M{"_id": id}, update, opts).Decode(&post); err != nil {
+		return nil, err
+	}
+	return &post, nil
+}
+
+// ListHidden renvoie les posts masqués (corbeille de modération, partagée
+// mod/admin), du plus récemment masqué au plus ancien, paginés.
+func (r *PostRepository) ListHidden(ctx context.Context, limit, skip int64) ([]models.Post, error) {
+	opts := options.Find().
+		SetSort(bson.D{{Key: "hidden_at", Value: -1}}).
+		SetLimit(limit).
+		SetSkip(skip)
+
+	cursor, err := r.posts.Find(ctx, bson.M{"is_hidden": true}, opts)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = cursor.Close(ctx) }()
+
+	posts := []models.Post{}
+	if err := cursor.All(ctx, &posts); err != nil {
+		return nil, err
+	}
+	return posts, nil
+}
+
+// ListPurgeable renvoie les posts masqués dont le masquage date d'avant
+// `before` (= now − rétention) → candidats à la purge RGPD définitive.
+func (r *PostRepository) ListPurgeable(ctx context.Context, before time.Time, limit int64) ([]models.Post, error) {
+	filter := bson.M{"is_hidden": true, "hidden_at": bson.M{"$lt": before}}
+	cursor, err := r.posts.Find(ctx, filter, options.Find().SetLimit(limit))
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = cursor.Close(ctx) }()
+	posts := []models.Post{}
+	if err := cursor.All(ctx, &posts); err != nil {
+		return nil, err
+	}
+	return posts, nil
+}
+
+// ListPurgeWarnable renvoie les posts masqués entrés dans la fenêtre de préavis
+// (`hidden_at < before` = now − (rétention − préavis)) et pas encore prévenus
+// (`purge_warned_at` absent) → à notifier une fois.
+func (r *PostRepository) ListPurgeWarnable(ctx context.Context, before time.Time, limit int64) ([]models.Post, error) {
+	filter := bson.M{
+		"is_hidden":       true,
+		"hidden_at":       bson.M{"$lt": before},
+		"purge_warned_at": bson.M{"$exists": false},
+	}
+	cursor, err := r.posts.Find(ctx, filter, options.Find().SetLimit(limit))
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = cursor.Close(ctx) }()
+	posts := []models.Post{}
+	if err := cursor.All(ctx, &posts); err != nil {
+		return nil, err
+	}
+	return posts, nil
+}
+
+// MarkPurgeWarned pose la date d'envoi du préavis de purge (idempotence du
+// balayage : on ne re-notifie pas un post déjà prévenu).
+func (r *PostRepository) MarkPurgeWarned(ctx context.Context, id bson.ObjectID, at time.Time) error {
+	_, err := r.posts.UpdateOne(ctx, bson.M{"_id": id}, bson.M{"$set": bson.M{"purge_warned_at": at}})
+	return err
+}
+
+// PurgeByAuthor efface DÉFINITIVEMENT toutes les données d'un utilisateur
+// (effacement RGPD) : ses posts, ses commentaires, ses likes, ses reposts et
+// ses signets (collections + appartenances + préférences). Best-effort sur
+// chaque collection ; renvoie le nombre de posts supprimés. Ne réajuste pas les
+// compteurs des posts d'AUTRES utilisateurs (compte effacé → dérive cosmétique
+// acceptable).
+func (r *PostRepository) PurgeByAuthor(ctx context.Context, userID string) (int64, error) {
+	res, err := r.posts.DeleteMany(ctx, bson.M{"author_id": userID})
+	var postsDeleted int64
+	if res != nil {
+		postsDeleted = res.DeletedCount
+	}
+	_, _ = r.comments.DeleteMany(ctx, bson.M{"author_id": userID})
+	_, _ = r.likes.DeleteMany(ctx, bson.M{"user_id": userID})
+	_, _ = r.reposts.DeleteMany(ctx, bson.M{"user_id": userID})
+	_, _ = r.bookmarks.DeleteMany(ctx, bson.M{"user_id": userID})
+	_, _ = r.bookmarkCollections.DeleteMany(ctx, bson.M{"user_id": userID})
+	_, _ = r.bookmarkPrefs.DeleteMany(ctx, bson.M{"user_id": userID})
+	return postsDeleted, err
 }
 
 // Update modifie le contenu et renvoie le document à jour (ReturnDocument

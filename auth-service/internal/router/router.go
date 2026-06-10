@@ -3,6 +3,7 @@ package router
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -13,13 +14,21 @@ import (
 
 const serviceName = "auth-service"
 
+// startedAt : instant d'init du package (≈ démarrage du process), exposé en
+// uptime dans /health (consommé par le monitoring admin du gateway).
+var startedAt = time.Now()
+
 // New construit le routeur Gin avec toutes les routes du service.
 func New(auth *services.AuthService) *gin.Engine {
 	r := gin.Default()
 	h := handlers.New(auth)
 
 	r.GET("/health", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"status": "ok", "service": serviceName})
+		c.JSON(http.StatusOK, gin.H{
+			"status":         "ok",
+			"service":        serviceName,
+			"uptime_seconds": int(time.Since(startedAt).Seconds()),
+		})
 	})
 
 	authGroup := r.Group("/auth")
@@ -35,13 +44,19 @@ func New(auth *services.AuthService) *gin.Engine {
 		// pose les claims avant que le handler ne les renvoie.
 		authGroup.GET("/validate", middleware.JWTAuth(auth), h.Validate)
 
-		// Administration des comptes (rôle + bannissement). Garde : JWT valide
-		// + rôle admin. Source de vérité du rôle et de l'état du compte.
-		admin := authGroup.Group("/users", middleware.JWTAuth(auth), middleware.AdminOnly())
+		// Administration des comptes. Source de vérité du rôle et de l'état du
+		// compte. Gardes différenciées (JWT valide d'abord) :
+		//   - annuaire + bannissement/réactivation = MODÉRATION → mod ou admin
+		//     (un modérateur « fait régner l'ordre » : il voit les comptes et peut
+		//     bannir/réactiver) ;
+		//   - changement de rôle = GOUVERNANCE → admin uniquement.
+		admin := authGroup.Group("/users", middleware.JWTAuth(auth))
 		{
-			admin.GET("", h.ListUsers)
-			admin.PATCH("/:id/role", h.SetRole)
-			admin.PATCH("/:id/status", h.SetStatus)
+			admin.GET("", middleware.ModeratorOnly(), h.ListUsers)
+			admin.PATCH("/:id/status", middleware.ModeratorOnly(), h.SetStatus)
+			admin.PATCH("/:id/role", middleware.AdminOnly(), h.SetRole)
+			// Effacement RGPD : purge définitive des identifiants (admin).
+			admin.DELETE("/:id", middleware.AdminOnly(), h.DeleteUser)
 		}
 	}
 

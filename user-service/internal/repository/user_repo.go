@@ -144,6 +144,20 @@ func (r *UserRepository) SoftDelete(id string) error {
 	return r.SetActive(id, false)
 }
 
+// PurgeUser efface DÉFINITIVEMENT un compte (effacement RGPD) : ses arêtes de
+// follow (les deux sens), ses demandes de follow en attente (les deux sens),
+// puis sa ligne `users`. Idempotent (aucune ligne = pas d'erreur).
+func (r *UserRepository) PurgeUser(id string) error {
+	if _, err := r.db.Exec(`DELETE FROM follows WHERE follower_id = $1 OR following_id = $1`, id); err != nil {
+		return err
+	}
+	if _, err := r.db.Exec(`DELETE FROM follow_requests WHERE follower_id = $1 OR following_id = $1`, id); err != nil {
+		return err
+	}
+	_, err := r.db.Exec(`DELETE FROM users WHERE id = $1`, id)
+	return err
+}
+
 // ─── Graphe social (follows) ──────────────────────────────────────────────
 
 // Follow crée la relation follower→following (idempotent : ON CONFLICT).

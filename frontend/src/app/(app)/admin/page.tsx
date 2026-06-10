@@ -1,10 +1,11 @@
-import { AdminView } from '@/components/admin/admin-view'
+import { AdminInfra } from '@/components/admin/admin-infra'
 
 /**
- * Panneau d'administration (rôle administrator) : annuaire des comptes,
- * changement de rôle (auth-service) et bannissement/réactivation (auth + user).
- * La garde d'accès est faite côté client dans AdminView et côté back (403).
+ * Administration « infra » (rôle administrator) : monitoring des conteneurs
+ * Docker / uptime des services (à venir, Stage ②). La gouvernance des comptes
+ * (annuaire, bannissement, rôles) vit désormais dans le centre de Modération,
+ * partagé avec les modérateurs. Garde côté client (AdminInfra) + back.
  */
 export default function AdminPage() {
-  return <AdminView />
+  return <AdminInfra />
 }

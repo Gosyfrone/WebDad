@@ -30,10 +30,23 @@ type Post struct {
 	CommentsCount int32         `bson:"comments_count" json:"comments_count"`
 	RepostsCount  int32         `bson:"reposts_count" json:"reposts_count"`
 	PinnedAt      *time.Time    `bson:"pinned_at,omitempty" json:"pinned_at,omitempty"`
-	RepostedByID  string        `bson:"-" json:"reposted_by_id,omitempty"`
-	RepostedAt    *time.Time    `bson:"-" json:"reposted_at,omitempty"`
-	CreatedAt     time.Time     `bson:"created_at" json:"created_at"`
-	UpdatedAt     time.Time     `bson:"updated_at" json:"updated_at"`
+	// Suppression « douce » par la modération : un modérateur/admin qui retire le
+	// post d'autrui le MASQUE (is_hidden) au lieu de l'effacer → il sort des fils
+	// publics mais reste restaurable depuis la corbeille de modération. HiddenAt
+	// sert aussi de point de départ à la purge RGPD (5 ans). L'auteur qui supprime
+	// SON post déclenche, lui, une vraie suppression (hard), pas un masquage.
+	IsHidden bool       `bson:"is_hidden,omitempty" json:"is_hidden,omitempty"`
+	HiddenBy string     `bson:"hidden_by,omitempty" json:"hidden_by,omitempty"`
+	HiddenAt *time.Time `bson:"hidden_at,omitempty" json:"hidden_at,omitempty"`
+	// PurgeWarnedAt : date d'envoi du préavis de purge RGPD (évite de re-notifier).
+	PurgeWarnedAt *time.Time `bson:"purge_warned_at,omitempty" json:"-"`
+	// PurgeAt : date prévue de purge définitive (transient = hidden_at + rétention),
+	// calculée à la lecture de la corbeille pour l'affichage front. NON stockée.
+	PurgeAt      *time.Time `bson:"-" json:"purge_at,omitempty"`
+	RepostedByID string     `bson:"-" json:"reposted_by_id,omitempty"`
+	RepostedAt   *time.Time `bson:"-" json:"reposted_at,omitempty"`
+	CreatedAt    time.Time  `bson:"created_at" json:"created_at"`
+	UpdatedAt    time.Time  `bson:"updated_at" json:"updated_at"`
 }
 
 // Repost — document de la collection `reposts`. Index unique `post_id+user_id`

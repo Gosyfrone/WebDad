@@ -230,6 +230,16 @@ func (h *Handler) Delete(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
+// PurgeUser : DELETE /users/:id/hard — efface DÉFINITIVEMENT un compte et son
+// graphe social (effacement RGPD, admin via middleware). Idempotent.
+func (h *Handler) PurgeUser(c *gin.Context) {
+	if err := h.users.PurgeUser(c.Param("id")); err != nil {
+		respondUserError(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
 // SetStatus : PATCH /users/:id/status — bannit/réactive un compte (admin via
 // middleware). Bascule la visibilité publique `users.is_active` ; le blocage
 // de connexion est porté par auth-service (PATCH /auth/users/:id/status).

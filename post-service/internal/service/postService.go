@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"time"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
@@ -66,6 +67,10 @@ type PostService struct {
 	bookmarkWindow time.Duration
 	profilClient   profilVisibilityClient
 	followClient   followStatusClient
+	// purgeAfter : rétention d'un tweet masqué avant purge RGPD ; purgeWarnBefore :
+	// préavis avant purge. <= 0 sur purgeAfter → balayage désactivé.
+	purgeAfter      time.Duration
+	purgeWarnBefore time.Duration
 }
 
 type profilVisibilityClient interface {
@@ -101,6 +106,15 @@ func WithNotifier(n notifier.Notifier) Option {
 func WithBookmarkWindow(window time.Duration) Option {
 	return func(s *PostService) {
 		s.bookmarkWindow = window
+	}
+}
+
+// WithPurgeRetention configure la rétention RGPD des tweets masqués (durée avant
+// purge définitive) et le préavis avant purge.
+func WithPurgeRetention(after, warnBefore time.Duration) Option {
+	return func(s *PostService) {
+		s.purgeAfter = after
+		s.purgeWarnBefore = warnBefore
 	}
 }
 
@@ -178,8 +192,9 @@ func (s *PostService) GetPosts(ctx context.Context, viewerID string, limit, offs
 }
 
 // GetPost renvoie un post par son id si le profil de l'auteur est lisible par
-// le visiteur courant.
-func (s *PostService) GetPost(ctx context.Context, id, viewerID string) (*models.Post, error) {
+// le visiteur courant. Un post masqué par la modération est invisible (404)
+// sauf pour un modérateur/admin (qui le consulte depuis la corbeille).
+func (s *PostService) GetPost(ctx context.Context, id, viewerID, viewerRole string) (*models.Post, error) {
 	oid, err := parseID(id)
 	if err != nil {
 		return nil, err
@@ -187,6 +202,9 @@ func (s *PostService) GetPost(ctx context.Context, id, viewerID string) (*models
 	post, err := s.repo.Get(ctx, oid)
 	if err != nil {
 		return nil, translateNotFound(err)
+	}
+	if post.IsHidden && !isModerator(viewerRole) {
+		return nil, ErrPostNotFound
 	}
 	allowed, err := s.canReadAuthor(ctx, viewerID, post.AuthorID)
 	if err != nil {
@@ -255,8 +273,13 @@ func (s *PostService) UnpinPost(ctx context.Context, id, actorID string) (*model
 	return unpinned, translateNotFound(err)
 }
 
-// DeletePost supprime un post si l'acteur en a le droit, puis purge ses likes
-// et commentaires (best-effort, pour ne pas laisser d'orphelins).
+// DeletePost retire un post. Deux comportements selon l'acteur :
+//   - l'auteur supprime SON post → suppression définitive (hard) + purge des
+//     likes/commentaires/reposts/signets et des notifications associées ;
+//   - un modérateur/admin retire le post d'un AUTRE utilisateur → suppression
+//     douce (masquage) : le post sort des fils mais file dans la corbeille de
+//     modération (partagée mod/admin), restaurable. Rien n'est purgé tant qu'il
+//     n'est pas effacé définitivement (PurgePost).
 func (s *PostService) DeletePost(ctx context.Context, id, actorID, actorRole string) error {
 	oid, err := parseID(id)
 	if err != nil {
@@ -269,6 +292,19 @@ func (s *PostService) DeletePost(ctx context.Context, id, actorID, actorRole str
 	if !canModify(post, actorID, actorRole) {
 		return ErrForbidden
 	}
+	// Auto-suppression (par l'auteur lui-même) = définitive. Retrait par la
+	// modération (acteur ≠ auteur) = masquage réversible vers la corbeille.
+	if post.AuthorID == actorID {
+		return s.hardDeletePost(ctx, oid, id, actorID)
+	}
+	_, err = s.repo.Hide(ctx, oid, actorID, time.Now())
+	return translateNotFound(err)
+}
+
+// hardDeletePost efface DÉFINITIVEMENT un post et purge en cascade ses
+// dépendances (likes/commentaires/reposts/signets) + les notifications qui le
+// pointent. Mutualisé entre l'auto-suppression et la purge de modération.
+func (s *PostService) hardDeletePost(ctx context.Context, oid bson.ObjectID, id, actorID string) error {
 	if err := s.repo.Delete(ctx, oid); err != nil {
 		return translateNotFound(err)
 	}
@@ -284,6 +320,135 @@ func (s *PostService) DeletePost(ctx context.Context, id, actorID, actorRole str
 		PostID:  id,
 	})
 	return nil
+}
+
+// ListHiddenPosts renvoie la corbeille de modération (posts masqués par
+// suppression douce), réservée aux modérateurs/admins. Du plus récemment
+// masqué au plus ancien.
+func (s *PostService) ListHiddenPosts(ctx context.Context, actorRole string, limit, offset int64) ([]models.Post, error) {
+	if !isModerator(actorRole) {
+		return nil, ErrForbidden
+	}
+	posts, err := s.repo.ListHidden(ctx, clampLimit(limit), clampOffset(offset))
+	if err != nil {
+		return nil, err
+	}
+	// Calcule la date de purge prévue (transient) pour l'affichage « bientôt
+	// purgé » côté modération. Sans rétention configurée, pas de date.
+	if s.purgeAfter > 0 {
+		for i := range posts {
+			if posts[i].HiddenAt != nil {
+				at := posts[i].HiddenAt.Add(s.purgeAfter)
+				posts[i].PurgeAt = &at
+			}
+		}
+	}
+	return posts, nil
+}
+
+// SweepPurge effectue un passage de purge RGPD : notifie les auteurs des tweets
+// entrant dans la fenêtre de préavis, puis purge définitivement ceux dont la
+// rétention est dépassée. Renvoie (prévenus, purgés). No-op si rétention <= 0.
+func (s *PostService) SweepPurge(ctx context.Context) (warned, purged int, err error) {
+	if s.purgeAfter <= 0 {
+		return 0, 0, nil
+	}
+	now := time.Now()
+	purgeBefore, warnBefore := purgeCutoffs(now, s.purgeAfter, s.purgeWarnBefore)
+
+	// Préavis (avant la purge, pour ne pas notifier un post qu'on efface dans le
+	// même passage).
+	warnable, err := s.repo.ListPurgeWarnable(ctx, warnBefore, MaxLimit)
+	if err != nil {
+		return 0, 0, err
+	}
+	for i := range warnable {
+		p := &warnable[i]
+		s.notif.Emit(notifier.Event{
+			Type:        notifier.EventPostPurgeWarning,
+			RecipientID: p.AuthorID,
+			PostID:      p.ID.Hex(),
+		})
+		if e := s.repo.MarkPurgeWarned(ctx, p.ID, now); e == nil {
+			warned++
+		}
+	}
+
+	// Purge définitive.
+	purgeable, err := s.repo.ListPurgeable(ctx, purgeBefore, MaxLimit)
+	if err != nil {
+		return warned, 0, err
+	}
+	for i := range purgeable {
+		p := &purgeable[i]
+		if e := s.hardDeletePost(ctx, p.ID, p.ID.Hex(), ""); e == nil {
+			purged++
+		}
+	}
+	return warned, purged, nil
+}
+
+// RunPurgeSweeper lance le balayage périodique jusqu'à annulation du contexte.
+// À appeler dans une goroutine au démarrage. Ne fait rien si rétention <= 0.
+func (s *PostService) RunPurgeSweeper(ctx context.Context, interval time.Duration) {
+	if s.purgeAfter <= 0 || interval <= 0 {
+		return
+	}
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		// Un premier passage immédiat, puis à chaque tick.
+		if warned, purged, err := s.SweepPurge(ctx); err != nil {
+			log.Printf("[purge] balayage : %v", err)
+		} else if warned > 0 || purged > 0 {
+			log.Printf("[purge] %d préavis, %d tweets purgés", warned, purged)
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+	}
+}
+
+// RestorePost lève le masquage d'un post depuis la corbeille (modérateur/admin).
+// Pas de confirmation : action réversible et non destructive.
+func (s *PostService) RestorePost(ctx context.Context, id, actorRole string) (*models.Post, error) {
+	if !isModerator(actorRole) {
+		return nil, ErrForbidden
+	}
+	oid, err := parseID(id)
+	if err != nil {
+		return nil, err
+	}
+	post, err := s.repo.RestoreHidden(ctx, oid)
+	return post, translateNotFound(err)
+}
+
+// PurgeUserData efface DÉFINITIVEMENT toutes les données d'un utilisateur
+// (effacement RGPD, réservé admin). Posts, commentaires, likes, reposts et
+// signets. Irréversible.
+func (s *PostService) PurgeUserData(ctx context.Context, userID, actorRole string) (int64, error) {
+	if actorRole != models.RoleAdmin {
+		return 0, ErrForbidden
+	}
+	return s.repo.PurgeByAuthor(ctx, userID)
+}
+
+// PurgePost efface DÉFINITIVEMENT un post depuis la corbeille de modération
+// (modérateur/admin) + cascade. Irréversible.
+func (s *PostService) PurgePost(ctx context.Context, id, actorID, actorRole string) error {
+	if !isModerator(actorRole) {
+		return ErrForbidden
+	}
+	oid, err := parseID(id)
+	if err != nil {
+		return err
+	}
+	if _, err := s.repo.Get(ctx, oid); err != nil {
+		return translateNotFound(err)
+	}
+	return s.hardDeletePost(ctx, oid, id, actorID)
 }
 
 // GetByProfile renvoie les posts d'un auteur, du plus récent au plus ancien.
@@ -767,9 +932,24 @@ func canPin(post *models.Post, actorID string) bool {
 // canAct : règle d'autorisation commune (posts ET commentaires) — l'auteur, un
 // modérateur ou un admin peut agir. Fonction PURE.
 func canAct(authorID, actorID, actorRole string) bool {
-	return authorID == actorID ||
-		actorRole == models.RoleModerator ||
-		actorRole == models.RoleAdmin
+	return authorID == actorID || isModerator(actorRole)
+}
+
+// isModerator : un modérateur OU un administrateur (l'admin est un sur-ensemble
+// du modérateur). Sert aux actions de modération (corbeille, restauration,
+// purge). Fonction PURE.
+func isModerator(role string) bool {
+	return role == models.RoleModerator || role == models.RoleAdmin
+}
+
+// purgeCutoffs calcule les bornes de balayage RGPD à partir de `now` :
+//   - purge : un tweet masqué avant cette date est purgé (hidden_at < now-after) ;
+//   - warn  : avant cette date, on entre dans la fenêtre de préavis
+//     (hidden_at < now-(after-warnBefore)).
+//
+// warn est forcément >= purge (la fenêtre de préavis précède la purge). PURE.
+func purgeCutoffs(now time.Time, after, warnBefore time.Duration) (purge, warn time.Time) {
+	return now.Add(-after), now.Add(-(after - warnBefore))
 }
 
 // withoutProfilePins masque l'état d'épinglage dans les feeds publics. Le pin

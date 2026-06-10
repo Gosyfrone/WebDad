@@ -13,12 +13,13 @@ const (
 // User représente une ligne de la table `credentials`.
 // PasswordHash n'est jamais sérialisé en JSON (tag `json:"-"`).
 type User struct {
-	ID           string    `json:"id"`
-	Email        string    `json:"email"`
-	PasswordHash string    `json:"-"` // colonne `password` (hash bcrypt)
-	Role         string    `json:"role"`
-	IsActive     bool      `json:"is_active"`
-	CreatedAt    time.Time `json:"created_at"`
+	ID            string     `json:"id"`
+	Email         string     `json:"email"`
+	PasswordHash  string     `json:"-"` // colonne `password` (hash bcrypt)
+	Role          string     `json:"role"`
+	IsActive      bool       `json:"is_active"`
+	DeactivatedAt *time.Time `json:"deactivated_at,omitempty"` // date du bannissement (NULL si actif)
+	CreatedAt     time.Time  `json:"created_at"`
 }
 
 // AuthUser : vue publique d'un utilisateur renvoyée par l'API d'auth.

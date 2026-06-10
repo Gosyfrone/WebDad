@@ -179,6 +179,11 @@ func (s *UserService) SoftDelete(id string) error {
 	return s.SetActive(id, false)
 }
 
+// PurgeUser efface DÉFINITIVEMENT un compte et son graphe social (RGPD).
+func (s *UserService) PurgeUser(id string) error {
+	return s.repo.PurgeUser(id)
+}
+
 // SetActive active/désactive un compte (admin). Désactiver = masquer le compte
 // des listes/recherche publiques (le blocage de connexion vit dans auth-service).
 func (s *UserService) SetActive(id string, active bool) error {

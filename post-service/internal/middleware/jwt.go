@@ -81,6 +81,42 @@ func OptionalJWTAuth(secret string) gin.HandlerFunc {
 	}
 }
 
+// ModeratorOnly exige un JWT dont le rôle est `moderator` ou `admin` (l'admin
+// est un sur-ensemble du modérateur). À chaîner APRÈS JWTAuth. 403 sinon. Garde
+// des routes de modération (corbeille, restauration, purge).
+func ModeratorOnly() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		claims, ok := ClaimsFrom(c)
+		if !ok {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "token manquant"})
+			return
+		}
+		if claims.Role != "moderator" && claims.Role != "admin" {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "réservé à la modération"})
+			return
+		}
+		c.Next()
+	}
+}
+
+// AdminOnly exige un JWT dont le rôle est `admin`. À chaîner APRÈS JWTAuth.
+// Garde des actions de gouvernance (ex. effacement RGPD des données d'un
+// utilisateur). 403 sinon.
+func AdminOnly() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		claims, ok := ClaimsFrom(c)
+		if !ok {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "token manquant"})
+			return
+		}
+		if claims.Role != "admin" {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "réservé aux administrateurs"})
+			return
+		}
+		c.Next()
+	}
+}
+
 // ClaimsFrom récupère les claims posés par JWTAuth dans le contexte.
 func ClaimsFrom(c *gin.Context) (*Claims, bool) {
 	val, exists := c.Get(contextKey)

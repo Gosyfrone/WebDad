@@ -1,12 +1,14 @@
 package main
 
 import (
+	"context"
 	"log"
 
 	"github.com/gin-gonic/gin"
 
 	"github.com/webdad/auth-service/internal/config"
 	"github.com/webdad/auth-service/internal/db"
+	"github.com/webdad/auth-service/internal/eraser"
 	"github.com/webdad/auth-service/internal/router"
 	"github.com/webdad/auth-service/internal/services"
 )
@@ -35,6 +37,19 @@ func main() {
 		}
 		log.Printf("[%s] admin par défaut assuré (%s)", serviceName, cfg.SeedAdminEmail)
 	}
+
+	// Balayage RGPD des comptes bannis depuis > 5 ans (purge cross-service via un
+	// token admin minté). En arrière-plan ; désactivé si rétention/intervalle nuls.
+	sweepCtx, stopSweeper := context.WithCancel(context.Background())
+	defer stopSweeper()
+	acctEraser := eraser.New(eraser.Targets{
+		User:    cfg.UserServiceURL,
+		Profil:  cfg.ProfilServiceURL,
+		Post:    cfg.PostServiceURL,
+		Message: cfg.MessageServiceURL,
+		Media:   cfg.MediaServiceURL,
+	})
+	go auth.RunAccountPurgeSweeper(sweepCtx, acctEraser, cfg.AccountPurgeAfter, cfg.AccountPurgeSweepInterval)
 
 	r := router.New(auth)
 

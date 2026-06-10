@@ -55,6 +55,23 @@ func JWTAuth(secret string) gin.HandlerFunc {
 	}
 }
 
+// AdminOnly exige un JWT dont le rôle est `admin`. À chaîner APRÈS JWTAuth.
+// Garde de l'effacement RGPD (purge des objets d'un propriétaire).
+func AdminOnly() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		claims, ok := ClaimsFrom(c)
+		if !ok {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "non authentifié"})
+			return
+		}
+		if claims.Role != "admin" {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "réservé aux administrateurs"})
+			return
+		}
+		c.Next()
+	}
+}
+
 // ClaimsFrom récupère les claims posés par JWTAuth dans le contexte.
 func ClaimsFrom(c *gin.Context) (*Claims, bool) {
 	val, exists := c.Get(contextKey)

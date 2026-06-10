@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react'
 import Link from 'next/link'
-import { AtSign, Bell, Heart, MessageCircle, Quote, Repeat2, Reply, Send, UserPlus } from 'lucide-react'
+import { AtSign, Bell, Heart, MessageCircle, Quote, Repeat2, Reply, Send, Trash2, UserPlus } from 'lucide-react'
 
 import { cn, timeAgo } from '@/lib/utils'
 import { type AppNotification, type NotificationType, notificationHref } from '@/lib/notifications'
@@ -26,6 +26,7 @@ const TYPE_ICON: Record<NotificationType, { Icon: React.ElementType; className: 
   follow_request: { Icon: UserPlus, className: 'text-emerald-500' },
   follow_request_accepted: { Icon: UserPlus, className: 'text-emerald-500' },
   follow_request_accept_confirm: { Icon: UserPlus, className: 'text-emerald-500' },
+  post_purge_warning: { Icon: Trash2, className: 'text-amber-500' },
 }
 
 export function NotificationsView() {
@@ -77,6 +78,8 @@ export function NotificationsView() {
         return t('notifications.follow_request_accepted', { name })
       case 'follow_request_accept_confirm':
         return t('notifications.follow_request_accept_confirm', { name })
+      case 'post_purge_warning':
+        return t('notifications.post_purge_warning')
     }
   }
 
@@ -96,6 +99,9 @@ export function NotificationsView() {
           {items.map((n) => {
             const { Icon, className } = TYPE_ICON[n.type]
             const fallback = (n.actor.displayName || 'U').charAt(0).toUpperCase()
+            // Notification SYSTÈME (sans acteur) : préavis de purge RGPD. Pas de
+            // lien profil, pas de navigation (le tweet masqué n'est pas visible).
+            const isSystem = n.type === 'post_purge_warning'
             return (
               <li
                 key={n.id}
@@ -104,7 +110,7 @@ export function NotificationsView() {
                   !n.isRead && 'bg-[#5B6CFF]/5',
                 )}
               >
-                {!['follow', 'follow_request', 'follow_request_accepted', 'follow_request_accept_confirm'].includes(n.type) && (
+                {!isSystem && !['follow', 'follow_request', 'follow_request_accepted', 'follow_request_accept_confirm'].includes(n.type) && (
                   <Link
                     href={notificationHref(n)}
                     aria-label={describe(n)}
@@ -112,43 +118,56 @@ export function NotificationsView() {
                   />
                 )}
 
-                {/* Avatar de l'acteur (au-dessus du lien étiré → mène au profil). */}
+                {/* Avatar de l'acteur (au-dessus du lien étiré → mène au profil).
+                    Pour une notification système, juste l'icône dans une pastille. */}
                 <div className="relative z-10">
-                  <ProfilLink author={n.actor}>
-                    <Avatar className="h-10 w-10">
-                      {n.actor.avatarUrl && (
-                        <AvatarImage src={n.actor.avatarUrl} alt={n.actor.displayName} />
-                      )}
-                      <AvatarFallback>{fallback}</AvatarFallback>
-                    </Avatar>
-                  </ProfilLink>
-                  <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-background shadow">
-                    <Icon className={cn('h-3.5 w-3.5', className)} aria-hidden />
-                  </span>
+                  {isSystem ? (
+                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-500/10">
+                      <Icon className={cn('h-5 w-5', className)} aria-hidden />
+                    </span>
+                  ) : (
+                    <>
+                      <ProfilLink author={n.actor}>
+                        <Avatar className="h-10 w-10">
+                          {n.actor.avatarUrl && (
+                            <AvatarImage src={n.actor.avatarUrl} alt={n.actor.displayName} />
+                          )}
+                          <AvatarFallback>{fallback}</AvatarFallback>
+                        </Avatar>
+                      </ProfilLink>
+                      <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-background shadow">
+                        <Icon className={cn('h-3.5 w-3.5', className)} aria-hidden />
+                      </span>
+                    </>
+                  )}
                 </div>
 
                 <div className="min-w-0 flex-1">
-                  {n.type === 'follow_request_accept_confirm' ? (
-                    <p className="text-sm leading-snug">
-                      <span className="text-foreground/90">
-                        {t('notifications.follow_request_accept_confirm_prefix')}{' '}
-                      </span>
-                      <ProfilLink author={n.actor} className="relative z-10 font-semibold hover:underline">
-                        {n.actor.displayName}
-                      </ProfilLink>
-                    </p>
-                  ) : (
-                    <p className="text-sm leading-snug">
-                      <ProfilLink author={n.actor} className="relative z-10 font-semibold hover:underline">
-                        {n.actor.displayName}
-                      </ProfilLink>{' '}
-                      {/* describe() commence toujours par « {name} » → on retire le nom
-                          (déjà rendu en lien gras) + l'espace qui suit. */}
-                      <span className="text-foreground/90">
-                        {describe(n).slice(n.actor.displayName.length + 1)}
-                      </span>
-                    </p>
-                  )}
+                  <p className="text-sm leading-snug">
+                    {isSystem ? (
+                      <span className="text-foreground/90">{describe(n)}</span>
+                    ) : n.type === 'follow_request_accept_confirm' ? (
+                      <>
+                        <span className="text-foreground/90">
+                          {t('notifications.follow_request_accept_confirm_prefix')}{' '}
+                        </span>
+                        <ProfilLink author={n.actor} className="relative z-10 font-semibold hover:underline">
+                          {n.actor.displayName}
+                        </ProfilLink>
+                      </>
+                    ) : (
+                      <>
+                        <ProfilLink author={n.actor} className="relative z-10 font-semibold hover:underline">
+                          {n.actor.displayName}
+                        </ProfilLink>{' '}
+                        {/* describe() commence toujours par « {name} » → on retire le nom
+                            (déjà rendu en lien gras) + l'espace qui suit. */}
+                        <span className="text-foreground/90">
+                          {describe(n).slice(n.actor.displayName.length + 1)}
+                        </span>
+                      </>
+                    )}
+                  </p>
                   <span className="text-xs text-muted-foreground">{timeAgo(n.updatedAt, locale)}</span>
                   {n.type === 'follow_request' && (
                     <div className="relative z-10 mt-2 flex gap-2">

@@ -25,6 +25,10 @@ const (
 	// conversation (`message_mention:<conversation_id>`). Navigue vers la
 	// conversation, pas vers un post.
 	TypeMessageMention = "message_mention"
+	// TypePostPurgeWarning : préavis (≈1 mois) avant la purge définitive d'un
+	// tweet masqué par la modération. Émis par post-service vers l'auteur
+	// (`recipient_id` + `post_id`). Une notification par post (pas d'agrégation).
+	TypePostPurgeWarning = "post_purge_warning"
 )
 
 // Types d'événement reçus des services émetteurs (au-delà des types de

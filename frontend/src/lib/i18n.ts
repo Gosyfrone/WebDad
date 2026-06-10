@@ -186,6 +186,8 @@ export const messages: Record<Locale, Messages> = {
     'notifications.follow_request_accepted': '{name} a accepté votre demande',
     'notifications.follow_request_accept_confirm': 'Vous avez accepté la demande de {name}',
     'notifications.follow_request_accept_confirm_prefix': 'Vous avez accepté la demande de',
+    'notifications.post_purge_warning':
+      'Un de vos tweets retiré par la modération sera supprimé définitivement dans environ un mois.',
     'notifications.accept': 'Accepter',
     'notifications.reject': 'Refuser',
 
@@ -309,6 +311,47 @@ export const messages: Record<Locale, Messages> = {
     'admin.role_note': "Un changement de rôle prend effet à la prochaine reconnexion de l'utilisateur (rafraîchissement du jeton).",
     'moderation.heading': 'Centre de modération',
     'moderation.desc': 'Les signalements et les actions de modération apparaîtront ici.',
+    'moderation.subtitle': 'Gardez l’ordre sur Breezy : tweets retirés et comptes.',
+    'moderation.tab_posts': 'Tweets supprimés',
+    'moderation.tab_accounts': 'Comptes',
+    'moderation.posts_empty': 'Aucun tweet dans la corbeille.',
+    'moderation.posts_error': 'Impossible de charger la corbeille.',
+    'moderation.restore': 'Restaurer',
+    'moderation.purge': 'Supprimer définitivement',
+    'moderation.purge_title': 'Supprimer définitivement ce tweet ?',
+    'moderation.purge_desc':
+      'Cette action est irréversible : le tweet et ses likes, commentaires et reposts seront effacés pour de bon.',
+    'moderation.removed_by': 'Retiré par {who} · {when}',
+    'moderation.purge_scheduled': 'Purge définitive prévue le {when}',
+    'moderation.expiring_soon': 'Bientôt purgé',
+    'moderation.restored_toast': 'Tweet restauré.',
+    'moderation.purged_toast': 'Tweet supprimé définitivement.',
+    'moderation.access_denied': 'Accès refusé',
+    'moderation.access_denied_desc': 'Cette page est réservée aux modérateurs et administrateurs.',
+    'moderation.ban_restricted': 'Un modérateur ne peut bannir qu’un utilisateur.',
+    'moderation.banned_since': 'Banni depuis {when}',
+    'moderation.account_delete': 'Supprimer le compte',
+    'moderation.account_delete_soon': 'Suppression définitive du compte (RGPD) — à venir.',
+    'moderation.account_delete_title': 'Supprimer définitivement ce compte ?',
+    'moderation.account_delete_desc':
+      'Effacement RGPD irréversible : profil, tweets, messages, médias et relations seront supprimés de tous les services. Tapez « {username} » pour confirmer.',
+    'moderation.account_delete_confirm_label': 'Nom d’utilisateur à confirmer',
+    'moderation.account_deleted_toast': 'Compte supprimé définitivement.',
+    'moderation.account_delete_failed': 'Échec de la suppression (effacement partiel possible).',
+    'admin.infra_subtitle': 'Supervision de l’infrastructure et des services.',
+    'admin.infra_heading': 'État des services',
+    'admin.infra_desc':
+      'L’état des conteneurs Docker et l’uptime des services apparaîtront ici prochainement.',
+    'admin.monitoring_error': 'Impossible de charger l’état des services.',
+    'admin.monitoring_updated': 'Mis à jour {when}',
+    'admin.status_up': 'En ligne',
+    'admin.status_down': 'Hors ligne',
+    'admin.latency': 'Latence',
+    'admin.uptime': 'Uptime',
+    'admin.uptime_d': 'j',
+    'admin.uptime_h': 'h',
+    'admin.uptime_m': 'min',
+    'admin.uptime_s': 's',
 
     // — Recherche / Tendances (colonne droite) —
     'search.placeholder': 'Rechercher',
@@ -364,6 +407,8 @@ export const messages: Record<Locale, Messages> = {
     'auth.login.no_account': 'Pas encore de compte ?',
     'auth.login.create_account': 'Créer un compte',
     'auth.login.failed': 'La connexion a échoué. Vérifie tes identifiants.',
+    'auth.login.account_disabled':
+      'Compte désactivé, veuillez contacter le support de Breezy.',
 
     // — Register —
     'auth.register.demo.kicker': 'Nouveau sur Breezy',
@@ -703,6 +748,8 @@ export const messages: Record<Locale, Messages> = {
     'notifications.follow_request_accepted': '{name} accepted your request',
     'notifications.follow_request_accept_confirm': "You accepted {name}'s request",
     'notifications.follow_request_accept_confirm_prefix': "You accepted the request from",
+    'notifications.post_purge_warning':
+      'One of your tweets removed by moderation will be permanently deleted in about a month.',
     'notifications.accept': 'Accept',
     'notifications.reject': 'Reject',
 
@@ -825,6 +872,47 @@ export const messages: Record<Locale, Messages> = {
     'admin.role_note': 'A role change takes effect the next time the user signs in (token refresh).',
     'moderation.heading': 'Moderation center',
     'moderation.desc': 'Reports and moderation actions will show up here.',
+    'moderation.subtitle': 'Keep order on Breezy: removed tweets and accounts.',
+    'moderation.tab_posts': 'Deleted tweets',
+    'moderation.tab_accounts': 'Accounts',
+    'moderation.posts_empty': 'No tweets in the trash.',
+    'moderation.posts_error': 'Could not load the trash.',
+    'moderation.restore': 'Restore',
+    'moderation.purge': 'Delete permanently',
+    'moderation.purge_title': 'Permanently delete this tweet?',
+    'moderation.purge_desc':
+      'This cannot be undone: the tweet and its likes, comments and reposts will be erased for good.',
+    'moderation.removed_by': 'Removed by {who} · {when}',
+    'moderation.purge_scheduled': 'Scheduled for permanent deletion on {when}',
+    'moderation.expiring_soon': 'Expiring soon',
+    'moderation.restored_toast': 'Tweet restored.',
+    'moderation.purged_toast': 'Tweet permanently deleted.',
+    'moderation.access_denied': 'Access denied',
+    'moderation.access_denied_desc': 'This page is reserved for moderators and administrators.',
+    'moderation.ban_restricted': 'A moderator can only ban a user.',
+    'moderation.banned_since': 'Banned {when}',
+    'moderation.account_delete': 'Delete account',
+    'moderation.account_delete_soon': 'Permanent account deletion (GDPR) — coming soon.',
+    'moderation.account_delete_title': 'Permanently delete this account?',
+    'moderation.account_delete_desc':
+      'Irreversible GDPR erasure: profile, tweets, messages, media and relationships will be deleted across all services. Type “{username}” to confirm.',
+    'moderation.account_delete_confirm_label': 'Username to confirm',
+    'moderation.account_deleted_toast': 'Account permanently deleted.',
+    'moderation.account_delete_failed': 'Deletion failed (partial erasure possible).',
+    'admin.infra_subtitle': 'Infrastructure and service monitoring.',
+    'admin.infra_heading': 'Service status',
+    'admin.infra_desc':
+      'Docker container health and service uptime will appear here soon.',
+    'admin.monitoring_error': 'Could not load service status.',
+    'admin.monitoring_updated': 'Updated {when}',
+    'admin.status_up': 'Online',
+    'admin.status_down': 'Offline',
+    'admin.latency': 'Latency',
+    'admin.uptime': 'Uptime',
+    'admin.uptime_d': 'd',
+    'admin.uptime_h': 'h',
+    'admin.uptime_m': 'm',
+    'admin.uptime_s': 's',
 
     // — Search / Trends (right column) —
     'search.placeholder': 'Search',
@@ -880,6 +968,8 @@ export const messages: Record<Locale, Messages> = {
     'auth.login.no_account': 'No account yet?',
     'auth.login.create_account': 'Create an account',
     'auth.login.failed': 'Sign-in failed. Check your credentials.',
+    'auth.login.account_disabled':
+      'Account disabled — please contact Breezy support.',
 
     // — Register —
     'auth.register.demo.kicker': 'New to Breezy',

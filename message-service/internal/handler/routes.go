@@ -45,6 +45,9 @@ func RegisterRoutes(
 		// Compteur de conversations non lues (badge app-wide).
 		messages.GET("/unread-count", auth, convH.UnreadCount)
 
+		// Effacement RGPD : purge la participation d'un utilisateur (admin).
+		messages.DELETE("/users/:id", auth, middleware.AdminOnly(), convH.PurgeUser)
+
 		// Conversations + messages.
 		conversations := messages.Group("/conversations", auth)
 		{

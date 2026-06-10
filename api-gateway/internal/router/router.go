@@ -8,6 +8,7 @@ import (
 
 	"github.com/webdad/api-gateway/internal/config"
 	"github.com/webdad/api-gateway/internal/middleware"
+	"github.com/webdad/api-gateway/internal/monitoring"
 	"github.com/webdad/api-gateway/internal/proxy"
 )
 
@@ -30,6 +31,11 @@ func New(cfg *config.Config) (*gin.Engine, error) {
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok", "service": serviceName})
 	})
+
+	// Monitoring infra (console admin) : agrège la santé de tous les services.
+	// Servi DIRECTEMENT par le gateway (pas un proxy) et réservé aux admins.
+	// Le préfixe `/admin` n'est pas une cible de proxy → aucun conflit.
+	r.GET("/admin/monitoring", middleware.AdminJWT(cfg.JWTSecret), monitoring.Handler(cfg.Services))
 
 	// Reverse proxy par préfixe vers le service cible. Deux routes par service :
 	//   - le préfixe nu (`/users`)        → endpoints collection (list, create)

@@ -25,6 +25,19 @@ type Config struct {
 	SeedAdmin         bool
 	SeedAdminEmail    string
 	SeedAdminPassword string
+
+	// Effacement RGPD automatique des comptes bannis. URLs des services à purger
+	// (vide → étape ignorée). AccountPurgeAfter : ancienneté du bannissement avant
+	// purge (défaut 5 ans) ; AccountPurgeSweepInterval : période de balayage
+	// (défaut 12h ; <= 0 sur l'une ou l'autre = balayage désactivé).
+	UserServiceURL    string
+	ProfilServiceURL  string
+	PostServiceURL    string
+	MessageServiceURL string
+	MediaServiceURL   string
+
+	AccountPurgeAfter         time.Duration
+	AccountPurgeSweepInterval time.Duration
 }
 
 // Load construit la config. Charge les .env best-effort (ignorés s'ils
@@ -60,7 +73,39 @@ func Load() *Config {
 		log.Fatal("[config] SEED_DEFAULT_ADMIN=true exige SEED_ADMIN_PASSWORD")
 	}
 
+	cfg.UserServiceURL = getEnv("USER_SERVICE_URL", defaultServiceURL("user-service", "8082"))
+	cfg.ProfilServiceURL = getEnv("PROFIL_SERVICE_URL", defaultServiceURL("profil-service", "8083"))
+	cfg.PostServiceURL = getEnv("POST_SERVICE_URL", defaultServiceURL("post-service", "8084"))
+	cfg.MessageServiceURL = getEnv("MESSAGE_SERVICE_URL", defaultServiceURL("message-service", "8085"))
+	cfg.MediaServiceURL = getEnv("MEDIA_SERVICE_URL", defaultServiceURL("media-service", "8087"))
+	cfg.AccountPurgeAfter = parseDurationOr("ACCOUNT_PURGE_AFTER", 43800*time.Hour) // ~5 ans
+	cfg.AccountPurgeSweepInterval = parseDurationOr("ACCOUNT_PURGE_SWEEP_INTERVAL", 12*time.Hour)
+
 	return cfg
+}
+
+// parseDurationOr lit une durée Go depuis l'env, avec repli silencieux sur la
+// valeur par défaut si absente ou invalide.
+func parseDurationOr(key string, fallback time.Duration) time.Duration {
+	raw := os.Getenv(key)
+	if raw == "" {
+		return fallback
+	}
+	d, err := time.ParseDuration(raw)
+	if err != nil {
+		log.Printf("[config] %s invalide (%q) : %v — repli sur %s", key, raw, err, fallback)
+		return fallback
+	}
+	return d
+}
+
+// defaultServiceURL : nom de conteneur en stack Docker (présence de /.dockerenv),
+// localhost sinon.
+func defaultServiceURL(serviceName, port string) string {
+	if _, err := os.Stat("/.dockerenv"); err == nil {
+		return fmt.Sprintf("http://%s:%s", serviceName, port)
+	}
+	return fmt.Sprintf("http://localhost:%s", port)
 }
 
 // buildDSN assemble la chaîne de connexion PostgreSQL à partir des

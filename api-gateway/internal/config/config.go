@@ -14,6 +14,7 @@ type Config struct {
 	GinMode        string
 	AllowedOrigins []string          // origines autorisées en CORS (front)
 	Services       map[string]string // préfixe de route -> URL du service cible
+	JWTSecret      string            // secret HS256 partagé (garde des routes admin servies par le gateway)
 }
 
 // Load construit la config. Charge les .env best-effort (ignorés s'ils
@@ -31,6 +32,7 @@ func Load() *Config {
 		Port:           getEnv("PORT", "8080"),
 		GinMode:        getEnv("GIN_MODE", "debug"),
 		AllowedOrigins: splitCSV(getEnv("CORS_ALLOWED_ORIGINS", "http://localhost:3000")),
+		JWTSecret:      getEnv("JWT_SECRET", ""),
 		Services: map[string]string{
 			"/auth":          getEnv("AUTH_SERVICE_URL", "http://localhost:8081"),
 			"/users":         getEnv("USER_SERVICE_URL", "http://localhost:8082"),

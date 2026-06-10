@@ -65,7 +65,8 @@ func ClaimsFrom(c *gin.Context) (*services.Claims, bool) {
 }
 
 // AdminOnly stoppe la requête (403) si l'utilisateur authentifié n'est pas
-// administrateur. À chaîner APRÈS JWTAuth (qui pose les claims).
+// administrateur. À chaîner APRÈS JWTAuth (qui pose les claims). Réservé aux
+// actions de gouvernance (changement de rôle).
 func AdminOnly() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		claims, ok := ClaimsFrom(c)
@@ -75,6 +76,25 @@ func AdminOnly() gin.HandlerFunc {
 		}
 		if claims.Role != models.RoleAdmin {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "réservé aux administrateurs"})
+			return
+		}
+		c.Next()
+	}
+}
+
+// ModeratorOnly stoppe la requête (403) si l'utilisateur n'est ni modérateur ni
+// administrateur (l'admin est un sur-ensemble du modérateur). À chaîner APRÈS
+// JWTAuth. Garde des actions de modération (annuaire des comptes, bannissement),
+// partagées entre modérateurs et admins.
+func ModeratorOnly() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		claims, ok := ClaimsFrom(c)
+		if !ok {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "claims absents"})
+			return
+		}
+		if claims.Role != models.RoleAdmin && claims.Role != models.RoleModerator {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "réservé à la modération"})
 			return
 		}
 		c.Next()

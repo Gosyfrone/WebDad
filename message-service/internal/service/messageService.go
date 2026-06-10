@@ -78,6 +78,12 @@ func (s *MessageService) PublishKey(ctx context.Context, userID, publicKey strin
 	return s.repo.UpsertKey(ctx, userID, publicKey)
 }
 
+// PurgeUser efface DÉFINITIVEMENT la participation d'un utilisateur à la
+// messagerie (effacement RGPD).
+func (s *MessageService) PurgeUser(ctx context.Context, userID string) error {
+	return s.repo.PurgeUser(ctx, userID)
+}
+
 // GetKey renvoie la clé publique d'un utilisateur (404 si absente).
 func (s *MessageService) GetKey(ctx context.Context, userID string) (*models.UserKey, error) {
 	k, err := s.repo.GetKey(ctx, userID)

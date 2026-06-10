@@ -36,6 +36,8 @@ export interface AdminUser {
   role: UserRole
   /** Compte actif = peut se connecter. `false` = banni (login bloqué). */
   isActive: boolean
+  /** Date du bannissement (point de départ de la purge RGPD à 5 ans). */
+  deactivatedAt?: string
   createdAt: string
   username: string
   displayName: string
@@ -47,6 +49,7 @@ interface ApiAuthUser {
   email: string
   role: string
   is_active: boolean
+  deactivated_at?: string
   created_at: string
 }
 
@@ -93,6 +96,7 @@ export async function listAdminUsers(
         email: u.email,
         role: mapRole(u.role),
         isActive: u.is_active,
+        deactivatedAt: u.deactivated_at,
         createdAt: u.created_at,
         username: resolved.username,
         displayName: resolved.displayName,
@@ -138,5 +142,39 @@ export async function setUserBanned(id: string, banned: boolean): Promise<void> 
   })
   if (res.status !== 404) {
     await expectOk(res)
+  }
+}
+
+// Étapes de l'effacement RGPD, dans l'ordre : on purge d'abord les données
+// applicatives et les IDENTIFIANTS (auth) EN DERNIER — ainsi, si une étape
+// échoue, le compte existe encore et l'opération est rejouable. Chaque service
+// possède SA donnée (une donnée = un service), orchestré ici côté admin comme
+// le bannissement. Un 404 est toléré (donnée déjà absente / jamais créée).
+const ERASE_STEPS: { label: string; path: (id: string) => string }[] = [
+  { label: 'profil', path: (id) => `/profils/${id}` },
+  { label: 'posts', path: (id) => `/posts/by-author/${id}` },
+  { label: 'messages', path: (id) => `/messages/users/${id}` },
+  { label: 'media', path: (id) => `/media/owners/${id}` },
+  { label: 'user', path: (id) => `/users/${id}/hard` },
+  { label: 'auth', path: (id) => `/auth/users/${id}` }, // identifiants en dernier
+]
+
+/**
+ * Efface DÉFINITIVEMENT un compte et toutes ses données à travers les services
+ * (effacement RGPD, admin). Best-effort + 404 toléré ; lève une erreur listant
+ * les services en échec (effacement partiel à rejouer).
+ */
+export async function hardDeleteUser(id: string): Promise<void> {
+  const failed: string[] = []
+  for (const step of ERASE_STEPS) {
+    try {
+      const res = await apiFetch(step.path(id), { method: 'DELETE' })
+      if (!res.ok && res.status !== 404) failed.push(step.label)
+    } catch {
+      failed.push(step.label)
+    }
+  }
+  if (failed.length > 0) {
+    throw new AdminApiError(`Effacement partiel : ${failed.join(', ')}`, 500)
   }
 }
