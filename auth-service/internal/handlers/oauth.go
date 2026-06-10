@@ -18,7 +18,7 @@ import (
 // @Tags        auth
 // @Produce     json
 // @Param       provider path string true "Fournisseur OIDC" Enums(google, microsoft)
-// @Success     200 {object} map[string]string "data: {url, state}"
+// @Success     200 {object} models.OAuthURLData "data: {url, state}"
 // @Failure     404 {object} map[string]string "Provider non supporté/configuré"
 // @Failure     500 {object} map[string]string "Erreur interne"
 // @Router      /auth/oauth/{provider}/url [get]

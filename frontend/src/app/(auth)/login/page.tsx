@@ -80,12 +80,12 @@ export default function LoginPage() {
     try {
       const response = await fetch(`/api/auth/oauth/${provider}`)
       const payload = await response.json().catch(() => null)
-      if (!response.ok || !(payload?.url ?? payload?.authorization_url)) {
+      if (!response.ok || !payload?.url) {
         setErrors({ form: payload?.error ?? t('auth.oauth.error') })
         setOauthLoading(null)
         return
       }
-      window.location.href = payload.url ?? payload.authorization_url
+      window.location.href = payload.url
     } catch {
       setErrors({ form: t('auth.err.network') })
       setOauthLoading(null)

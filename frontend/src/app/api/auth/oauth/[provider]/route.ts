@@ -4,6 +4,15 @@ import { apiUrl } from '@/lib/config'
 import { provisionUser } from '@/lib/provision'
 import { setRefreshCookie } from '@/lib/server/auth-cookie'
 
+type OAuthURLPayload = {
+  data?: {
+    url?: string
+    state?: string
+  }
+  message?: string
+  error?: string
+}
+
 type OAuthExchangePayload = {
   data?: {
     token?: string
@@ -31,7 +40,7 @@ export async function GET(
     )
   }
 
-  const payload = await upstreamResponse.json().catch(() => null)
+  const payload = (await upstreamResponse.json().catch(() => null)) as OAuthURLPayload | null
 
   if (!upstreamResponse.ok) {
     return NextResponse.json(
@@ -40,7 +49,11 @@ export async function GET(
     )
   }
 
-  return NextResponse.json(payload, { status: 200 })
+  // Aplatit data.{url,state} pour simplifier la lecture côté client
+  return NextResponse.json(
+    { url: payload?.data?.url, state: payload?.data?.state },
+    { status: 200 }
+  )
 }
 
 // POST /api/auth/oauth/[provider] → échange le code contre un token

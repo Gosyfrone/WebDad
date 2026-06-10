@@ -244,10 +244,7 @@
           "200": {
             "description": "data: {url, state}",
             "schema": {
-              "type": "object",
-              "additionalProperties": {
-                "type": "string"
-              }
+              "$ref": "#/definitions/models.OAuthURLData"
             }
           },
           "404": {
@@ -4192,6 +4189,19 @@
         },
         "state": {
           "type": "string"
+        }
+      }
+    },
+    "models.OAuthURLData": {
+      "type": "object",
+      "properties": {
+        "state": {
+          "type": "string",
+          "example": "a1b2c3d4e5f6"
+        },
+        "url": {
+          "type": "string",
+          "example": "https://accounts.google.com/o/oauth2/auth?..."
         }
       }
     },

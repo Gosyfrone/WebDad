@@ -77,6 +77,13 @@ type ResetPasswordRequest struct {
 	NewPassword string `json:"new_password" binding:"required,min=8"`
 }
 
+// OAuthURLData : corps de la réponse 200 de GET /auth/oauth/:provider/url.
+// Enveloppé dans {"data": ...} par le handler (convention du service).
+type OAuthURLData struct {
+	URL   string `json:"url"   example:"https://accounts.google.com/o/oauth2/auth?..."`
+	State string `json:"state" example:"a1b2c3d4e5f6"`
+}
+
 // OAuthExchangeRequest : payload de POST /auth/oauth/:provider/exchange.
 // `code` = code d'autorisation renvoyé par le provider au callback front.
 // `state` est facultatif côté serveur (le front l'a déjà revérifié) ; il est
