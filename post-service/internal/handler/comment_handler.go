@@ -71,7 +71,7 @@ func (h *CommentHandler) ListCommentReplies(c *gin.Context) {
 // @Produce     json
 // @Security    BearerAuth
 // @Param       id   path  string                        true "Post ID"
-// @Param       body body  models.CreateCommentRequest   true "Contenu + parent_id optionnel"
+// @Param       body body  models.CreateCommentRequest   true "Contenu texte et/ou médias + parent_id optionnel"
 // @Success     201 {object} models.Comment
 // @Failure     400 {object} map[string]string
 // @Failure     401 {object} map[string]string

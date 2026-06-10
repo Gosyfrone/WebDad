@@ -1564,7 +1564,7 @@ paths:
         name: id
         in: path
         required: true
-      - description: Contenu + parent_id optionnel
+      - description: Contenu texte et/ou médias + parent_id optionnel
         name: body
         in: body
         required: true
@@ -2757,14 +2757,14 @@ definitions:
         type: string
       content:
         type: string
-      media:
-        type: array
-        items:
-          $ref: '#/definitions/models.MediaRef'
       created_at:
         type: string
       id:
         type: string
+      media:
+        type: array
+        items:
+          $ref: '#/definitions/models.MediaRef'
       parent_id:
         type: string
       post_id:

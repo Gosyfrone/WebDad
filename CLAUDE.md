@@ -146,6 +146,8 @@ several well-chosen secondary features · **all 3 roles functional** · pro slid
 - 2026-06-10: comment media support implemented end-to-end; comments/replies accept up to 4 uploaded images/videos/GIFs via media-service and render them in `CommentSection`.
 - 2026-06-10: desktop quote dialogs now scroll when quoted media plus newly attached media exceed the viewport height.
 - 2026-06-10: suggested French commit message for the latest changes: `feat(commentaires): ajouter les medias et le scroll des citations`.
+- 2026-06-10: Swagger annotation/docs updated for comment media; `doc/openapi.{json,yaml}` regenerated through the aggregation script in a temporary Go Linux container because local Windows `make swagger` cannot launch WSL bash.
+- 2026-06-10: suggested commit message for the Swagger/doc update: `docs(swagger): mettre a jour les annotations et la spec OpenAPI des commentaires`.
 
 ---
 
