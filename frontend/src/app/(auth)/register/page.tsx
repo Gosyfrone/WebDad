@@ -66,6 +66,7 @@ const usernamePattern = /^[a-zA-Z0-9_]{3,24}$/
 const maxUsernameLength = 24
 const maxEmailLength = 50
 const maxPasswordLength = 250
+const minBirthDate = '1900-01-01'
 const reservedUsernames = new Set([
   'me',
   'admin',
@@ -110,6 +111,26 @@ function mapServerError(message: string): FormErrors {
   return { form: message }
 }
 
+function toDateInputValue(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+
+  return `${year}-${month}-${day}`
+}
+
+function isDateInputValue(value: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value)
+}
+
+function clampBirthDate(value: string, maxBirthDate: string): string {
+  if (!isDateInputValue(value)) return value
+  if (value > maxBirthDate) return maxBirthDate
+  if (value < minBirthDate) return minBirthDate
+
+  return value
+}
+
 export default function RegisterPage() {
   const t = useT()
   const router = useRouter()
@@ -124,18 +145,17 @@ export default function RegisterPage() {
     React.useState(false)
   const [errors, setErrors] = React.useState<FormErrors>({})
   const [isSubmitting, setIsSubmitting] = React.useState(false)
-  const maxBirthDate = React.useMemo(() => {
+  const todayDate = React.useMemo(() => toDateInputValue(new Date()), [])
+  const minimumAgeBirthDate = React.useMemo(() => {
     const date = new Date()
     date.setFullYear(date.getFullYear() - 13)
-    return date.toISOString().split('T')[0]
+    return toDateInputValue(date)
   }, [])
 
   const validate = React.useCallback((): FormErrors => {
     const nextErrors: FormErrors = {}
     const trimmedUsername = username.trim()
     const trimmedEmail = email.trim()
-    const selectedBirthDate = birthDate ? new Date(`${birthDate}T00:00:00`) : null
-    const minimumBirthDate = new Date(`${maxBirthDate}T23:59:59`)
 
     if (!trimmedUsername) {
       nextErrors.username = t('auth.register.err.username_required')
@@ -149,11 +169,11 @@ export default function RegisterPage() {
 
     if (!birthDate) {
       nextErrors.birthDate = t('auth.register.err.birthdate_required')
-    } else if (
-      !selectedBirthDate ||
-      Number.isNaN(selectedBirthDate.getTime()) ||
-      selectedBirthDate > minimumBirthDate
-    ) {
+    } else if (!isDateInputValue(birthDate) || birthDate < minBirthDate) {
+      nextErrors.birthDate = t('auth.register.err.birthdate_invalid')
+    } else if (birthDate > todayDate) {
+      nextErrors.birthDate = t('auth.register.err.birthdate_future')
+    } else if (birthDate > minimumAgeBirthDate) {
       nextErrors.birthDate = t('auth.register.err.age')
     }
 
@@ -186,7 +206,7 @@ export default function RegisterPage() {
     }
 
     return nextErrors
-  }, [birthDate, email, gender, maxBirthDate, password, passwordConfirmation, username, t])
+  }, [birthDate, email, gender, minimumAgeBirthDate, password, passwordConfirmation, todayDate, username, t])
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -532,15 +552,27 @@ export default function RegisterPage() {
                       name="birthDate"
                       type="date"
                       autoComplete="bday"
-                      min="1900-01-01"
-                      max={maxBirthDate}
+                      min={minBirthDate}
+                      max={todayDate}
                       className="h-9 rounded-2xl border-white/70 bg-white/90 pl-11 text-sm shadow-sm shadow-slate-200/60 transition-all [color-scheme:light] hover:border-[#47D9FF]/70 focus-visible:border-[#5B6CFF] focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15 dark:border-white/15 dark:bg-white/5 dark:[color-scheme:dark]"
                       value={birthDate}
                       onChange={(event) => {
-                        setBirthDate(event.target.value)
+                        setBirthDate(clampBirthDate(event.target.value, todayDate))
                         if (errors.birthDate) {
                           setErrors((current) => ({ ...current, birthDate: undefined }))
                         }
+                      }}
+                      onInput={(event) => {
+                        const input = event.currentTarget
+                        const nextValue = clampBirthDate(input.value, todayDate)
+
+                        if (nextValue !== input.value) {
+                          input.value = nextValue
+                          setBirthDate(nextValue)
+                        }
+                      }}
+                      onBlur={(event) => {
+                        setBirthDate(clampBirthDate(event.currentTarget.value, todayDate))
                       }}
                       aria-invalid={Boolean(errors.birthDate)}
                       aria-describedby={
