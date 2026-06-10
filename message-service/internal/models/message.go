@@ -97,12 +97,15 @@ type Member struct {
 
 // Message — document de la collection `messages`. UNIQUEMENT du chiffré.
 type Message struct {
-	ID             bson.ObjectID `bson:"_id,omitempty" json:"id"`
-	ConversationID string        `bson:"conversation_id" json:"conversation_id"`
-	SenderID       string        `bson:"sender_id" json:"sender_id"`
-	Ciphertext     string        `bson:"ciphertext" json:"ciphertext"`
-	Nonce          string        `bson:"nonce" json:"nonce"`
-	CreatedAt      time.Time     `bson:"created_at" json:"created_at"`
+	ID                 bson.ObjectID `bson:"_id,omitempty" json:"id"`
+	ConversationID     string        `bson:"conversation_id" json:"conversation_id"`
+	SenderID           string        `bson:"sender_id" json:"sender_id"`
+	Ciphertext         string        `bson:"ciphertext" json:"ciphertext"`
+	Nonce              string        `bson:"nonce" json:"nonce"`
+	OriginalCiphertext string        `bson:"original_ciphertext,omitempty" json:"original_ciphertext,omitempty"`
+	OriginalNonce      string        `bson:"original_nonce,omitempty" json:"original_nonce,omitempty"`
+	CreatedAt          time.Time     `bson:"created_at" json:"created_at"`
+	EditedAt           *time.Time    `bson:"edited_at,omitempty" json:"edited_at,omitempty"`
 }
 
 // ConversationView — vue renvoyée au client : la conversation + l'enveloppe de
@@ -208,6 +211,15 @@ type SetMemberRoleRequest struct {
 // d'appartenance uniquement (jamais de texte) → sert à notifier les membres
 // mentionnés sans casser l'E2EE. Les ids non-membres sont ignorés côté serveur.
 type SendMessageRequest struct {
+	Ciphertext         string   `json:"ciphertext" binding:"required"`
+	Nonce              string   `json:"nonce" binding:"required"`
+	MentionedMemberIDs []string `json:"mentioned_member_ids"`
+}
+
+// EditMessageRequest : corps de PATCH .../messages/:messageId. Le client
+// chiffre déjà la nouvelle version ; le serveur conserve l'ancienne version
+// chiffrée sans jamais lire le clair.
+type EditMessageRequest struct {
 	Ciphertext         string   `json:"ciphertext" binding:"required"`
 	Nonce              string   `json:"nonce" binding:"required"`
 	MentionedMemberIDs []string `json:"mentioned_member_ids"`

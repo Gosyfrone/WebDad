@@ -507,6 +507,49 @@ func (h *ConversationHandler) SendMessage(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"data": msg})
 }
 
+// EditMessage : PATCH /messages/conversations/:id/messages/:messageId — modifie
+// un message chiffré existant. Owner du message uniquement ; l'original est
+// conservé chiffré côté serveur.
+// @Summary     Modifier un message chiffré
+// @Tags        messages
+// @Accept      json
+// @Produce     json
+// @Security    BearerAuth
+// @Param       id        path string                    true "Conversation ID"
+// @Param       messageId path string                    true "Message ID"
+// @Param       body      body models.EditMessageRequest true "Nouvelle version chiffrée + nonce"
+// @Success     200 {object} map[string]interface{} "Message modifié"
+// @Failure     400 {object} map[string]string
+// @Failure     401 {object} map[string]string
+// @Failure     403 {object} map[string]string
+// @Failure     404 {object} map[string]string
+// @Router      /messages/conversations/{id}/messages/{messageId} [patch]
+func (h *ConversationHandler) EditMessage(c *gin.Context) {
+	claims, ok := middleware.ClaimsFrom(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "claims absents"})
+		return
+	}
+
+	var req models.EditMessageRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "payload invalide : " + err.Error()})
+		return
+	}
+
+	msg, memberIDs, err := h.service.EditMessage(
+		c.Request.Context(), c.Param("id"), c.Param("messageId"), claims.UserID, req.Ciphertext, req.Nonce, req.MentionedMemberIDs,
+	)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+
+	h.hub.Publish(memberIDs, gin.H{"type": "message_updated", "data": msg})
+
+	c.JSON(http.StatusOK, gin.H{"data": msg})
+}
+
 // pageLimit lit ?limit (défaut/borne appliqués côté service).
 func pageLimit(c *gin.Context) int64 {
 	n, err := strconv.ParseInt(c.Query("limit"), 10, 64)

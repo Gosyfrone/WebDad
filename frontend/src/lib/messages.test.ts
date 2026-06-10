@@ -17,9 +17,11 @@ function msg(id: string, mine = false): ChatMessage {
     conversationId: 'c',
     senderId: mine ? 'me' : 's',
     text: 'x',
+    originalText: '',
     media: [],
     decrypted: true,
     createdAt: '2026-06-08T00:00:00Z',
+    editedAt: '',
     mine,
   }
 }

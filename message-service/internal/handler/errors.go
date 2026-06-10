@@ -13,6 +13,7 @@ import (
 func respondError(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, service.ErrConversationNotFound), errors.Is(err, service.ErrKeyNotFound),
+		errors.Is(err, service.ErrMessageNotFound),
 		errors.Is(err, service.ErrTargetNotMember):
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 	case errors.Is(err, service.ErrInvalidID), errors.Is(err, service.ErrSelfConversation),
@@ -20,7 +21,8 @@ func respondError(c *gin.Context, err error) {
 		errors.Is(err, service.ErrInvalidCommunity), errors.Is(err, service.ErrInvalidRole):
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 	case errors.Is(err, service.ErrNotMember), errors.Is(err, service.ErrCannotWrite),
-		errors.Is(err, service.ErrOwnerOnly), errors.Is(err, service.ErrOwnerCannotLeave):
+		errors.Is(err, service.ErrOwnerOnly), errors.Is(err, service.ErrOwnerCannotLeave),
+		errors.Is(err, service.ErrNotMessageOwner):
 		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
 	case errors.Is(err, service.ErrNotGroup), errors.Is(err, service.ErrNotCommunity),
 		errors.Is(err, service.ErrNotManageable), errors.Is(err, service.ErrAlreadyMember),

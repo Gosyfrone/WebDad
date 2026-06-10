@@ -31,6 +31,7 @@ func TestProtectedRoutes_RequireAuth(t *testing.T) {
 		{http.MethodGet, "/messages/conversations/abc"},
 		{http.MethodGet, "/messages/conversations/abc/messages"},
 		{http.MethodPost, "/messages/conversations/abc/messages"},
+		{http.MethodPatch, "/messages/conversations/abc/messages/def"},
 		{http.MethodPatch, "/messages/conversations/abc"},
 		{http.MethodDelete, "/messages/conversations/abc"},
 		{http.MethodGet, "/messages/conversations/abc/members"},

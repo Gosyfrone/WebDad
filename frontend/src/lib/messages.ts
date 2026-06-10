@@ -86,7 +86,10 @@ interface ApiMessage {
   sender_id: string
   ciphertext: string
   nonce: string
+  original_ciphertext?: string
+  original_nonce?: string
   created_at: string
+  edited_at?: string
 }
 
 /** Message brut tel que poussé par la WebSocket (chiffré). Le `MessagesProvider`
@@ -167,11 +170,14 @@ export interface ChatMessage {
   conversationId: string
   senderId: string
   text: string
+  /** Texte original, déchiffré localement, si le message a été modifié. */
+  originalText: string
   /** Pièces jointes (images/vidéos chiffrées) ; vide pour un message texte. */
   media: ChatAttachment[]
   /** false si le déchiffrement a échoué (clé absente sur cet appareil). */
   decrypted: boolean
   createdAt: string
+  editedAt: string
   mine: boolean
 }
 
@@ -614,6 +620,7 @@ export function decodeMessageBody(body: string): { text: string; media: WireAtta
 /** Déchiffre un message brut avec la CK d'une conversation (échec → texte vide). */
 export function decryptMessage(conv: Conversation, api: ApiMessage, myId: string): ChatMessage {
   let text = ''
+  let originalText = ''
   let media: ChatAttachment[] = []
   let decrypted = false
   if (conv.contentKey) {
@@ -621,6 +628,12 @@ export function decryptMessage(conv: Conversation, api: ApiMessage, myId: string
       const body = decodeMessageBody(decryptText(conv.contentKey, api.ciphertext, api.nonce))
       text = body.text
       media = body.media.map((m) => ({ ...m, type: mediaKind(m.mime) }))
+      if (api.original_ciphertext && api.original_nonce) {
+        const originalBody = decodeMessageBody(
+          decryptText(conv.contentKey, api.original_ciphertext, api.original_nonce),
+        )
+        originalText = originalBody.text
+      }
       decrypted = true
     } catch {
       decrypted = false
@@ -634,6 +647,8 @@ export function decryptMessage(conv: Conversation, api: ApiMessage, myId: string
     media,
     decrypted,
     createdAt: api.created_at,
+    editedAt: api.edited_at ?? '',
+    originalText,
     mine: api.sender_id === myId,
   }
 }
@@ -769,6 +784,40 @@ export async function sendMessage(
     }),
   )
   return decryptMessage(conv, created, currentUserId())
+}
+
+/**
+ * Modifie un message existant : le nouveau texte est re-chiffré côté client, le
+ * serveur conserve l'ancienne version chiffrée. Les pièces jointes déjà liées au
+ * message sont conservées telles quelles.
+ */
+export async function editMessage(
+  conv: Conversation,
+  message: ChatMessage,
+  text: string,
+  mentionedMemberIds: string[] = [],
+): Promise<ChatMessage> {
+  if (!conv.contentKey) {
+    throw new MessageApiError('clé de conversation indisponible sur cet appareil', 412)
+  }
+  const media = message.media.map(({ id, nonce, mime, name, size }) => ({
+    id,
+    nonce,
+    mime,
+    name,
+    size,
+  }))
+  const { ciphertext, nonce } = encryptText(conv.contentKey, encodeMessageBody(text, media))
+  const body: { ciphertext: string; nonce: string; mentioned_member_ids?: string[] } = { ciphertext, nonce }
+  if (mentionedMemberIds.length > 0) body.mentioned_member_ids = mentionedMemberIds
+  const updated = await unwrap<ApiMessage>(
+    await apiFetch(`/messages/conversations/${conv.id}/messages/${message.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }),
+  )
+  return decryptMessage(conv, updated, currentUserId())
 }
 
 // --- Recherche dans une conversation (côté client, E2EE) --------------------
