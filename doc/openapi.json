@@ -3384,6 +3384,95 @@
         }
       }
     },
+    "/messages/conversations/{id}/messages/{messageId}": {
+      "patch": {
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "messages"
+        ],
+        "summary": "Modifier un message chiffré",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "Conversation ID",
+            "name": "id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "Message ID",
+            "name": "messageId",
+            "in": "path",
+            "required": true
+          },
+          {
+            "description": "Nouvelle version chiffrée + nonce",
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/models.EditMessageRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Message modifié",
+            "schema": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
     "/messages/keys": {
       "put": {
         "security": [
@@ -4519,6 +4608,27 @@
           "type": "string"
         },
         "type": {
+          "type": "string"
+        }
+      }
+    },
+    "models.EditMessageRequest": {
+      "type": "object",
+      "required": [
+        "ciphertext",
+        "nonce"
+      ],
+      "properties": {
+        "ciphertext": {
+          "type": "string"
+        },
+        "mentioned_member_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "nonce": {
           "type": "string"
         }
       }
