@@ -271,6 +271,18 @@ func (h *MediaHandler) Delete(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
+// PurgeByOwner : DELETE /media/owners/:id — efface TOUS les objets d'un
+// propriétaire (effacement RGPD, admin via middleware). Renvoie le nombre
+// d'objets supprimés.
+func (h *MediaHandler) PurgeByOwner(c *gin.Context) {
+	n, err := h.store.RemoveByOwner(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": "purge impossible"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": gin.H{"objects_deleted": n}})
+}
+
 // randomID génère un identifiant opaque non devinable (128 bits → 32 hex).
 func randomID() (string, error) {
 	b := make([]byte, 16)

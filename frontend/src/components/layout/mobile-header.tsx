@@ -9,8 +9,9 @@ import { LogOut, Settings } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { logout } from '@/lib/auth-client'
 import { getMyProfil, subscribeProfilUpdated } from '@/lib/profil-client'
+import { useSession } from '@/lib/session'
 import { ROUTES, navItemsForRole } from '@/lib/routes'
-import type { ProfilDetails, UserRole } from '@/types'
+import type { ProfilDetails } from '@/types'
 import { useT } from '@/components/language-provider'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -23,11 +24,6 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet'
-
-interface MobileHeaderProps {
-  role: UserRole | null
-  username?: string
-}
 
 /** Largeur (px) de la zone de bord gauche sensible au swipe d'ouverture. */
 const EDGE_ZONE = 24
@@ -45,25 +41,27 @@ const SWIPE_THRESHOLD = 60
  * Les pages disposant déjà de leur propre en-tête (ex. profil) ne l'affichent
  * pas → on rend `null` sur ces routes (le swipe y est aussi désactivé).
  */
-export function MobileHeader({ role, username = 'Utilisateur' }: MobileHeaderProps) {
+export function MobileHeader() {
   const t = useT()
   const pathname = usePathname()
+  const session = useSession()
   const hidden = pathname?.startsWith(ROUTES.profil) ?? false
   const [open, setOpen] = useState(false)
   const [account, setAccount] = useState({
-    displayName: username,
-    username: username === 'Utilisateur' ? '' : username,
+    displayName: '',
+    username: '',
     avatarUrl: '',
-    role,
   })
 
+  // Rôle réel issu du JWT (cf. lib/session) ; `null` au 1er rendu (hydratation).
+  const role = session?.role ?? null
   const fallbackInitial = (account.displayName || account.username || 'U')
     .charAt(0)
     .toUpperCase()
   // Avant le chargement du profil (username vide) on affiche un libellé traduit.
   const shownName = account.username ? account.displayName : t('common.user')
   const handle = account.username ? `@${account.username}` : `@${t('common.username_fallback')}`
-  const displayedRole = account.role ?? role
+  const displayedRole = role
 
   useEffect(() => {
     let cancelled = false
@@ -73,7 +71,6 @@ export function MobileHeader({ role, username = 'Utilisateur' }: MobileHeaderPro
         displayName: profil.displayName,
         username: profil.username,
         avatarUrl: profil.avatarUrl,
-        role: profil.role,
       })
     }
 
@@ -92,7 +89,7 @@ export function MobileHeader({ role, username = 'Utilisateur' }: MobileHeaderPro
       cancelled = true
       unsubscribe()
     }
-  }, [role, username])
+  }, [])
 
   // Ouverture par swipe depuis le bord gauche (→ droite).
   useEffect(() => {

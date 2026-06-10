@@ -38,6 +38,18 @@ func RegisterRoutes(r *gin.Engine, serviceName string, postService *service.Post
 		posts.GET("/me/reposted-ids", auth, PostHandler.RepostedByMe)
 		posts.GET("/me/bookmarked-ids", auth, BookmarkHandler.BookmarkedByMe)
 
+		// Modération — routes STATIQUES (`/posts/moderation/…`) placées avant le
+		// groupe `/:id`. Corbeille partagée mod/admin (tweets retirés en
+		// suppression douce). Garde ModeratorOnly (mod ou admin).
+		moderation := posts.Group("/moderation", auth, middleware.ModeratorOnly())
+		{
+			moderation.GET("/deleted", PostHandler.ListHidden)
+		}
+
+		// Effacement RGPD : purge toutes les données d'un utilisateur (admin).
+		// Route STATIQUE (`/posts/by-author/:id`) avant le groupe `/:id`.
+		posts.DELETE("/by-author/:id", auth, middleware.AdminOnly(), PostHandler.PurgeUserData)
+
 		// Signets — routes STATIQUES (`/posts/bookmarks/…`), placées avant le
 		// groupe `/:id` ; toutes protégées (les signets sont strictement privés).
 		bookmarks := posts.Group("/bookmarks", auth)
@@ -64,6 +76,10 @@ func RegisterRoutes(r *gin.Engine, serviceName string, postService *service.Post
 			post.DELETE("", auth, PostHandler.DeletePost)
 			post.PATCH("/pin", auth, PostHandler.PinPost)
 			post.DELETE("/pin", auth, PostHandler.UnpinPost)
+			// Modération d'un post précis (mod/admin) : restaurer depuis la
+			// corbeille ou effacer définitivement.
+			post.POST("/restore", auth, middleware.ModeratorOnly(), PostHandler.RestorePost)
+			post.DELETE("/purge", auth, middleware.ModeratorOnly(), PostHandler.PurgePost)
 
 			post.GET("/likes", LikeHandler.ListPostLikes)
 			post.POST("/like", auth, LikeHandler.LikePost)

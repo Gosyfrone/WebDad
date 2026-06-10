@@ -4,6 +4,7 @@
 package services
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"database/sql"
@@ -11,11 +12,13 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 
+	"github.com/webdad/auth-service/internal/eraser"
 	"github.com/webdad/auth-service/internal/models"
 )
 
@@ -25,6 +28,11 @@ var (
 	ErrInvalidCredentials  = errors.New("email ou mot de passe invalide")
 	ErrUserInactive        = errors.New("compte désactivé")
 	ErrInvalidRefreshToken = errors.New("refresh token invalide ou expiré")
+	ErrUserNotFound        = errors.New("utilisateur introuvable")
+	ErrInvalidRole         = errors.New("rôle invalide (user, moderator ou admin)")
+	// ErrInsufficientPrivilege : l'acteur n'a pas le niveau pour agir sur la
+	// cible (ex. un modérateur tente de bannir un autre modérateur / un admin).
+	ErrInsufficientPrivilege = errors.New("privilèges insuffisants pour cette cible")
 )
 
 // defaultAdminID : UUID figé de l'admin par défaut, partagé avec les autres
@@ -213,6 +221,226 @@ func (s *AuthService) EnsureDefaultAdmin(email, password string) error {
 
 	if _, err := s.db.Exec(q, defaultAdminID, email, string(hash), models.RoleAdmin); err != nil {
 		return fmt.Errorf("seed admin : %w", err)
+	}
+	return nil
+}
+
+// ─── Administration (réservé aux comptes admin, garde côté handler/route) ───
+
+// ListUsers retourne une page de comptes (annuaire admin). `query` filtre par
+// email (sous-chaîne, insensible à la casse) ; vide = tous les comptes. Inclut
+// les comptes désactivés (l'admin doit voir les bannis).
+func (s *AuthService) ListUsers(limit, offset int, query string) ([]models.User, error) {
+	const q = `
+		SELECT id, email, role, is_active, deactivated_at, created_at
+		FROM credentials
+		WHERE ($1 = '' OR email ILIKE '%' || $1 || '%')
+		ORDER BY created_at DESC
+		LIMIT $2 OFFSET $3`
+
+	rows, err := s.db.Query(q, query, limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("liste comptes : %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	users := make([]models.User, 0, limit)
+	for rows.Next() {
+		var u models.User
+		if err := rows.Scan(&u.ID, &u.Email, &u.Role, &u.IsActive, &u.DeactivatedAt, &u.CreatedAt); err != nil {
+			return nil, fmt.Errorf("lecture compte : %w", err)
+		}
+		users = append(users, u)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("parcours comptes : %w", err)
+	}
+	return users, nil
+}
+
+// SetRole change le rôle d'un compte (source de vérité du rôle = ce service).
+// La prise d'effet côté JWT est différée au prochain /refresh de l'utilisateur
+// (le token courant porte l'ancien rôle jusqu'à expiration ≤ jwtExpiry).
+func (s *AuthService) SetRole(id, role string) error {
+	if !validRole(role) {
+		return ErrInvalidRole
+	}
+	res, err := s.db.Exec(`UPDATE credentials SET role = $2 WHERE id = $1`, id, role)
+	if err != nil {
+		return fmt.Errorf("changement de rôle : %w", err)
+	}
+	return errIfNoRows(res)
+}
+
+// RoleOf renvoie le rôle courant d'un compte (ErrUserNotFound si absent). Sert
+// à protéger la hiérarchie : un modérateur ne doit bannir qu'un simple
+// utilisateur, pas un autre modérateur ni un admin.
+func (s *AuthService) RoleOf(id string) (string, error) {
+	var role string
+	err := s.db.QueryRow(`SELECT role FROM credentials WHERE id = $1`, id).Scan(&role)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", ErrUserNotFound
+	}
+	if err != nil {
+		return "", fmt.Errorf("lecture du rôle : %w", err)
+	}
+	return role, nil
+}
+
+// SetActive active/désactive un compte. Désactiver = bannir : bloque le login
+// ET le /refresh (cf. Login/Refresh), et on révoque immédiatement les refresh
+// tokens du compte pour tuer sa session courante au plus vite (sa session ne
+// survit alors qu'à l'access token en cours, ≤ jwtExpiry).
+func (s *AuthService) SetActive(id string, active bool) error {
+	// deactivated_at : posée au bannissement (point de départ de la purge RGPD à
+	// 5 ans), effacée à la réactivation. `CASE` pour ne pas écraser une date déjà
+	// posée si on rebannit (improbable mais sûr).
+	res, err := s.db.Exec(`
+		UPDATE credentials
+		SET is_active = $2,
+		    deactivated_at = CASE
+		        WHEN $2 = false AND deactivated_at IS NULL THEN NOW()
+		        WHEN $2 = true THEN NULL
+		        ELSE deactivated_at
+		    END
+		WHERE id = $1`, id, active)
+	if err != nil {
+		return fmt.Errorf("changement d'état du compte : %w", err)
+	}
+	if err := errIfNoRows(res); err != nil {
+		return err
+	}
+	if !active {
+		// Révocation best-effort : l'échec ne doit pas annuler le bannissement.
+		_, _ = s.db.Exec(`DELETE FROM refresh_tokens WHERE user_id = $1`, id)
+	}
+	return nil
+}
+
+// DeleteAccount efface DÉFINITIVEMENT les identifiants d'un compte (effacement
+// RGPD) : ses refresh tokens puis sa ligne `credentials`. La purge des données
+// applicatives (profil, posts, messages, médias, graphe social) est orchestrée
+// par l'appelant (admin) sur les autres services. ErrUserNotFound si absent.
+func (s *AuthService) DeleteAccount(id string) error {
+	// Best-effort sur les tokens (révocation), impératif sur les credentials.
+	_, _ = s.db.Exec(`DELETE FROM refresh_tokens WHERE user_id = $1`, id)
+	res, err := s.db.Exec(`DELETE FROM credentials WHERE id = $1`, id)
+	if err != nil {
+		return fmt.Errorf("suppression du compte : %w", err)
+	}
+	return errIfNoRows(res)
+}
+
+// systemActorID : id « système » porté par le token admin minté pour le
+// balayage automatique (aucun compte réel — sert uniquement aux gardes admin
+// des services en aval).
+const systemActorID = "00000000-0000-0000-0000-000000000000"
+
+// ListBannedBefore renvoie les comptes bannis (is_active=false) dont le
+// bannissement remonte à avant `before`, du plus ancien au plus récent.
+func (s *AuthService) ListBannedBefore(before time.Time, limit int) ([]models.User, error) {
+	const q = `
+		SELECT id, email, role, is_active, deactivated_at, created_at
+		FROM credentials
+		WHERE is_active = false AND deactivated_at IS NOT NULL AND deactivated_at < $1
+		ORDER BY deactivated_at ASC
+		LIMIT $2`
+	rows, err := s.db.Query(q, before, limit)
+	if err != nil {
+		return nil, fmt.Errorf("liste comptes bannis : %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	users := make([]models.User, 0, limit)
+	for rows.Next() {
+		var u models.User
+		if err := rows.Scan(&u.ID, &u.Email, &u.Role, &u.IsActive, &u.DeactivatedAt, &u.CreatedAt); err != nil {
+			return nil, fmt.Errorf("lecture compte : %w", err)
+		}
+		users = append(users, u)
+	}
+	return users, rows.Err()
+}
+
+// mintSystemAdminToken signe un JWT admin éphémère pour les appels
+// serveur-à-serveur du balayage (auth est l'émetteur de tokens).
+func (s *AuthService) mintSystemAdminToken() (string, error) {
+	return s.GenerateToken(&models.User{ID: systemActorID, Email: "system@auth", Role: models.RoleAdmin})
+}
+
+// SweepBannedAccounts efface (RGPD) les comptes bannis depuis plus de `after` :
+// purge des données applicatives sur les autres services (token admin minté),
+// puis suppression des identifiants. Renvoie le nombre de comptes effacés.
+func (s *AuthService) SweepBannedAccounts(ctx context.Context, e *eraser.Eraser, after time.Duration) (int, error) {
+	if after <= 0 {
+		return 0, nil
+	}
+	banned, err := s.ListBannedBefore(time.Now().Add(-after), 100)
+	if err != nil {
+		return 0, err
+	}
+	if len(banned) == 0 {
+		return 0, nil
+	}
+	bearer, err := s.mintSystemAdminToken()
+	if err != nil {
+		return 0, err
+	}
+	purged := 0
+	for _, u := range banned {
+		if failed := e.Erase(ctx, bearer, u.ID); len(failed) > 0 {
+			log.Printf("[account-purge] %s : échec partiel %v", u.ID, failed)
+		}
+		if err := s.DeleteAccount(u.ID); err != nil {
+			log.Printf("[account-purge] suppression credentials %s : %v", u.ID, err)
+			continue
+		}
+		purged++
+	}
+	return purged, nil
+}
+
+// RunAccountPurgeSweeper balaye périodiquement les comptes bannis à purger
+// (RGPD) jusqu'à annulation du contexte. À lancer en goroutine. No-op si
+// rétention ou intervalle <= 0.
+func (s *AuthService) RunAccountPurgeSweeper(ctx context.Context, e *eraser.Eraser, after, interval time.Duration) {
+	if after <= 0 || interval <= 0 {
+		return
+	}
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		if n, err := s.SweepBannedAccounts(ctx, e, after); err != nil {
+			log.Printf("[account-purge] balayage : %v", err)
+		} else if n > 0 {
+			log.Printf("[account-purge] %d comptes bannis effacés (RGPD)", n)
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+	}
+}
+
+// validRole vérifie qu'un rôle fait partie de l'enum autorisé.
+func validRole(role string) bool {
+	switch role {
+	case models.RoleUser, models.RoleModerator, models.RoleAdmin:
+		return true
+	default:
+		return false
+	}
+}
+
+// errIfNoRows mappe « 0 ligne affectée » vers ErrUserNotFound.
+func errIfNoRows(res sql.Result) error {
+	n, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("lignes affectées : %w", err)
+	}
+	if n == 0 {
+		return ErrUserNotFound
 	}
 	return nil
 }

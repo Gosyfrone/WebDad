@@ -21,9 +21,16 @@ CREATE TABLE IF NOT EXISTS credentials (
     password    VARCHAR(255) NOT NULL,          -- hash bcrypt
     role        user_role NOT NULL DEFAULT 'user',
     is_active   BOOLEAN NOT NULL DEFAULT true,
+    -- deactivated_at : date du bannissement (is_active passé à false). Sert de
+    -- point de départ à la purge RGPD automatique des comptes bannis (5 ans).
+    -- NULL quand le compte est actif.
+    deactivated_at TIMESTAMPTZ,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Idempotent pour les volumes créés avant l'ajout de la colonne.
+ALTER TABLE credentials ADD COLUMN IF NOT EXISTS deactivated_at TIMESTAMPTZ;
 
 -- Refresh tokens (préparé pour la feature bonus).
 CREATE TABLE IF NOT EXISTS refresh_tokens (

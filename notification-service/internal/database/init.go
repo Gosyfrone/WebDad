@@ -84,7 +84,7 @@ var validators = map[string]bson.M{
 			"properties": bson.M{
 				"recipient_id":    bson.M{"bsonType": "string"},
 				"group_key":       bson.M{"bsonType": "string"},
-				"type":            bson.M{"bsonType": "string", "enum": bson.A{"like", "comment", "reply", "mention", "repost", "quote", "follow", "message_mention", "follow_request", "follow_request_accepted", "follow_request_accept_confirm"}},
+				"type":            bson.M{"bsonType": "string", "enum": bson.A{"like", "comment", "reply", "mention", "repost", "quote", "follow", "message_mention", "follow_request", "follow_request_accepted", "follow_request_accept_confirm", "post_purge_warning"}},
 				"post_id":         bson.M{"bsonType": bson.A{"string", "null"}},
 				"comment_id":      bson.M{"bsonType": bson.A{"string", "null"}},
 				"conversation_id": bson.M{"bsonType": bson.A{"string", "null"}},

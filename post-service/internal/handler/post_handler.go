@@ -102,7 +102,8 @@ func (h *PostHandler) ListPosts(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": posts})
 }
 
-// GetPost : GET /posts/:id (public).
+// GetPost : GET /posts/:id (public). Un post masqué par la modération n'est
+// visible qu'à un modérateur/admin (rôle lu dans le JWT optionnel).
 // @Summary     Détail d'un post
 // @Tags        posts
 // @Produce     json
@@ -112,10 +113,12 @@ func (h *PostHandler) ListPosts(c *gin.Context) {
 // @Router      /posts/{id} [get]
 func (h *PostHandler) GetPost(c *gin.Context) {
 	viewerID := ""
+	viewerRole := ""
 	if claims, ok := middleware.ClaimsFrom(c); ok {
 		viewerID = claims.UserID
+		viewerRole = claims.Role
 	}
-	post, err := h.service.GetPost(c.Request.Context(), c.Param("id"), viewerID)
+	post, err := h.service.GetPost(c.Request.Context(), c.Param("id"), viewerID, viewerRole)
 	if err != nil {
 		respondPostError(c, err)
 		return
@@ -307,6 +310,69 @@ func (h *PostHandler) DeletePost(c *gin.Context) {
 		return
 	}
 	c.Status(http.StatusNoContent)
+}
+
+// ListHidden : GET /posts/moderation/deleted — corbeille de modération (posts
+// retirés en suppression douce, partagée mod/admin). Réservé via ModeratorOnly.
+func (h *PostHandler) ListHidden(c *gin.Context) {
+	claims, ok := middleware.ClaimsFrom(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "claims absents"})
+		return
+	}
+	posts, err := h.service.ListHiddenPosts(c.Request.Context(), claims.Role, pageLimit(c), pageOffset(c))
+	if err != nil {
+		respondPostError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": posts})
+}
+
+// RestorePost : POST /posts/:id/restore — restaure un post masqué depuis la
+// corbeille (mod/admin). Pas de confirmation : action réversible.
+func (h *PostHandler) RestorePost(c *gin.Context) {
+	claims, ok := middleware.ClaimsFrom(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "claims absents"})
+		return
+	}
+	post, err := h.service.RestorePost(c.Request.Context(), c.Param("id"), claims.Role)
+	if err != nil {
+		respondPostError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": post})
+}
+
+// PurgePost : DELETE /posts/:id/purge — efface DÉFINITIVEMENT un post de la
+// corbeille (mod/admin). Irréversible.
+func (h *PostHandler) PurgePost(c *gin.Context) {
+	claims, ok := middleware.ClaimsFrom(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "claims absents"})
+		return
+	}
+	if err := h.service.PurgePost(c.Request.Context(), c.Param("id"), claims.UserID, claims.Role); err != nil {
+		respondPostError(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+// PurgeUserData : DELETE /posts/by-author/:id — efface toutes les données d'un
+// utilisateur (effacement RGPD, admin). Renvoie le nombre de posts supprimés.
+func (h *PostHandler) PurgeUserData(c *gin.Context) {
+	claims, ok := middleware.ClaimsFrom(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "claims absents"})
+		return
+	}
+	n, err := h.service.PurgeUserData(c.Request.Context(), c.Param("id"), claims.Role)
+	if err != nil {
+		respondPostError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": gin.H{"posts_deleted": n}})
 }
 
 // respondPostError mappe les erreurs métier vers des codes HTTP.

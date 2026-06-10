@@ -9,6 +9,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+
+	"github.com/webdad/user-service/internal/models"
 )
 
 // contextKey : clé sous laquelle les claims sont stockés dans le contexte Gin.
@@ -63,6 +65,41 @@ func ClaimsFrom(c *gin.Context) (*Claims, bool) {
 	}
 	claims, ok := val.(*Claims)
 	return claims, ok
+}
+
+// AdminOnly stoppe la requête (403) si l'utilisateur authentifié n'est pas
+// administrateur. À chaîner APRÈS JWTAuth (qui pose les claims).
+func AdminOnly() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		claims, ok := ClaimsFrom(c)
+		if !ok {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "claims absents"})
+			return
+		}
+		if claims.Role != models.RoleAdmin {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "réservé aux administrateurs"})
+			return
+		}
+		c.Next()
+	}
+}
+
+// ModeratorOnly stoppe la requête (403) si l'utilisateur n'est ni modérateur ni
+// administrateur (l'admin est un sur-ensemble du modérateur). À chaîner APRÈS
+// JWTAuth. Garde des actions de modération (ex. masquer un compte banni).
+func ModeratorOnly() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		claims, ok := ClaimsFrom(c)
+		if !ok {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "claims absents"})
+			return
+		}
+		if claims.Role != models.RoleAdmin && claims.Role != models.RoleModerator {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "réservé à la modération"})
+			return
+		}
+		c.Next()
+	}
 }
 
 // parseToken valide la signature (HS256) et l'expiration, puis retourne les claims.

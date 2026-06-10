@@ -1,18 +1,11 @@
-import { Shield } from 'lucide-react'
+import { ModerationView } from '@/components/moderation/moderation-view'
 
-import { PlaceholderPage } from '@/components/layout/placeholder-page'
-
-// TODO : implémenter le panneau de modération (rôles moderator + administrator)
-//   - lister les posts signalés (via Gateway -> post-service)
-//   - actions : masquer / supprimer un post, avertir un utilisateur
-//   - garde d'accès : refuser si le rôle n'est pas moderator/administrator
+/**
+ * Centre de modération (rôles moderator + administrator) : corbeille des tweets
+ * supprimés (restaurer / purger) et annuaire des comptes (bannir/réactiver ;
+ * rôles + suppression de compte réservés aux admins). Garde côté client
+ * (ModerationView) + back (403). L'« administration infra » vit sur /admin.
+ */
 export default function ModerationPage() {
-  return (
-    <PlaceholderPage
-      icon={<Shield className="h-10 w-10 text-[#5B6CFF] dark:text-[#9aa6ff]" aria-hidden />}
-      titleKey="nav.moderation"
-      headingKey="moderation.heading"
-      descKey="moderation.desc"
-    />
-  )
+  return <ModerationView />
 }

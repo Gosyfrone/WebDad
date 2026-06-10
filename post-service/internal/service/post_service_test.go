@@ -80,6 +80,50 @@ func TestCanAct(t *testing.T) {
 	}
 }
 
+// TestIsModerator : seuls les rôles modérateur et admin ouvrent la corbeille de
+// modération (restauration / purge). PURE.
+func TestIsModerator(t *testing.T) {
+	cases := []struct {
+		role string
+		want bool
+	}{
+		{models.RoleUser, false},
+		{models.RoleModerator, true},
+		{models.RoleAdmin, true},
+		{"", false},
+		{"Admin", false}, // sensible à la casse (le JWT émet en minuscules)
+	}
+	for _, tc := range cases {
+		t.Run(tc.role, func(t *testing.T) {
+			if got := isModerator(tc.role); got != tc.want {
+				t.Fatalf("isModerator(%q) = %v, attendu %v", tc.role, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestPurgeCutoffs : la borne de préavis précède toujours la borne de purge
+// (fenêtre de préavis = avant la purge), et les deux sont dans le passé. PURE.
+func TestPurgeCutoffs(t *testing.T) {
+	now := time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC)
+	after := 43800 * time.Hour // ~5 ans
+	warn := 720 * time.Hour    // 30 jours
+
+	purge, warnAt := purgeCutoffs(now, after, warn)
+	if !purge.Equal(now.Add(-after)) {
+		t.Fatalf("purge cutoff = %v, attendu %v", purge, now.Add(-after))
+	}
+	if !warnAt.After(purge) {
+		t.Fatalf("la borne de préavis (%v) doit être postérieure à la borne de purge (%v)", warnAt, purge)
+	}
+	// Un tweet masqué il y a (after - warn/2) doit être en zone de préavis mais
+	// pas encore purgeable : hidden_at > purge cutoff ET hidden_at < warn cutoff.
+	hiddenAt := now.Add(-(after - warn/2))
+	if !hiddenAt.After(purge) || !hiddenAt.Before(warnAt) {
+		t.Fatalf("tweet en préavis mal classé : hidden=%v purge=%v warn=%v", hiddenAt, purge, warnAt)
+	}
+}
+
 // TestResolveParentID : threading 2 niveaux — répondre à une racine garde son
 // id, répondre à une réponse rattache à la racine de cette réponse. PURE.
 func TestResolveParentID(t *testing.T) {

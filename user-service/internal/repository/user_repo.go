@@ -119,11 +119,12 @@ func (r *UserRepository) Update(id string, username *string) (*models.User, erro
 	return scanUser(r.db.QueryRow(q, id, username))
 }
 
-// SoftDelete désactive un compte (is_active=false) sans le supprimer.
-// Retourne sql.ErrNoRows si l'utilisateur n'existe pas.
-func (r *UserRepository) SoftDelete(id string) error {
-	const q = `UPDATE users SET is_active = false WHERE id = $1`
-	res, err := r.db.Exec(q, id)
+// SetActive active/désactive un compte (visibilité publique : les comptes
+// inactifs sont masqués des listes/recherche/follows). Retourne sql.ErrNoRows
+// si l'utilisateur n'existe pas.
+func (r *UserRepository) SetActive(id string, active bool) error {
+	const q = `UPDATE users SET is_active = $2 WHERE id = $1`
+	res, err := r.db.Exec(q, id, active)
 	if err != nil {
 		return err
 	}
@@ -135,6 +136,26 @@ func (r *UserRepository) SoftDelete(id string) error {
 		return sql.ErrNoRows
 	}
 	return nil
+}
+
+// SoftDelete désactive un compte (is_active=false) sans le supprimer.
+// Retourne sql.ErrNoRows si l'utilisateur n'existe pas.
+func (r *UserRepository) SoftDelete(id string) error {
+	return r.SetActive(id, false)
+}
+
+// PurgeUser efface DÉFINITIVEMENT un compte (effacement RGPD) : ses arêtes de
+// follow (les deux sens), ses demandes de follow en attente (les deux sens),
+// puis sa ligne `users`. Idempotent (aucune ligne = pas d'erreur).
+func (r *UserRepository) PurgeUser(id string) error {
+	if _, err := r.db.Exec(`DELETE FROM follows WHERE follower_id = $1 OR following_id = $1`, id); err != nil {
+		return err
+	}
+	if _, err := r.db.Exec(`DELETE FROM follow_requests WHERE follower_id = $1 OR following_id = $1`, id); err != nil {
+		return err
+	}
+	_, err := r.db.Exec(`DELETE FROM users WHERE id = $1`, id)
+	return err
 }
 
 // ─── Graphe social (follows) ──────────────────────────────────────────────

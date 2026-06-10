@@ -1,14 +1,16 @@
 'use client'
 
-import { apiFetch, getAccessToken } from '@/lib/auth-client'
+import { apiFetch } from '@/lib/auth-client'
 import { resolveMediaUrl, toStoredMedia } from '@/lib/media'
-import type { ProfilDetails, ProfilEditableFields, UserRole } from '@/types'
+import { decodeClaims, mapRole } from '@/lib/session'
+import type { ProfilDetails, ProfilEditableFields } from '@/types'
 
 type ApiEnvelope<T> = { data?: T; error?: string; message?: string }
 
 type ApiUser = {
   id: string
   username: string
+  is_active?: boolean
   created_at: string
   updated_at?: string
   follower_count?: number
@@ -29,11 +31,6 @@ type ApiProfil = {
   updated_at?: string
   display_name_changed_at?: string
   visibility?: 'public' | 'private'
-}
-
-type JwtClaims = {
-  user_id?: string
-  role?: string
 }
 
 const PROFIL_UPDATED_EVENT = 'breezy:profil-updated'
@@ -104,7 +101,7 @@ function mergeProfil(
   profil: ApiProfil | null,
   currentUser: boolean
 ): ProfilDetails {
-  const claims = currentUser ? readClaims() : null
+  const claims = currentUser ? decodeClaims() : null
   const role = currentUser ? mapRole(claims?.role) : 'user'
 
   return {
@@ -112,6 +109,7 @@ function mergeProfil(
     displayName: profil?.display_name?.trim() || user.username,
     username: user.username,
     role,
+    isActive: user.is_active ?? true,
     bio: profil?.bio ?? '',
     avatarUrl: resolveMediaUrl(profil?.avatar_url),
     bannerUrl: resolveMediaUrl(profil?.banner_url),
@@ -169,29 +167,4 @@ function toUpdatePayload(fields: ProfilEditableFields) {
 
 function jsonHeaders(): HeadersInit {
   return { 'Content-Type': 'application/json' }
-}
-
-function readClaims(): JwtClaims | null {
-  const token = getAccessToken()
-  if (!token) return null
-
-  const [, payload] = token.split('.')
-  if (!payload) return null
-
-  try {
-    return JSON.parse(window.atob(toBase64(payload))) as JwtClaims
-  } catch {
-    return null
-  }
-}
-
-function toBase64(base64Url: string): string {
-  const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/')
-  return base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=')
-}
-
-function mapRole(role?: string): UserRole {
-  if (role === 'admin') return 'administrator'
-  if (role === 'moderator' || role === 'administrator') return role
-  return 'user'
 }

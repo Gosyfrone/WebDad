@@ -38,6 +38,8 @@ export interface ProfilDetails {
   /** Identifiant unique sans « @ » (immuable). */
   username: string
   role: UserRole
+  /** Compte actif ? `false` = banni (login bloqué + compte masqué). */
+  isActive: boolean
   bio: string
   avatarUrl: string
   /** Image de bannière (en-tête du profil). */

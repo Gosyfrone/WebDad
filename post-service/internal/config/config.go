@@ -31,6 +31,14 @@ type Config struct {
 	// dernière collection ; au-delà, le serveur redemande la collection. Défaut 5m,
 	// configurable via BOOKMARK_SESSION_WINDOW (format durée Go, ex. « 10m »).
 	BookmarkWindow time.Duration
+	// PurgeAfter : durée de rétention d'un tweet masqué (corbeille de modération)
+	// avant purge définitive automatique (RGPD). Défaut 5 ans. PurgeWarnBefore :
+	// préavis avant la purge (notif à l'auteur + marquage « bientôt purgé »),
+	// défaut 30 jours. PurgeSweepInterval : période du balayage, défaut 6h.
+	// Format durée Go (PURGE_AFTER / PURGE_WARN_BEFORE / PURGE_SWEEP_INTERVAL).
+	PurgeAfter         time.Duration
+	PurgeWarnBefore    time.Duration
+	PurgeSweepInterval time.Duration
 }
 
 // Load construit la config. Charge les .env best-effort (ignorés s'ils
@@ -55,6 +63,10 @@ func Load() *Config {
 		NotificationURL:  os.Getenv("NOTIFICATION_SERVICE_URL"),
 		InternalSecret:   getEnv("INTERNAL_SECRET", os.Getenv("INTERNAL_EVENT_SECRET")),
 		BookmarkWindow:   getDuration("BOOKMARK_SESSION_WINDOW", 5*time.Minute),
+		// 5 ans ≈ 43800h ; 30 jours = 720h.
+		PurgeAfter:         getDuration("PURGE_AFTER", 43800*time.Hour),
+		PurgeWarnBefore:    getDuration("PURGE_WARN_BEFORE", 720*time.Hour),
+		PurgeSweepInterval: getDuration("PURGE_SWEEP_INTERVAL", 6*time.Hour),
 	}
 
 	if cfg.JWTSecret == "" {

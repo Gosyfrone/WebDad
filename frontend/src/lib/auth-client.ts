@@ -26,11 +26,17 @@ export function getAccessToken(): string | null {
 export function setAccessToken(token: string): void {
   if (typeof window === 'undefined') return
   window.localStorage.setItem(ACCESS_TOKEN_KEY, token)
+  // Notifie useSession() (lib/session) : un refresh peut changer le rôle porté
+  // par le JWT (ex. promotion/rétrogradation prise en compte au refresh).
+  // Nom d'événement = SESSION_CHANGED_EVENT (évité en import pour ne pas créer
+  // de cycle session ↔ auth-client).
+  window.dispatchEvent(new Event('breezy:session-changed'))
 }
 
 export function clearAccessToken(): void {
   if (typeof window === 'undefined') return
   window.localStorage.removeItem(ACCESS_TOKEN_KEY)
+  window.dispatchEvent(new Event('breezy:session-changed'))
 }
 
 /**

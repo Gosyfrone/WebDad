@@ -25,6 +25,9 @@ const (
 	TypeRepost       = "repost"
 	TypeQuote        = "quote"
 	EventPostDeleted = "post_deleted"
+	// EventPostPurgeWarning : préavis (≈1 mois) avant la purge définitive d'un
+	// tweet masqué par la modération → notifie l'auteur (RecipientID).
+	EventPostPurgeWarning = "post_purge_warning"
 )
 
 // Event — charge utile envoyée au notification-service.

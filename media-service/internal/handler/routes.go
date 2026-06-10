@@ -23,4 +23,6 @@ func RegisterRoutes(r *gin.Engine, serviceName string, store *storage.Store, cfg
 	r.POST("/media/encrypted", auth, h.UploadEncrypted) // blob chiffré E2EE (JWT)
 	r.GET("/media/:id", h.Download)                     // lecture publique (stream + Range)
 	r.DELETE("/media/:id", auth, h.Delete)              // suppression (propriétaire/admin)
+	// Effacement RGPD : purge tous les objets d'un propriétaire (admin).
+	r.DELETE("/media/owners/:id", auth, middleware.AdminOnly(), h.PurgeByOwner)
 }

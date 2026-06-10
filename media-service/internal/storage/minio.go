@@ -99,6 +99,35 @@ func (s *Store) Remove(ctx context.Context, id string) error {
 	return s.client.RemoveObject(ctx, s.bucket, id, minio.RemoveObjectOptions{})
 }
 
+// RemoveByOwner supprime TOUS les objets appartenant à `ownerID` (effacement
+// RGPD). Parcourt le bucket (scan O(n)) et lit la métadonnée propriétaire via
+// Stat (fiable, contrairement à la métadonnée parfois absente du listing).
+// Renvoie le nombre d'objets supprimés. Pas de base à côté → un scan est le
+// prix de l'autonomie du service (perspective : index propriétaire→objets).
+func (s *Store) RemoveByOwner(ctx context.Context, ownerID string) (int, error) {
+	count := 0
+	for obj := range s.client.ListObjects(ctx, s.bucket, minio.ListObjectsOptions{Recursive: true}) {
+		if obj.Err != nil {
+			return count, obj.Err
+		}
+		info, err := s.Stat(ctx, obj.Key)
+		if err != nil {
+			if errors.Is(err, ErrNotFound) {
+				continue // course : objet déjà supprimé entre-temps
+			}
+			return count, err
+		}
+		if OwnerOf(info) != ownerID {
+			continue
+		}
+		if err := s.Remove(ctx, obj.Key); err != nil {
+			return count, err
+		}
+		count++
+	}
+	return count, nil
+}
+
 // OwnerOf extrait l'id du propriétaire depuis les métadonnées d'un ObjectInfo.
 func OwnerOf(info minio.ObjectInfo) string {
 	return info.Metadata.Get("X-Amz-Meta-" + ownerMetaKey)

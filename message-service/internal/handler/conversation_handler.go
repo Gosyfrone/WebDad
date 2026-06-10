@@ -318,6 +318,17 @@ func (h *ConversationHandler) UnreadCount(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": gin.H{"count": count}})
 }
 
+// PurgeUser : DELETE /messages/users/:id — efface DÉFINITIVEMENT la
+// participation d'un utilisateur à la messagerie (effacement RGPD, admin via
+// middleware). Idempotent.
+func (h *ConversationHandler) PurgeUser(c *gin.Context) {
+	if err := h.service.PurgeUser(c.Request.Context(), c.Param("id")); err != nil {
+		respondError(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
 // ListMembers : GET /messages/conversations/:id/members — membres (id + rôle),
 // sans les enveloppes des autres (membre requis).
 func (h *ConversationHandler) ListMembers(c *gin.Context) {

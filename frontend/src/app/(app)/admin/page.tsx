@@ -1,18 +1,11 @@
-import { Settings2 } from 'lucide-react'
+import { AdminInfra } from '@/components/admin/admin-infra'
 
-import { PlaceholderPage } from '@/components/layout/placeholder-page'
-
-// TODO : implémenter le panneau d'administration (rôle administrator)
-//   - lister / gérer les utilisateurs (via Gateway -> user-service)
-//   - changer les rôles (user / moderator / administrator)
-//   - garde d'accès : refuser si le rôle n'est pas administrator
+/**
+ * Administration « infra » (rôle administrator) : monitoring des conteneurs
+ * Docker / uptime des services (à venir, Stage ②). La gouvernance des comptes
+ * (annuaire, bannissement, rôles) vit désormais dans le centre de Modération,
+ * partagé avec les modérateurs. Garde côté client (AdminInfra) + back.
+ */
 export default function AdminPage() {
-  return (
-    <PlaceholderPage
-      icon={<Settings2 className="h-10 w-10 text-[#5B6CFF] dark:text-[#9aa6ff]" aria-hidden />}
-      titleKey="nav.admin"
-      headingKey="admin.heading"
-      descKey="admin.desc"
-    />
-  )
+  return <AdminInfra />
 }

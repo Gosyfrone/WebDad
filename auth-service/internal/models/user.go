@@ -13,12 +13,13 @@ const (
 // User représente une ligne de la table `credentials`.
 // PasswordHash n'est jamais sérialisé en JSON (tag `json:"-"`).
 type User struct {
-	ID           string    `json:"id"`
-	Email        string    `json:"email"`
-	PasswordHash string    `json:"-"` // colonne `password` (hash bcrypt)
-	Role         string    `json:"role"`
-	IsActive     bool      `json:"is_active"`
-	CreatedAt    time.Time `json:"created_at"`
+	ID            string     `json:"id"`
+	Email         string     `json:"email"`
+	PasswordHash  string     `json:"-"` // colonne `password` (hash bcrypt)
+	Role          string     `json:"role"`
+	IsActive      bool       `json:"is_active"`
+	DeactivatedAt *time.Time `json:"deactivated_at,omitempty"` // date du bannissement (NULL si actif)
+	CreatedAt     time.Time  `json:"created_at"`
 }
 
 // AuthUser : vue publique d'un utilisateur renvoyée par l'API d'auth.
@@ -52,4 +53,16 @@ type LoginRequest struct {
 // httpOnly) — pas de binding `required` pour que /logout reste best-effort.
 type RefreshRequest struct {
 	RefreshToken string `json:"refresh_token"`
+}
+
+// UpdateRoleRequest : payload de PATCH /auth/users/:id/role (admin).
+type UpdateRoleRequest struct {
+	Role string `json:"role" binding:"required"`
+}
+
+// UpdateStatusRequest : payload de PATCH /auth/users/:id/status (admin).
+// Pointeur + required : force la présence explicite de `is_active` (sinon un
+// `false` omis serait indistinct d'un champ absent).
+type UpdateStatusRequest struct {
+	IsActive *bool `json:"is_active" binding:"required"`
 }

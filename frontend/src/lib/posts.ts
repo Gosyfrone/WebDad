@@ -11,9 +11,10 @@
  * l'API est mappé vers le camelCase des types front.
  */
 
-import { apiFetch, getAccessToken } from '@/lib/auth-client'
+import { apiFetch } from '@/lib/auth-client'
 import { resolveMediaUrl } from '@/lib/media'
 import type { ProfilDetails } from '@/types'
+import { decodeClaims } from '@/lib/session'
 
 /** Erreur d'appel API portant le code HTTP. */
 export class PostApiError extends Error {
@@ -142,34 +143,14 @@ async function expectOk(res: Response, message: string): Promise<void> {
 
 // --- Contexte utilisateur courant (claims JWT) ------------------------------
 
-interface Claims {
-  user_id?: string
-  role?: string
-}
-
-/** Décode les claims du JWT (id + rôle) pour les droits d'affichage. */
-function readClaims(): Claims | null {
-  const token = getAccessToken()
-  if (!token) return null
-  const [, payload] = token.split('.')
-  if (!payload) return null
-  try {
-    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/')
-    const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=')
-    return JSON.parse(window.atob(padded)) as Claims
-  } catch {
-    return null
-  }
-}
-
-/** Id de l'utilisateur courant (ou '' si pas de session). */
+/** Id de l'utilisateur courant (ou '' si pas de session). Cf. `lib/session`. */
 export function currentUserId(): string {
-  return readClaims()?.user_id ?? ''
+  return decodeClaims()?.user_id ?? ''
 }
 
 /** L'utilisateur courant peut-il supprimer un contenu de `authorId` ? */
 function canDelete(authorId: string): boolean {
-  const claims = readClaims()
+  const claims = decodeClaims()
   if (!claims) return false
   const role = claims.role
   return claims.user_id === authorId || role === 'moderator' || role === 'admin'

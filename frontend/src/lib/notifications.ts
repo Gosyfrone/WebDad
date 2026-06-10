@@ -33,6 +33,7 @@ export type NotificationType =
   | 'follow_request'
   | 'follow_request_accepted'
   | 'follow_request_accept_confirm'
+  | 'post_purge_warning'
 
 export type FollowRequestDecisionStatus = 'accepted' | 'rejected'
 

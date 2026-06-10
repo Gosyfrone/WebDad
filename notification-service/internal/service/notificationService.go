@@ -81,7 +81,7 @@ func (s *NotificationService) HandleEvent(ctx context.Context, ev models.Event) 
 		}
 		return s.applyToGroup(ctx, ev.RecipientID, gk, ev)
 
-	case models.TypeLike, models.TypeComment, models.TypeReply, models.TypeRepost, models.TypeQuote, models.TypeFollow, models.TypeFollowRequest, models.TypeFollowRequestAcceptConfirm:
+	case models.TypeLike, models.TypeComment, models.TypeReply, models.TypeRepost, models.TypeQuote, models.TypeFollow, models.TypeFollowRequest, models.TypeFollowRequestAcceptConfirm, models.TypePostPurgeWarning:
 		recipient := ev.RecipientID
 		if recipient == "" || recipient == ev.ActorID {
 			return nil // pas de notification à soi-même
@@ -313,6 +313,12 @@ func groupKeyFor(ev models.Event) (string, bool) {
 			return "", false
 		}
 		return "follow_request_accept_confirm:" + ev.ActorID, true
+	case models.TypePostPurgeWarning:
+		// Une notification par post (préavis de purge), pas d'agrégation.
+		if ev.PostID == "" {
+			return "", false
+		}
+		return "post_purge_warning:" + ev.PostID, true
 	}
 	return "", false
 }

@@ -48,11 +48,17 @@ func main() {
 		service.WithBookmarkWindow(cfg.BookmarkWindow),
 		service.WithProfilClient(client.NewProfilClient(cfg.ProfilServiceURL)),
 		service.WithFollowClient(client.NewFollowClient(cfg.UserServiceURL, cfg.InternalSecret)),
+		service.WithPurgeRetention(cfg.PurgeAfter, cfg.PurgeWarnBefore),
 	}
 	if cfg.NotificationURL != "" {
 		opts = append(opts, service.WithNotifier(notifier.New(cfg.NotificationURL, cfg.InternalSecret)))
 	}
 	postService := service.NewPostService(postRepo, opts...)
+
+	// Balayage RGPD des tweets masqués (préavis + purge définitive) en arrière-plan.
+	sweepCtx, stopSweeper := context.WithCancel(context.Background())
+	defer stopSweeper()
+	go postService.RunPurgeSweeper(sweepCtx, cfg.PurgeSweepInterval)
 
 	r := gin.Default()
 	handler.RegisterRoutes(r, serviceName, postService, cfg.JWTSecret)

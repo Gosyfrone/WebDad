@@ -99,9 +99,14 @@ export default function LoginPage() {
       const payload = await response.json().catch(() => null)
 
       if (!response.ok) {
-        setErrors({
-          form: payload?.error ?? payload?.message ?? t('auth.login.failed'),
-        })
+        // 403 = compte désactivé/banni (auth-service ErrUserInactive). On ne
+        // remonte pas le message brut du back (« compte désactivé » minuscule) :
+        // on affiche un message dédié, localisé, qui oriente vers le support.
+        const form =
+          response.status === 403
+            ? t('auth.login.account_disabled')
+            : (payload?.error ?? payload?.message ?? t('auth.login.failed'))
+        setErrors({ form })
         return
       }
 

@@ -32,6 +32,22 @@ func NewMessageRepository(db *mongo.Database) *MessageRepository {
 	}
 }
 
+// PurgeUser efface DÉFINITIVEMENT la participation d'un utilisateur à la
+// messagerie (effacement RGPD) : sa clé publique, ses appartenances aux
+// conversations et les messages qu'il a envoyés. Les conversations partagées
+// (DM/groupes) subsistent pour les autres membres ; un groupe/communauté dont
+// il était propriétaire devient orphelin (compromis assumé, cf. CLAUDE.md §6).
+func (r *MessageRepository) PurgeUser(ctx context.Context, userID string) error {
+	if _, err := r.keys.DeleteMany(ctx, bson.M{"user_id": userID}); err != nil {
+		return err
+	}
+	if _, err := r.members.DeleteMany(ctx, bson.M{"user_id": userID}); err != nil {
+		return err
+	}
+	_, err := r.messages.DeleteMany(ctx, bson.M{"sender_id": userID})
+	return err
+}
+
 // --- Clés publiques ----------------------------------------------------------
 
 // UpsertKey publie/met à jour la clé publique d'un utilisateur (idempotent).

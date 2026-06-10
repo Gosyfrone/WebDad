@@ -49,3 +49,9 @@ type CreateUserRequest struct {
 type UpdateUserRequest struct {
 	Username *string `json:"username" binding:"omitempty,min=3,max=50"`
 }
+
+// UpdateStatusRequest : payload de PATCH /users/:id/status (admin).
+// Pointeur + required : force la présence explicite de `is_active`.
+type UpdateStatusRequest struct {
+	IsActive *bool `json:"is_active" binding:"required"`
+}
