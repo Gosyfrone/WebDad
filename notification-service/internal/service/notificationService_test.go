@@ -33,6 +33,9 @@ func TestGroupKeyFor(t *testing.T) {
 		{"reply sans commentaire → invalide", models.Event{Type: models.TypeReply, PostID: "p1"}, "", false},
 		{"repost agrège par post original", models.Event{Type: models.TypeRepost, PostID: "p1"}, "repost:p1", true},
 		{"quote agrège par post citant", models.Event{Type: models.TypeQuote, PostID: "p2"}, "quote:p2", true},
+		{"follow agrège par destinataire", models.Event{Type: models.TypeFollow, ActorID: "u1", RecipientID: "u2"}, "follow", true},
+		{"acceptation follow privé agrège par propriétaire", models.Event{Type: models.TypeFollowRequestAccepted, ActorID: "u2", RecipientID: "u1"}, "follow_request_accepted:u2", true},
+		{"confirmation acceptation follow privé agrège par demandeur", models.Event{Type: models.TypeFollowRequestAcceptConfirm, ActorID: "u1", RecipientID: "u2"}, "follow_request_accept_confirm:u1", true},
 		{"mention en message agrège par conversation", models.Event{Type: models.TypeMessageMention, ConversationID: "cv1"}, "message_mention:cv1", true},
 		{"mention en message sans conversation → invalide", models.Event{Type: models.TypeMessageMention}, "", false},
 		{"type inconnu → invalide", models.Event{Type: "bogus"}, "", false},
@@ -79,33 +82,19 @@ func TestClampLimit(t *testing.T) {
 	}
 }
 
-func TestHandleEventPublishesFollowRequestDecision(t *testing.T) {
+func TestHandleEventIgnoresFollowRequestRejected(t *testing.T) {
 	pub := &capturePublisher{}
 	svc := NewNotificationService(nil, pub, nil)
 
 	err := svc.HandleEvent(context.Background(), models.Event{
-		Type:        models.EventFollowRequestAccepted,
+		Type:        models.EventFollowRequestRejected,
 		ActorID:     "private-user",
 		RecipientID: "requester",
 	})
 	if err != nil {
 		t.Fatalf("HandleEvent() erreur inattendue: %v", err)
 	}
-	if len(pub.userIDs) != 1 || pub.userIDs[0] != "requester" {
-		t.Fatalf("destinataires = %#v ; attendu requester", pub.userIDs)
-	}
-	payload, ok := pub.event.(map[string]any)
-	if !ok {
-		t.Fatalf("payload type = %T ; attendu map[string]any", pub.event)
-	}
-	if payload["type"] != "follow_request_decision" {
-		t.Fatalf("type = %#v ; attendu follow_request_decision", payload["type"])
-	}
-	data, ok := payload["data"].(map[string]string)
-	if !ok {
-		t.Fatalf("data type = %T ; attendu map[string]string", payload["data"])
-	}
-	if data["actor_id"] != "private-user" || data["status"] != "accepted" {
-		t.Fatalf("data = %#v ; attendu actor/status accepted", data)
+	if pub.event != nil || len(pub.userIDs) != 0 {
+		t.Fatalf("event = %#v destinataires = %#v ; attendu aucun envoi", pub.event, pub.userIDs)
 	}
 }

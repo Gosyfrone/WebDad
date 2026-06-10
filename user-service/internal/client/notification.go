@@ -11,9 +11,11 @@ import (
 )
 
 const (
-	TypeFollowRequest         = "follow_request"
-	TypeFollowRequestAccepted = "follow_request_accepted"
-	TypeFollowRequestRejected = "follow_request_rejected"
+	TypeFollow                     = "follow"
+	TypeFollowRequest              = "follow_request"
+	TypeFollowRequestAccepted      = "follow_request_accepted"
+	TypeFollowRequestAcceptConfirm = "follow_request_accept_confirm"
+	TypeFollowRequestRejected      = "follow_request_rejected"
 )
 
 type NotificationClient struct {

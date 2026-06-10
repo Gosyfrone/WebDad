@@ -41,6 +41,13 @@ These govern *how* Claude works on this repo. They override default behavior.
     `graphify-out/wiki/index.md` for broad navigation, and `GRAPH_REPORT.md` only for broad
     architecture review. Read raw source only to modify/debug or when the graph lacks detail.
     **After modifying code, run `graphify update .`** to keep the graph current (AST-only, no API cost).
+12. **Session note — follow notifications:** implemented 10/06/2026 after user validation. Public
+    direct follows emit aggregated `follow` notifications; private follow accept/reject keeps the
+    existing `follow_request` flow and does not emit `follow`.
+13. **Session note — private follow accept UX:** implemented 10/06/2026. Rejecting a private follow
+    request only retracts the owner's `follow_request`; accepting retracts it, creates a persisted
+    `follow_request_accept_confirm` notification for the owner, and sends a persisted
+    `follow_request_accepted` notification to the requester.
 
 ---
 

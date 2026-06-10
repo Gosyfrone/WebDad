@@ -23,18 +23,16 @@ import { resolveMediaUrl } from '@/lib/media'
 
 export type NotificationType =
   | 'like'
- 
   | 'comment'
- 
   | 'reply'
- 
   | 'mention'
- 
   | 'repost'
- 
   | 'quote'
+  | 'follow'
   | 'message_mention'
   | 'follow_request'
+  | 'follow_request_accepted'
+  | 'follow_request_accept_confirm'
 
 export type FollowRequestDecisionStatus = 'accepted' | 'rejected'
 
@@ -247,7 +245,7 @@ export interface NotificationHandlers {
   onDeleted: (id: string) => void
   /** Le serveur demande un rechargement complet (purge en cascade). */
   onRefresh: () => void
-  /** Une demande de follow privée a été acceptée/refusée par son propriétaire. */
+  /** Une demande de follow privée a été acceptée par son propriétaire. */
   onFollowRequestDecision?: (decision: FollowRequestDecision) => void
 }
 

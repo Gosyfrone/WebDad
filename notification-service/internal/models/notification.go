@@ -9,13 +9,16 @@ import (
 
 // Types de notification (alignés sur l'enum du validateur Mongo).
 const (
-	TypeLike          = "like"
-	TypeComment       = "comment"
-	TypeReply         = "reply"
-	TypeMention       = "mention"
-	TypeRepost        = "repost"
-	TypeQuote         = "quote"
-	TypeFollowRequest = "follow_request"
+	TypeLike                       = "like"
+	TypeComment                    = "comment"
+	TypeReply                      = "reply"
+	TypeMention                    = "mention"
+	TypeRepost                     = "repost"
+	TypeQuote                      = "quote"
+	TypeFollow                     = "follow"
+	TypeFollowRequest              = "follow_request"
+	TypeFollowRequestAccepted      = "follow_request_accepted"
+	TypeFollowRequestAcceptConfirm = "follow_request_accept_confirm"
 	// TypeMessageMention : mention (@handle) DANS UN MESSAGE (DM / groupe /
 	// communauté). Émise par message-service avec les `recipient_id` déjà
 	// résolus (le serveur de messagerie connaît ses membres) ; agrégée par
@@ -24,11 +27,11 @@ const (
 	TypeMessageMention = "message_mention"
 )
 
-// Types d'événement reçus de post-service (au-delà des 4 types de notification,
-// `post_deleted` déclenche une purge en cascade — il ne crée pas de notification).
+// Types d'événement reçus des services émetteurs (au-delà des types de
+// notification, `post_deleted` déclenche une purge en cascade — il ne crée pas
+// de notification).
 const (
 	EventPostDeleted           = "post_deleted"
-	EventFollowRequestAccepted = "follow_request_accepted"
 	EventFollowRequestRejected = "follow_request_rejected"
 )
 
@@ -56,14 +59,18 @@ type Notification struct {
 	UpdatedAt      time.Time `bson:"updated_at" json:"updated_at"`
 }
 
-// Event — charge utile de POST /internal/events, émise par post-service après
-// une action (like, commentaire, réponse, mention) ou une suppression.
+// Event — charge utile de POST /internal/events, émise par post-service ou
+// user-service après une action (like, commentaire, follow...) ou une suppression.
 //
 // Selon le type :
 //   - like/comment/reply : `recipient_id` est fourni directement (post-service
 //     connaît l'auteur du post / du commentaire visé) ;
 //   - mention            : `mention_handles` est résolu par CE service via
 //     user-service (seul détenteur des handles) → un destinataire par handle ;
+//   - follow             : `recipient_id` est l'utilisateur suivi ;
+//   - follow_request_accepted : `recipient_id` est le demandeur accepté ;
+//   - follow_request_accept_confirm : `recipient_id` est le propriétaire qui
+//     vient d'accepter la demande ;
 //   - message_mention    : `recipient_id` + `conversation_id` sont fournis
 //     directement (message-service connaît ses membres, et le contenu reste
 //     chiffré → la résolution du handle se fait côté client/messagerie) ;

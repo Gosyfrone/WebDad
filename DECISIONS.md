@@ -108,11 +108,15 @@
 - **Emission = synchronous best-effort fire-and-forget** to `/internal/events` (off the gateway, `INTERNAL_EVENT_SECRET`).
   Temporal coupling neutralized by best-effort; an event bus (NATS/Redis) is oversized for now (report perspective).
 - **Aggregation (anti-spam):** one notification = one `group_key` per recipient (`like:<post>`, `comment:<post>`,
-  `reply:<rootComment>`, `mention:<source>`, `repost:<post>`, `quote:<...>`, `follow_request:<actor>`,
+  `reply:<rootComment>`, `mention:<source>`, `repost:<post>`, `quote:<...>`, `follow`,
+  `follow_request:<actor>`, `follow_request_accepted:<actor>`,
+  `follow_request_accept_confirm:<actor>`,
   `message_mention:<conv>`), `$inc count`, `retract` decrements/deletes. O(1), no actor array (slight cosmetic
   `last_actor` blur after retract, assumed).
 - **Rules by type:** like/comment/repost/quote → post (or quoted) author; reply → ROOT author; mention → each mentioned;
-  follow_request → private-profile owner (actionable); decision → non-persisted WS event to the requester. Never to self.
+  follow_request → private-profile owner (actionable); accepted request → persisted notification + WS decision
+  to the requester, plus persisted confirmation in the owner's notification list; rejected request → no
+  requester notification. Never to self.
 - **Front badge:** app-wide unread counter held in memory (dedup by id), single WS, seeded by `unread-count`. Avoids a
   server request per event during spikes; self-corrects on page open / `notification_refresh`.
 
