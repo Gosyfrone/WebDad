@@ -131,6 +131,14 @@ several well-chosen secondary features · **all 3 roles functional** · pro slid
 
 **Individual:** technical mastery (full block skills, strong Q&A) · **English** during the defense.
 
+## 8. API documentation rules
+
+- Annotations live **in each service's handlers** (swaggo/swag code-first). Never in separate DTO files.
+- **`make swagger` before every commit** that touches a handler or route — regenerates `doc/openapi.{json,yaml}`.
+- The CI drift check (`ci-go.yml` job `swagger`) blocks PRs where `doc/` is stale.
+- **Published doc:** `https://gosyfrone.github.io/WebDad/` (Redoc, auto-deployed on `push develop` via `pages.yml`).
+- Local preview: `make swagger-site` → `http://localhost:8088`.
+
 ---
 
 *This file is the lean entry point. Current status, decisions, architecture detail and history live in the
