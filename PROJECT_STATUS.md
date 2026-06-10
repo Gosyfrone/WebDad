@@ -52,7 +52,8 @@
 - [x] CI/CD: 3 GitHub Actions workflows (`ci-go` build+test -race + golangci-lint + govulncheck;
       `ci-frontend` lint+build; `ci-integration` docker stack + healthchecks). govulncheck = 0 vuln.
 - [x] **API documentation:** Swagger/OpenAPI spec — `make swagger` génère `doc/openapi.{json,yaml}` (58 routes, 7 services annotés swaggo/swag code-first). Spec agrégé commité. Per-service `docs/` gitignorés.
-- [ ] **Perspective:** gitleaks, Dependabot, CD (push images to GHCR), Swagger UI (Phase 2), CI regen check (Phase 3).
+- [x] **CI swagger job** (`ci-go.yml` job `swagger`) : drift check (`git diff --exit-code doc/`) + validation Swagger 2.0 (`go-swagger validate`). Bloquant sur PR.
+- [ ] **Perspective:** gitleaks, Dependabot, CD (push images to GHCR), Swagger UI (Phase 3).
 
 ## Open issues / TODO (active)
 
