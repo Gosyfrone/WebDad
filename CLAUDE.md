@@ -151,6 +151,8 @@ several well-chosen secondary features · **all 3 roles functional** · pro slid
 
 ## 9. Current handoff
 
+- 2026-06-10: register birth date input now clamps future dates to today's local date across browsers/mobile pickers, while keeping the 13+ validation at submit time.
+- 2026-06-10: suggested commit message for this change: `fix(auth): cap register birth date to today`.
 - 2026-06-10: quote/repost media rendering implemented on the frontend; quoted posts now show image/video previews, and Docker exposes the app on port 3000.
 - 2026-06-10: suggested commit message for this change: `fix(posts): show quoted media in quotes`.
 - 2026-06-10: comment media support implemented end-to-end; comments/replies accept up to 4 uploaded images/videos/GIFs via media-service and render them in `CommentSection`.

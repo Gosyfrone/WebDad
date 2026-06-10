@@ -397,6 +397,8 @@ export const messages: Record<Locale, Messages> = {
     'auth.register.err.username_check':
       "Impossible de vérifier le nom d'utilisateur. Réessaie dans un instant.",
     'auth.register.err.birthdate_required': 'La date de naissance est requise.',
+    'auth.register.err.birthdate_invalid': 'Saisis une date de naissance valide.',
+    'auth.register.err.birthdate_future': 'La date de naissance ne peut pas être dans le futur.',
     'auth.register.err.age': "Tu dois avoir au moins 13 ans pour t'inscrire.",
     'auth.register.err.gender_required': 'Choisis un genre.',
     'auth.register.err.password_max': 'Le mot de passe est limité à 250 caractères.',
@@ -893,6 +895,8 @@ export const messages: Record<Locale, Messages> = {
     'auth.register.err.username_check':
       "Couldn't check the username. Try again in a moment.",
     'auth.register.err.birthdate_required': 'Date of birth is required.',
+    'auth.register.err.birthdate_invalid': 'Enter a valid date of birth.',
+    'auth.register.err.birthdate_future': "Date of birth can't be in the future.",
     'auth.register.err.age': 'You must be at least 13 to sign up.',
     'auth.register.err.gender_required': 'Choose a gender.',
     'auth.register.err.password_max': 'Password is limited to 250 characters.',
