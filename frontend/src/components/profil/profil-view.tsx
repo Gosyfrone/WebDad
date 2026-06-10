@@ -7,8 +7,18 @@ import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { ROUTES } from '@/lib/routes'
 import { useFollow } from '@/lib/use-follow'
-import { getMyProfil, getPublicProfil, saveMyProfil } from '@/lib/profil-client'
-import { listByAuthor, subscribePostCreated, type FeedPost } from '@/lib/posts'
+import {
+  getMyProfil,
+  getPublicProfil,
+  saveMyProfil,
+  subscribeProfilUpdated,
+} from '@/lib/profil-client'
+import {
+  applyProfilUpdateToPosts,
+  listByAuthor,
+  subscribePostCreated,
+  type FeedPost,
+} from '@/lib/posts'
 import { FOLLOW_CHANGE_EVENT, type FollowChangeDetail } from '@/lib/use-follow'
 import { useToast } from '@/hooks/use-toast'
 import type { ProfilDetails, ProfilEditableFields } from '@/types'
@@ -184,6 +194,14 @@ export function ProfilView({ username }: ProfilViewProps) {
       )
     })
   }, [profil?.userId])
+
+  useEffect(
+    () =>
+      subscribeProfilUpdated((updatedProfil) => {
+        setPosts((prev) => applyProfilUpdateToPosts(prev, updatedProfil))
+      }),
+    [],
+  )
 
   function handleDeleted(id: string) {
     setPosts((prev) => prev.filter((p) => p.id !== id))

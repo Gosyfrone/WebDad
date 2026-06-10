@@ -13,6 +13,7 @@
 
 import { apiFetch, getAccessToken } from '@/lib/auth-client'
 import { resolveMediaUrl } from '@/lib/media'
+import type { ProfilDetails } from '@/types'
 
 /** Erreur d'appel API portant le code HTTP. */
 export class PostApiError extends Error {
@@ -177,6 +178,45 @@ function canDelete(authorId: string): boolean {
 // --- Résolution d'auteur (mémoïsée) -----------------------------------------
 
 const authorCache = new Map<string, Promise<PostAuthor>>()
+
+function authorFromProfil(profil: ProfilDetails): PostAuthor {
+  return {
+    id: profil.userId,
+    username: profil.username,
+    displayName: profil.displayName || profil.username || 'Utilisateur',
+    avatarUrl: profil.avatarUrl,
+  }
+}
+
+function syncAuthorCacheFromProfil(profil: ProfilDetails): PostAuthor {
+  const author = authorFromProfil(profil)
+  authorCache.set(profil.userId, Promise.resolve(author))
+  return author
+}
+
+function applyAuthorUpdateToPost(post: FeedPost, author: PostAuthor): FeedPost {
+  const quotedPost = post.quotedPost
+    ? applyAuthorUpdateToPost(post.quotedPost, author)
+    : null
+  const authorChanged = post.author.id === author.id
+  const quoteChanged = quotedPost !== post.quotedPost
+
+  if (!authorChanged && !quoteChanged) return post
+
+  return {
+    ...post,
+    author: authorChanged ? author : post.author,
+    quotedPost,
+  }
+}
+
+export function applyProfilUpdateToPosts(
+  posts: FeedPost[],
+  profil: ProfilDetails,
+): FeedPost[] {
+  const author = syncAuthorCacheFromProfil(profil)
+  return posts.map((post) => applyAuthorUpdateToPost(post, author))
+}
 
 async function fetchUser(userId: string): Promise<ApiUser | null> {
   const res = await apiFetch(`/users/${userId}`)
