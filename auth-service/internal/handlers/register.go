@@ -11,6 +11,16 @@ import (
 )
 
 // Register : POST /auth/register — crée un compte (role=user).
+// @Summary     Créer un compte
+// @Tags        auth
+// @Accept      json
+// @Produce     json
+// @Param       body body models.RegisterRequest true "Email + mot de passe (min 8 chars)"
+// @Success     201 {object} models.AuthUser "Compte créé — data: {token, refresh_token, user}"
+// @Failure     400 {object} map[string]string "Payload invalide"
+// @Failure     409 {object} map[string]string "Email déjà utilisé"
+// @Failure     500 {object} map[string]string "Erreur interne"
+// @Router      /auth/register [post]
 func (h *Handler) Register(c *gin.Context) {
 	var req models.RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

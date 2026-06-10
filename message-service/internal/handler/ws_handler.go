@@ -41,6 +41,11 @@ func NewWSHandler(hub *realtime.Hub, secret string, allowedOrigins []string) *WS
 // Le token transite en query param car le navigateur n'autorise pas d'en-tête
 // Authorization sur une poignée de main WebSocket. L'utilisateur reçoit ensuite
 // les messages (chiffrés) de TOUTES ses conversations.
+// @Summary     Connexion WebSocket temps réel (messages)
+// @Tags        messages
+// @Param       access_token query string true "JWT access token"
+// @Success     101 {string} string "Upgrade WebSocket"
+// @Router      /messages/ws [get]
 func (h *WSHandler) Connect(c *gin.Context) {
 	claims, err := middleware.ParseToken(c.Query("access_token"), h.secret)
 	if err != nil {

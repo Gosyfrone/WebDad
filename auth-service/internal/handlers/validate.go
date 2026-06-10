@@ -11,6 +11,14 @@ import (
 // Validate : GET /auth/validate — destinée à l'API Gateway pour vérifier
 // un token avant de relayer vers les autres services. Le middleware JWT a
 // déjà validé le token et posé les claims dans le contexte ; on les renvoie.
+// @Summary     Valider un access token (usage gateway)
+// @Tags        auth
+// @Produce     json
+// @Security    BearerAuth
+// @Success     200 {object} map[string]string "Claims — data: {user_id, email, role}"
+// @Failure     401 {object} map[string]string "Token invalide"
+// @Failure     500 {object} map[string]string "Erreur interne"
+// @Router      /auth/validate [get]
 func (h *Handler) Validate(c *gin.Context) {
 	val, exists := c.Get("claims")
 	if !exists {

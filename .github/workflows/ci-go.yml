@@ -13,6 +13,8 @@ on:
       - "notification-service/**"
       - "media-service/**"
       - "api-gateway/**"
+      - "doc/**"
+      - "scripts/swagger-aggregate.sh"
       - ".github/workflows/ci-go.yml"
 
 # Annule les runs obsolètes d'une même PR / branche.
@@ -95,3 +97,39 @@ jobs:
           go install golang.org/x/vuln/cmd/govulncheck@latest
           "$(go env GOPATH)/bin/govulncheck" ./... \
             || echo "::warning::govulncheck a trouvé des vulnérabilités (report-only, non bloquant) — voir le log ci-dessus"
+
+  swagger:
+    name: Swagger - drift check + lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+          cache: false   # pas de go.sum à la racine
+
+      - name: Installer swag (générateur annotations → spec)
+        run: go install github.com/swaggo/swag/cmd/swag@latest
+
+      - name: Installer go-swagger (validateur Swagger 2.0)
+        run: go install github.com/go-swagger/go-swagger/cmd/swagger@latest
+
+      - name: Installer pyyaml (sortie YAML du script d'agrégation)
+        run: pip install pyyaml --quiet
+
+      - name: Régénérer le spec OpenAPI
+        run: make swagger
+
+      - name: Drift check
+        run: |
+          git diff --exit-code doc/openapi.json doc/openapi.yaml \
+            || {
+              echo "::error::Le spec OpenAPI dans doc/ est périmé."
+              echo "::error::Lancez 'make swagger' localement et committez le résultat."
+              exit 1
+            }
+
+      - name: Valider le spec OpenAPI (Swagger 2.0)
+        run: swagger validate doc/openapi.json

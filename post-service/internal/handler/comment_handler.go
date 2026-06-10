@@ -24,6 +24,15 @@ func NewCommentHandler(svc *service.PostService, serviceName string) *CommentHan
 
 // ListPostComments : GET /posts/:id/comments (public) — commentaires RACINE,
 // chronologiques, paginés (les réponses sont chargées via ListCommentReplies).
+// @Summary     Commentaires d'un post
+// @Tags        comments
+// @Produce     json
+// @Param       id     path  string true  "Post ID"
+// @Param       limit  query int    false "Nb résultats"
+// @Param       offset query int    false "Décalage"
+// @Success     200 {array} models.Comment
+// @Failure     404 {object} map[string]string
+// @Router      /posts/{id}/comments [get]
 func (h *CommentHandler) ListPostComments(c *gin.Context) {
 	comments, err := h.service.ListComments(c.Request.Context(), c.Param("id"), pageLimit(c), pageOffset(c))
 	if err != nil {
@@ -35,6 +44,16 @@ func (h *CommentHandler) ListPostComments(c *gin.Context) {
 
 // ListCommentReplies : GET /posts/:id/comments/:commentId/replies (public) —
 // réponses d'un commentaire, chronologiques, paginées.
+// @Summary     Réponses à un commentaire
+// @Tags        comments
+// @Produce     json
+// @Param       id        path  string true  "Post ID"
+// @Param       commentId path  string true  "Comment ID"
+// @Param       limit     query int    false "Nb résultats"
+// @Param       offset    query int    false "Décalage"
+// @Success     200 {array} models.Comment
+// @Failure     404 {object} map[string]string
+// @Router      /posts/{id}/comments/{commentId}/replies [get]
 func (h *CommentHandler) ListCommentReplies(c *gin.Context) {
 	replies, err := h.service.ListReplies(c.Request.Context(), c.Param("commentId"), pageLimit(c), pageOffset(c))
 	if err != nil {
@@ -45,6 +64,18 @@ func (h *CommentHandler) ListCommentReplies(c *gin.Context) {
 }
 
 // CreatPostComment : POST /posts/:id/comments — l'auteur est dérivé du JWT.
+// @Summary     Commenter un post
+// @Tags        comments
+// @Accept      json
+// @Produce     json
+// @Security    BearerAuth
+// @Param       id   path  string                        true "Post ID"
+// @Param       body body  models.CreateCommentRequest   true "Contenu + parent_id optionnel"
+// @Success     201 {object} models.Comment
+// @Failure     400 {object} map[string]string
+// @Failure     401 {object} map[string]string
+// @Failure     404 {object} map[string]string
+// @Router      /posts/{id}/comments [post]
 func (h *CommentHandler) CreatPostComment(c *gin.Context) {
 	claims, ok := middleware.ClaimsFrom(c)
 	if !ok {
@@ -68,6 +99,16 @@ func (h *CommentHandler) CreatPostComment(c *gin.Context) {
 
 // DeletePostComment : DELETE /posts/:id/comments/:commentId — auteur du
 // commentaire (ou modérateur/admin).
+// @Summary     Supprimer un commentaire (auteur/modérateur/admin)
+// @Tags        comments
+// @Security    BearerAuth
+// @Param       id        path string true "Post ID"
+// @Param       commentId path string true "Comment ID"
+// @Success     204
+// @Failure     401 {object} map[string]string
+// @Failure     403 {object} map[string]string
+// @Failure     404 {object} map[string]string
+// @Router      /posts/{id}/comments/{commentId} [delete]
 func (h *CommentHandler) DeletePostComment(c *gin.Context) {
 	claims, ok := middleware.ClaimsFrom(c)
 	if !ok {

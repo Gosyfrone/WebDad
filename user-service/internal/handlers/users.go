@@ -22,6 +22,17 @@ const (
 // L'id provient du JWT (claims), pas du corps : un utilisateur ne crée que
 // son propre enregistrement. Endpoint surtout utile pour les tests/l'admin ;
 // le flux normal repose sur le provisioning paresseux (cf. GetMe).
+// @Summary     Créer l'entrée utilisateur
+// @Tags        users
+// @Accept      json
+// @Produce     json
+// @Security    BearerAuth
+// @Param       body body models.CreateUserRequest true "Username"
+// @Success     201 {object} models.User "Utilisateur créé"
+// @Failure     400 {object} map[string]string "Payload invalide"
+// @Failure     401 {object} map[string]string "Non authentifié"
+// @Failure     409 {object} map[string]string "Username pris"
+// @Router      /users [post]
 func (h *Handler) Create(c *gin.Context) {
 	claims, ok := middleware.ClaimsFrom(c)
 	if !ok {
@@ -45,6 +56,14 @@ func (h *Handler) Create(c *gin.Context) {
 }
 
 // List : GET /users — liste paginée (?limit=&offset=).
+// @Summary     Lister les utilisateurs (paginé)
+// @Tags        users
+// @Produce     json
+// @Param       limit  query int false "Nb résultats (défaut 20, max 100)"
+// @Param       offset query int false "Décalage"
+// @Success     200 {array} models.User
+// @Failure     500 {object} map[string]string
+// @Router      /users [get]
 func (h *Handler) List(c *gin.Context) {
 	limit, offset := paginate(c)
 	users, err := h.users.List(limit, offset)
@@ -57,6 +76,15 @@ func (h *Handler) List(c *gin.Context) {
 }
 
 // Search : GET /users/search?q= — recherche d'utilisateurs par username (public).
+// @Summary     Rechercher des utilisateurs par username
+// @Tags        users
+// @Produce     json
+// @Param       q      query string true  "Terme de recherche"
+// @Param       limit  query int    false "Nb résultats"
+// @Param       offset query int    false "Décalage"
+// @Success     200 {array} models.User
+// @Failure     500 {object} map[string]string
+// @Router      /users/search [get]
 func (h *Handler) Search(c *gin.Context) {
 	limit, offset := paginate(c)
 	users, err := h.users.Search(c.Query("q"), limit, offset)
@@ -68,6 +96,14 @@ func (h *Handler) Search(c *gin.Context) {
 }
 
 // Suggestions : GET /users/suggestions — comptes les plus suivis (public).
+// @Summary     Suggestions (comptes les plus suivis)
+// @Tags        users
+// @Produce     json
+// @Param       limit  query int false "Nb résultats"
+// @Param       offset query int false "Décalage"
+// @Success     200 {array} models.User
+// @Failure     500 {object} map[string]string
+// @Router      /users/suggestions [get]
 func (h *Handler) Suggestions(c *gin.Context) {
 	limit, offset := paginate(c)
 	users, err := h.users.Suggestions(limit, offset)
@@ -79,6 +115,13 @@ func (h *Handler) Suggestions(c *gin.Context) {
 }
 
 // GetByID : GET /users/:id — détail d'un utilisateur + compteurs (public).
+// @Summary     Détail d'un utilisateur par ID
+// @Tags        users
+// @Produce     json
+// @Param       id path string true "User ID"
+// @Success     200 {object} models.UserDetails
+// @Failure     404 {object} map[string]string
+// @Router      /users/{id} [get]
 func (h *Handler) GetByID(c *gin.Context) {
 	user, err := h.users.GetDetailsByID(c.Param("id"))
 	if err != nil {
@@ -89,6 +132,13 @@ func (h *Handler) GetByID(c *gin.Context) {
 }
 
 // GetByUsername : GET /users/by-username/:username — détail par handle (public).
+// @Summary     Détail d'un utilisateur par username
+// @Tags        users
+// @Produce     json
+// @Param       username path string true "Username (handle)"
+// @Success     200 {object} models.UserDetails
+// @Failure     404 {object} map[string]string
+// @Router      /users/by-username/{username} [get]
 func (h *Handler) GetByUsername(c *gin.Context) {
 	user, err := h.users.GetDetailsByUsername(c.Param("username"))
 	if err != nil {
@@ -101,6 +151,14 @@ func (h *Handler) GetByUsername(c *gin.Context) {
 // GetMe : GET /users/me — utilisateur courant (protégé).
 // Provisioning paresseux : si l'enregistrement n'existe pas encore, il est
 // créé à la volée à partir des claims du JWT.
+// @Summary     Utilisateur courant (provisioning paresseux)
+// @Tags        users
+// @Produce     json
+// @Security    BearerAuth
+// @Success     200 {object} models.User
+// @Failure     401 {object} map[string]string
+// @Failure     500 {object} map[string]string
+// @Router      /users/me [get]
 func (h *Handler) GetMe(c *gin.Context) {
 	claims, ok := middleware.ClaimsFrom(c)
 	if !ok {
@@ -118,6 +176,18 @@ func (h *Handler) GetMe(c *gin.Context) {
 }
 
 // UpdateMe : PATCH /users/me — modifie l'utilisateur courant (protégé).
+// @Summary     Modifier le username courant
+// @Tags        users
+// @Accept      json
+// @Produce     json
+// @Security    BearerAuth
+// @Param       body body models.UpdateUserRequest true "Champs à modifier"
+// @Success     200 {object} models.User
+// @Failure     400 {object} map[string]string
+// @Failure     401 {object} map[string]string
+// @Failure     409 {object} map[string]string "Username pris"
+// @Failure     429 {object} map[string]string "Cooldown actif"
+// @Router      /users/me [patch]
 func (h *Handler) UpdateMe(c *gin.Context) {
 	claims, ok := middleware.ClaimsFrom(c)
 	if !ok {
@@ -141,6 +211,16 @@ func (h *Handler) UpdateMe(c *gin.Context) {
 }
 
 // Delete : DELETE /users/:id — désactive un compte (protégé, admin).
+// @Summary     Désactiver un compte (admin)
+// @Tags        users
+// @Produce     json
+// @Security    BearerAuth
+// @Param       id path string true "User ID"
+// @Success     204
+// @Failure     401 {object} map[string]string
+// @Failure     403 {object} map[string]string "Réservé admin"
+// @Failure     404 {object} map[string]string
+// @Router      /users/{id} [delete]
 func (h *Handler) Delete(c *gin.Context) {
 	claims, ok := middleware.ClaimsFrom(c)
 	if !ok {

@@ -1,429 +1,145 @@
-# CONTEXT — Distributed App Dev Project (FISA INFO A3)
+# CONTEXT — Breezy (WebDad) · Distributed App Dev Project (FISA INFO A3)
 
-> This file is the single source of truth for Claude Code.
-> **Always read it at session start. Update it after each significant change.**
-
----
-
-## 1. ARCHITECTURE
-
-4-layer microservices app (see archi.png):
-
-```
-[Client] User / Moderator / Administrator
-    ↓
-[Web]  Frontend (React or similar)
-    ↓
-[Services] API Gateway → User Service | Post Service | Profil Service | Auth Service
-    ↓
-[Data] PostgreSQL (User) | MongoDB (Post) | MongoDB (Profil) | PostgreSQL (Auth)
-```
-
-**Key rules:**
-- All inter-service communication goes through the API Gateway
-- JWT auth (Auth Service) + protected routes
-- Full Docker containerization (docker-compose)
-- 3 user roles: User, Moderator, Administrator
+> Entry point for Claude Code. Read this first at every session start.
+> Detail lives in dedicated files (keep this one lean):
+> - **[ARCHITECTURE.md](ARCHITECTURE.md)** — system architecture, service boundaries, flows, critical components.
+> - **[DECISIONS.md](DECISIONS.md)** — architectural decisions + rationale (defense prep).
+> - **[PROJECT_STATUS.md](PROJECT_STATUS.md)** — current state, open TODOs, assumed compromises.
+> - **[CHANGELOG.md](CHANGELOG.md)** — session work log · **[CHANGELOG_ARCHIVE.md](CHANGELOG_ARCHIVE.md)** — resolved issues / debugging history.
+> - **[PROMPTING.md](PROMPTING.md)** — token-efficient workflow + prompt templates (read on demand, NOT auto-loaded; user may say *"from PROMPTING.md, write me the prompt for: …"*).
+> - Knowledge graph in `graphify-out/` — query it before reading source (see Operating Rules).
 
 ---
 
-## 1bis. STACK TECHNIQUE
+## ⚠️ CLAUDE OPERATING RULES (HIGH PRIORITY — do not weaken)
 
-**Backend**
-- Langage : **Go 1.25** (bumpé depuis 1.22, EOL : 1.22 ne recevait plus les patchs sécu stdlib → CVE govulncheck. Dockerfiles `golang:1.25-alpine`, `go 1.25.0` dans les 5 `go.mod`, CI `setup-go: 1.25`)
-- Framework HTTP : **Gin** (`github.com/gin-gonic/gin`)
-- Un service = **un module Go indépendant** (chacun a son propre `go.mod`)
-- Linter : **golangci-lint**
-- Hot reload (dev) : **air** (`github.com/cosmtrek/air`)
-- Build / lint / test par service : via `Makefile` (`make run`, `make build`, `make lint`, `make test`)
-
-**Frontend**
-- Framework : **Next.js 14** (App Router)
-- Langage : **TypeScript**
-- Style : **Tailwind CSS** + **shadcn/ui** (thème **slate**)
-- Gestionnaire de paquets : **npm**
-- Port de dev : **3000** (convention Next.js — `npm run dev` est configuré avec `next dev -p 3000`)
-- Variable d'environnement principale : `NEXT_PUBLIC_API_URL` (URL de l'API Gateway, par défaut `http://localhost:8080`)
-
-**Ports par défaut**
-| Service              | Port |
-| -------------------- | ---- |
-| frontend (Next.js)   | 3000 |
-| api-gateway          | 8080 |
-| auth-service         | 8081 |
-| user-service         | 8082 |
-| profil-service       | 8083 |
-| post-service         | 8084 |
-| message-service      | 8085 |
-| notification-service | 8086 |
-| media-service        | 8087 |
-| MinIO (API S3)       | 9000 |
-| MinIO (console web)  | 9001 |
-
-Plus aucun conflit : le frontend (3000) et le backend (8080+) occupent des plages distinctes.
-
-**Bases de données**
-| Service              | Base       |
-| -------------------- | ---------- |
-| auth-service         | PostgreSQL |
-| user-service         | PostgreSQL |
-| profil-service       | MongoDB    |
-| post-service         | MongoDB    |
-| message-service      | MongoDB    |
-| notification-service | MongoDB    |
-| media-service        | MinIO (objet) |
-
----
-
-## 2. EVALUATION CRITERIA (grading grid)
-
-### Group grade — Deliverable (written report)
-| Criterion | What's needed for A (5pts) |
-|---|---|
-| Needs analysis | Well understood and explained |
-| Architecture diagram | Clear, readable, matches requirements |
-| Prioritization | Primary + secondary features, justified order |
-| Planning | Tools (Trello/Gantt), tracked, delays explained |
-| Methodology | Global approach, correct technical terms |
-| Interface (Wireframe) | Wireframe + final, gaps justified, intuitive UX |
-| Features presentation | Clear, limitations explicit |
-| Improvements & outlook | Prioritized, with effort estimates |
-| Report writing | Well structured, professional layout |
-
-### Group grade — Defense (oral)
-| Criterion | What's needed for A (5pts) |
-|---|---|
-| Context & approach | Clear, adapted to audience |
-| Choices made | Justified (architecture, features) |
-| Microservices architecture | Coherent, matches diagram or changes argued |
-| Security | JWT sessions, protected routes |
-| Containerization | Full Docker, correct params |
-| Primary features | All present and functional |
-| Secondary features | Several, well chosen |
-| Users (roles) | All 3 roles functional |
-| Oral presentation | Pro-quality slides + scripted demo |
-| Timing & energy | Balanced speaking time, dynamic, on schedule |
-
-### Individual grade
-| Criterion | What's needed for A (5pts) |
-|---|---|
-| Technical mastery | Full block skills demonstrated, strong Q&A |
-| English | Demonstrates skills in English during defense |
-
-**Grading scale:** A=5pts / B=4pts / C=2pts / D=1pt
-
-**Team members:** Zaid, Perujan, Candis, Théo
-
----
-
-## 3. PROJECT STATE
-
-> **Update this section after each work session.**
-
-### Services status
-| Service | Status | DB | Notes |
-|---|---|---|---|
-| Auth Service | 🟡 WIP | PostgreSQL | Routes `/auth/{register,login,refresh,logout,validate}` + `/health`. JWT HS256 (claims user_id/email/role) + bcrypt. Access 15m + refresh 24h opaque haché SHA-256, rotation à `/refresh`, révoqué à `/logout` (cf. §5 « Refresh token »). Autonome (schéma embarqué au boot, seed admin opt.). TODO : tests Go, détection de réutilisation de refresh. |
-| User Service | 🟢 OK (v1) | PostgreSQL | Couches repo/service/handlers, autonome (schéma `users`+`follows`+`follow_requests` au boot). CRUD users (`GET /users`, `/users/:id`, `/by-username/:username`, `POST /users`, `GET/PATCH /users/me`, `DELETE /users/:id` admin). Follow public = arête directe ; profil privé = demande `pending` + notif `follow_request`, puis accept/reject (`POST /users/follow-requests/:followerId/{accept,reject}`) ; pending sortants (`GET /users/me/follow-requests/outgoing`) ; retrait d’un abonné via `DELETE /users/me/followers/:id`. Listes/compteurs followers|following, recherche/suggestions, provisioning paresseux sur `/users/me`. Possède `username`+`is_active`+graphe social (`display_name`/`visibility` → profil-service). `username_changed_at` = baseline cooldown (cf. §5). Tests Go + e2e. TODO : tests intégration repo. |
-| Post Service | 🟢 OK (v1) | MongoDB | Autonome (collections+validateurs+index au boot). CRUD posts (`POST/GET/PATCH/DELETE /posts`, filtres `?author_id=`/`?author_ids=`, `quote_post_id`) avec **lecture filtrée par visibilité profil** : public visible, privé visible seulement au propriétaire ou à un follower accepté (clients profil-service + user-service, JWT optionnel sur GET). Reposts/citations, épinglage profil (`pinned_at`, `PATCH/DELETE /posts/:id/pin`) visible sur profil uniquement : les feeds global/abonnements masquent `pinned_at`. Likes (`POST/DELETE /posts/:id/like`, `/me/liked-ids`), commentaires threadés 2 niveaux (`/posts/:id/comments[/:id/replies]`). Compteurs dénormalisés int32 (`$inc`), nettoyage orphelins. **Médias (images/vidéos)** : champ `media []MediaRef {url,type}` sur le post (validateur `$jsonSchema`, cap 4) ; `content` optionnel si média joint (texte OU média requis). Émet vers notif-service (cf. §5). **Signets en collections** : collections `bookmark_collections`/`bookmarks` (many-to-many)/`bookmark_prefs` ; collection par défaut `is_default` (non supprimable/renommable, en tête) ; routes JWT `/posts/bookmarks/collections[/:cid[/posts]]`, `/posts/:id/bookmark`, `/posts/:id/bookmark/collections`, vue « Tous » dédupliquée (`/posts/bookmarks`), `/posts/me/bookmarked-ids` ; **modèle de rafale** `BOOKMARK_SESSION_WINDOW` (clic court → `filed`/`needs_choice`) (cf. §5). Tests Go (`withinSessionWindow` + routes 401 + masquage pin feed) + e2e signets 24/24. TODO : édition post côté front (back prêt). |
-| Profil Service | 🟢 OK (v1) | MongoDB | Autonome (collection `profiles`, validateur resync `collMod` au boot). Possède le décoratif (`display_name`/`bio`/`avatar_url`/`banner_url`/`website`/`location`/`birth_date`/`gender`) + **`visibility` public/private**. Routes : `GET /profils/:userId`, `GET /profils/:userId/visibility`, `GET /profils/me` (lecture seule, 404 si absent), `PATCH /profils/me`, `POST /profils` (UNIQUE création, display_name requis), `DELETE` admin, `GET /profils/search`. `birth_date` set-once, `display_name_changed_at` cooldown (cf. §5). Tests Go OK. **Upload avatar/bannière branché** (Phase 1 média : `PATCH /profils/me` stocke `/media/<id>`). TODO : agrégation lecture front. |
-| Message Service | 🟢 OK (DM+groupes+communautés+pièces jointes) | MongoDB | Messagerie E2EE (cf. §5 « Messagerie »). Serveur aveugle pour DM/groupes (`ciphertext`+`nonce`+enveloppes). **Pièces jointes chiffrées** sans changement de schéma : le payload chiffré porte une enveloppe `{v:1,text,media[]}`, les octets vivent (chiffrés) au media-service. Clés X25519 (`/messages/keys`), conversations/messages paginés par curseur, WebSocket `/messages/ws`. Groupes (nom chiffré, cap 32, owner-only manage), communautés hybrides (nom clair, clé serveur, annuaire public `/messages/communities`, talker/viewer). Épinglage/suppression côté user (`members.pinned_at/cleared_at`). **Curseur de lecture serveur (`members.last_read_at`) : `PUT /conversations/:id/read` + `GET /messages/unread-count` (badge, cf. §5), calcul par métadonnées (jamais le `ciphertext`).** Tests Go + e2e (Phase 1 13/13, 2 21/21, 3 28/28). Back COMPLET + UX. |
-| Notification Service | 🟢 OK (temps réel, agrégé) | MongoDB | Notifications agrégées façon Instagram (`group_key` unique/destinataire, `$inc count`). Ingestion `POST /internal/events` (secret `X-Internal-Secret`, hors gateway) : like/comment/reply/mention/repost/quote/**follow_request**/post_deleted, `retract` défait ; événements WS non persistés `follow_request_decision` pour accept/reject côté demandeur. API `/notifications` (JWT : list curseur, unread-count, read) + WS `/notifications/ws`. Règles par type + modèle d'agrégation (cf. §5). Tests Go + e2e live OK. |
-| Media Service | 🟢 OK (branché : profils/posts/messages) | MinIO (objet) | Stockage de fichiers transverse (profils/posts/messages), **agnostique du contenu** (octets opaques). Autonome (bucket `breezy-media` garanti au boot, idempotent). `POST /media` (JWT, multipart, détection MIME par magic bytes + caps 5 Mo image/50 Mo vidéo), `POST /media/encrypted` (JWT, blob E2EE opaque → `application/octet-stream`, cap vidéo), `GET /media/:id` (**public**, stream + Range/seek + `Cache-Control immutable` + ETag), `DELETE /media/:id` (propriétaire via métadonnée objet, ou admin). `owner_id` en user-metadata MinIO → pas de base à côté. Smoke test e2e OK (upload/download/415/403/404/206). **Branché sur les 3 surfaces** : avatar/bannière (Ph.1), images/vidéos de post (Ph.2), pièces jointes messagerie chiffrées (Ph.3). |
-| API Gateway | 🟡 WIP | — | Reverse proxy stdlib : préfixes `/auth`,`/users`,`/profils`,`/posts`,`/messages`,`/notifications`,`/media` → service cible (.env). WebSocket proxifié nativement (101 vérifié). CORS (`CORS_ALLOWED_ORIGINS`). Le download média transite par la gateway en streaming (MinIO jamais exposé). ⚠️ `/internal/events` non routé (serveur-à-serveur). TODO : middleware JWT pour protéger les préfixes. |
-| Frontend | 🟡 WIP | — | Next.js 14 + layout responsive style X. Auth refresh tokens (access localStorage, refresh cookie httpOnly via BFF `/api/auth/*`, `apiFetch` refresh single-flight, garde `middleware.ts`). Clients métier `lib/{api,posts,bookmarks,messages,notifications,media}.ts` au-dessus d'`apiFetch`. Câblé : feed/posts (like/commentaires/pin/repost/citation ; badges `Épinglé`/`Reposté` synchronisés optimiste/réponse serveur), **signets en collections** (bouton `PostCard` + `BookmarkDialog` + page `/signets`), profil hydraté + pages `/profil/[username]`, confidentialité profil (compte privé verrouillé sur posts/réponses/j'aime + listes relations masquées hors compteurs), follow pending privé, confirmation avant unfollow d'un profil privé, accept/reject temps réel côté demandeur, retrait d’un abonné, compteurs abonnés/abonnements dynamiques via événement optimiste/rollback, notifications follow_request accept/refuse, Explorer + « Qui suivre » + **historique local des profils ouverts depuis la recherche** (`breezy-search-history:<user_id>`), messagerie E2EE (DM/groupes/communautés) avec **pièces jointes chiffrées**, notifications (badge+WS), traduction auto conservatrice, i18n FR/EN maison, dark mode tokenisé, pages légales `(legal)`, **mots filtrés par compte dans le feed**, **mentions @handle**, **upload images/vidéos** (avatar/bannière, posts, messages chiffrés ; visionneuse photo/lightbox plein écran via portail, vidéos autoplay façon Twitter). TODO : rôle réel (placeholder admin), édition post. |
-
-### Features status
-| Feature | Type | Status |
-|---|---|---|
-| Registration / Login | Primary | 🟢 De bout en bout : UI → BFF → gateway → auth-service. Provisioning user (register `POST /users`, login `GET /users/me`), pré-vérification username. Déconnexion + garde de session faites. |
-| JWT auth + protected routes | Primary | 🟢 access 15m + refresh 24h (rotation, révocable) + `/auth/validate`. Front : refresh single-flight sur 401, garde `(app)`. TODO : middleware JWT gateway. |
-| Role management (User/Mod/Admin) | Primary | 🟡 Rôle dans le JWT ; user-service applique le contrôle admin (`DELETE /users/:id`). UI nav par rôle faite. TODO : généraliser aux autres services, rôle réel front (placeholder admin). |
-| Post creation/reading | Primary | 🟢 De bout en bout (cf. Post Service + §5). Feed défilement infini (Pour toi / Abonnements) sans divulguer les pins d'autrui, **lecture filtrée par visibilité profil**, like optimiste animé, commentaires threadés 2 niveaux, reposts/citations, épinglage visible sur profil, emoji, **images/vidéos** (composer : upload multi cap 4 ; `PostCard` : galerie + lecteur vidéo autoplay façon Twitter). `lib/posts.ts` cache auteur. TODO : édition post. |
-| User profile | Primary | 🟡 UI consultation+édition faite + page profil par username. Profils privés non suivis : message « compte privé » sur posts/réponses/j'aime, compteurs abonnés/abonnements visibles mais listes détaillées verrouillées. **Upload avatar/bannière réel** (media-service). TODO : brancher lecture agrégée user+profil+post. |
-| Social graph (follow/followers) | Secondary | 🟢 user-service follow + listes + compteurs + demandes privées `pending` accept/refuse + retrait d’abonné (`DELETE /users/me/followers/:id`). Front câblé (`lib/api.ts`, `RelationsDialog`, bouton Suivre⇄Demandé⇄Abonné, hook `use-follow`) ; confirmation avant unfollow d'un profil privé ; accept/reject pousse un événement WS au demandeur pour actualiser la page profil ouverte en direct ; compteurs dynamiques via événement `breezy:follow-change` avec rollback si l’API échoue. Testé e2e. |
-| Recherche / Explorer (comptes) | Secondary | 🟢 `GET /users/search` + `/profils/search`. Front `/explorer` debouncé (`@`→username sinon display_name), « Qui suivre » via `/users/suggestions`. **Historique local par compte** des personnes cherchées puis ouvertes en profil (déduplication, plus récent en haut, effacement global ou entrée par entrée via une croix). Testé e2e. TODO : recherche de posts. |
-| Traduction automatique des posts | Secondary | 🟢 Route BFF `/api/translate` (LibreTranslate + fallback Google, timeouts), `TranslatedContent` (posts+commentaires), cache, bascule original/traduction. Déclenchement conservateur côté client : pas de traduction sur texte court, mixte, déjà majoritairement dans la langue cible, ou simple faute/mot étranger isolé. Détection étendue par écritures (chinois/japonais, arabe, coréen, cyrillique, grec, hébreu, indien, thaï, etc.) + marqueurs latins courants. |
-| Mots filtrés dans le feed | Secondary | 🟢 `/parametres` : bloc sous la langue, ajout/suppression par chips, ascenseur après ~3 lignes. Persistance locale **par compte** (`breezy-muted-words:<user_id>`, `getMe()` si token pas encore rechargé). `FeedView` masque les posts des autres contenant l'expression filtrée (hashtag inclus), mais garde visibles les propres posts de l'utilisateur. |
-| Messagerie privée chiffrée (E2EE) | Secondary | 🟢 De bout en bout (back + UX). DM/groupes admin-proof, communautés hybrides (clé serveur). UI `/messages` deux volets (cf. §5). **État lu/non-lu côté serveur** (`members.last_read_at`, multi-appareil) : pastille liste + ancre « Nouveaux messages » + **badge non-lu app-wide** (`MessagesProvider`, cf. §5). **Sourdine par conversation** (`members.muted_at`) : exclue du badge, reste non-lue dans la liste. **Pièces jointes images/vidéos chiffrées** (cf. §5 « Stockage média » Ph.3) : fichier chiffré client (clé de contenu) → blob opaque au media-service, métadonnées dans l'enveloppe chiffrée du message → **serveur toujours aveugle, zéro changement de schéma**. Aperçu dernier message, épinglage/suppression côté user. Clé d'identité par appareil (IndexedDB). |
-| Notifications temps réel | Secondary | 🟢 De bout en bout (testé e2e live). Agrégation Instagram, types like/comment/reply/mention/repost/quote **+ `message_mention`** (mention en DM/groupe/communauté, agrégée par conversation, navigue vers `/messages?conv=`)/**follow_request**, WebSocket. Front `NotificationsProvider` (badge app-wide + WS unique), page `/notifications` + détail `/posts/[id]`, actions accepter/refuser pour les demandes de follow privées. TODO : rôle réel. |
-| Mentions (@handle) | Secondary | 🟢 De bout en bout (cf. §5 « Mentions »). **Posts/commentaires** : autocomplétion `@` (pop-up avatar/nom/@handle, `useMention`+`MentionAutocomplete`), rendu cliquable→profil (`MentionText` dans `TranslatedContent`). Back posts/commentaires déjà émetteur. **Messages (E2EE)** : autocomplétion membres-d'abord, `mentioned_member_ids` (ids only, jamais le texte) → `message_mention` ; rendu membre→profil / non-membre→carte preview→`/explorer?q=@h` (`MentionMessageText`) ; « X vous a mentionné » dans l'aperçu (client). i18n FR/EN. Tests : vitest mentions 10/10, Go OK. |
-| Signets / Bookmarks (collections) | Secondary | 🟢 De bout en bout (back + front, cf. Post Service + décision §5). Posts enregistrés dans des **collections** (many-to-many) + **collection par défaut** non supprimable. Front : `lib/bookmarks.ts`, bouton signet sur `PostCard` (clic court `filed`/`needs_choice`, appui long → sélecteur, dé-signer), `BookmarkDialog`, page `/signets` (`BookmarksView`), nav `nav.bookmarks`, i18n FR/EN. Vérifié : tsc/lint/vitest 31/31 + back e2e 24/24. |
-| Upload d'images / vidéos | Secondary | 🟢 **Complet (Phases 0→3)** : (0) `media-service` + MinIO + préfixe gateway `/media` + `lib/media.ts` ; (1) **avatar/bannière** ; (2) **images/vidéos de post** (champ `media[]` + validateur, composer upload multi cap 4, `PostCard` galerie/vidéo) ; (3) **pièces jointes messagerie chiffrées** (fichier chiffré client → blob opaque, métadonnées dans l'enveloppe chiffrée, serveur aveugle). Testé e2e via gateway + vitest 46/46. Perspective : miniatures, transcodage, présigné/CDN. |
-| GIFs (Tenor/Giphy) | Secondary | 🔴 TODO (plan acté §5 « GIFs ») — BFF `/api/gifs/*` + `GifPicker` ; posts = URL externe (zéro backend), messages = octets rapatriés + chiffrés (pipeline pièce jointe). |
-| Moderation (moderate posts) | Secondary | 🔴 TODO |
-| Admin panel | Secondary | 🔴 TODO |
-| Internationalisation (FR/EN) | Secondary | 🟢 i18n maison zéro dépendance (`lib/i18n.ts` registre + `LanguageProvider` + `useT()` + `LanguageSelector` globe). Tous les textes UI traduits, dates localisées. Défaut FR. Ajout langue = 1 entrée `LOCALES` + 1 bloc `messages`. TODO : persistance côté compte. |
-| *(add features here)* | | |
-
-### Infrastructure
-- [x] docker-compose.yml with all services
-- [x] Persistent volumes for DBs
-- [x] .env for secrets (never commit)
-- [x] README with setup instructions
-- [x] CI/CD : 3 workflows GitHub Actions (`ci-go` build+test -race **+ golangci-lint v2.12.2 / action v9 (bloquant, config par défaut, vert sur les 6 modules dont notification-service) + govulncheck (report-only)**, `ci-frontend` lint+build, `ci-integration` stack docker + healthchecks BDD, **incluant `mongo-notification`+`notification-service`**). Cf. décision §5. **govulncheck = 0 vuln** depuis le bump Go 1.25 + `x/net@v0.55.0` + `golang-jwt/jwt/v5@v5.3.1` (tooles en CI/Docker résolvent vers le dernier patch 1.25.x). TODO (perspective) : gitleaks, Dependabot, CD (push images GHCR)
-
----
-
-## 4. FILE STRUCTURE (target)
-
-```
-project/
-├── CLAUDE.md              ← this file (keep up to date)
-├── docker-compose.yml
-├── .env.example
-├── frontend/
-│   └── ...
-├── api-gateway/
-│   └── ...
-├── auth-service/
-│   ├── Dockerfile
-│   └── ...
-├── user-service/
-│   ├── Dockerfile
-│   └── ...
-├── post-service/
-│   ├── Dockerfile
-│   └── ...
-└── profil-service/
-    ├── Dockerfile
-    └── ...
-```
-
----
-
-## 5. TECHNICAL DECISIONS
-
-> Fill in as decisions are made.
-
-| Topic | Decision | Reason |
-|---|---|---|
-| Gateway | *(e.g. Express / Kong / custom)* | |
-| Frontend | Next.js 14 (App Router) + TS + Tailwind/shadcn | Stack imposée (§1bis) |
-| Frontend routing | Route groups `(auth)` (public), `(app)` (authentifié, gardé par `middleware.ts`) et `(legal)` (public : mentions légales / CGU / confidentialité) | Sépare layouts publics/privés sans polluer l'URL. `(legal)` distinct de `(app)` pour rester **hors garde de session** (le `matcher` du middleware ne couvre pas ces chemins → accessibles déconnecté depuis login/register) |
-| Frontend config | `lib/config.ts` (API Gateway) + `lib/routes.ts` (constantes de routes) | Source de vérité unique, pas de chaînes en dur |
-| Auth front (access + refresh) | **Access token (15m) en localStorage** (le client appelle le gateway directement avec `Authorization: Bearer`) ; **refresh token (24h) en cookie httpOnly `breezy-refresh`** géré par le **BFF Next** (`/api/auth/{login,register,refresh,logout}`). Le refresh token transite BFF↔gateway dans le **corps JSON** (jamais exposé au JS). `lib/auth-client.ts` : `apiFetch` ajoute le Bearer, catche le 401, déclenche un **refresh single-flight** (une promesse partagée), rejoue la requête, et redirige /login si le refresh échoue. `logout` révoque + efface. `lib/server/auth-cookie.ts` centralise pose/effacement du cookie | Pattern « access court + refresh httpOnly » : compromis assumé (access en localStorage = exposé XSS mais court ; refresh httpOnly = non volable). **Cookie géré par le BFF (same-origin)** plutôt que par l'auth-service : évite toute la complexité CORS/SameSite d'un cookie cross-origin, cohérent avec le BFF existant. Single-flight = pas de tempête de refresh quand N requêtes prennent 401 en même temps |
-| Refresh token (back) | Jeton **opaque** aléatoire (crypto/rand, 256 bits), **stocké haché** (SHA-256) dans `refresh_tokens` (jamais en clair). **Rotation** : `/auth/refresh` révoque l'ancien et émet une nouvelle paire. `/auth/logout` supprime le token (révocation). Le back **ne renouvelle jamais tout seul** : il signe avec `exp` et 401 sur expiration ; le front pilote le refresh. Middleware JWT ajoute `code: token_expired` pour distinguer expiration (→ refresh) de token invalide (→ pas de refresh) | Opaque + DB-stocké = **révocable** (≠ JWT self-contained) ; hash = une fuite DB ne livre aucun token. Rotation = un refresh token n'est rejouable qu'une fois (base pour la détection de réutilisation, en perspective). « Back ne prévoit pas l'expiration » = logique d'expiration portée par le front (cf. demande) |
-| URL gateway client vs serveur | `apiUrl()` choisit la base selon le contexte : **client** = `NEXT_PUBLIC_API_URL` (`localhost:8080`, port publié) ; **serveur** (route handlers, dans le conteneur) = `API_INTERNAL_URL` (`http://api-gateway:8080`, réseau Docker). `API_INTERNAL_URL` non préfixée `NEXT_PUBLIC_` → invisible client → repli sur `API_URL` | Dans le conteneur frontend, `localhost` = le conteneur lui-même, pas la gateway → les fetch serveur doivent viser le nom de service Docker. En local sans Docker, laisser les deux sur `localhost:8080` |
-| Provisioning user au login | Le BFF (`lib/provision.ts`) provisionne après l'auth, best-effort (n'échoue jamais l'auth). **Register** : `POST /users {username}` → persiste le handle CHOISI ; repli `GET /users/me` (dérivé email) si pris (409). **Login** : `GET /users/me` (l'utilisateur a déjà sa ligne). Dispo du username **pré-vérifiée** avant inscription (`/api/users/check-username` → `GET /users/by-username/:username`, 404=libre) + validation front alignée sur le back (`^[a-zA-Z0-9_]{3,50}$` + réservés) | Place le provisioning au point le plus robuste (serveur, à l'auth) : garanti, sans complexité client. Relie register→user sans coupler auth↔user. Le pré-check donne l'erreur sur le champ avant de créer le compte ; le repli couvre la course rarissime. Alternative écartée : provisioning au montage du feed (client) = moins garanti |
-| Gateway : pas de redirection slash | `RedirectTrailingSlash=false` + chaque service exposé via **2 routes** : préfixe nu (`/users`) ET sous-chemin (`/users/*path`) | Sans ça, un `POST /users` (endpoint collection) déclenchait un 307 vers `/users/` que le service (route `/users`) ne connaît pas → boucle de redirections → `fetch` échoue. Bug latent (on ne passait que par des sous-chemins comme `/users/me`). Touche tous les endpoints collection (liste + création) |
-| Frontend nav par rôle | `navItemsForRole()` filtre les liens (user/mod/admin) | Reflète les 3 rôles côté UI |
-| Nom du produit | **Breezy** (logo `frontend/public/logo_breezy.png`) | WebDad = nom du projet/repo, Breezy = nom du réseau social |
-| Layout feed | 3 colonnes style X.com : nav (gauche) / fil (centre) / suggestions (droite) | UX familière, démo lisible (critère « Interface » §2) |
-| Composer post | Logique de saisie factorisée dans `PostComposer` ; `CreatePost` = version inline (tête du fil), `CreatePostDialog` = popup (bouton « Poster » sidebar, shadcn `Dialog`) | Limite 280 car. + validation en un seul endroit, pas de duplication entre inline et modale |
-| Emoji picker | `EmojiPicker` (shadcn `Popover` + liste statique d'emojis), insertion à la position du curseur dans le composer | Pas de dépendance lourde ; fonctionne inline et dans la popup |
-| i18n (FR/EN, maison) | **Mécanisme maison léger, zéro dépendance** (pas de `next-intl`/`react-i18next`). `lib/i18n.ts` = registre `LOCALES` (source de vérité du sélecteur, scalable) + `messages: Record<Locale, Record<string,string>>` (clés `namespace.key`, **FR référence**, repli en cascade locale→FR→clé brute, interpolation `{param}`). `LanguageProvider` (Context client, calqué sur next-themes) lit `localStorage breezy-locale` au montage et pose `<html lang>` ; hook `useT()` (+`useLanguage()` pour `locale`). **Hydratation** : on rend TOUJOURS `DEFAULT_LOCALE` (FR) au 1er rendu serveur+client (pas de mismatch), puis bascule en effet → bref flash assumé (même compromis que le thème). Sélecteur **dropdown globe** (pas un toggle binaire) pour accueillir ES/IT/ZH plus tard. `routes.ts`/nav arrays stockent une `labelKey` (pas le libellé). Dates via `timeAgo(iso, locale)` + `Intl.DateTimeFormat('en-US'|'fr-FR')`. Pages stub = Server Components qui passent l'**icône en JSX** (`ReactNode`) au Client `PlaceholderPage` (on ne peut pas passer une *fonction* composant à travers la frontière RSC). | Cohérent avec le style « on l'a construit » + registre `themes.ts`. 2 langues → un dico maison suffit, `next-intl` (routing par locale, refonte) serait disproportionné. Demande utilisateur : interrupteur « comme le thème » MAIS **scalable** → dropdown piloté par registre, ajout d'une langue = 1 entrée `LOCALES` + 1 bloc `messages`. Placement « juste au-dessus du clair/sombre » + variante flottante translucide sur les pages publiques (tranché avec l'utilisateur, décideur) |
-| Onglets du fil | `FeedView` (client) gère l'état « Pour toi » / « Abonnements » ; Abonnements = placeholder (état vide) en attendant l'API | Switch d'onglet réel côté UI ; la page reste un Server Component qui passe les données stub |
-| Page profil | `ProfilView` (client) orchestre : `ProfilHeader` (bannière/avatar/bio/compteurs/rôle) + onglets Posts/Réponses/J'aime (réutilise `PostCard`) + `EditProfilDialog`. Type `ProfilDetails`/`ProfilEditableFields` dans `types`. Édition optimiste (état local mis à jour à l'enregistrement) ; `isOwner` distingue bouton « Éditer » vs « Suivre ». Page = Server Component avec données stub | Consultation + édition en un seul flux ; édition réutilise le pattern `Dialog` du composer ; même convention stub+TODO que le feed (`PATCH /profils/me` à brancher) |
-| Édition photo/bannière (Phase 1 média) | Front : `ImagePicker` (dans `EditProfilDialog`) **uploade** le fichier au media-service (`uploadMedia`, spinner + toast d'erreur) et restitue l'URL ; `PATCH /profils/me` persiste `avatar_url`/`banner_url`. **Forme stockée = chemin relatif `/media/<id>`** (portable, pas d'hôte figé en base) : `resolveMediaUrl` (lib/media) transforme en URL absolue gateway dans les **mappers API→modèle** (`profil-client`, `posts`, `notifications`, `user-cache`, `api`), `toStoredMedia` fait l'inverse à la sauvegarde. L'image **survit au reload**. | Une seule fonction de résolution appliquée aux ~5 mappers centraux → tous les consommateurs (`<img>` sidebar/composer/feed/notifs/messages) reçoivent une URL prête, sans toucher chaque composant. Relatif en base = portable entre environnements (l'origine gateway vit côté client). Remplace l'ancien aperçu data-URL (qui ne survivait pas au reload) |
-| Responsive / mobile | Mobile-first, breakpoint pivot `lg` (1024). **< lg** (téléphones, iPad portrait) : `MobileHeader` (avatar→**tiroir latéral gauche** `Sheet` avec Fil/Profil/Modération/Admin filtrés par rôle, + Paramètres et déconnexion en bas + logo Breezy centré, masqué sur /profil qui a son propre en-tête) + `MobileTabBar` fixe en bas (Accueil=`logo_only.png`, Recherche, Notifications, Messages) + `ComposeFab` (« + », bas-**droite**, convention X). **≥ lg** : sidebar gauche. **≥ xl** (1280) : + colonne droite. Sidebars en `hidden lg:flex`/`hidden xl:flex` ; `<main>` en `pb-16` pour dégager la barre. Sur feed mobile : titre + composer inline masqués (`hidden lg:block`). Favicon = `logo_only.png` (`metadata.icons`) | X.com-like sur 3 cibles (2 tél. + iPad) sans dupliquer les pages. Tiroir gauche (`Sheet` sur Radix Dialog) = navigation par section façon X mobile, déclenché par l'avatar. `MobileHeader` se masque seul (`usePathname`) sur les pages à en-tête propre. Pivot unique `lg`, robuste |
-| Swipe d'ouverture du tiroir | `MobileHeader` rend le `Sheet` **contrôlé** (`open`/`setOpen`) + écoute `touchstart`/`touchend` sur `window` : un geste depuis le bord gauche (≤24px) vers la droite (>60px, surtout horizontal) ouvre le tiroir. Hooks appelés avant le `return null` (règles des hooks) ; listeners non attachés quand l'en-tête est masqué | Radix `Dialog`/`Sheet` n'a **aucun** geste de swipe natif → ajout manuel. ⚠️ Sur iOS Safari le swipe bord-gauche déclenche aussi le « retour » du navigateur (conflit connu, acceptable en démo). Actif uniquement là où `MobileHeader` est monté (pas sur /profil) |
-| Anti-débordement mobile | Colonne centrale en `overflow-x-clip` (+ `min-w-0`) | Empêche le défilement horizontal parasite sur téléphone. `clip` (et non `hidden`) : ne crée pas de conteneur de scroll → ne casse pas les en-têtes `sticky` ; les éléments `fixed` (barre d'onglets, FAB) ne sont pas rognés (leur bloc conteneur = viewport) |
-| Thème / couleurs | 2 dimensions : mode clair/sombre (next-themes, `.dark`) + accent (`[data-accent]` : pink défaut / blue / cyan, registre `lib/themes.ts`). **Direction graphique (refonte #79)** : glassmorphism, dégradé de marque **violet `#8D3DFF` → indigo `#5B6CFF` → cyan `#47D9FF`** (calé sur le logo "B") + fond de page dégradé + cartes « verre ». **Dark mode (refonte #81)** : décliné dans la **même direction**, fond **violet quasi-noir** (`#0b0712→#1a1033`), surfaces violet sombre, accents identiques (le dégradé du logo claque sur fond sombre). | Identité visuelle alignée sur le logo ; dark mode cohérent avec le clair sans toucher au clair |
-| Surfaces tokenisées (clair+sombre) | La refonte #79 codait les couleurs **en dur** partout (≈230 occurrences : `bg-white/72`, `from-[#F8F3FF]`, `text-slate-*`, fond inline) → invisibles au `.dark`. #81 a **tokenisé** : variables CSS dans `globals.css` (`--bg-page`, `--panel`, `--glass`, `--column`, `--ink-strong`) avec **valeurs light = état exact** + déclinaison dark, consommées par des classes `@layer components` (`.bg-page`/`.bg-page-glow-1/2`, `.panel`/`.panel-y`, `.glass`/`.glass-strong`, `.glass-column`, `.brand-text`). Textes `text-slate-*` → tokens sémantiques (`text-foreground`/`text-muted-foreground`). Long tail (couleurs uniques) → variantes `dark:` ponctuelles. Accents de marque (boutons dégradés, `.brand-text`) inchangés dans les 2 modes | Une seule source de vérité par surface → le dark vit à un seul endroit, le clair reste identique au pixel. ⚠️ Priorité CSS : un utilitaire `bg-*`/`border-*` écrase ces classes (`@layer components`) → retirer l'utilitaire conflictuel en gardant la largeur de bordure (`border`, `border-b`) |
-| Sélecteur de mode (clair/sombre/système) | Composant `ThemeToggle` (`useTheme()` next-themes, persistance auto) : **interrupteur façon iOS** clair/sombre (curseur qui glisse sur Soleil/Lune) + **ligne « Mode système »** (icône écran) affichant Activé/Désactivé. Quand système activé → l'interrupteur est **grisé/désactivé** et reflète `resolvedTheme` ; le désactiver fige l'apparence courante en choix manuel (`setTheme(resolvedTheme)`). Monté à **2 endroits** (même composant, pas de duplication) : **tiroir mobile** (`MobileHeader`, < lg) ET **sidebar gauche PC** (`SidebarLeft`, ≥ lg, sur un panneau `.panel` **au-dessus de la card user**, les deux dans un conteneur de bas pour garder le `justify-between` de l'`<aside>`). **Variante compacte flottante `FloatingThemeToggle`** (slider Soleil/Lune seul, sans option système, **translucide** `bg-white/20`+`backdrop-blur`, **fixe en bas à gauche**) sur les **pages publiques login/register** (montée une fois dans le layout `(auth)`, qui n'a pas de menu) — laisse voir le dégradé de fond ; réutilise les mêmes keyframes de slide. ⚠️ **Au chargement complet** (arrivée sur /login après logout = `window.location.assign`, page statique), `FloatingThemeToggle` **ne se rend qu'après montage** (`if (!mounted) return null`) et lit le thème **effectif** (`resolvedTheme`, **repli sur la classe `.dark` du `<html>`** posée par next-themes avant le paint) → corrige le bug « curseur figé côté Soleil alors qu'on est en sombre » (l'état `theme` n'était pas encore propagé au 1er rendu). `enableSystem` activé dans le `ThemeProvider` (défaut reste clair). Flag `mounted` anti-mismatch d'hydratation. **Slide animé** du curseur via keyframes Tailwind `theme-thumb-left/right` (état `slide` mémorise le sens) | Bascule de mode demandée, UX type réglages iOS. next-themes gère application + persistance → composant purement UI. `isDark` lit `resolvedTheme` quand système actif pour positionner le curseur correctement. `mounted` requis car le serveur ignore le thème. ⚠️ Slide en **`animation`** (pas `transition`) car `disableTransitionOnChange` de next-themes désactive les `transition` au moment du switch — les keyframes y échappent |
-| Inter-service auth | JWT passed in header | Grading requirement |
-| API Gateway | Reverse proxy mince (`httputil.ReverseProxy`, stdlib) : table préfixe→URL (`internal/proxy` + `internal/router`), forwarde méthode/chemin/corps/headers et renvoie la réponse intacte (`{data}`/`{error}` remontent). CORS maison (`internal/middleware`, gère le preflight OPTIONS). Routes publiques pour l'instant ; le middleware JWT (validation locale avec `JWT_SECRET` partagé) viendra protéger les préfixes au login | Mince + évolutif + « on l'a construit » (démo). Forward transparent vs handlers par endpoint (BFF) réservés à l'agrégation multi-services. Préfixe conservé (`/auth/...` → service sur `/auth/...`) |
-| Containerization | Docker + docker-compose | Grading requirement |
-| Dev hot-reload | `make dev` = overlay `docker-compose.dev.yml` par-dessus la base. Go : stage `dev` du Dockerfile (`air` épinglé `air-verse/air@v1.52.3`) + `.air.toml` par service + bind-mount source ; caches Go partagés (volumes `go-mod-cache`/`go-build-cache`). Frontend : stage `deps` + `command: npm run dev` + bind-mount + volume anonyme `node_modules` + `WATCHPACK_POLLING=true`. Le `frontend` voit son `depends_on` effacé via `!reset`. `make up` reste les images de prod figées | Itérer sans rebuild. Stage `dev` placé AVANT le runtime → `make up`/`build` produisent toujours l'image de prod (dernier stage). `!reset` car un `depends_on: []` ne vide pas (compose fusionne les mappings). `start_period: 90s` sur les services Go pour laisser le 1er build `air` se faire |
-| Config `.env` | Racine = vars transverses (`JWT_SECRET`, `JWT_EXPIRY`, `NEXT_PUBLIC_API_URL`) ; `<service>/.env` = config propre, chargée par compose via `env_file:` ; `environment:` réservé aux overrides Docker (host = nom de conteneur) | Découplage : un service tourne seul (`make run`) avec son `.env`, et en stack via compose. ⚠️ Les vars d'un `env_file` ne sont PAS interpolables (`${...}`) dans le compose — seul le `.env` racine l'est. DB host surchargé via `DB_HOST`/`MONGO_HOST` |
-| Schéma DB (post) | Le service possède son schéma : `EnsureSchema` (post-service/internal/database/init.go) crée collections + validateurs `$jsonSchema` + index au démarrage, idempotent. Aucun script monté dans `mongo-post`. Config Mongo construite depuis le `.env` (`internal/config`), zéro creds en dur. `scripts/init-db/post-init.js` et le `post-service/docker-compose.yaml` parasite supprimés | Source de vérité unique + service autonome (`make run`/`make dev` contre un Mongo vierge). Même pattern que auth. ✅ user-service et profil-service sont désormais autonomes eux aussi (plus aucun init-db monté) |
-| Schéma DB (auth) | Le service possède son schéma : `auth-service/internal/db/schema.sql` (embarqué `go:embed`), appliqué au boot de façon idempotente (`EnsureSchema`). Aucun script monté dans `postgres-auth`. Seed admin via `SEED_DEFAULT_ADMIN`+`SEED_ADMIN_PASSWORD` (idempotent, UUID figé). `scripts/init-db/auth-init.sql` supprimé | Source de vérité unique + service autonome (`make run` contre un Postgres nu). Même pattern que post. ✅ profil-service harmonisé (autonome) — plus aucun service sur init-db monté |
-| Schéma DB (user) | Même pattern autonome : `user-service/internal/db/schema.sql` embarqué + `EnsureSchema` au boot (tables `users`+`follows`+`follow_requests`, index, trigger `updated_at`, seed admin UUID figé). Mount `scripts/init-db/user-init.sql` retiré du compose, fichier supprimé. `users.id` = `credentials.id` (auth) | Cohérent avec auth/post/profil : chaque service porte son schéma. `follow_requests` sépare clairement intention de suivre et relation acceptée |
-| Schéma DB (profil) | Même pattern autonome : `profil-service/internal/database/init.go` (`EnsureSchema`) crée la collection `profiles` + validateur `$jsonSchema` + index **unique** `user_id` + profil admin (upsert idempotent) au boot. `scripts/init-db/profil-init.js` supprimé + mount retiré du compose. **Dernier service harmonisé** → les 4 services possèdent désormais leur schéma | Source de vérité unique + autonome (`make run`/`make dev` contre un Mongo vierge). Clôt le TODO §6 d'harmonisation |
-| Propriété des données profil ↔ user | **profil-service possède les champs décoratifs/éditables** : `display_name`, `bio`, `avatar_url`, `banner_url`, `website`, `location`, `birth_date`, `gender`, **`visibility` public/private**. **user-service garde l'identité** : `username` (immuable, unique, handle), `is_active`, le graphe social (follows + compteurs + demandes). `role` reste porté par le JWT | Une seule source de vérité par donnée. La visibilité est une propriété du profil ; l'autorisation sociale reste côté user-service. Toute écriture profil = `PATCH /profils/me`, pas de transaction inter-bases |
-| Agrégation `ProfilDetails` (lecture) | L'écriture est atomique (1 service, cf. ci-dessus) ; seule la **lecture** de la vue agrégée (identité + décoratif + compteurs) croise 3 sources (user + profil + post). profil-service ne renvoie que SES données ; l'agrégation se fera côté **front (`apiFetch`)** ou **BFF Next** — **tranché au moment de brancher le front** (hors squelette, ne change pas les routes du service) | Découple le service de l'agrégation. Le squelette est identique quel que soit l'agrégateur choisi → décision repoussée sans dette |
-| Provisioning user (lazy) | La table `users` n'est PAS remplie par auth au register (bases séparées + règle « tout passe par la gateway »). À la place : `POST /users` exposé (CRUD/admin/tests) **+** provisioning paresseux sur `GET /users/me` (upsert depuis les claims JWT au 1er accès authentifié). Username dérivé de l'email (modifiable via PATCH) | Zéro couplage auth↔user, service autonome, robuste en démo. Laisse aussi la porte à un flow « première connexion » distinct plus tard. Alternative écartée : auth appelle user au register (couplage + incohérence transactionnelle inter-bases) |
-| Layering user-service | Couche `repository` (SQL pur) sous `service` (métier/erreurs) sous `handlers`, contrairement à auth (SQL inline dans le service) | Le CRUD users+follows a beaucoup plus de requêtes → couche repo dédiée justifiée (proche de post-service) |
-| Follows (user-service) | Table d'arêtes `follows` en Postgres (PK composite + index 2 sens) + table `follow_requests` pour les profils privés. Follow public ou déjà accepté → statut `following`; follow privé non accepté → statut `pending`, notif `follow_request`, aucune arête tant que le propriétaire n'accepte pas. Accept = transaction qui supprime la demande et insère l'arête ; reject/unfollow suppriment la demande pendante. Anti-self-follow, follower auto-provisionné, compteurs **calculés** (COUNT) sur les vues détail uniquement | Le graphe social est un many-to-many relationnel ; la demande privée n'est PAS une relation. Idempotence = appels réseau rejouables. L'acceptation atomique évite l'état « accepté mais pas abonné ». Dénormalisation des compteurs reportée |
-| Username (user-service) | Provisioning : username dérivé de l'email, **résolution de collision** par candidats successifs (`base` → `base_<8id>` → `user_<8id>`). User-supplied (Create/PATCH) : regex `^[a-zA-Z0-9_]{3,50}$` + liste de mots réservés (`me`, `admin`, `users`…) | Deux emails de même partie locale ne doivent pas planter le provisioning (bug corrigé) ; les handles structurants/sensibles sont protégés. Lecture par handle via `GET /users/by-username/:username` (route statique placée avant `/:id`) |
-| Profil : POST = UNIQUE création, GET ne crée rien | `GET /profils/me` est en **lecture seule** : `404` si le profil n'existe pas (aucun provisioning paresseux). La **seule** création est `POST /profils` (`display_name` **obligatoire**), appelé par le BFF au register (`display_name = username`). `PATCH /profils/me` `404` si absent. Front : `GET` → si `404`, créer via `POST` (popup) ; sinon `PATCH`. Le profil admin est créé par le seed `EnsureSchema`. profil-service n'appelle JAMAIS user-service en direct | Demande utilisateur : ni écriture sur un GET, ni display_name supposé en base. Une création = un acte explicite (`POST`). En base, `display_name` est soit le username (register), soit ce que l'utilisateur a saisi — jamais deviné. Coût assumé : le front gère le `404` (POST-si-absent) ; le compte sans profil (POST register échoué, best-effort) s'auto-soigne à la 1re édition. Une donnée = un service : profil ne connaît pas le username (user-service) et ne se couple pas à lui au runtime ; le BFF aligne `display_name = username` au register (`lib/provision.ts`) |
-| Profil : `birth_date` set-once | Modifiable via `PATCH /profils/me` tant que le champ est vide ; une fois posée, rejouer la même valeur est toléré (no-op) mais toute valeur différente → `409 ErrBirthDateLocked`. Logique dans `planUpdate` (fonction PURE, testée) | « On ne peut pas modifier la date de naissance » (demande) tout en laissant l'utilisateur la renseigner après coup s'il l'a sautée. Set-once > « jamais via PATCH » (plus souple, même garantie d'immuabilité une fois posée) |
-| CI/CD (GitHub Actions) | **3 workflows séparés par domaine** dans `.github/workflows/` : `ci-go.yml` (matrice 1 job/service sur les 5 modules Go → gofmt + `go vet` + `go build` + `go test -race` + check `go mod tidy`), `ci-frontend.yml` (`npm ci` + `npm run lint` + `npm run build`/typecheck), `ci-integration.yml` (génère les `.env` depuis les `.example`, `docker compose up -d --build` de **tout sauf le frontend** = 2 Postgres + 2 Mongo + 5 services Go, puis **attend que tous les conteneurs soient `healthy`** via les healthchecks existants `pg_isready`/`mongosh ping`/`wget /health`, timeout 240s, logs+teardown). Tous : `concurrency` (annule les runs obsolètes) + cache `setup-go`/`setup-node`. Déclencheurs : `push main` + `pull_request` avec **path-filters** par domaine | Fichiers séparés = déclencheurs/path-filters indépendants. Matrice Go = parallélisme + isolation par module (chacun son `go.mod`). `-race` gratuit et attrape les data races. Le smoke test docker matérialise « santé BDD » + « Docker complet » (§2) sans monter le frontend (lent, déjà couvert par `ci-frontend`). `.env` gitignoré → régénéré depuis les `.example` en CI |
-| Cooldown de changement (display_name / username) | **Architecture posée maintenant, enforcement désactivé.** Chaque champ « identitaire » porte une date de dernier changement : `profiles.display_name_changed_at` (Mongo) et `users.username_changed_at` (Postgres, nullable). Elle est **posée uniquement quand la valeur change réellement** (comparaison à l'ancienne valeur — en SQL côté user via un `CASE`, dans `planUpdate` côté profil). Le **refus** (`429`) est codé derrière un délai configurable par env (`DISPLAY_NAME_CHANGE_COOLDOWN` / `USERNAME_CHANGE_COOLDOWN`, format durée Go), **défaut 0 = désactivé**. Activer la règle = poser l'env, **zéro code, zéro migration** | On capture la baseline **dès aujourd'hui** : ajouter le champ plus tard laisserait les profils existants sans date de référence (le cooldown serait contournable au 1er changement). Le timestamp est gratuit ; seul le refus est piloté par config → on tient « prépare l'archi, je l'activerai peut-être » sans dette. Symétrie stricte entre les deux services (mêmes noms, même sémantique) |
-| Front abonnés/abonnements (refonte post-#79) | Client métier `lib/api.ts` **mince au-dessus de `apiFetch`**. Modale `RelationsDialog`, ligne `UserListItem` réutilisable. Données `[]User` enrichies par `getProfil(userId)`. État du bouton = `getFollowingIds(moi)` + `getPendingFollowRequestIds()` ; `follow()` renvoie `following` ou `pending`. Sur profil privé non suivi : les compteurs restent visibles mais les listes détaillées sont verrouillées ; après acceptation, tout redevient accessible | Reprend les patterns existants. `apiFetch` centralise session/refresh. La séparation compteurs visibles / liste verrouillée évite de fuiter l'identité des relations tout en gardant l'information quantitative demandée |
-| Fil / profil posts (cross-service + privacy) | Le front fournit toujours les ids suivis au fil « Abonnements » via `GET /posts?author_ids=...`, mais le **post-service applique aussi une barrière de visibilité** à toutes les lectures posts (`GET /posts`, `?author_id=`, `?author_ids=`, `GET /posts/:id`) : profil public → visible ; profil privé → visible au propriétaire ou follower accepté seulement. Clients internes `profil-service` (`visibility`) + `user-service` (`follow status`) injectés avec fallback d'autonomie si URL absentes | La sélection DB reste efficace, mais la sécurité ne dépend pas du front. Le couplage post→profil/user est volontairement limité aux lectures qui exposent du contenu privé ; en local/test, clients no-op/fallback gardent le service testable |
-| Compteurs likes/comments (post) | Dénormalisés sur le document `posts` (`likes_count`/`comments_count`), maintenus par `$inc` à chaque like/commentaire. **Typés `int32`** (Go) car le validateur `$jsonSchema` les déclare `bsonType:"int"` — un `int64` (long) casserait la validation à l'insert/update. Likes idempotents via l'index unique `post_id+user_id` (on n'incrémente que si l'insert a créé une ligne / le delete en a supprimé une). | Lecture du fil sans agrégation (compteur lu direct sur le post). Idempotence = un like rejoué ne double pas le compteur. `int32` = contrainte du validateur, pas un choix de capacité |
-| Client posts front (`lib/posts.ts`) | Mince au-dessus de `apiFetch` (Bearer + refresh hérités). Le post-service ne renvoie que `author_id` → le client **résout l'auteur** (username via user-service + displayName/avatar via profil-service) et **mémoïse** dans un `authorCache` (Map module-level) pour ne pas refetch le même auteur à chaque post d'un fil. État « liké » initialisé par `getLikedIds()` (pas de flag `is_liked` côté API, comme `getFollowingIds` pour les follows). Like/suppression **optimistes + rollback**. Post créé → event `breezy:post-created` (comme `breezy:profil-updated`) → le fil prépend sans refetch. Commentaires repliables chargés à la demande (`comment-section`). | Reprend les patterns acquis (enrichissement N+1 best-effort, état stateless via liste d'ids, broadcast par CustomEvent). Cache auteur = la seule optimisation N+1 nécessaire à l'échelle projet (vs endpoint agrégé/dénormalisation, en perspective) |
-| Épinglage de post profil | Le propriétaire est le post-service : champ optionnel `pinned_at` sur le document `posts`, routes protégées `PATCH /posts/:id/pin` et `DELETE /posts/:id/pin`, autorisées uniquement à l'auteur. Lors d'un pin, le service désépingle les autres posts du même auteur, puis pose `pinned_at`. La lecture profil reste `GET /posts?author_id=` mais triée côté Mongo par `pinned_at DESC, created_at DESC`. Les feeds publics/global/abonnements (`GET /posts`, `GET /posts?author_ids=`) renvoient une copie des posts sans `pinned_at`. Côté front, `PostCard` n'affiche le badge `Épinglé` que si la vue le demande (`showPinBadge`, activé sur `ProfilView`) ou immédiatement après l'épinglage d'un post appartenant à l'utilisateur courant (`post.canPin`). | Le post épinglé doit être visible par tous les visiteurs du profil et survivre au refresh, mais ne doit pas transformer le feed en signal de personnalisation d'un autre compte. Un seul post épinglé par profil garde une UX claire façon X/Twitter. Masquer `pinned_at` dans les feeds rend le contrat robuste même si une autre vue réutilise ces endpoints ; l'exception `canPin` garde le retour visuel instantané pour l'auteur dans son feed |
-| **Signets (bookmarks) — collections & rafale** | Propriétaire = **post-service** (mirroir likes/reposts), 3 collections : `bookmark_collections` (collections nommées par user), `bookmarks` (**many-to-many** : 1 doc par `user_id+post_id+collection_id`, index unique → idempotent), `bookmark_prefs` (1 doc/user : `last_collection_id` + `last_bookmark_at`). **Collection par défaut** (`is_default`, une seule par user, créée à la volée à la 1re lecture des collections, index unique partiel) : **toujours en tête, NON supprimable et NON renommable** (`ErrDefaultCollection` → 403), mais on y ajoute/retire des posts comme les autres → permet d'enregistrer **sans créer de collection**. Le front affiche un libellé localisé (`bookmarks.default_name`) pour cette collection. En plus, « Tous mes signets » reste une **vue virtuelle** distincte (union dédupliquée de TOUS les posts signés quelle que soit la collection, agrégation Mongo) — utile car un post peut être rangé dans une collection nommée sans être dans la défaut. Compteur d'items **calculé** à la lecture (`CountDocuments`, pas de dénormalisation → pas de dérive), comme les followers. **Modèle de rafale** : le **clic court** (`POST /posts/:id/bookmark` sans `collection_id`) consulte une **fenêtre glissante** (`BOOKMARK_SESSION_WINDOW`, défaut 5m) — si le dernier signet date de < fenêtre → range automatiquement dans `last_collection_id` (statut `filed`) ; sinon « ouverture de rafale » → statut `needs_choice`, **rien n'est rangé**, le front ouvre le sélecteur (choisir/créer une collection). `collection_id` fourni (sélecteur / appui long) → ajout explicite + repousse la fenêtre. **Dé-signer** = `DELETE` sans `collection_id` (retire de toutes les collections). État des boutons via `GET /posts/me/bookmarked-ids` (dédupliqué `Distinct`), cases du sélecteur via `GET /posts/:id/bookmark/collections`. Ownership stricte (404 sur collection d'autrui, pas de fuite d'existence). `withinSessionWindow` = fonction PURE testée. | Les signets ressemblent à likes/reposts (référencent un post) → même service. Many-to-many car « collection » (un post peut être rangé à plusieurs endroits), ≠ dossier unique façon X. **Modèle de rafale** (demande explicite, façon Instagram « enregistrer ») : on choisit la collection en début de session/rafale, puis on enchaîne sans friction tant qu'on reste dans la fenêtre — « 1er signet » = pas une notion d'« une fois pour toujours » mais « dernier signet ancien (> fenêtre) », porté **côté serveur** (`last_bookmark_at`, par compte, multi-appareil, pas de triche d'horloge client). `needs_choice` ne range rien (le serveur ne devine pas la collection au 1er signet). Compteur calculé = cohérent avec la philosophie du projet (followers). Fenêtre configurable comme les cooldowns identitaires |
-| Traduction automatique des posts | La traduction passe par une **route BFF Next** (`POST /api/translate`) et non par le navigateur directement. Avant l'appel API, le front (`lib/post-translation.ts`) applique `isTranslationCandidate`/`shouldAttemptTranslation` : texte >= 12 caractères, au moins 4 mots pour les langues latines, marqueurs latins courants (FR/EN/ES/DE/IT/PT/NL) majoritairement dans une langue différente de la langue cible, et détection par écriture dominante pour les langues non latines (`Arabic`, `Han/Hiragana/Katakana`, `Hangul`, `Cyrillic`, `Greek`, `Hebrew`, `Devanagari`, `Thai`, `Tamil`, etc.). Ex. navigateur FR : `my name is maxime`, chinois, arabe, espagnol clair → traduit ; `hello les gars comment ça va ?` ne traduit pas ; fautes/mini-textes ne déclenchent rien. Si candidat, le client envoie `{text,targetLanguage}` ; la route appelle LibreTranslate puis fallback Google. `TranslatedContent` n'affiche même pas le spinner si le texte est refusé localement. Cache par post/langue/contenu et bascule original/traduction conservés. | Les clés/API restent côté serveur. Le post-service reste indépendant et ne stocke pas de traduction dérivée. Le filtre local évite les faux positifs coûteux : un mot étranger, une faute ou un texte mixte ne doivent pas transformer un post français en traduction automatique. Les écritures non latines donnent une couverture très large sans dépendance externe ; l'approche reste volontairement conservatrice pour les langues latines ambiguës. |
-| Recherche de comptes (cross-service, front) | Le préfixe `@` **route** la recherche : `@xxx` → `GET /users/search` (username, user-service) ; sinon → `GET /profils/search` (display_name, profil-service). Dans les deux cas l'orchestration + l'enrichissement (récupérer le champ manquant dans l'autre service) se font **côté front** (`searchUsers`) → `RelationUser[]` uniforme rendu par `UserListItem`. « Qui suivre » = `GET /users/suggestions` (tri SQL par `COUNT(followers)` DESC). État de suivi mutualisé dans le hook `use-follow` (modale/Explorer/sidebar) | username et display_name vivent dans 2 services distincts (règle « une donnée = un service ») → aucune jointure backend possible, la vue agrégée se compose chez l'appelant (pattern déjà acté pour le profil). `@` = signal explicite et familier (identifiant) vs nom affiché. Tri par followers en SQL (sous-requête `COUNT`) plutôt que dénormalisé : OK à l'échelle projet. Hook partagé pour ne pas tripler la logique optimiste de follow |
-| **Convention : identité d'un utilisateur = cliquable → son profil** | Partout où un utilisateur est affiché (avatar + nom/@handle), cliquer **mène à son profil** (`/profil/<username>`, ou `/profil` pour soi). Implémenté dans `UserListItem` via un **lien « étiré »** (`<Link absolute inset-0>`) qui rend toute la zone de survol cliquable ; le bouton « Suivre » est remonté (`relative z-10` + `preventDefault`) pour rester actionnable sans naviguer. Couvre déjà Explorer, « Qui suivre » et la modale des relations. Par ailleurs l'avatar du composer (« Ça breez ? ») affiche le **vrai avatar de l'utilisateur courant** (`getMyProfil` + resync `subscribeProfilUpdated`, même source que la sidebar). **À étendre** quand elles arriveront : **messages privés** et **notifications** — au minimum la **photo de profil** (idéalement nom + @handle) doit renvoyer vers le profil de la personne | Cohérence UX façon X/Twitter : une identité est toujours un point d'entrée vers le profil. Le lien étiré garde « tout le hover » cliquable sans HTML invalide (`<button>` dans `<a>`). Convention posée maintenant pour que DM/notifications la respectent dès leur implémentation (la photo de profil = ancre minimale garantie) |
-| **Messagerie E2EE — modèle (hybride)** | Chiffrement **côté navigateur** (≠ at-rest serveur). Chaque user a une paire **X25519** (privée en IndexedDB, **par appareil**, jamais envoyée). Chaque conversation a une **clé de contenu symétrique** ; pour DM/groupes elle est **emballée par membre** (sealed box anonyme) → le serveur ne voit que des enveloppes + des `ciphertext`/`nonce` (XChaCha20-Poly1305), il ne peut RIEN déchiffrer. **Hybride** : DM + groupes = vrai E2EE **admin-proof** ; **communautés** = la clé est **détenue par le serveur** (remise à chaque arrivant pour l'auto-join illimité) → semi-publiques, **lisibles par un admin**. | Tient « même les admins ne peuvent pas lire » pour le privé. « Viewers illimités + auto-join par des inconnus » est impossible en E2EE strict (il faudrait un détenteur de clé en ligne) → communautés « à la Telegram channel ». Clé par appareil = simple (backup passphrase = perspective). Transport **WebSocket** (`/messages/ws`, token en query param, hub par user) choisi pour la fluidité d'un chat |
-| **Messagerie — groupes / communautés** | **Groupes** : owner + membres ; **tout membre invite** (il détient la clé → l'emballe pour l'invité) ; **owner-only** exclure/renommer/supprimer ; owner ne peut pas quitter (supprime) ; cap 32 ; nom **chiffré** ; **clé unique sans rotation** → nouvel arrivant lit tout l'historique (Option A). **Communautés** : rejoint en **viewer** (auto-join), **owner promeut** viewer↔talker (cap 32 talkers, viewers illimités), nom **en clair** + **annuaire public** (`GET /messages/communities?q=`, sans la clé), `canWrite` refuse les viewers. Endpoints généralisés group→community via `isManageable`. | Modèle « à la Insta » (groupes) validé. Pas de rotation = simple/démo-able (forward secrecy = perspective). Nom de communauté en clair = nécessaire pour la découverte (un non-membre lit le nom avant de rejoindre). Cap sur les talkers (pas les viewers) = contrainte produit. `content_key` exposée **uniquement aux membres** (via `buildView`), jamais dans l'annuaire |
-| **Messagerie — pagination par curseur** | `GET .../messages?limit=&before=<messageId>` : sans `before` = la page la plus récente ; avec = les messages antérieurs (scroll haut). **Curseur sur `_id`**, pas d'offset. Front : `listMessagesPage → {messages, hasMore, oldestId}` (pur, testé) pour brancher `useInfiniteScroll`. | Sur un chat *vivant* l'offset se décale (doublons/trous) ; le curseur `before _id` est stable (les nouveaux messages arrivent par WS en bas, sans perturber la pagination arrière) |
-| **Schéma DB (message)** | Pattern autonome (post/profil) : `EnsureSchema` crée collections (`user_keys`/`conversations`/`members`/`messages`) + validateurs `$jsonSchema` + index au boot, resync `collMod`. `mongo-message` (port hôte `27019`). Les `messages` n'ont **aucun champ clair** (`ciphertext`+`nonce`) ; `user_keys` ne stocke que la clé PUBLIQUE ; `conversations.content_key` (communautés only). | Source de vérité unique + service autonome. Le validateur Mongo **matérialise** la garantie « pas de clair en base » pour DM/groupes |
-| **Messagerie — épinglage / suppression « côté user »** | État **par-utilisateur** porté par la collection `members` (et non `conversations`) : `pinned_at` + `cleared_at` (nullable). Endpoints `PATCH/DELETE /conversations/:id/pin` et `DELETE /conversations/:id/me`, **sans diffusion WS** (personnel). « Supprimer » = poser `cleared_at` → `ListConversations` masque la conv tant qu'aucun message n'est postérieur (`HasMessagesAfter`), `ListMessages` filtre `created_at > cleared_at` (historique coupé). Tri « épinglées d'abord » (`convLess` PURE). Le front réplique le tri (`sortConversations`) car le `bump` temps réel doit respecter l'épinglage. | Le pin/clear ne concernent QUE le membre courant → l'état vit sur SON document `members`, pas sur la conversation partagée (≠ DeleteConversation owner qui efface pour tous). `cleared_at` (cutoff) plutôt qu'une vraie suppression = réversible, non destructif pour les autres, et « réapparaît au prochain message » gratuitement (façon WhatsApp). Choix back-side (≠ localStorage de l'état lu) tranché avec l'utilisateur : par-compte, multi-appareil, cohérent « une donnée = un service » |
-| **Notifications — émission (post/user→notif)** | Communication **synchrone best-effort fire-and-forget** : post-service et user-service postent l'événement à `notification-service:8086/internal/events` (timeout court, erreur loggée jamais propagée). Appel direct réseau Docker (pas gateway), authentifié par `INTERNAL_EVENT_SECRET`. Émission désactivée si `NOTIFICATION_SERVICE_URL`/`INTERNAL_EVENT_SECRET` absents → services autonomes. Interfaces injectées (`Notifier`/`NotificationClient` + Noop) | Couplage temporel neutralisé par le best-effort. Serveur-à-serveur ≠ trafic client. **Perspective rapport** : bus d'événements (NATS/Redis) si besoin de réessai/exactly-once ; surdimensionné pour le projet actuel |
-| **Notifications — agrégation (anti-spam)** | Une notification = un GROUPE `group_key` unique par destinataire (`{recipient_id, group_key}` index unique) : `like:<post>`, `comment:<post>`, `reply:<rootComment>`, `mention:<source>`, `repost:<post>`, `follow_request:<actor>`. `Upsert` = `$inc count` + `$set last_actor_id`/`is_read:false`/`updated_at`. `retract` décrémente/supprime à 0. PAS de tableau d'acteurs (compteur `count` simple suffit ; léger flou cosmétique possible sur `last_actor` après retract, assumé) | Tient l'agrégation façon Instagram avec coût O(1). `follow_request:<actor>` évite de multiplier les demandes identiques du même demandeur et permet à la notif de porter les actions accepter/refuser côté front |
-| **Notifications — règles par type** | **like** → auteur du post. **comment** (racine) → auteur du post. **reply** → auteur de la **RACINE** du fil. **mention** (`@handle`) → mentionnés, une notif par mention. **repost** → auteur du post. **citation** (`quote_post_id`) → auteur cité, une par citation (`quote:<postCitant>`). **follow_request** → propriétaire du profil privé, `actor_id` = demandeur, actions front accept/reject. **follow_request_accepted/rejected** → événement WS non persisté au demandeur (`follow_request_decision`) pour rafraîchir `useFollow` et déverrouiller/reverrouiller le profil ouvert. Jamais à soi-même (recipient≠actor). Suppression/retract défait quand applicable | Threading à plat sous la racine : notifier/clé sur la racine garde la symétrie création↔suppression. Mentions = contexte distinct. Follow privé est une demande actionnable ; la décision est un signal temps réel, pas une notification listée |
-| **Notifications — front (badge + temps réel)** | `lib/notifications.ts` (REST+WS sur `apiFetch`). `NotificationsProvider` (Context, monté dans `(app)/layout`) tient le **compteur non-lu app-wide** + **une seule** connexion WS + la liste vivante. Badge amorcé par `GET /unread-count`, maintenu en mémoire : une notif entrante non-lue d'id inconnu incrémente (les activités répétées d'un même groupe partagent l'id → comptées une fois). Ouvrir `/notifications` = `markAllSeen` (badge→0). WS pousse `notification`/`notification_deleted`/`notification_refresh`. Clic notif → **page détail `/posts/[id]`** (réutilise `PostCard`). Acteur (avatar+nom) → profil (convention « identité cliquable »). | Provider dans le layout = badge présent partout sans recharger la liste à chaque page, WS unique partagé. Dédup par id du badge évite de recompter un même groupe sans requête serveur par événement (≠ refetch sur chaque like d'un pic de 300). Page détail nécessaire car « aller au post direct » et le fil n'a pas de vue post unique |
-| **Messagerie — état « lu » côté serveur + badge non-lu** | L'état « lu » est devenu une **donnée serveur** (avant : `localStorage` par appareil) : curseur `members.last_read_at` (jumeau de `pinned_at`/`cleared_at`). **`PUT /messages/conversations/:id/read`** avance le curseur à l'ouverture ; **`GET /messages/unread-count`** renvoie `{count}` = **nb de conversations** ayant un message postérieur à `max(last_read_at, cleared_at)` **et** pas de soi (agrégation `$lookup` bornée à 1 msg/conv, **jamais le `ciphertext`**). Front : **`MessagesProvider`** (monté dans `(app)/layout`, jumeau de `NotificationsProvider`) **possède l'UNIQUE WS messages** (la vue `/messages` s'y abonne via `subscribeMessages`/`subscribeEvents` au lieu d'ouvrir la sienne, et déchiffre seule) ; il amorce le badge via `unread-count` puis **ré-interroge le serveur (coalescé 300 ms)** sur message entrant d'autrui / marquage lu → toujours exact, multi-appareil. Conv active (`setActiveConversation`) → messages entrants marqués lus à la volée. Pastille de liste + ancre « Nouveaux messages » dérivées de `lastReadAt` (`computeDivider` prend désormais un **timestamp**, plus un id). Badge nav réutilisé tel quel (sidebar + barre mobile), `messages.badge_aria`. `message-reads.ts` (localStorage) **supprimé**. **Sourdine par conversation** : `members.muted_at` (jumeau de `pinned_at`), `PATCH/DELETE /conversations/:id/mute`, `ConversationView.muted` ; `CountUnreadConversations` ajoute `muted_at: null` à son `$match` → une conv en sourdine **n'alimente pas le badge** mais **reste « non lue » dans la liste** (pastille client inchangée). Toggle dans le menu « … » de la ligne + icône cloche barrée ; `toggleMute` optimiste appelle `refresh()` (le serveur exclut, le provider ré-interroge). | Demande utilisateur : badge « rond avec compteur » comme les notifs **sans charger tous les messages** côté client. Le serveur calcule (métadonnées seules → E2EE intact). Ré-interrogation coalescée plutôt qu'un compteur en mémoire fragile : débit d'événements faible en messagerie → résultat exact + simple, et **multi-appareil** (lu sur un appareil = lu partout, livre la perspective « accusés de lecture »). WS unique (≠ 2 connexions) tranché avec l'utilisateur |
-| **Mentions (@handle) — posts / commentaires / messages** | **Briques partagées** (`lib/mentions.ts` PUR : regex alignée sur le back `(^|[^\w@])@(\w{3,50})`, `parseMentionSegments`/`extractMentionHandles`/`textMentionsUser`/`detectMentionTyping`/`applyMention` ; `lib/use-mention.ts` hook d'autocomplétion ; `MentionAutocomplete` pop-up ; `MentionText`/`MentionMessageText` rendu cliquable). **Posts/commentaires** : autocomplétion `@` branchée sur `post-composer` + `comment-section` (recherche globale `searchUsers('@'+q)`) ; rendu des `@handle` en liens profil via `TranslatedContent` (couvre posts ET commentaires). **Back déjà émetteur** (post-service `ParseMentions` → notif `mention`) → AUCUNE modif back posts/commentaires. **Messages (E2EE)** : le serveur ne lit pas le `ciphertext` → le **client** calcule les `mentioned_member_ids` (intersection handles↔membres, hors soi) et les joint au `POST .../messages` (métadonnée d'appartenance, **jamais de texte**) ; `message-service` (nouveau `internal/notifier`, best-effort fire-and-forget comme post-service) émet `message_mention` à notif-service. **Nouveau type notif `message_mention`** (+ champ `conversation_id`, enum validateur Mongo) **agrégé par conversation** (`message_mention:<conv>`, anti-spam) → navigue vers `/messages?conv=`. **Rendu messages** : mention d'un **membre** → lien profil (décision produit) ; **non-membre** → carte d'aperçu (avatar/nom/@handle) dont le clic ouvre `/explorer?q=@handle` (onglet Recherche). **« X vous a mentionné »** dans l'aperçu de conversation = **100 % client** (le dernier message est déjà déchiffré côté destinataire → on teste `textMentionsUser(text, monHandle)`, zéro flag serveur). Autocomplétion messages = **membres d'abord** (`makeMemberFirstSearch`) puis recherche globale. | E2EE préservé : le back de messagerie ne reçoit que des ids (appartenance), pas le contenu → cohérent « serveur aveugle ». Agrégation par conversation = même philosophie anti-spam que les posts (≠ une notif par message). « Membre→profil / non-membre→recherche » et « membres d'abord » tranchés avec l'utilisateur. « Vous a mentionné » côté client évite un flag serveur et tient l'E2EE. Briques partagées entre les 3 surfaces = une seule source de vérité (regex/insertion/rendu), réutilise `searchUsers`, `resolveUsers`, la convention « identité cliquable → /profil ». Émission message→notif calquée sur post→notif (best-effort, `INTERNAL_EVENT_SECRET`, hors gateway). Limite assumée : pour une **grande communauté** (viewers illimités) `chat-pane` résout tous les `memberIds` pour distinguer membre/non-membre au rendu — OK à l'échelle projet (perspective : endpoint d'appartenance ciblé) |
-| **Stockage média (MinIO via gateway)** | Un **6ᵉ microservice `media-service`** (port 8087) adossé à **MinIO** (stockage objet S3-compatible, conteneur + volume `minio-data`). Service **agnostique du contenu** : il range des **octets opaques** sous un id aléatoire (128 bits), avec `owner_id` en **user-metadata MinIO** → **pas de base à côté** (MinIO *est* sa base). **Tout passe par la gateway** (préfixe `/media`, conservé) : upload `POST /media` (JWT, multipart, détection MIME réelle par **magic bytes** via `gabriel-vasile/mimetype` — jamais l'en-tête client —, allowlist jpeg/png/webp/gif + mp4/webm, caps 5 Mo image / 50 Mo vidéo) ; download `GET /media/:id` **public** (id non devinable) servi **en streaming** par le proxy gateway (`http.ServeContent` → **Range/seek vidéo**, HEAD, `If-None-Match`, `Cache-Control: immutable` + ETag) ; `DELETE /media/:id` (propriétaire ou admin). **Pièces jointes E2EE** : route distincte `POST /media/encrypted` qui **ne sniffe pas** (le blob est du ciphertext aléatoire) → stocké `application/octet-stream` ; la vraie nature (mime/nom/nonce) vit dans l'enveloppe chiffrée du message → **serveur aveugle**. Front : `lib/media.ts` (`uploadMedia` clair / `uploadEncryptedMedia` blob / `mediaUrl(id)` = URL absolue gateway — on **stocke l'id**, pas une URL relative qui taperait :3000). **Phase 2 (posts)** : le post-service porte `media []MediaRef {url,type}` (validateur `maxItems:4`, items `url`+`type` enum image/video) ; le post-service reste **agnostique** (stocke des refs `/media/<id>` relatives) ; `content` devient optionnel si ≥1 média (texte OU média requis, vérifié handler). Composer = upload multi best-effort (cap 4, aperçus supprimables) ; `PostCard` = galerie (1 plein / 2-4 grille) + `<video controls>` ; URLs résolues par `resolveMediaUrl` dans `toFeedPost`. **Phase 3 (messagerie E2EE)** : le fichier est **chiffré côté client** (`encryptSymmetric` avec la clé de contenu de la conversation) → le **ciphertext** est uploadé via `POST /media/encrypted` (blob opaque) → l'`id` + le `nonce` + mime/nom/taille voyagent **dans l'enveloppe chiffrée** du message (`encodeMessageBody` : `{v:1,text,media[]}`, sinon texte brut → rétrocompatible). À la lecture : `fetchMediaBytes` (GET public, `fetch` simple sans Bearer → pas de preflight) → `decryptSymmetric` → `Blob`/`objectURL` (révoqué au démontage). **Serveur toujours aveugle, zéro changement de schéma `message-service`.** Fonctions pures `encode/decodeMessageBody`/`mediaKind` testées (vitest). | **Download via la gateway** (et NON URLs présignées MinIO) car la règle cardinale §1 est « tout passe par la gateway » : les présignées exposeraient MinIO (port public + CORS + host non résolvable navigateur) et **violeraient** le principe défendu à l'oral. Le proxy stdlib **stream déjà** → la vidéo n'est pas un souci mémoire. **Perspective rapport** (améliorations §2) : URLs présignées + CDN à l'échelle, miniatures, transcodage, antivirus. MinIO = réponse microservices canonique (coche « containerisation »), bien meilleur en soutenance que « blob en base »/disque. Métadonnée objet plutôt qu'un 5ᵉ Mongo dédié = service mince et autonome (même esprit qu'`EnsureSchema`) |
-| **Visionneuse média (clic → agrandir)** | Deux comportements selon le contexte. **Message privé** : clic sur une image → `MediaLightbox` (overlay plein écran générique, fond sombre, ✕/Échap/clic-fond pour fermer, bouton **télécharger**). L'`src` est l'**objectURL déjà déchiffré** → le téléchargement enregistre le fichier en clair (`att.name`), sans re-solliciter le serveur. **Post** : clic sur une image → `PostPhotoModal`, **deux volets façon X** : à gauche le média en grand (fond sombre) + navigation ‹ ›/flèches clavier + **barre de stats sous la photo** ; à droite l'en-tête + texte du post puis les **commentaires** (`CommentSection`, toujours visibles). La barre d'actions like/repost/citer a été **extraite de `PostCard` dans `PostActions`** (partagée carte + modale → une seule logique optimiste, zéro duplication). `MediaGallery` rend les images cliquables (la vidéo garde ses contrôles natifs). | Demande utilisateur : voir les photos en plus grand. Le lightbox message reste E2EE (objectURL local, jamais le serveur). La vue post reprend le pattern X (image + contexte + commentaires) cohérent avec le reste de l'UI. Extraction de `PostActions` plutôt que duplication = compteurs/état cohérents et maintenables. **Les deux overlays sont rendus via `createPortal(document.body)`** : sans ça, le `position: fixed` était **confiné par un ancêtre** (la carte du post / les bulles de message en `backdrop-blur` + `transform` créent un bloc conteneur pour `fixed`) → l'overlay restait dans la zone du post au lieu de couvrir tout l'écran de l'app. Image en `h-full w-full object-contain` → elle **grandit pour remplir l'espace** (ratio préservé). ⚠️ Compromis assumé : carte du fil et modale ont des **instances d'état distinctes** → un like dans la modale n'est pas reflété en direct sur la carte derrière (resync au prochain chargement). Perspective : route dédiée `/posts/:id/photo/:n` (partageable) + sync d'état. |
-| **GIFs (à implémenter — PLAN)** | **Décision : route BFF Next, PAS de microservice** (calqué sur la traduction §5). (1) **BFF** : routes `/api/gifs/trending` + `/api/gifs/search?q=` côté serveur Next qui appellent le provider, **clé en env serveur** (`GIF_API_URL`/`GIF_API_KEY`, jamais exposée au client). Provider recommandé **Tenor** (Google, gratuit, clé simple) ou Giphy — URL/clé configurables comme `TRANSLATION_API_*`. (2) **UI** : composant `GifPicker` (façon `EmojiPicker` : popover + recherche debouncée + grille tendances/résultats), monté dans `PostComposer` ET le composer de `chat-pane`. (3) **Intégration par contexte** : **Posts (publics)** → insérer l'**URL externe** du GIF comme média `{url:<url tenor/giphy>, type:'image'}` → **ZÉRO changement backend** (`resolveMediaUrl` laisse passer les `http(s)`, `<img>` joue le GIF animé, cap 4 média réutilisé) ; pas d'upload MinIO. **Messages (E2EE)** → pour rester **serveur-aveugle** et ne pas fuiter vers le CDN du provider côté destinataire : **télécharger les octets du GIF via le BFF** (proxy → contourne CORS + cache la clé), en faire un `Blob` (`image/gif`), puis **réutiliser le pipeline pièce jointe Phase 3** (`encryptAndUpload` → blob chiffré au media-service, métadonnées dans l'enveloppe chiffrée) → s'affiche via `AttachmentView`/lightbox comme une image. | Un GIF = appel API tierce + clé à cacher = cas identique à la traduction → même pattern BFF, pas de nouveau conteneur/DB. Un `gif-service` Go derrière la gateway serait l'alternative « micro-service pure » mais surdimensionné (rien à *posséder*, juste un proxy + clé). Le split par contexte tombe juste : un post est public (URL externe suffit, gratuit), un message doit rester chiffré (donc octets rapatriés + chiffrés, jamais une URL tierce que le destinataire irait chercher en clair). **Env à ajouter** : `GIF_API_URL`, `GIF_API_KEY` (racine `.env`/`.env.example`, comme `TRANSLATION_*`). Perspective : favoris/récents de GIF, cache BFF, badge `type:'gif'` (nécessiterait d'ajouter `gif` à l'enum du validateur post-service ; sinon `image` suffit). |
-| **Vidéos de fil (autoplay façon Twitter)** | Composant `FeedVideo` (remplace le `<video>` brut de `MediaGallery`). **Lecture auto en muet + `loop` + `playsInline`** dès que la vidéo est **≥ 60 % visible** (`IntersectionObserver` seuil 0.6), **pause** dès qu'elle quitte le champ. **Chargement paresseux lié à la pagination** : un **2ᵉ** observer (`rootMargin: 400px`) ne **monte l'élément `<video>` que près du viewport** → une vidéo loin dans le fil infini n'est ni téléchargée ni mise en boucle (juste un cadre noir tant qu'on ne s'approche pas). **Vitesse réglable** 0.5×→2× (overlay `Popover` → `video.playbackRate`). Contrôles natifs conservés (son/pause/scrub). La cellule vidéo a un **ratio défini** (`aspect-video` si 1 média, sinon `aspect-square`) car la `<video>` interne est en `h-full`. | Front pur, zéro surcoût serveur. **L'autoplay impose le muet** (politique navigateur) → son réactivable via les contrôles natifs. Le **lazy-mount** (≠ simple `preload`) est la clé pour ne pas charger/boucler N vidéos d'un fil infini : seules les vidéos proches du curseur existent dans le DOM. Pause hors-champ = un seul flux actif à la fois en pratique (fil vertical). Perspective : contrôles custom façon X (barre au survol), couper le son global, vignette/poster. | **Download via la gateway** (et NON URLs présignées MinIO) car la règle cardinale §1 est « tout passe par la gateway » : les présignées exposeraient MinIO (port public + CORS + host non résolvable navigateur) et **violeraient** le principe défendu à l'oral. Le proxy stdlib **stream déjà** → la vidéo n'est pas un souci mémoire. **Perspective rapport** (améliorations §2) : URLs présignées + CDN à l'échelle, miniatures, transcodage, antivirus. MinIO = réponse microservices canonique (coche « containerisation »), bien meilleur en soutenance que « blob en base »/disque. Métadonnée objet plutôt qu'un 5ᵉ Mongo dédié = service mince et autonome (même esprit qu'`EnsureSchema`) |
-
----
-
-## 6. KNOWN ISSUES / BLOCKERS
-
-> Add/remove as issues arise.
-
-- **✅ RÉSOLU — drift du validateur Mongo `profiles`.** Un volume `mongo-profil` créé par une
-  **ancienne** version d'`EnsureSchema` gardait un validateur `$jsonSchema` exigeant encore
-  `user_id` + **`username`** (avant le déménagement de `display_name`) → le `POST /profils` du
-  register (qui n'envoie plus `username`) échouait → aucun profil créé → recherche par
-  `display_name` vide. **Correctif** : `ensureCollections` applique désormais `collMod` sur les
-  collections existantes (resync idempotent du validateur), au lieu de les ignorer — le service
-  **maintient** son schéma à chaque boot, pas seulement à la création. Vérifié e2e (validateur
-  repassé à `user_id`+`created_at`, `POST`/insert sans username OK, recherche display_name OK).
-  ⚠️ **Limite résiduelle** (pas un bug) : les comptes créés par un login-only (sans passer par le
-  register) n'ont **pas** de profil — le profil n'est créé qu'au register (`POST /profils`) ou via
-  la popup d'édition (branche WIP), **jamais** au login (décision : pas de provisioning paresseux
-  du profil). Ces comptes ne sont donc pas trouvables par `display_name` tant qu'ils n'ont pas de
-  profil. (Note dev : le `display_name` du seed admin a été corrigé en base sur le volume courant ;
-  un volume recréé l'aura via le seed.)
-
-- **Rappel : `make up` = images de prod FIGÉES.** L'image frontend embarque un `npm run build`
-  (`output: standalone` → `node server.js`) et les images Go un binaire statique, tous figés au
-  build. `docker compose up` ne rebuild PAS sur changement de source → un changement de code
-  n'apparaît qu'après `make build`. **Pour développer avec hot-reload, utiliser `make dev`** (voir §5).
-
-- **À FAIRE — rôle / username réels (frontend).** La déconnexion et la garde de session sont
-  faites (logout révoque + `middleware.ts` redirige vers `/login` sans cookie refresh). Reste : le
-  layout `(app)` utilise encore `PLACEHOLDER_ROLE = 'administrator'`. À faire : déduire `role`/
-  `username` réels (via `apiFetch('/users/me')` côté client, ou décodage du JWT) pour la nav par rôle.
-
-- **NOTE — access token en localStorage (compromis XSS).** Choix assumé du pattern « access court +
-  refresh httpOnly » : l'access token (15m) est en localStorage (lisible par le JS → exposé en cas
-  de XSS), le refresh (24h) reste en cookie httpOnly (non volable). Mitigation : access très court.
-  Perspective : détection de réutilisation de refresh token (la rotation est déjà en place).
-
-- **NOTE — CORS gateway pour `apiFetch`.** Les appels data partiront du navigateur DIRECTEMENT vers
-  le gateway (`Authorization: Bearer`, cross-origin). La CORS du gateway autorise déjà `Authorization`
-  + l'origine front ; vérifier `CORS_ALLOWED_ORIGINS` quand on branchera le feed/profil réels.
-
-- **✅ RÉSOLU — harmonisation des schémas.** Les **4 services** (auth/post/user/profil) possèdent
-  désormais leur schéma (embarqué + `EnsureSchema` au boot, cf. §5). Plus aucun script `init-db`
-  monté ; `scripts/init-db/` est vide. `profil-init.js` supprimé.
-
-- **✅ RÉSOLU — profil-service implémenté (repository/service).** Lecture (`GET /profils/:userId`,
-  `GET /profils/me` — **lecture seule, 404 si absent**), édition (`PATCH /profils/me`, `birth_date`
-  set-once), **création = `POST /profils` uniquement** (display_name obligatoire), `DELETE` admin.
-  Reste (front) : **gérer le 404 (POST-si-absent)**, brancher l'agrégation lecture user+profil+post
-  (cf. décision §5) et l'upload réel avatar/bannière.
-
-- **À FAIRE — activer/calibrer les cooldowns identitaires (optionnel).** L'archi est posée
-  (`display_name_changed_at` / `username_changed_at` enregistrés, refus codé). Pour activer :
-  poser `DISPLAY_NAME_CHANGE_COOLDOWN` / `USERNAME_CHANGE_COOLDOWN` (ex. `168h`). Aucune migration.
-  Perspective : exposer la prochaine date autorisée au front (le champ `*_changed_at` est déjà
-  renvoyé dans les réponses).
-
-- **À FAIRE — tests d'intégration repo (user-service).** Les tests Go actuels couvrent le
-  middleware JWT et la validation (sans DB). Les requêtes SQL (CRUD + follows) sont validées par
-  un e2e manuel contre un Postgres jetable, mais pas par des tests automatisés. À ajouter (ex.
-  `dockertest` ou `testcontainers`) si on veut une couverture repo en CI.
-
-- **NOTE — compteurs followers/following calculés (COUNT).** `user-service` calcule les compteurs
-  par sous-requête à chaque lecture de profil. OK à l'échelle du projet ; à dénormaliser
-  (colonnes `follower_count`/`following_count` + triggers/incréments) si la charge l'exige
-  (cf. perspective §2 *Improvements & outlook*).
-
-- **MESSAGERIE — COMPLÈTE (back + UX).** message-service 🟢 (DM + groupes + communautés +
-  WebSocket) **+ UI livrée** (`components/messages/`, page `/messages` deux volets). **Compromis
-  assumés** : (1) communautés **lisibles par un admin** (clé serveur, ≠ DM/groupes admin-proof) ;
-  (2) clé d'identité **par appareil** (nouvel appareil ne déchiffre pas l'historique d'avant → la
-  conversation affiche un bandeau « clé indisponible » et désactive lecture/écriture). **État « lu »
-  désormais serveur** (`members.last_read_at`, multi-appareil) + **badge non-lu app-wide** via
-  `MessagesProvider` (cf. §5) ; le serveur ne lit que des métadonnées (E2EE intact). **Pièces jointes
-  images/vidéos chiffrées livrées** (Ph.3 média : fichier chiffré client → blob opaque au media-service,
-  métadonnées dans l'enveloppe chiffrée → serveur aveugle, zéro changement de schéma). **Perspectives** :
-  aperçu du dernier message dans la liste (nécessiterait de déchiffrer le dernier message par conv au
-  chargement), rotation de clé (forward secrecy), transfert d'ownership, backup
-  passphrase (login multi-appareil — règle aussi la cause « nav privée / nouvel appareil » du non-déchiffrement,
-  + à coupler avec un stockage de clé scopé **par utilisateur** dans IndexedDB, cf. clé `'self'` unique
-  actuelle qui mélange deux comptes sur un même navigateur), coffre séparé pour `content_key`.
-
-- **SETUP — `message-service/.env` doit exister pour `make dev`/`docker compose`.** Il était absent
-  (seul `.env.example` présent) et **bloquait tout le compose** (`env file ... not found`). Créé via
-  `cp message-service/.env.example message-service/.env` (gitignoré, comme les autres services). À
-  refaire sur un checkout neuf : `make env` (ou copier l'exemple) avant `make dev`.
-
-- **SETUP — `INTERNAL_EVENT_SECRET` doit être dans le `.env` racine.** Docker Compose interpole
-  `${INTERNAL_EVENT_SECRET}` depuis le fichier racine uniquement ; le mettre dans
-  `notification-service/.env` ne suffit pas pour `make dev`. Corrigé localement dans `.env`
-  (gitignoré). Vérif : `docker compose -f docker-compose.yml -f docker-compose.dev.yml config --quiet`.
-
-- **REVIEW — points à corriger sur private follow/privacy.** (1) `user-service` expose
-  `/internal/...is-following...` sans vérifier `X-Internal-Secret` : fuite possible du graphe
-  follow si le service/port est joignable. (2) Sur la page profil, `followOverride=false`
-  après une demande `pending` peut masquer l'acceptation temps réel ultérieure : le profil reste
-  verrouillé tant que le composant n'est pas remount. (3) `NotificationsView` appelle
-  `loadInitial()` après accept/reject, mais ce loader no-op si la liste a déjà été chargée ;
-  dépend du WS pour nettoyer l'item. (4) `post-service.visiblePage` peut scanner beaucoup de
-  posts privés filtrés avant de trouver une page visible ; surveiller l'effet perf/DoS.
-
-- **NOTIFICATIONS — compromis assumés.** (1) Émission post→notif (et désormais **message→notif**
-  pour les mentions `message_mention`) **best-effort sans réessai** :
-  si notif-service est down à l'instant T, l'événement est perdu (le like/commentaire/message réussit
-- **SETUP — MinIO partage le `media-service/.env`.** Le conteneur `minio` ET le `media-service`
-  lisent le **même** `media-service/.env` (`MINIO_ROOT_USER`/`MINIO_ROOT_PASSWORD` — un seul jeu
-  d'identifiants pour les deux, comme le pattern `MONGO_INITDB_ROOT_*`). `make env` le crée. Console
-  MinIO dispo en dev sur `http://localhost:9001` (mêmes identifiants). Le bucket `breezy-media` est
-  créé par le service au boot (idempotent) → rien à provisionner.
-
-- **MÉDIA — COMPLET (Phases 0→3).** Fondation (`media-service` + MinIO + gateway `/media` +
-  `lib/media.ts`) **+ avatar/bannière** (Ph.1) **+ images/vidéos de post** (Ph.2) **+ pièces jointes
-  messagerie chiffrées** (Ph.3 : fichier chiffré client → blob opaque, métadonnées dans l'enveloppe
-  chiffrée du message, serveur aveugle, zéro changement de schéma). Testé e2e via gateway + vitest 46/46.
-  **Perspectives (rapport)** : miniatures, transcodage vidéo, antivirus, URLs présignées + CDN à l'échelle.
-  ⚠️ **Rappel images stale** : `webdad-*` taguées peuvent être des images **dev** (air) d'un `make dev`
-  antérieur → un `docker compose up` prod sans `--build` les relance et air plante (`.air.toml` absent).
-  Utiliser `make dev` (overlay, bind-mount) ou `make build` pour des images prod fraîches.
-
-- **NOTIFICATIONS — compromis assumés.** (1) Émission post→notif **best-effort sans réessai** :
-  si notif-service est down à l'instant T, l'événement est perdu (le like/commentaire réussit
-  quand même). Mitigation : un bus d'événements (NATS/Redis) en perspective. (2) Le badge non-lu
-  est maintenu **en mémoire côté front** (dédup par id) : amorcé par `unread-count`, il peut
-  sur-compter de 1 si une activité arrive sur une notif déjà non-lue **antérieure à la session** et
-  non encore chargée — s'auto-corrige à l'ouverture de la page (`markAllSeen`) ou sur
-  `notification_refresh`. (3) Tant que la page `/notifications` est ouverte, une nouvelle notif
-  **incrémente quand même** le badge (pas de « lu en direct »). (4) Après un `retract`,
-  `last_actor_id` peut rester celui de l'acteur parti (flou cosmétique, jamais le `count`).
-  Perspectives : exactly-once (broker), ne pas incrémenter quand la page est active, rôle réel
-  (placeholder).
-
----
-
-## 7. INSTRUCTIONS FOR CLAUDE CODE
+These govern *how* Claude works on this repo. They override default behavior.
 
 1. **Read this file first** at every session start.
 2. **⛔ NE PAS CODER avant validation de l'utilisateur.** Pour toute feature/tâche :
    d'abord proposer (a) l'**architecture** et (b) **comment la feature sera implémentée**,
    et **attendre l'accord explicite** avant d'écrire/modifier du code. Pas d'implémentation
    spontanée.
-3. **Update sections 3, 5, 6** after any significant change.
-4. **Never hardcode secrets** — use `.env` variables.
-5. **Each service is independent**: its own Dockerfile, its own DB.
-6. When implementing a feature, **update its status** in section 3 (🔴→🟡→🟢).
-7. Before any architectural decision, **check section 2** (evaluation criteria).
-8. Keep responses concise — update this file rather than re-explaining context.
+3. **Propose, then decide:** explain what you are going to do before doing it; when there are
+   several viable approaches, present the implementation choices; ask for confirmation before
+   any major architectural change. Prefer analysis before coding.
+4. **Update the docs after any significant change** — keep them the source of truth instead of
+   re-explaining context:
+   - `PROJECT_STATUS.md` (status markers 🔴→🟡→🟢, TODOs),
+   - `DECISIONS.md` (new architectural decision + rationale),
+   - `ARCHITECTURE.md` (only if boundaries/flows change),
+   - `CHANGELOG.md` (one session entry; push older entries to `CHANGELOG_ARCHIVE.md`).
+5. **Never hardcode secrets** — use `.env` variables.
+6. **Each service is independent**: its own Dockerfile, its own DB, its own embedded schema.
+7. When implementing a feature, **update its status** in `PROJECT_STATUS.md`.
+8. Before any architectural decision, **check the evaluation criteria** (Reference section below).
+9. **Keep responses concise** — update the docs rather than re-explaining context.
+10. **No self-commit / no self-push** — only propose the commit message; the user commits.
+11. **graphify-first for codebase questions:** when `graphify-out/graph.json` exists, run
+    `graphify query "<question>"` (scoped subgraph, far smaller than raw grep / GRAPH_REPORT.md).
+    Use `graphify path "<A>" "<B>"` for relationships, `graphify explain "<concept>"` for a concept,
+    `graphify-out/wiki/index.md` for broad navigation, and `GRAPH_REPORT.md` only for broad
+    architecture review. Read raw source only to modify/debug or when the graph lacks detail.
+    **After modifying code, run `graphify update .`** to keep the graph current (AST-only, no API cost).
 
 ---
 
-## CHANGELOG
+## 1. Project purpose
 
-> Historique complet déplacé dans **[CHANGELOG.md](CHANGELOG.md)** (sortie du contexte auto-chargé). Ne garder ici que les 2-3 dernières entrées ; pousser les plus anciennes vers `CHANGELOG.md`.
+**Breezy** is a 4-layer microservices social network (X/Twitter-like) built for the FISA INFO A3
+"Distributed App Dev" project. *WebDad* = repo/project name, *Breezy* = product name
+(logo `frontend/public/logo_breezy.png`). 3 roles: User, Moderator, Administrator.
 
-*Last updated: 09/06/2026 — chore(rebase) : branche `40-upload-dimages` (média : upload images/vidéos avatar/post/messages, visionneuse photo+lightbox plein écran, autoplay vidéo façon Twitter) **rebasée sur `origin/develop`** (mentions #150, fix repost/épinglage/traduction #143, signets #141, mots filtrés #140). Conflits résolus : `messages.ts` (`sendMessage(conv,text,files,mentionedMemberIds)` fusionne pièces jointes chiffrées + `mentioned_member_ids`), `chat-pane` (composer = trombone + autocomplétion mentions ; bulle = `AttachmentView` + `MentionMessageText`), `post-card` (barre d'actions de develop conservée — signets + fix repost `repostedById` — `MediaGallery` cliquable + `FeedVideo` + `PostPhotoModal` ajoutés ; `PostActions` utilisé seulement par la modale photo), `conversation-list`/`messages-view` (`ConversationPreview` = mentions + `hasMedia`), `Makefile` (`.PHONY`). **Vérifié** : tsc + lint propres, vitest 66/66, post-service go build/vet/test OK.*
+## 2. Technology stack
 
-*Last updated: 09/06/2026 — feat(mentions) : **mentions @handle dans posts, commentaires et messages (DM/groupes/communautés)**, branche `129-mentions`. Briques partagées : `lib/mentions.ts` (PUR, regex alignée back), `lib/use-mention.ts` (autocomplétion), `MentionAutocomplete` (pop-up avatar/nom/@handle), `MentionText`/`MentionMessageText` (rendu cliquable). Posts/commentaires : autocomplétion branchée sur `post-composer` + `comment-section`, rendu→profil via `TranslatedContent` (back déjà émetteur). Messages (E2EE) : le client calcule `mentioned_member_ids` (ids only, jamais le texte) → `message-service` (nouveau `internal/notifier`, best-effort) émet le nouveau type notif **`message_mention`** (+ `conversation_id`, agrégé par conversation, navigue `/messages?conv=`) ; rendu membre→profil / non-membre→carte preview→`/explorer?q=@h` ; « X vous a mentionné » dans l'aperçu (100 % client). Décisions tranchées avec l'utilisateur (clic membre→profil, suggestions membres-d'abord). Détails §5 « Mentions ». **Vérifié** : Go build/vet/test (notif+message) ; front tsc + lint propres + vitest 51/51 (mentions 10/10).*
+**Backend** — Go 1.25 + Gin, one independent Go module per service (own `go.mod`), golangci-lint,
+`air` hot-reload, per-service `Makefile` (`make run/build/lint/test`).
 
-*Last updated: 09/06/2026 — chore(merge) : **conflits résolus** dans `CLAUDE.md` et `post-service/internal/service/postService.go`. Fusion conservée : lecture posts filtrée par visibilité profil + masquage de `pinned_at` dans les feeds (`GetPosts`/`GetFeed`) tout en gardant le pin sur profil (`GetByProfile`). Vérifs : `rg` marqueurs, `gofmt`, `go test ./...` post-service.*
+**Frontend** — Next.js 14 (App Router) + TypeScript + Tailwind + shadcn/ui (slate theme), npm,
+dev port 3000, env `NEXT_PUBLIC_API_URL` (default `http://localhost:8080`).
 
-*Last updated: 09/06/2026 — feat(private-unfollow-confirm) : **confirmation avant désabonnement d'un profil privé**. Sur la page profil, cliquer « Ne plus suivre » pour un compte privé suivi ouvre une modale expliquant la perte d'accès aux posts/réponses/j'aime/listes ; les profils publics gardent l'unfollow direct. i18n FR/EN ajouté. Vérifs : `npm run lint`, `npx tsc --noEmit`.*
+**Databases** — PostgreSQL (auth, user) · MongoDB (profil, post, message, notification) · MinIO (media).
 
-*Last updated: 09/06/2026 — fix(translation) : **détection conservatrice avant traduction auto étendue multi-langues**. `lib/post-translation.ts` ajoute `isTranslationCandidate`/`shouldAttemptTranslation` : marqueurs latins FR/EN/ES/DE/IT/PT/NL + détection par écritures Unicode (`Arabic`, CJK, `Hangul`, `Cyrillic`, `Greek`, `Hebrew`, `Devanagari`, `Thai`, `Tamil`, etc.). Cas couverts : `my name is maxime`, chinois, arabe, espagnol clair → traduit vers FR ; `hello les gars comment ca va ?`, mini-textes/fautes → pas de traduction. `TranslatedContent` évite le spinner quand le texte est refusé localement. Tests ajoutés/étendus `post-translation.test.ts`. Vérifs : `npm test` 49/49, `npx tsc --noEmit`, `npm run lint`, `localhost:3000` HTTP 200.*
+**Ports** — frontend 3000 · api-gateway 8080 · auth 8081 · user 8082 · profil 8083 · post 8084 ·
+message 8085 · notification 8086 · media 8087 · MinIO API 9000 / console 9001.
+
+## 3. Architecture summary
+
+```
+[Client] → [Frontend (Next.js + BFF)] → [API Gateway] → 7 Go services → DBs (PG / Mongo / MinIO)
+```
+
+- **All inter-service traffic goes through the API Gateway** (sole exception: server-to-server
+  notification emission to `/internal/events`, off the gateway, secret-authenticated).
+- **JWT auth:** access 15m (localStorage, Bearer to gateway) + refresh 24h (httpOnly cookie via Next BFF).
+- **One datum = one service** (e.g. `username`→user-service, `display_name`/`visibility`→profil-service);
+  aggregated views composed by the caller.
+- **Each Go service owns its schema** (`EnsureSchema` at boot, idempotent).
+- **Full Docker containerization** (docker-compose).
+
+→ Full detail in **ARCHITECTURE.md**; the *why* behind each choice in **DECISIONS.md**.
+
+## 4. Coding conventions
+
+- One service = one Go module (`internal/{config,database,models,repository,service,handlers,middleware}`),
+  embedded schema applied at boot, no mounted init-db scripts.
+- Mongo counters denormalized as `int32` (`$jsonSchema` declares `bsonType:"int"`).
+- Frontend: business clients (`lib/{api,posts,bookmarks,messages,notifications,media}.ts`) layer over
+  `apiFetch` (Bearer + single-flight refresh inherited); no hardcoded URLs (`lib/config.ts`/`lib/routes.ts`).
+- i18n: every UI string via `useT()`, keys `namespace.key`, FR is the reference, EN parity required.
+- Identity (avatar/name) is always clickable → the person's profile.
+- Pure, testable functions for non-trivial logic (e.g. `planUpdate`, `convLess`, `withinSessionWindow`,
+  `computeDivider`, mention/translation helpers) — Go tests + vitest.
+- Secrets only via `.env` (root = cross-cutting + interpolable by compose; `<service>/.env` = own config).
+
+## 5. Frequently used commands
+
+```bash
+make env            # create .env files from .example (run before first make dev)
+make dev            # full stack with hot-reload (air + next dev, bind-mounts)   ← use this to develop
+make up             # frozen prod images (no rebuild on source change)
+make build          # rebuild prod images
+make logs-<svc> / make sh-<svc>
+# per service:
+make run | make build | make lint | make test
+# frontend:
+npm run dev | npm run lint | npx tsc --noEmit | npm test
+# graph:
+graphify query "<question>" | graphify path "<A>" "<B>" | graphify explain "<concept>" | graphify update .
+```
+
+## 6. Critical architectural rules (non-negotiable)
+
+- Everything through the gateway (incl. media download, streamed — **never** presigned MinIO URLs).
+- Security never depends on the front: post-service applies the visibility barrier server-side.
+- Messaging server is **blind** for DM/groups (E2EE, admin-proof); communities are admin-readable
+  (server key) by design. Read/unread state is server-side metadata only (never the `ciphertext`).
+- Media-service is content-agnostic (opaque bytes); encrypted attachments stay E2EE end-to-end.
+- Notification emission is best-effort fire-and-forget (off the gateway, `INTERNAL_EVENT_SECRET`).
+
+## 7. Reference — evaluation criteria (grading grid)
+
+Check before architectural decisions. Scale: **A=5 / B=4 / C=2 / D=1 pts**. Team: Zaid, Perujan, Candis, Théo.
+
+**Group — Deliverable (report):** needs analysis · architecture diagram · prioritization (primary+secondary,
+justified) · planning (Trello/Gantt, delays explained) · methodology · interface (wireframe + final, UX) ·
+features presentation (limitations explicit) · improvements & outlook (prioritized, effort estimates) · writing.
+
+**Group — Defense (oral):** context & approach · justified choices · coherent microservices architecture ·
+**security (JWT sessions, protected routes)** · **full containerization** · all primary features functional ·
+several well-chosen secondary features · **all 3 roles functional** · pro slides + scripted demo · timing & energy.
+
+**Individual:** technical mastery (full block skills, strong Q&A) · **English** during the defense.
+
+## 8. API documentation rules
+
+- Annotations live **in each service's handlers** (swaggo/swag code-first). Never in separate DTO files.
+- **`make swagger` before every commit** that touches a handler or route — regenerates `doc/openapi.{json,yaml}`.
+- The CI drift check (`ci-go.yml` job `swagger`) blocks PRs where `doc/` is stale.
+- **Published doc:** `https://gosyfrone.github.io/WebDad/` (Redoc, auto-deployed on `push develop` via `pages.yml`).
+- Local preview: `make swagger-site` → `http://localhost:8088`.
+
+---
+
+*This file is the lean entry point. Current status, decisions, architecture detail and history live in the
+linked files. Keep them updated per the Operating Rules; do not let this file regrow past ~250 lines.*

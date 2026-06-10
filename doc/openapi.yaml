@@ -1,0 +1,2963 @@
+swagger: '2.0'
+info:
+  contact: {}
+  title: Breezy API
+  description: API agrégée de la plateforme Breezy (réseau social microservices).
+  version: '1.0'
+paths:
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      tags:
+      - auth
+      summary: Se connecter
+      parameters:
+      - description: Credentials
+        name: body
+        in: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.LoginRequest'
+      responses:
+        '200':
+          description: 'Connexion réussie — data: {token, refresh_token, user}'
+          schema:
+            $ref: '#/definitions/models.AuthUser'
+        '400':
+          description: Payload invalide
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '401':
+          description: Credentials invalides
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '403':
+          description: Compte désactivé
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '500':
+          description: Erreur interne
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /auth/logout:
+    post:
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      tags:
+      - auth
+      summary: Se déconnecter (best-effort)
+      parameters:
+      - description: Refresh token (optionnel)
+        name: body
+        in: body
+        schema:
+          $ref: '#/definitions/models.RefreshRequest'
+      responses:
+        '200':
+          description: Déconnecté
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '500':
+          description: Erreur interne
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /auth/refresh:
+    post:
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      tags:
+      - auth
+      summary: Rafraîchir les tokens
+      parameters:
+      - description: Refresh token
+        name: body
+        in: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.RefreshRequest'
+      responses:
+        '200':
+          description: 'Nouvelle paire tokens — data: {token, refresh_token, user}'
+          schema:
+            $ref: '#/definitions/models.AuthUser'
+        '401':
+          description: Token absent/invalide/expiré
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '403':
+          description: Compte désactivé
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '500':
+          description: Erreur interne
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /auth/register:
+    post:
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      tags:
+      - auth
+      summary: Créer un compte
+      parameters:
+      - description: Email + mot de passe (min 8 chars)
+        name: body
+        in: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.RegisterRequest'
+      responses:
+        '201':
+          description: 'Compte créé — data: {token, refresh_token, user}'
+          schema:
+            $ref: '#/definitions/models.AuthUser'
+        '400':
+          description: Payload invalide
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '409':
+          description: Email déjà utilisé
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '500':
+          description: Erreur interne
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /auth/validate:
+    get:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - auth
+      summary: Valider un access token (usage gateway)
+      responses:
+        '200':
+          description: 'Claims — data: {user_id, email, role}'
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '401':
+          description: Token invalide
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '500':
+          description: Erreur interne
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /users:
+    get:
+      produces:
+      - application/json
+      tags:
+      - users
+      summary: Lister les utilisateurs (paginé)
+      parameters:
+      - type: integer
+        description: Nb résultats (défaut 20, max 100)
+        name: limit
+        in: query
+      - type: integer
+        description: Décalage
+        name: offset
+        in: query
+      responses:
+        '200':
+          description: OK
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/models.User'
+        '500':
+          description: Internal Server Error
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+    post:
+      security:
+      - BearerAuth: []
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      tags:
+      - users
+      summary: Créer l'entrée utilisateur
+      parameters:
+      - description: Username
+        name: body
+        in: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.CreateUserRequest'
+      responses:
+        '201':
+          description: Utilisateur créé
+          schema:
+            $ref: '#/definitions/models.User'
+        '400':
+          description: Payload invalide
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '401':
+          description: Non authentifié
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '409':
+          description: Username pris
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /users/by-username/{username}:
+    get:
+      produces:
+      - application/json
+      tags:
+      - users
+      summary: Détail d'un utilisateur par username
+      parameters:
+      - type: string
+        description: Username (handle)
+        name: username
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          schema:
+            $ref: '#/definitions/models.UserDetails'
+        '404':
+          description: Not Found
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /users/follow-requests/{followerId}/accept:
+    post:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - users
+      summary: Accepter une demande d'abonnement
+      parameters:
+      - type: string
+        description: ID du demandeur
+        name: followerId
+        in: path
+        required: true
+      responses:
+        '200':
+          description: 'status: accepted'
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '404':
+          description: Not Found
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /users/follow-requests/{followerId}/reject:
+    post:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - users
+      summary: Rejeter une demande d'abonnement
+      parameters:
+      - type: string
+        description: ID du demandeur
+        name: followerId
+        in: path
+        required: true
+      responses:
+        '200':
+          description: 'status: rejected'
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '404':
+          description: Not Found
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /users/me:
+    get:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - users
+      summary: Utilisateur courant (provisioning paresseux)
+      responses:
+        '200':
+          description: OK
+          schema:
+            $ref: '#/definitions/models.User'
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '500':
+          description: Internal Server Error
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+    patch:
+      security:
+      - BearerAuth: []
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      tags:
+      - users
+      summary: Modifier le username courant
+      parameters:
+      - description: Champs à modifier
+        name: body
+        in: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.UpdateUserRequest'
+      responses:
+        '200':
+          description: OK
+          schema:
+            $ref: '#/definitions/models.User'
+        '400':
+          description: Bad Request
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '409':
+          description: Username pris
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '429':
+          description: Cooldown actif
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /users/me/follow-requests/outgoing:
+    get:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - users
+      summary: Demandes d'abonnement sortantes (envoyées par moi)
+      responses:
+        '200':
+          description: Liste d'IDs
+          schema:
+            type: array
+            items:
+              type: string
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /users/me/followers/{id}:
+    delete:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - users
+      summary: Retirer un abonné de sa liste
+      parameters:
+      - type: string
+        description: ID de l'abonné à retirer
+        name: id
+        in: path
+        required: true
+      responses:
+        '204':
+          description: No Content
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /users/search:
+    get:
+      produces:
+      - application/json
+      tags:
+      - users
+      summary: Rechercher des utilisateurs par username
+      parameters:
+      - type: string
+        description: Terme de recherche
+        name: q
+        in: query
+        required: true
+      - type: integer
+        description: Nb résultats
+        name: limit
+        in: query
+      - type: integer
+        description: Décalage
+        name: offset
+        in: query
+      responses:
+        '200':
+          description: OK
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/models.User'
+        '500':
+          description: Internal Server Error
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /users/suggestions:
+    get:
+      produces:
+      - application/json
+      tags:
+      - users
+      summary: Suggestions (comptes les plus suivis)
+      parameters:
+      - type: integer
+        description: Nb résultats
+        name: limit
+        in: query
+      - type: integer
+        description: Décalage
+        name: offset
+        in: query
+      responses:
+        '200':
+          description: OK
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/models.User'
+        '500':
+          description: Internal Server Error
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /users/{id}:
+    get:
+      produces:
+      - application/json
+      tags:
+      - users
+      summary: Détail d'un utilisateur par ID
+      parameters:
+      - type: string
+        description: User ID
+        name: id
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          schema:
+            $ref: '#/definitions/models.UserDetails'
+        '404':
+          description: Not Found
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+    delete:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - users
+      summary: Désactiver un compte (admin)
+      parameters:
+      - type: string
+        description: User ID
+        name: id
+        in: path
+        required: true
+      responses:
+        '204':
+          description: No Content
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '403':
+          description: Réservé admin
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '404':
+          description: Not Found
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /users/{id}/follow:
+    post:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - users
+      summary: Suivre un utilisateur
+      parameters:
+      - type: string
+        description: ID de l'utilisateur à suivre
+        name: id
+        in: path
+        required: true
+      responses:
+        '200':
+          description: 'status: following|requested'
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '400':
+          description: Bad Request
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '404':
+          description: Not Found
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+    delete:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - users
+      summary: Ne plus suivre un utilisateur
+      parameters:
+      - type: string
+        description: ID de l'utilisateur
+        name: id
+        in: path
+        required: true
+      responses:
+        '204':
+          description: No Content
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /users/{id}/followers:
+    get:
+      produces:
+      - application/json
+      tags:
+      - users
+      summary: Lister les abonnés d'un utilisateur
+      parameters:
+      - type: string
+        description: User ID
+        name: id
+        in: path
+        required: true
+      - type: integer
+        description: Nb résultats
+        name: limit
+        in: query
+      - type: integer
+        description: Décalage
+        name: offset
+        in: query
+      responses:
+        '200':
+          description: OK
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/models.User'
+        '404':
+          description: Not Found
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /users/{id}/following:
+    get:
+      produces:
+      - application/json
+      tags:
+      - users
+      summary: Lister les abonnements d'un utilisateur
+      parameters:
+      - type: string
+        description: User ID
+        name: id
+        in: path
+        required: true
+      - type: integer
+        description: Nb résultats
+        name: limit
+        in: query
+      - type: integer
+        description: Décalage
+        name: offset
+        in: query
+      responses:
+        '200':
+          description: OK
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/models.User'
+        '404':
+          description: Not Found
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /profils:
+    post:
+      security:
+      - BearerAuth: []
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      tags:
+      - profils
+      summary: Créer son profil
+      parameters:
+      - description: display_name obligatoire
+        name: body
+        in: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.CreateProfilRequest'
+      responses:
+        '201':
+          description: Created
+          schema:
+            $ref: '#/definitions/models.Profil'
+        '400':
+          description: Bad Request
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '409':
+          description: Profil déjà existant
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /profils/me:
+    get:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - profils
+      summary: Profil de l'utilisateur courant
+      responses:
+        '200':
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Profil'
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '404':
+          description: Not Found
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+    patch:
+      security:
+      - BearerAuth: []
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      tags:
+      - profils
+      summary: Modifier son profil
+      parameters:
+      - description: Champs à modifier (tous optionnels)
+        name: body
+        in: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.UpdateProfilRequest'
+      responses:
+        '200':
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Profil'
+        '400':
+          description: Bad Request
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '409':
+          description: birth_date déjà définie
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '429':
+          description: Cooldown display_name
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /profils/search:
+    get:
+      produces:
+      - application/json
+      tags:
+      - profils
+      summary: Rechercher des profils par display_name
+      parameters:
+      - type: string
+        description: Terme de recherche
+        name: q
+        in: query
+        required: true
+      - type: integer
+        description: Nb résultats (défaut 20, max 50)
+        name: limit
+        in: query
+      responses:
+        '200':
+          description: OK
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/models.Profil'
+        '500':
+          description: Internal Server Error
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /profils/{userId}:
+    get:
+      produces:
+      - application/json
+      tags:
+      - profils
+      summary: Profil public d'un utilisateur
+      parameters:
+      - type: string
+        description: User ID
+        name: userId
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Profil'
+        '404':
+          description: Not Found
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+    delete:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - profils
+      summary: Supprimer un profil (admin)
+      parameters:
+      - type: string
+        description: User ID
+        name: userId
+        in: path
+        required: true
+      responses:
+        '204':
+          description: No Content
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '403':
+          description: Réservé admin
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '404':
+          description: Not Found
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /profils/{userId}/visibility:
+    get:
+      produces:
+      - application/json
+      tags:
+      - profils
+      summary: Visibilité d'un profil (public/private)
+      parameters:
+      - type: string
+        description: User ID
+        name: userId
+        in: path
+        required: true
+      responses:
+        '200':
+          description: 'visibility: public|private'
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '404':
+          description: Not Found
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /posts:
+    get:
+      produces:
+      - application/json
+      tags:
+      - posts
+      summary: Fil de posts (global, profil ou abonnements)
+      parameters:
+      - type: string
+        description: Fil d'un auteur
+        name: author_id
+        in: query
+      - type: string
+        description: Fil abonnements (IDs séparés par virgule)
+        name: author_ids
+        in: query
+      - type: integer
+        description: Nb résultats
+        name: limit
+        in: query
+      - type: integer
+        description: Décalage
+        name: offset
+        in: query
+      responses:
+        '200':
+          description: OK
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/models.Post'
+        '500':
+          description: Internal Server Error
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+    post:
+      security:
+      - BearerAuth: []
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      tags:
+      - posts
+      summary: Créer un post
+      parameters:
+      - description: Contenu (texte et/ou médias)
+        name: body
+        in: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.CreatePostRequest'
+      responses:
+        '201':
+          description: Created
+          schema:
+            $ref: '#/definitions/models.Post'
+        '400':
+          description: Bad Request
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /posts/bookmarks:
+    get:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - bookmarks
+      summary: Tous mes signets
+      parameters:
+      - type: integer
+        description: Nb résultats
+        name: limit
+        in: query
+      - type: integer
+        description: Décalage
+        name: offset
+        in: query
+      responses:
+        '200':
+          description: OK
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/models.Post'
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /posts/bookmarks/collections:
+    get:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - bookmarks
+      summary: Lister mes collections de signets
+      responses:
+        '200':
+          description: OK
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/models.BookmarkCollection'
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+    post:
+      security:
+      - BearerAuth: []
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      tags:
+      - bookmarks
+      summary: Créer une collection de signets
+      parameters:
+      - description: Nom de la collection
+        name: body
+        in: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.CreateCollectionRequest'
+      responses:
+        '201':
+          description: Created
+          schema:
+            $ref: '#/definitions/models.BookmarkCollection'
+        '400':
+          description: Bad Request
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /posts/bookmarks/collections/{cid}:
+    delete:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - bookmarks
+      summary: Supprimer une collection de signets
+      parameters:
+      - type: string
+        description: Collection ID
+        name: cid
+        in: path
+        required: true
+      responses:
+        '204':
+          description: No Content
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '403':
+          description: Forbidden
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '404':
+          description: Not Found
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+    patch:
+      security:
+      - BearerAuth: []
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      tags:
+      - bookmarks
+      summary: Renommer une collection de signets
+      parameters:
+      - type: string
+        description: Collection ID
+        name: cid
+        in: path
+        required: true
+      - description: Nouveau nom
+        name: body
+        in: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.RenameCollectionRequest'
+      responses:
+        '200':
+          description: OK
+          schema:
+            $ref: '#/definitions/models.BookmarkCollection'
+        '400':
+          description: Bad Request
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '403':
+          description: Forbidden
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '404':
+          description: Not Found
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /posts/bookmarks/collections/{cid}/posts:
+    get:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - bookmarks
+      summary: Posts d'une collection de signets
+      parameters:
+      - type: string
+        description: Collection ID
+        name: cid
+        in: path
+        required: true
+      - type: integer
+        description: Nb résultats
+        name: limit
+        in: query
+      - type: integer
+        description: Décalage
+        name: offset
+        in: query
+      responses:
+        '200':
+          description: OK
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/models.Post'
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '404':
+          description: Not Found
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /posts/me/bookmarked-ids:
+    get:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - bookmarks
+      summary: IDs des posts que j'ai signés
+      responses:
+        '200':
+          description: Liste d'IDs
+          schema:
+            type: array
+            items:
+              type: string
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /posts/me/liked-ids:
+    get:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - likes
+      summary: IDs des posts que j'ai likés
+      responses:
+        '200':
+          description: Liste d'IDs
+          schema:
+            type: array
+            items:
+              type: string
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /posts/me/reposted-ids:
+    get:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - posts
+      summary: IDs des posts que j'ai repostés
+      responses:
+        '200':
+          description: Liste d'IDs
+          schema:
+            type: array
+            items:
+              type: string
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /posts/{id}:
+    get:
+      produces:
+      - application/json
+      tags:
+      - posts
+      summary: Détail d'un post
+      parameters:
+      - type: string
+        description: Post ID (ObjectID hex)
+        name: id
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Post'
+        '404':
+          description: Not Found
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+    delete:
+      security:
+      - BearerAuth: []
+      tags:
+      - posts
+      summary: Supprimer un post (auteur/modérateur/admin)
+      parameters:
+      - type: string
+        description: Post ID
+        name: id
+        in: path
+        required: true
+      responses:
+        '204':
+          description: No Content
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '403':
+          description: Forbidden
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '404':
+          description: Not Found
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+    patch:
+      security:
+      - BearerAuth: []
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      tags:
+      - posts
+      summary: Modifier un post (auteur/modérateur/admin)
+      parameters:
+      - type: string
+        description: Post ID
+        name: id
+        in: path
+        required: true
+      - description: Nouveau contenu
+        name: body
+        in: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.UpdatePostRequest'
+      responses:
+        '200':
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Post'
+        '400':
+          description: Bad Request
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '403':
+          description: Forbidden
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '404':
+          description: Not Found
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /posts/{id}/bookmark:
+    post:
+      security:
+      - BearerAuth: []
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      tags:
+      - bookmarks
+      summary: Signer (bookmarker) un post
+      parameters:
+      - type: string
+        description: Post ID
+        name: id
+        in: path
+        required: true
+      - description: Collection ID (optionnel)
+        name: body
+        in: body
+        schema:
+          $ref: '#/definitions/models.BookmarkRequest'
+      responses:
+        '200':
+          description: OK
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '404':
+          description: Not Found
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+    delete:
+      security:
+      - BearerAuth: []
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      tags:
+      - bookmarks
+      summary: Retirer un signet
+      parameters:
+      - type: string
+        description: Post ID
+        name: id
+        in: path
+        required: true
+      - description: Collection ID (optionnel)
+        name: body
+        in: body
+        schema:
+          $ref: '#/definitions/models.BookmarkRequest'
+      responses:
+        '200':
+          description: OK
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '404':
+          description: Not Found
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /posts/{id}/bookmark/collections:
+    get:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - bookmarks
+      summary: Collections contenant un post signé
+      parameters:
+      - type: string
+        description: Post ID
+        name: id
+        in: path
+        required: true
+      responses:
+        '200':
+          description: Liste d'IDs de collections
+          schema:
+            type: array
+            items:
+              type: string
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /posts/{id}/comments:
+    get:
+      produces:
+      - application/json
+      tags:
+      - comments
+      summary: Commentaires d'un post
+      parameters:
+      - type: string
+        description: Post ID
+        name: id
+        in: path
+        required: true
+      - type: integer
+        description: Nb résultats
+        name: limit
+        in: query
+      - type: integer
+        description: Décalage
+        name: offset
+        in: query
+      responses:
+        '200':
+          description: OK
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/models.Comment'
+        '404':
+          description: Not Found
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+    post:
+      security:
+      - BearerAuth: []
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      tags:
+      - comments
+      summary: Commenter un post
+      parameters:
+      - type: string
+        description: Post ID
+        name: id
+        in: path
+        required: true
+      - description: Contenu + parent_id optionnel
+        name: body
+        in: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.CreateCommentRequest'
+      responses:
+        '201':
+          description: Created
+          schema:
+            $ref: '#/definitions/models.Comment'
+        '400':
+          description: Bad Request
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '404':
+          description: Not Found
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /posts/{id}/comments/{commentId}:
+    delete:
+      security:
+      - BearerAuth: []
+      tags:
+      - comments
+      summary: Supprimer un commentaire (auteur/modérateur/admin)
+      parameters:
+      - type: string
+        description: Post ID
+        name: id
+        in: path
+        required: true
+      - type: string
+        description: Comment ID
+        name: commentId
+        in: path
+        required: true
+      responses:
+        '204':
+          description: No Content
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '403':
+          description: Forbidden
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '404':
+          description: Not Found
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /posts/{id}/comments/{commentId}/replies:
+    get:
+      produces:
+      - application/json
+      tags:
+      - comments
+      summary: Réponses à un commentaire
+      parameters:
+      - type: string
+        description: Post ID
+        name: id
+        in: path
+        required: true
+      - type: string
+        description: Comment ID
+        name: commentId
+        in: path
+        required: true
+      - type: integer
+        description: Nb résultats
+        name: limit
+        in: query
+      - type: integer
+        description: Décalage
+        name: offset
+        in: query
+      responses:
+        '200':
+          description: OK
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/models.Comment'
+        '404':
+          description: Not Found
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /posts/{id}/like:
+    post:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - likes
+      summary: Liker un post
+      parameters:
+      - type: string
+        description: Post ID
+        name: id
+        in: path
+        required: true
+      responses:
+        '200':
+          description: likes_count
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '404':
+          description: Not Found
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+    delete:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - likes
+      summary: Retirer son like
+      parameters:
+      - type: string
+        description: Post ID
+        name: id
+        in: path
+        required: true
+      responses:
+        '200':
+          description: likes_count
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '404':
+          description: Not Found
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /posts/{id}/likes:
+    get:
+      produces:
+      - application/json
+      tags:
+      - likes
+      summary: Utilisateurs ayant liké un post
+      parameters:
+      - type: string
+        description: Post ID
+        name: id
+        in: path
+        required: true
+      responses:
+        '200':
+          description: Liste d'user IDs
+          schema:
+            type: array
+            items:
+              type: string
+        '404':
+          description: Not Found
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /posts/{id}/pin:
+    delete:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - posts
+      summary: Désépingler un post
+      parameters:
+      - type: string
+        description: Post ID
+        name: id
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Post'
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '403':
+          description: Forbidden
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '404':
+          description: Not Found
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+    patch:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - posts
+      summary: Épingler un post (auteur uniquement)
+      parameters:
+      - type: string
+        description: Post ID
+        name: id
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Post'
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '403':
+          description: Forbidden
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '404':
+          description: Not Found
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /posts/{id}/repost:
+    post:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - posts
+      summary: Reposter un post
+      parameters:
+      - type: string
+        description: Post ID
+        name: id
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Post'
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '404':
+          description: Not Found
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+    delete:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - posts
+      summary: Retirer un repost
+      parameters:
+      - type: string
+        description: Post ID
+        name: id
+        in: path
+        required: true
+      responses:
+        '200':
+          description: reposts_count
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '404':
+          description: Not Found
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /messages/communities:
+    get:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - messages
+      summary: Annuaire des communautés
+      parameters:
+      - type: string
+        description: Recherche par nom
+        name: q
+        in: query
+      - type: integer
+        description: Nb résultats
+        name: limit
+        in: query
+      - type: integer
+        description: Décalage
+        name: offset
+        in: query
+      responses:
+        '200':
+          description: Liste de communautés
+          schema:
+            type: array
+            items:
+              type: object
+              additionalProperties: true
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /messages/conversations:
+    get:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - messages
+      summary: Lister mes conversations
+      responses:
+        '200':
+          description: OK
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/models.ConversationView'
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+    post:
+      security:
+      - BearerAuth: []
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      tags:
+      - messages
+      summary: Créer ou trouver une conversation (DM, groupe ou communauté)
+      parameters:
+      - description: Paramètres de création
+        name: body
+        in: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.CreateConversationRequest'
+      responses:
+        '201':
+          description: Created
+          schema:
+            $ref: '#/definitions/models.ConversationView'
+        '400':
+          description: Bad Request
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /messages/conversations/{id}:
+    get:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - messages
+      summary: Détail d'une conversation
+      parameters:
+      - type: string
+        description: Conversation ID
+        name: id
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          schema:
+            $ref: '#/definitions/models.ConversationView'
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '403':
+          description: Forbidden
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '404':
+          description: Not Found
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /messages/conversations/{id}/join:
+    post:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - messages
+      summary: Rejoindre une communauté
+      parameters:
+      - type: string
+        description: Conversation ID (communauté)
+        name: id
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          schema:
+            $ref: '#/definitions/models.ConversationView'
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '404':
+          description: Not Found
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /messages/conversations/{id}/messages:
+    get:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - messages
+      summary: Historique chiffré d'une conversation
+      parameters:
+      - type: string
+        description: Conversation ID
+        name: id
+        in: path
+        required: true
+      - type: string
+        description: Curseur (ID du dernier message chargé)
+        name: before
+        in: query
+      - type: integer
+        description: Nb résultats
+        name: limit
+        in: query
+      responses:
+        '200':
+          description: Messages chiffrés
+          schema:
+            type: array
+            items:
+              type: object
+              additionalProperties: true
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '403':
+          description: Forbidden
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+    post:
+      security:
+      - BearerAuth: []
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      tags:
+      - messages
+      summary: Envoyer un message chiffré
+      parameters:
+      - type: string
+        description: Conversation ID
+        name: id
+        in: path
+        required: true
+      - description: Message chiffré + nonce
+        name: body
+        in: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.SendMessageRequest'
+      responses:
+        '201':
+          description: Message persisté
+          schema:
+            type: object
+            additionalProperties: true
+        '400':
+          description: Bad Request
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '403':
+          description: Forbidden
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /messages/keys:
+    put:
+      security:
+      - BearerAuth: []
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      tags:
+      - messages
+      summary: Publier / mettre à jour sa clé publique E2EE
+      parameters:
+      - description: Clé publique (base64)
+        name: body
+        in: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.PublishKeyRequest'
+      responses:
+        '200':
+          description: user_id + public_key
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '400':
+          description: Bad Request
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /messages/keys/{userId}:
+    get:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - messages
+      summary: Récupérer la clé publique d'un utilisateur
+      parameters:
+      - type: string
+        description: User ID
+        name: userId
+        in: path
+        required: true
+      responses:
+        '200':
+          description: public_key
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '404':
+          description: Not Found
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /messages/unread-count:
+    get:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - messages
+      summary: Nombre de conversations non lues (badge)
+      responses:
+        '200':
+          description: 'data: {count}'
+          schema:
+            type: object
+            additionalProperties:
+              type: integer
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /messages/ws:
+    get:
+      tags:
+      - messages
+      summary: Connexion WebSocket temps réel (messages)
+      parameters:
+      - type: string
+        description: JWT access token
+        name: access_token
+        in: query
+        required: true
+      responses:
+        '101':
+          description: Upgrade WebSocket
+          schema:
+            type: string
+  /notifications:
+    get:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - notifications
+      summary: Lister mes notifications (paginé)
+      parameters:
+      - type: integer
+        description: Nb résultats
+        name: limit
+        in: query
+      - type: string
+        description: Curseur (ID de la dernière notif chargée)
+        name: before
+        in: query
+      responses:
+        '200':
+          description: Liste de notifications
+          schema:
+            type: array
+            items:
+              type: object
+              additionalProperties: true
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '500':
+          description: Internal Server Error
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /notifications/read:
+    post:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - notifications
+      summary: Marquer toutes les notifications comme lues
+      responses:
+        '204':
+          description: No Content
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '500':
+          description: Internal Server Error
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /notifications/unread-count:
+    get:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - notifications
+      summary: Nombre de notifications non lues (badge)
+      responses:
+        '200':
+          description: 'data: {count}'
+          schema:
+            type: object
+            additionalProperties:
+              type: integer
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '500':
+          description: Internal Server Error
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /notifications/ws:
+    get:
+      tags:
+      - notifications
+      summary: Connexion WebSocket temps réel (notifications)
+      parameters:
+      - type: string
+        description: JWT access token
+        name: access_token
+        in: query
+        required: true
+      responses:
+        '101':
+          description: Upgrade WebSocket
+          schema:
+            type: string
+  /notifications/{id}/read:
+    post:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - notifications
+      summary: Marquer une notification comme lue
+      parameters:
+      - type: string
+        description: Notification ID
+        name: id
+        in: path
+        required: true
+      responses:
+        '204':
+          description: No Content
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '404':
+          description: Not Found
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /media:
+    post:
+      security:
+      - BearerAuth: []
+      consumes:
+      - multipart/form-data
+      produces:
+      - application/json
+      tags:
+      - media
+      summary: Uploader un média (image ou vidéo)
+      parameters:
+      - type: file
+        description: Fichier image (JPEG/PNG/GIF/WebP) ou vidéo (MP4/WebM)
+        name: file
+        in: formData
+        required: true
+      responses:
+        '201':
+          description: Created
+          schema:
+            $ref: '#/definitions/handler.uploadResponse'
+        '400':
+          description: Bad Request
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '413':
+          description: Fichier trop volumineux
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '415':
+          description: Type MIME non supporté
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /media/encrypted:
+    post:
+      security:
+      - BearerAuth: []
+      consumes:
+      - multipart/form-data
+      produces:
+      - application/json
+      tags:
+      - media
+      summary: Uploader un blob chiffré E2EE
+      parameters:
+      - type: file
+        description: Blob chiffré (contenu opaque)
+        name: file
+        in: formData
+        required: true
+      responses:
+        '201':
+          description: Created
+          schema:
+            $ref: '#/definitions/handler.uploadResponse'
+        '400':
+          description: Bad Request
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /media/{id}:
+    get:
+      produces:
+      - application/octet-stream
+      tags:
+      - media
+      summary: Télécharger un média (lecture publique, streaming + Range)
+      parameters:
+      - type: string
+        description: Media ID
+        name: id
+        in: path
+        required: true
+      responses:
+        '200':
+          description: Contenu binaire
+          schema:
+            type: file
+        '206':
+          description: Contenu partiel (Range)
+          schema:
+            type: file
+        '404':
+          description: Not Found
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+    delete:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - media
+      summary: Supprimer un média (propriétaire ou admin)
+      parameters:
+      - type: string
+        description: Media ID
+        name: id
+        in: path
+        required: true
+      responses:
+        '204':
+          description: No Content
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '403':
+          description: Forbidden
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '404':
+          description: Not Found
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+definitions:
+  models.AuthUser:
+    type: object
+    properties:
+      email:
+        type: string
+      id:
+        type: string
+      role:
+        type: string
+  models.LoginRequest:
+    type: object
+    required:
+    - email
+    - password
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+  models.RefreshRequest:
+    type: object
+    properties:
+      refresh_token:
+        type: string
+  models.RegisterRequest:
+    type: object
+    required:
+    - email
+    - password
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+        minLength: 8
+  models.CreateUserRequest:
+    type: object
+    required:
+    - username
+    properties:
+      username:
+        type: string
+        maxLength: 50
+        minLength: 3
+  models.UpdateUserRequest:
+    type: object
+    properties:
+      username:
+        type: string
+        maxLength: 50
+        minLength: 3
+  models.User:
+    type: object
+    properties:
+      created_at:
+        type: string
+      id:
+        type: string
+      is_active:
+        type: boolean
+      updated_at:
+        type: string
+      username:
+        type: string
+      username_changed_at:
+        description: 'UsernameChangedAt : date du dernier changement effectif du handle
+
+          (nil = jamais changé). Sert de base au cooldown de changement de
+
+          username (cf. service). Symétrique de display_name_changed_at (profil).'
+        type: string
+  models.UserDetails:
+    type: object
+    properties:
+      created_at:
+        type: string
+      follower_count:
+        type: integer
+      following_count:
+        type: integer
+      id:
+        type: string
+      is_active:
+        type: boolean
+      updated_at:
+        type: string
+      username:
+        type: string
+      username_changed_at:
+        description: 'UsernameChangedAt : date du dernier changement effectif du handle
+
+          (nil = jamais changé). Sert de base au cooldown de changement de
+
+          username (cf. service). Symétrique de display_name_changed_at (profil).'
+        type: string
+  models.CreateProfilRequest:
+    type: object
+    required:
+    - display_name
+    properties:
+      birth_date:
+        type: string
+      display_name:
+        type: string
+        maxLength: 100
+      gender:
+        type: string
+        enum:
+        - male
+        - female
+  models.Profil:
+    type: object
+    properties:
+      avatar_url:
+        type: string
+      banner_url:
+        type: string
+      bio:
+        type: string
+      birth_date:
+        type: string
+      created_at:
+        type: string
+      display_name:
+        type: string
+      display_name_changed_at:
+        description: 'DisplayNameChangedAt : date du dernier changement EFFECTIF de
+          display_name
+
+          (nil = jamais changé depuis le provisioning). Enregistrée dès aujourd''hui
+
+          pour servir de base à un cooldown « X jours entre deux changements de nom
+          »
+
+          (cf. config DisplayNameCooldown ; enforcement désactivé par défaut). On
+          la
+
+          capture maintenant pour ne pas avoir de profils sans baseline le jour où
+
+          le cooldown est activé. Symétrique de users.username_changed_at.'
+        type: string
+      gender:
+        description: '"male" | "female"'
+        type: string
+      location:
+        type: string
+      updated_at:
+        type: string
+      user_id:
+        type: string
+      visibility:
+        type: string
+      website:
+        type: string
+  models.UpdateProfilRequest:
+    type: object
+    properties:
+      avatar_url:
+        type: string
+      banner_url:
+        type: string
+      bio:
+        type: string
+        maxLength: 160
+      birth_date:
+        type: string
+      display_name:
+        type: string
+        maxLength: 100
+      gender:
+        type: string
+        enum:
+        - male
+        - female
+      location:
+        type: string
+      website:
+        type: string
+  models.BookmarkCollection:
+    type: object
+    properties:
+      created_at:
+        type: string
+      id:
+        type: string
+      is_default:
+        description: 'IsDefault : collection « par défaut » de l''utilisateur (une
+          seule par compte,
+
+          créée à la volée). Toujours en tête de liste, NON supprimable et NON
+
+          renommable — mais on peut y ajouter/retirer des posts comme les autres.'
+        type: boolean
+      items_count:
+        type: integer
+      name:
+        type: string
+      updated_at:
+        type: string
+      user_id:
+        type: string
+  models.BookmarkRequest:
+    type: object
+    properties:
+      collection_id:
+        type: string
+  models.Comment:
+    type: object
+    properties:
+      author_id:
+        type: string
+      content:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      parent_id:
+        type: string
+      post_id:
+        type: string
+      reply_count:
+        type: integer
+      updated_at:
+        type: string
+  models.CreateCollectionRequest:
+    type: object
+    required:
+    - name
+    properties:
+      name:
+        type: string
+        maxLength: 60
+  models.CreateCommentRequest:
+    type: object
+    required:
+    - content
+    properties:
+      content:
+        type: string
+        maxLength: 280
+      parent_id:
+        type: string
+  models.CreatePostRequest:
+    type: object
+    properties:
+      content:
+        type: string
+        maxLength: 280
+      media:
+        type: array
+        maxItems: 4
+        items:
+          $ref: '#/definitions/models.MediaRef'
+      quote_post_id:
+        type: string
+  models.MediaRef:
+    type: object
+    required:
+    - url
+    properties:
+      type:
+        type: string
+        enum:
+        - image
+        - video
+      url:
+        type: string
+  models.Post:
+    type: object
+    properties:
+      author_id:
+        type: string
+      comments_count:
+        type: integer
+      content:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      likes_count:
+        type: integer
+      media:
+        type: array
+        items:
+          $ref: '#/definitions/models.MediaRef'
+      pinned_at:
+        type: string
+      quote_post_id:
+        type: string
+      reposted_at:
+        type: string
+      reposted_by_id:
+        type: string
+      reposts_count:
+        type: integer
+      updated_at:
+        type: string
+  models.RenameCollectionRequest:
+    type: object
+    required:
+    - name
+    properties:
+      name:
+        type: string
+        maxLength: 60
+  models.UpdatePostRequest:
+    type: object
+    required:
+    - content
+    properties:
+      content:
+        type: string
+        maxLength: 280
+  models.ConversationView:
+    type: object
+    properties:
+      content_key:
+        description: 'ContentKey : clé de contenu d''une COMMUNAUTÉ (base64), remise
+          au membre par
+
+          le serveur. Vide pour DM/groupes (qui utilisent les enveloppes scellées).'
+        type: string
+      created_at:
+        type: string
+      created_by:
+        type: string
+      id:
+        type: string
+      last_read_at:
+        description: 'LastReadAt : curseur de lecture de CE membre (nil/omis = jamais
+          lu). Sert à
+
+          la pastille « non-lu » de la liste et à l''ancre « Nouveaux messages ».'
+        type: string
+      member_ids:
+        type: array
+        items:
+          type: string
+      muted:
+        description: 'Muted : la conversation est-elle en sourdine pour CE membre
+          ? (exclue du
+
+          badge non-lu app-wide, mais toujours « non lue » dans la liste).'
+        type: boolean
+      my_envelope:
+        type: string
+      my_role:
+        type: string
+      pinned_at:
+        description: 'PinnedAt : épinglage de la conversation par CE membre (nil/omis
+          = non
+
+          épinglée). Sert au tri « épinglé d''abord » côté client.'
+        type: string
+      title:
+        type: string
+      title_nonce:
+        type: string
+      type:
+        type: string
+      updated_at:
+        type: string
+  models.CreateConversationRequest:
+    type: object
+    properties:
+      content_key:
+        type: string
+      envelopes:
+        type: object
+        additionalProperties:
+          type: string
+      peer_id:
+        type: string
+      title:
+        type: string
+      title_nonce:
+        type: string
+      type:
+        type: string
+  models.PublishKeyRequest:
+    type: object
+    required:
+    - public_key
+    properties:
+      public_key:
+        type: string
+  models.SendMessageRequest:
+    type: object
+    required:
+    - ciphertext
+    - nonce
+    properties:
+      ciphertext:
+        type: string
+      mentioned_member_ids:
+        type: array
+        items:
+          type: string
+      nonce:
+        type: string
+  handler.uploadResponse:
+    type: object
+    properties:
+      id:
+        type: string
+      kind:
+        type: string
+      mime:
+        type: string
+      size:
+        type: integer
+      url:
+        type: string
+host: localhost:8080
+basePath: /

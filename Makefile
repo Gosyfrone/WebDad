@@ -1,7 +1,8 @@
 .PHONY: help env env-sync sync-one up dev dev-down dev-logs down build logs ps clean reset db-only \
         logs-gateway logs-auth logs-user logs-profil logs-post logs-message logs-notification logs-media logs-front logs-db \
         sh-auth sh-user sh-profil sh-post sh-message sh-notification sh-media sh-gateway \
-        psql-auth psql-user mongo-profil-cli mongo-post-cli mongo-message-cli mongo-notification-cli
+        psql-auth psql-user mongo-profil-cli mongo-post-cli mongo-message-cli mongo-notification-cli \
+        swagger swagger-site
 
 # Services possédant un .env propre (chargé par compose via env_file)
 SERVICES := auth-service user-service profil-service post-service message-service notification-service media-service api-gateway
@@ -31,6 +32,8 @@ help:
 	@echo "  Logs d'un service : make logs-auth | logs-user | logs-profil | logs-post | logs-message | logs-notification | logs-media | logs-front | logs-gateway | logs-db"
 	@echo "  Shell d'un service: make sh-auth | sh-user | sh-profil | sh-post | sh-message | sh-notification | sh-media | sh-gateway"
 	@echo "  CLI BDD           : make psql-auth | psql-user | mongo-profil-cli | mongo-post-cli | mongo-message-cli | mongo-notification-cli"
+	@echo "  make swagger        Générer + agréger le spec OpenAPI (doc/openapi.{json,yaml})"
+	@echo "  make swagger-site   Servir la doc Redoc localement → http://localhost:8088"
 	@echo ""
 
 # ─── Préparation des .env ─────────────────────────────────────────
@@ -210,3 +213,15 @@ mongo-message-cli:
 
 mongo-notification-cli:
 	docker compose exec mongo-notification sh -c 'mongosh -u "$$MONGO_INITDB_ROOT_USERNAME" -p "$$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin "$$MONGO_INITDB_DATABASE"'
+
+# ─── Documentation API ───────────────────────────────────────────────────────
+swagger:
+	@bash scripts/swagger-aggregate.sh
+	@echo ""
+	@echo "  ✓ Spec OpenAPI → doc/openapi.json  doc/openapi.yaml"
+	@echo "    (régénérer après toute modification des annotations)"
+
+swagger-site:
+	@echo "  ▶  Redoc UI → http://localhost:8088"
+	@echo "     (Ctrl-C pour arrêter)"
+	@cd doc && python3 -m http.server 8088

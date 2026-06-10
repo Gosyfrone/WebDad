@@ -14,6 +14,16 @@ import (
 // transmis par le BFF Next depuis le cookie httpOnly) contre une NOUVELLE paire
 // access + refresh (rotation). 401 si le token est absent/invalide/expiré : le
 // front efface sa session et redirige vers /login.
+// @Summary     Rafraîchir les tokens
+// @Tags        auth
+// @Accept      json
+// @Produce     json
+// @Param       body body models.RefreshRequest true "Refresh token"
+// @Success     200 {object} models.AuthUser "Nouvelle paire tokens — data: {token, refresh_token, user}"
+// @Failure     401 {object} map[string]string "Token absent/invalide/expiré"
+// @Failure     403 {object} map[string]string "Compte désactivé"
+// @Failure     500 {object} map[string]string "Erreur interne"
+// @Router      /auth/refresh [post]
 func (h *Handler) Refresh(c *gin.Context) {
 	var req models.RefreshRequest
 	if err := c.ShouldBindJSON(&req); err != nil || req.RefreshToken == "" {

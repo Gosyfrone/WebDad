@@ -25,6 +25,16 @@ func NewConversationHandler(svc *service.MessageService, hub *realtime.Hub) *Con
 // CreateConversation : POST /messages/conversations — crée (ou retrouve) une
 // conversation. `type:"group"` → groupe ; sinon (défaut) → DM. Le client a
 // généré la clé de contenu et fournit les enveloppes par membre.
+// @Summary     Créer ou trouver une conversation (DM, groupe ou communauté)
+// @Tags        messages
+// @Accept      json
+// @Produce     json
+// @Security    BearerAuth
+// @Param       body body models.CreateConversationRequest true "Paramètres de création"
+// @Success     201 {object} models.ConversationView
+// @Failure     400 {object} map[string]string
+// @Failure     401 {object} map[string]string
+// @Router      /messages/conversations [post]
 func (h *ConversationHandler) CreateConversation(c *gin.Context) {
 	claims, ok := middleware.ClaimsFrom(c)
 	if !ok {
@@ -59,6 +69,16 @@ func (h *ConversationHandler) CreateConversation(c *gin.Context) {
 
 // ListCommunities : GET /messages/communities — annuaire public (nom en clair,
 // nb de membres, déjà-membre). Pagination + recherche `?q=`. Jamais la clé.
+// @Summary     Annuaire des communautés
+// @Tags        messages
+// @Produce     json
+// @Security    BearerAuth
+// @Param       q      query string false "Recherche par nom"
+// @Param       limit  query int    false "Nb résultats"
+// @Param       offset query int    false "Décalage"
+// @Success     200 {array} map[string]interface{} "Liste de communautés"
+// @Failure     401 {object} map[string]string
+// @Router      /messages/communities [get]
 func (h *ConversationHandler) ListCommunities(c *gin.Context) {
 	claims, ok := middleware.ClaimsFrom(c)
 	if !ok {
@@ -78,6 +98,15 @@ func (h *ConversationHandler) ListCommunities(c *gin.Context) {
 
 // JoinCommunity : POST /messages/conversations/:id/join — auto-join en viewer ;
 // renvoie la vue AVEC la clé de contenu (remise par le serveur).
+// @Summary     Rejoindre une communauté
+// @Tags        messages
+// @Produce     json
+// @Security    BearerAuth
+// @Param       id path string true "Conversation ID (communauté)"
+// @Success     200 {object} models.ConversationView
+// @Failure     401 {object} map[string]string
+// @Failure     404 {object} map[string]string
+// @Router      /messages/conversations/{id}/join [post]
 func (h *ConversationHandler) JoinCommunity(c *gin.Context) {
 	claims, ok := middleware.ClaimsFrom(c)
 	if !ok {
@@ -267,6 +296,13 @@ func (h *ConversationHandler) MarkRead(c *gin.Context) {
 
 // UnreadCount : GET /messages/unread-count — nombre de conversations ayant au
 // moins un message non lu (badge app-wide). Calcul serveur, sans lire le contenu.
+// @Summary     Nombre de conversations non lues (badge)
+// @Tags        messages
+// @Produce     json
+// @Security    BearerAuth
+// @Success     200 {object} map[string]int "data: {count}"
+// @Failure     401 {object} map[string]string
+// @Router      /messages/unread-count [get]
 func (h *ConversationHandler) UnreadCount(c *gin.Context) {
 	claims, ok := middleware.ClaimsFrom(c)
 	if !ok {
@@ -351,6 +387,13 @@ func (h *ConversationHandler) RemoveMember(c *gin.Context) {
 
 // ListConversations : GET /messages/conversations — mes conversations (avec mon
 // enveloppe + mon rôle), triées par activité.
+// @Summary     Lister mes conversations
+// @Tags        messages
+// @Produce     json
+// @Security    BearerAuth
+// @Success     200 {array} models.ConversationView
+// @Failure     401 {object} map[string]string
+// @Router      /messages/conversations [get]
 func (h *ConversationHandler) ListConversations(c *gin.Context) {
 	claims, ok := middleware.ClaimsFrom(c)
 	if !ok {
@@ -367,6 +410,16 @@ func (h *ConversationHandler) ListConversations(c *gin.Context) {
 }
 
 // GetConversation : GET /messages/conversations/:id — détail (membre requis).
+// @Summary     Détail d'une conversation
+// @Tags        messages
+// @Produce     json
+// @Security    BearerAuth
+// @Param       id path string true "Conversation ID"
+// @Success     200 {object} models.ConversationView
+// @Failure     401 {object} map[string]string
+// @Failure     403 {object} map[string]string
+// @Failure     404 {object} map[string]string
+// @Router      /messages/conversations/{id} [get]
 func (h *ConversationHandler) GetConversation(c *gin.Context) {
 	claims, ok := middleware.ClaimsFrom(c)
 	if !ok {
@@ -384,6 +437,17 @@ func (h *ConversationHandler) GetConversation(c *gin.Context) {
 
 // ListMessages : GET /messages/conversations/:id/messages — historique chiffré
 // (membre requis). ?before=<messageId> pagine vers le haut ; ?limit borne la page.
+// @Summary     Historique chiffré d'une conversation
+// @Tags        messages
+// @Produce     json
+// @Security    BearerAuth
+// @Param       id     path  string true  "Conversation ID"
+// @Param       before query string false "Curseur (ID du dernier message chargé)"
+// @Param       limit  query int    false "Nb résultats"
+// @Success     200 {array} map[string]interface{} "Messages chiffrés"
+// @Failure     401 {object} map[string]string
+// @Failure     403 {object} map[string]string
+// @Router      /messages/conversations/{id}/messages [get]
 func (h *ConversationHandler) ListMessages(c *gin.Context) {
 	claims, ok := middleware.ClaimsFrom(c)
 	if !ok {
@@ -404,6 +468,18 @@ func (h *ConversationHandler) ListMessages(c *gin.Context) {
 // SendMessage : POST /messages/conversations/:id/messages — poste un message
 // DÉJÀ chiffré (membre + droit d'écriture requis), puis le diffuse en temps réel
 // aux membres connectés.
+// @Summary     Envoyer un message chiffré
+// @Tags        messages
+// @Accept      json
+// @Produce     json
+// @Security    BearerAuth
+// @Param       id   path  string                      true "Conversation ID"
+// @Param       body body  models.SendMessageRequest   true "Message chiffré + nonce"
+// @Success     201 {object} map[string]interface{} "Message persisté"
+// @Failure     400 {object} map[string]string
+// @Failure     401 {object} map[string]string
+// @Failure     403 {object} map[string]string
+// @Router      /messages/conversations/{id}/messages [post]
 func (h *ConversationHandler) SendMessage(c *gin.Context) {
 	claims, ok := middleware.ClaimsFrom(c)
 	if !ok {
