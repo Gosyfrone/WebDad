@@ -41,7 +41,7 @@ var (
 	ErrInvalidToken = errors.New("token invalide ou expiré")
 	// ErrNoLocalPassword : tentative de login classique sur un compte créé via
 	// un provider externe (password NULL). Le front doit rediriger vers OAuth.
-	ErrNoLocalPassword = errors.New("ce compte se connecte via un fournisseur externe (Google/Microsoft) ; aucun mot de passe n'est défini")
+	ErrNoLocalPassword = errors.New("ce compte se connecte via un fournisseur externe (Google) ; aucun mot de passe n'est défini")
 )
 
 // Usages des account_tokens + TTL de la vérification d'e-mail.

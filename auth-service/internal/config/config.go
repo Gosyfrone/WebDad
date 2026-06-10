@@ -45,15 +45,12 @@ type Config struct {
 	AccountPurgeAfter         time.Duration
 	AccountPurgeSweepInterval time.Duration
 
-	// OAuth OIDC (Login with Google/Microsoft). Un provider sans ClientID est
-	// simplement ignoré (endpoints → 404). Le redirect URI front est dérivé de
+	// OAuth OIDC (Login with Google). Un provider sans ClientID est simplement
+	// ignoré (endpoints → 404). Le redirect URI front est dérivé de
 	// OAuthRedirectBaseURL : <base>/auth/callback/<provider>.
-	OAuthRedirectBaseURL  string
-	GoogleClientID        string
-	GoogleClientSecret    string
-	MicrosoftClientID     string
-	MicrosoftClientSecret string
-	MicrosoftTenant       string // 'common', 'organizations' ou un tenant id précis
+	OAuthRedirectBaseURL string
+	GoogleClientID       string
+	GoogleClientSecret   string
 }
 
 // Load construit la config. Charge les .env best-effort (ignorés s'ils
@@ -104,9 +101,6 @@ func Load() *Config {
 	cfg.OAuthRedirectBaseURL = getEnv("OAUTH_REDIRECT_BASE_URL", "http://localhost:3000")
 	cfg.GoogleClientID = os.Getenv("GOOGLE_CLIENT_ID")
 	cfg.GoogleClientSecret = os.Getenv("GOOGLE_CLIENT_SECRET")
-	cfg.MicrosoftClientID = os.Getenv("MICROSOFT_CLIENT_ID")
-	cfg.MicrosoftClientSecret = os.Getenv("MICROSOFT_CLIENT_SECRET")
-	cfg.MicrosoftTenant = getEnv("MICROSOFT_TENANT", "common")
 
 	return cfg
 }
@@ -133,12 +127,6 @@ func defaultServiceURL(serviceName, port string) string {
 		return fmt.Sprintf("http://%s:%s", serviceName, port)
 	}
 	return fmt.Sprintf("http://localhost:%s", port)
-}
-
-// MicrosoftIssuer construit l'URL de l'émetteur Microsoft à partir du tenant
-// configuré (multi-tenant 'common' par défaut).
-func (c *Config) MicrosoftIssuer() string {
-	return "https://login.microsoftonline.com/" + c.MicrosoftTenant + "/v2.0"
 }
 
 // buildDSN assemble la chaîne de connexion PostgreSQL à partir des

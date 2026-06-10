@@ -45,7 +45,7 @@ paths:
             additionalProperties:
               type: string
         '409':
-          description: Compte sans mot de passe (connexion via Google/Microsoft)
+          description: Compte sans mot de passe (connexion via Google)
           schema:
             type: object
             additionalProperties:
@@ -92,11 +92,10 @@ paths:
       - application/json
       tags:
       - auth
-      summary: Finaliser une connexion OAuth (Google/Microsoft)
+      summary: Finaliser une connexion OAuth (Google)
       parameters:
       - enum:
         - google
-        - microsoft
         type: string
         description: Fournisseur OIDC
         name: provider
@@ -149,11 +148,10 @@ paths:
       - application/json
       tags:
       - auth
-      summary: Démarrer une connexion OAuth (Google/Microsoft)
+      summary: Démarrer une connexion OAuth (Google)
       parameters:
       - enum:
         - google
-        - microsoft
         type: string
         description: Fournisseur OIDC
         name: provider
@@ -2939,8 +2937,25 @@ definitions:
         type: string
       created_at:
         type: string
+      hidden_at:
+        type: string
+      hidden_by:
+        type: string
       id:
         type: string
+      is_hidden:
+        description: 'Suppression « douce » par la modération : un modérateur/admin
+          qui retire le
+
+          post d''autrui le MASQUE (is_hidden) au lieu de l''effacer → il sort des
+          fils
+
+          publics mais reste restaurable depuis la corbeille de modération. HiddenAt
+
+          sert aussi de point de départ à la purge RGPD (5 ans). L''auteur qui supprime
+
+          SON post déclenche, lui, une vraie suppression (hard), pas un masquage.'
+        type: boolean
       likes_count:
         type: integer
       media:
@@ -2948,6 +2963,12 @@ definitions:
         items:
           $ref: '#/definitions/models.MediaRef'
       pinned_at:
+        type: string
+      purge_at:
+        description: 'PurgeAt : date prévue de purge définitive (transient = hidden_at
+          + rétention),
+
+          calculée à la lecture de la corbeille pour l''affichage front. NON stockée.'
         type: string
       quote_post_id:
         type: string

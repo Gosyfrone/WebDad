@@ -29,21 +29,17 @@
 - **Username login orchestration stays in the BFF.** `username` remains owned by user-service:
   the Next BFF resolves `username -> user_id` through the gateway, then calls auth-service with
   `user_id + password`. Auth-service still owns only credentials/JWT and never joins user data.
-- **Login with Google/Microsoft = OIDC Authorization Code, code→tokens exchanged server-side in auth-service**
+- **Login with Google = OIDC Authorization Code, code→tokens exchanged server-side in auth-service**
   (`golang.org/x/oauth2` + `go-oidc/v3`). The front only obtains the authorization URL and relays the callback
   `code`; the ID token (signature via JWKS, issuer, audience=client_id) is verified **server-side** — never trusting
   a front-supplied token. Anti-CSRF `state` is server-generated, stored by the front, re-checked at callback.
-  Unverified `email_verified` is rejected (blocks account takeover by email matching); when the claim is **absent**
-  (Microsoft v2.0 often omits it) the provider's `assumeEmailVerified` default applies (true for Microsoft) —
-  an explicit `false` is still rejected.
-- **Generic provider registry** (`internal/oauth`, map `{google, microsoft}` = issuer + scopes): adding Microsoft is
-  one map entry + env vars (`MICROSOFT_CLIENT_ID/SECRET/TENANT`); a provider with no `CLIENT_ID` is skipped (→ 404).
-  Providers are **lazily** built (OIDC discovery at first use, not at boot) so the service starts offline-resilient.
-  **Microsoft multi-tenant (`common`/`organizations`/`consumers`) is supported**: the discovery doc declares the
-  literal issuer `…/{tenantid}/v2.0`, which go-oidc can't match, so for these endpoints automatic issuer
-  verification is disabled (`InsecureIssuerURLContext` + `SkipIssuerCheck`) and **redone manually** after `Verify`:
-  strict issuer shape (`https://login.microsoftonline.com/<uuid>/v2.0`) + consistency with the `tid` claim
-  (pure function, unit-tested). A fixed `MICROSOFT_TENANT=<uuid>` keeps full automatic verification.
+  `email_verified` is required (blocks account takeover by email matching): the claim is decoded as `*bool` and an
+  absent or explicit-`false` value is rejected (Google always sends it).
+  *(Microsoft/Entra support — multi-tenant `common` issuer with manual `tid` verification — was implemented then
+  removed on owner's request; only Google remains. See CHANGELOG 10/06/2026.)*
+- **Generic provider registry** (`internal/oauth`, map `{google}` = issuer + scopes): adding a provider is
+  one map entry + env vars; a provider with no `CLIENT_ID` is skipped (→ 404). Providers are **lazily** built
+  (OIDC discovery at first use, not at boot) so the service starts offline-resilient.
 - **Account reconciliation by email:** existing account → connect + fill `provider_subject` (only if unset, no
   hijack); absent → create with `password NULL`. Classic login on a password-less account is refused with a clear
   409 (`ErrNoLocalPassword`) steering the user to the external provider. Schema migrated via idempotent `ALTER`

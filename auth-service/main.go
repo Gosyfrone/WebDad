@@ -63,7 +63,7 @@ func main() {
 	})
 	go auth.RunAccountPurgeSweeper(sweepCtx, acctEraser, cfg.AccountPurgeAfter, cfg.AccountPurgeSweepInterval)
 
-	// Providers OAuth (Login with Google/Microsoft). Construction paresseuse :
+	// Providers OAuth (Login with Google). Construction paresseuse :
 	// le discovery OIDC se fait au premier usage, pas au boot.
 	oauthReg := oauth.NewRegistry(context.Background(), oauth.Options{
 		RedirectBaseURL: cfg.OAuthRedirectBaseURL,
@@ -71,11 +71,6 @@ func main() {
 			"google": {
 				ClientID:     cfg.GoogleClientID,
 				ClientSecret: cfg.GoogleClientSecret,
-			},
-			"microsoft": {
-				ClientID:     cfg.MicrosoftClientID,
-				ClientSecret: cfg.MicrosoftClientSecret,
-				Issuer:       cfg.MicrosoftIssuer(),
 			},
 		},
 	})

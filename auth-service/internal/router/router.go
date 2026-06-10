@@ -68,7 +68,7 @@ func New(auth *services.AuthService, oauthReg *oauth.Registry) *gin.Engine {
 			admin.DELETE("/:id", middleware.AdminOnly(), h.DeleteUser)
 		}
 
-		// OAuth OIDC (Login with Google/Microsoft) — l'échange code→tokens et
+		// OAuth OIDC (Login with Google) — l'échange code→tokens et
 		// la vérification de l'ID token se font côté serveur.
 		oauthGroup := authGroup.Group("/oauth/:provider")
 		{

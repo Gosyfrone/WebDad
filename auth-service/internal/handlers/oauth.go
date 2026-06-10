@@ -14,10 +14,10 @@ import (
 // OAuthURL : GET /auth/oauth/{provider}/url — renvoie l'URL d'autorisation OIDC
 // et un state anti-CSRF. Le front stocke le state, redirige l'utilisateur vers
 // `url`, puis revérifie le state au callback avant d'appeler /exchange.
-// @Summary     Démarrer une connexion OAuth (Google/Microsoft)
+// @Summary     Démarrer une connexion OAuth (Google)
 // @Tags        auth
 // @Produce     json
-// @Param       provider path string true "Fournisseur OIDC" Enums(google, microsoft)
+// @Param       provider path string true "Fournisseur OIDC" Enums(google)
 // @Success     200 {object} models.OAuthURLData "data: {url, state}"
 // @Failure     404 {object} map[string]string "Provider non supporté/configuré"
 // @Failure     500 {object} map[string]string "Erreur interne"
@@ -44,11 +44,11 @@ func (h *Handler) OAuthURL(c *gin.Context) {
 // d'autorisation contre les tokens du provider, vérifie l'ID token (signature
 // JWKS, issuer, audience), rapproche/crée le compte par email, puis émet NOS
 // tokens (même format de réponse que /auth/login).
-// @Summary     Finaliser une connexion OAuth (Google/Microsoft)
+// @Summary     Finaliser une connexion OAuth (Google)
 // @Tags        auth
 // @Accept      json
 // @Produce     json
-// @Param       provider path string true "Fournisseur OIDC" Enums(google, microsoft)
+// @Param       provider path string true "Fournisseur OIDC" Enums(google)
 // @Param       body body models.OAuthExchangeRequest true "Code d'autorisation"
 // @Success     200 {object} models.AuthUser "Connexion réussie — data: {token, refresh_token, user}"
 // @Failure     400 {object} map[string]string "Payload invalide"

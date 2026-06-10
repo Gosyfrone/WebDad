@@ -22,7 +22,7 @@ import (
 // @Failure     400 {object} map[string]string "Payload invalide"
 // @Failure     401 {object} map[string]string "Credentials invalides"
 // @Failure     403 {object} map[string]string "Compte désactivé ou e-mail non vérifié (code: email_not_verified)"
-// @Failure     409 {object} map[string]string "Compte sans mot de passe (connexion via Google/Microsoft)"
+// @Failure     409 {object} map[string]string "Compte sans mot de passe (connexion via Google)"
 // @Failure     500 {object} map[string]string "Erreur interne"
 // @Router      /auth/login [post]
 func (h *Handler) Login(c *gin.Context) {
