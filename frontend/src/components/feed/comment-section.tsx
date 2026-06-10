@@ -1,16 +1,18 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Loader2, Smile, Trash2 } from 'lucide-react'
+import { Image as ImageIcon, Loader2, Smile, Trash2, X } from 'lucide-react'
 
 import { cn, initialOf, timeAgo } from '@/lib/utils'
 import { useInfiniteScroll } from '@/lib/use-infinite-scroll'
+import { resolveMediaUrl, uploadMedia } from '@/lib/media'
 import {
   createComment,
   deleteComment,
   listComments,
   listReplies,
   type PostComment,
+  type PostMedia,
 } from '@/lib/posts'
 import { useToast } from '@/hooks/use-toast'
 import { useMention } from '@/lib/use-mention'
@@ -24,6 +26,7 @@ import { TranslatedContent } from '@/components/feed/translated-content'
 import { ProfilLink } from '@/components/profil/profil-link'
 
 const MAX_CHARS = 280
+const MAX_MEDIA = 4
 const COMMENTS_PAGE = 10
 const REPLIES_PAGE = 6
 
@@ -53,8 +56,11 @@ export function CommentSection({ postId, onCountChange }: CommentSectionProps) {
   const [hasMore, setHasMore] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [content, setContent] = useState('')
+  const [media, setMedia] = useState<PostMedia[]>([])
+  const [uploadingMedia, setUploadingMedia] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const mention = useMention({
     inputRef,
     onChange: setContent,
@@ -65,7 +71,7 @@ export function CommentSection({ postId, onCountChange }: CommentSectionProps) {
   const offsetRef = useRef(0)
 
   const remaining = MAX_CHARS - content.length
-  const canSubmit = content.trim().length > 0 && remaining >= 0 && !submitting
+  const canSubmit = (content.trim().length > 0 || media.length > 0) && remaining >= 0 && !submitting && !uploadingMedia
 
   useEffect(() => {
     let cancelled = false
@@ -110,9 +116,10 @@ export function CommentSection({ postId, onCountChange }: CommentSectionProps) {
     if (!canSubmit) return
     setSubmitting(true)
     try {
-      const created = await createComment(postId, content.trim())
+      const created = await createComment(postId, content.trim(), undefined, media)
       setComments((prev) => [...prev, created])
       setContent('')
+      setMedia([])
       onCountChange?.(1)
       inputRef.current?.focus()
     } catch {
@@ -120,6 +127,37 @@ export function CommentSection({ postId, onCountChange }: CommentSectionProps) {
     } finally {
       setSubmitting(false)
     }
+  }
+
+  async function handleFiles(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? [])
+    e.target.value = ''
+    if (files.length === 0) return
+
+    const room = MAX_MEDIA - media.length
+    if (room <= 0) {
+      toast({ title: t('composer.media_max', { count: MAX_MEDIA }), variant: 'destructive' })
+      return
+    }
+
+    setUploadingMedia(true)
+    try {
+      const uploaded = await Promise.all(
+        files.slice(0, room).map(async (file) => {
+          const { url, kind } = await uploadMedia(file)
+          return { url, type: kind } as PostMedia
+        }),
+      )
+      setMedia((prev) => [...prev, ...uploaded])
+    } catch {
+      toast({ title: t('composer.media_failed'), variant: 'destructive' })
+    } finally {
+      setUploadingMedia(false)
+    }
+  }
+
+  function removeMedia(index: number) {
+    setMedia((prev) => prev.filter((_, i) => i !== index))
   }
 
   function insertEmoji(emoji: string) {
@@ -142,48 +180,74 @@ export function CommentSection({ postId, onCountChange }: CommentSectionProps) {
   return (
     <div className="mt-2 border-t border-border pt-3">
       {/* Composer racine */}
-      <div className="flex items-center gap-2">
-        <div className="relative min-w-0 flex-1">
-          <input
-            ref={inputRef}
-            value={content}
-            onChange={(e) => {
-              setContent(e.target.value)
-              mention.sync()
-            }}
-            onKeyUp={mention.sync}
-            onClick={mention.sync}
-            onKeyDown={(e) => {
-              mention.onKeyDown(e)
-              if (e.defaultPrevented) return
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault()
-                void handleSubmit()
-              }
-            }}
-            placeholder={t('comment.placeholder')}
-            maxLength={MAX_CHARS + 20}
-            className="w-full rounded-full border border-border bg-background/60 px-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-[#5B6CFF] focus:outline-none"
-          />
-          <MentionAutocomplete controller={mention} placement="top" />
-        </div>
-        <EmojiPicker onSelect={insertEmoji}>
+      <div className="flex flex-col gap-2">
+        {media.length > 0 && (
+          <CommentMediaPreviews media={media} onRemove={removeMedia} removeLabel={t('composer.media_remove')} />
+        )}
+        <div className="flex items-center gap-2">
+          <div className="relative min-w-0 flex-1">
+            <input
+              ref={inputRef}
+              value={content}
+              onChange={(e) => {
+                setContent(e.target.value)
+                mention.sync()
+              }}
+              onKeyUp={mention.sync}
+              onClick={mention.sync}
+              onKeyDown={(e) => {
+                mention.onKeyDown(e)
+                if (e.defaultPrevented) return
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  void handleSubmit()
+                }
+              }}
+              placeholder={t('comment.placeholder')}
+              maxLength={MAX_CHARS + 20}
+              className="w-full rounded-full border border-border bg-background/60 px-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-[#5B6CFF] focus:outline-none"
+            />
+            <MentionAutocomplete controller={mention} placement="top" />
+          </div>
           <button
             type="button"
-            aria-label={t('composer.add_emoji')}
-            className="shrink-0 rounded-full p-2 text-[#5B6CFF] transition-colors hover:bg-primary/10"
+            aria-label={t('composer.add_image')}
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploadingMedia || media.length >= MAX_MEDIA}
+            className="shrink-0 rounded-full p-2 text-[#5B6CFF] transition-colors hover:bg-primary/10 disabled:opacity-40"
           >
-            <Smile className="h-4 w-4" />
+            {uploadingMedia ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <ImageIcon className="h-4 w-4" />
+            )}
           </button>
-        </EmojiPicker>
-        <Button
-          size="sm"
-          className="shrink-0 rounded-full bg-gradient-to-r from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] font-bold text-white"
-          disabled={!canSubmit}
-          onClick={handleSubmit}
-        >
-          {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : t('comment.reply')}
-        </Button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*,video/*"
+            multiple
+            onChange={handleFiles}
+            className="sr-only"
+          />
+          <EmojiPicker onSelect={insertEmoji}>
+            <button
+              type="button"
+              aria-label={t('composer.add_emoji')}
+              className="shrink-0 rounded-full p-2 text-[#5B6CFF] transition-colors hover:bg-primary/10"
+            >
+              <Smile className="h-4 w-4" />
+            </button>
+          </EmojiPicker>
+          <Button
+            size="sm"
+            className="shrink-0 rounded-full bg-gradient-to-r from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] font-bold text-white"
+            disabled={!canSubmit}
+            onClick={handleSubmit}
+          >
+            {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : t('comment.reply')}
+          </Button>
+        </div>
       </div>
 
       {/* Liste */}
@@ -249,8 +313,11 @@ function CommentThread({ postId, comment, onRemove, onCountChange }: CommentThre
     username: comment.author.username,
   })
   const [content, setContent] = useState('')
+  const [media, setMedia] = useState<PostMedia[]>([])
+  const [uploadingMedia, setUploadingMedia] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const replyInputRef = useRef<HTMLInputElement>(null)
+  const replyFileInputRef = useRef<HTMLInputElement>(null)
   const mention = useMention({
     inputRef: replyInputRef,
     onChange: setContent,
@@ -259,7 +326,7 @@ function CommentThread({ postId, comment, onRemove, onCountChange }: CommentThre
 
   const hasMoreReplies = replies.length < replyCount
   const remaining = MAX_CHARS - content.length
-  const canSubmit = content.trim().length > 0 && remaining >= 0 && !submitting
+  const canSubmit = (content.trim().length > 0 || media.length > 0) && remaining >= 0 && !submitting && !uploadingMedia
 
   async function loadReplies(offset: number) {
     setLoading(true)
@@ -291,11 +358,12 @@ function CommentThread({ postId, comment, onRemove, onCountChange }: CommentThre
     if (!canSubmit) return
     setSubmitting(true)
     try {
-      const created = await createComment(postId, content.trim(), target.id)
+      const created = await createComment(postId, content.trim(), target.id, media)
       setReplies((prev) => [...prev, created])
       setReplyCount((n) => n + 1)
       setOpen(true)
       setContent('')
+      setMedia([])
       setComposerOpen(false)
       onCountChange?.(1)
     } catch {
@@ -303,6 +371,37 @@ function CommentThread({ postId, comment, onRemove, onCountChange }: CommentThre
     } finally {
       setSubmitting(false)
     }
+  }
+
+  async function handleReplyFiles(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? [])
+    e.target.value = ''
+    if (files.length === 0) return
+
+    const room = MAX_MEDIA - media.length
+    if (room <= 0) {
+      toast({ title: t('composer.media_max', { count: MAX_MEDIA }), variant: 'destructive' })
+      return
+    }
+
+    setUploadingMedia(true)
+    try {
+      const uploaded = await Promise.all(
+        files.slice(0, room).map(async (file) => {
+          const { url, kind } = await uploadMedia(file)
+          return { url, type: kind } as PostMedia
+        }),
+      )
+      setMedia((prev) => [...prev, ...uploaded])
+    } catch {
+      toast({ title: t('composer.media_failed'), variant: 'destructive' })
+    } finally {
+      setUploadingMedia(false)
+    }
+  }
+
+  function removeReplyMedia(index: number) {
+    setMedia((prev) => prev.filter((_, i) => i !== index))
   }
 
   function insertReplyEmoji(emoji: string) {
@@ -374,48 +473,78 @@ function CommentThread({ postId, comment, onRemove, onCountChange }: CommentThre
       {(open || composerOpen) && (
         <div className="ml-5 mt-2 flex flex-col gap-3 border-l border-border pl-3">
           {composerOpen && (
-            <div className="flex items-center gap-2">
-              <div className="relative min-w-0 flex-1">
-                <input
-                  ref={replyInputRef}
-                  value={content}
-                  onChange={(e) => {
-                    setContent(e.target.value)
-                    mention.sync()
-                  }}
-                  onKeyUp={mention.sync}
-                  onClick={mention.sync}
-                  onKeyDown={(e) => {
-                    mention.onKeyDown(e)
-                    if (e.defaultPrevented) return
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault()
-                      void submitReply()
-                    }
-                  }}
-                  placeholder={t('comment.reply_placeholder')}
-                  maxLength={MAX_CHARS + 20}
-                  className="w-full rounded-full border border-border bg-background/60 px-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-[#5B6CFF] focus:outline-none"
+            <div className="flex flex-col gap-2">
+              {media.length > 0 && (
+                <CommentMediaPreviews
+                  media={media}
+                  onRemove={removeReplyMedia}
+                  removeLabel={t('composer.media_remove')}
                 />
-                <MentionAutocomplete controller={mention} placement="top" />
-              </div>
-              <EmojiPicker onSelect={insertReplyEmoji}>
+              )}
+              <div className="flex items-center gap-2">
+                <div className="relative min-w-0 flex-1">
+                  <input
+                    ref={replyInputRef}
+                    value={content}
+                    onChange={(e) => {
+                      setContent(e.target.value)
+                      mention.sync()
+                    }}
+                    onKeyUp={mention.sync}
+                    onClick={mention.sync}
+                    onKeyDown={(e) => {
+                      mention.onKeyDown(e)
+                      if (e.defaultPrevented) return
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault()
+                        void submitReply()
+                      }
+                    }}
+                    placeholder={t('comment.reply_placeholder')}
+                    maxLength={MAX_CHARS + 20}
+                    className="w-full rounded-full border border-border bg-background/60 px-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-[#5B6CFF] focus:outline-none"
+                  />
+                  <MentionAutocomplete controller={mention} placement="top" />
+                </div>
                 <button
                   type="button"
-                  aria-label={t('composer.add_emoji')}
-                  className="shrink-0 rounded-full p-2 text-[#5B6CFF] transition-colors hover:bg-primary/10"
+                  aria-label={t('composer.add_image')}
+                  onClick={() => replyFileInputRef.current?.click()}
+                  disabled={uploadingMedia || media.length >= MAX_MEDIA}
+                  className="shrink-0 rounded-full p-2 text-[#5B6CFF] transition-colors hover:bg-primary/10 disabled:opacity-40"
                 >
-                  <Smile className="h-4 w-4" />
+                  {uploadingMedia ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <ImageIcon className="h-4 w-4" />
+                  )}
                 </button>
-              </EmojiPicker>
-              <Button
-                size="sm"
-                className="shrink-0 rounded-full bg-gradient-to-r from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] font-bold text-white"
-                disabled={!canSubmit}
-                onClick={submitReply}
-              >
-                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : t('comment.reply')}
-              </Button>
+                <input
+                  ref={replyFileInputRef}
+                  type="file"
+                  accept="image/*,video/*"
+                  multiple
+                  onChange={handleReplyFiles}
+                  className="sr-only"
+                />
+                <EmojiPicker onSelect={insertReplyEmoji}>
+                  <button
+                    type="button"
+                    aria-label={t('composer.add_emoji')}
+                    className="shrink-0 rounded-full p-2 text-[#5B6CFF] transition-colors hover:bg-primary/10"
+                  >
+                    <Smile className="h-4 w-4" />
+                  </button>
+                </EmojiPicker>
+                <Button
+                  size="sm"
+                  className="shrink-0 rounded-full bg-gradient-to-r from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] font-bold text-white"
+                  disabled={!canSubmit}
+                  onClick={submitReply}
+                >
+                  {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : t('comment.reply')}
+                </Button>
+              </div>
             </div>
           )}
 
@@ -489,12 +618,15 @@ function CommentRow({
           <span className="shrink-0 text-muted-foreground">·</span>
           <span className="shrink-0 text-muted-foreground">{timeAgo(comment.createdAt, locale)}</span>
         </div>
-        <TranslatedContent
-          contentId={`comment:${comment.id}`}
-          content={comment.content}
-          className="whitespace-pre-wrap break-words text-sm text-foreground/85"
-          indicatorClassName="min-h-5 text-[11px]"
-        />
+        {comment.content && (
+          <TranslatedContent
+            contentId={`comment:${comment.id}`}
+            content={comment.content}
+            className="whitespace-pre-wrap break-words text-sm text-foreground/85"
+            indicatorClassName="min-h-5 text-[11px]"
+          />
+        )}
+        {comment.media.length > 0 && <CommentMediaGallery media={comment.media} />}
         {footer}
       </div>
 
@@ -510,6 +642,75 @@ function CommentRow({
           <Trash2 className="h-3.5 w-3.5" />
         </button>
       )}
+    </div>
+  )
+}
+
+function CommentMediaPreviews({
+  media,
+  onRemove,
+  removeLabel,
+}: {
+  media: PostMedia[]
+  onRemove: (index: number) => void
+  removeLabel: string
+}) {
+  return (
+    <div className={cn('grid gap-2', media.length > 1 ? 'grid-cols-2' : 'grid-cols-1')}>
+      {media.map((m, i) => (
+        <div key={m.url} className="group relative overflow-hidden rounded-xl border border-border bg-background/45">
+          {m.type === 'video' ? (
+            <video src={resolveMediaUrl(m.url)} className="max-h-52 w-full object-cover" muted playsInline />
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={resolveMediaUrl(m.url)} alt="" className="max-h-52 w-full object-cover" />
+          )}
+          <button
+            type="button"
+            aria-label={removeLabel}
+            onClick={() => onRemove(i)}
+            className="absolute right-1.5 top-1.5 rounded-full bg-black/60 p-1 text-white transition hover:bg-black/80"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function CommentMediaGallery({ media }: { media: PostMedia[] }) {
+  return (
+    <div
+      className={cn(
+        'mt-2 grid max-w-md gap-1.5 overflow-hidden rounded-xl border border-border',
+        media.length > 1 ? 'grid-cols-2' : 'grid-cols-1',
+      )}
+    >
+      {media.map((m, i) => {
+        const cellClass = cn(
+          media.length === 1 ? 'max-h-72' : 'aspect-square',
+          media.length === 3 && i === 0 && 'row-span-2 aspect-auto',
+        )
+        return (
+          <div
+            key={m.url}
+            className={cn('overflow-hidden bg-background/50', media.length === 3 && i === 0 && 'row-span-2')}
+          >
+            {m.type === 'video' ? (
+              <video
+                src={m.url}
+                className={cn('h-full w-full object-cover', media.length === 1 ? 'max-h-72 aspect-video' : cellClass)}
+                controls
+                playsInline
+              />
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={m.url} alt="" loading="lazy" className={cn('h-full w-full object-cover', cellClass)} />
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }

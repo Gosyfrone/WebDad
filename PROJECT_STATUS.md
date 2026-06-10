@@ -12,13 +12,13 @@
 |---|---|---|---|
 | Auth | 🟡 WIP | PostgreSQL | `/auth/{register,login,refresh,logout,validate}` + `/health`. JWT HS256 + bcrypt, access 15m + refresh 24h (rotation, revoke). Autonomous schema + optional admin seed. **TODO:** Go tests, refresh-reuse detection. |
 | User | 🟢 OK (v1) | PostgreSQL | repo/service/handlers, autonomous schema (`users`+`follows`+`follow_requests`). CRUD users, follow (public edge / private `pending`→accept/reject), followers/following lists+counts, search/suggestions, lazy provisioning on `/users/me`. **TODO:** repo integration tests. |
-| Post | 🟢 OK (v1) | MongoDB | Autonomous. CRUD posts with **profile-visibility-filtered reads**, reposts/quotes, profile pin (hidden in feeds), likes, 2-level threaded comments, denormalized int32 counters, **media `[]MediaRef` (cap 4)**, **bookmark collections + burst model**. **TODO:** post edit front (back ready). |
+| Post | 🟢 OK (v1) | MongoDB | Autonomous. CRUD posts with **profile-visibility-filtered reads**, reposts/quotes, profile pin (hidden in feeds), likes, 2-level threaded comments with media, denormalized int32 counters, **media `[]MediaRef` (cap 4)**, **bookmark collections + burst model**. **TODO:** post edit front (back ready). |
 | Profil | 🟢 OK (v1) | MongoDB | Autonomous. Owns decorative fields + **`visibility`**. `GET/PATCH /profils/me`, `POST` (unique creation), search, admin delete. `birth_date` set-once, display_name cooldown baseline. Avatar/banner upload wired. **TODO:** front aggregated read. |
 | Message | 🟢 OK | MongoDB | E2EE (DM/groups/communities), blind server, X25519 keys, cursor pagination, WS, **encrypted attachments** (no schema change), server-side read cursor + app-wide unread badge, per-conversation mute. Back + UX complete. |
 | Notification | 🟢 OK | MongoDB | Aggregated (Instagram-style), ingest `/internal/events`, types like/comment/reply/mention/repost/quote/follow_request/message_mention/post_deleted, JWT API + WS. |
 | Media | 🟢 OK | MinIO | Cross-cutting opaque storage, autonomous bucket. `POST /media` (sniff+caps), `POST /media/encrypted` (E2EE blob), public `GET /media/:id` (Range/seek), owner/admin delete. Wired on profils/posts/messages. |
 | API Gateway | 🟡 WIP | — | stdlib reverse proxy, prefix routing, WS proxy, CORS, media streaming. `/internal/events` not routed (server-to-server). **TODO:** JWT middleware to protect prefixes. |
-| Frontend | 🟡 WIP | — | Next.js 14, X-style responsive layout, refresh-token auth, business clients over `apiFetch`. Wired: feed/posts (like/comments/pin/repost/quote with media preview), bookmark collections, hydrated profile + privacy, follow pending/accept/reject, Explorer + search history, E2EE messaging + attachments, notifications (badge+WS), translation, i18n FR/EN, dark mode, legal pages, muted words, @mentions, image/video upload (lightbox, Twitter-style autoplay). **TODO:** real role (admin placeholder), post edit. |
+| Frontend | 🟡 WIP | — | Next.js 14, X-style responsive layout, refresh-token auth, business clients over `apiFetch`. Wired: feed/posts (like/comments with media/pin/repost/quote with media preview), bookmark collections, hydrated profile + privacy, follow pending/accept/reject, Explorer + search history, E2EE messaging + attachments, notifications (badge+WS), translation, i18n FR/EN, dark mode, legal pages, muted words, @mentions, image/video upload (lightbox, Twitter-style autoplay). **TODO:** real role (admin placeholder), post edit. |
 
 ## Features
 
@@ -27,7 +27,7 @@
 | Registration / Login | Primary | 🟢 End-to-end (UI→BFF→gateway→auth), provisioning, username pre-check, logout + session guard. |
 | JWT auth + protected routes | Primary | 🟢 access 15m + refresh 24h + `/auth/validate`, front single-flight refresh + `(app)` guard. **TODO:** gateway JWT middleware. |
 | Role management (User/Mod/Admin) | Primary | 🟡 Role in JWT, user-service enforces admin delete, role-based nav. **TODO:** generalize to other services, real role front. |
-| Post creation/reading | Primary | 🟢 End-to-end, infinite feed (For you / Following), visibility-filtered, likes, threaded comments, reposts/quotes, pin, emoji, images/videos. **TODO:** post edit. |
+| Post creation/reading | Primary | 🟢 End-to-end, infinite feed (For you / Following), visibility-filtered, likes, threaded comments with images/videos/GIF uploads, reposts/quotes, pin, emoji, images/videos. **TODO:** post edit. |
 | User profile | Primary | 🟡 View + edit + by-username page, private-account locking, real avatar/banner upload. **TODO:** wire aggregated user+profil+post read. |
 | Social graph (follow/followers) | Secondary | 🟢 follow + lists + counts + private requests + follower removal, front wired, e2e tested. |
 | Search / Explorer (accounts) | Secondary | 🟢 user + profil search, "Who to follow", per-account local search history. **TODO:** post search. |

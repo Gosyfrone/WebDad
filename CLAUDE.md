@@ -143,6 +143,9 @@ several well-chosen secondary features · **all 3 roles functional** · pro slid
 
 - 2026-06-10: quote/repost media rendering implemented on the frontend; quoted posts now show image/video previews, and Docker exposes the app on port 3000.
 - 2026-06-10: suggested commit message for this change: `fix(posts): show quoted media in quotes`.
+- 2026-06-10: comment media support implemented end-to-end; comments/replies accept up to 4 uploaded images/videos/GIFs via media-service and render them in `CommentSection`.
+- 2026-06-10: desktop quote dialogs now scroll when quoted media plus newly attached media exceed the viewport height.
+- 2026-06-10: suggested French commit message for the latest changes: `feat(commentaires): ajouter les medias et le scroll des citations`.
 
 ---
 

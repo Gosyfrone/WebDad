@@ -548,7 +548,7 @@ func (s *PostService) RepostedPostIDs(ctx context.Context, actorID string) ([]st
 // existant et incrémente son compteur. Si `parentID` est fourni, c'est une
 // réponse : elle est rattachée à plat au commentaire RACINE (cf. resolveParentID,
 // threading à 2 niveaux) et incrémente le `reply_count` de cette racine.
-func (s *PostService) CreateComment(ctx context.Context, postID, authorID, content, parentID string) (*models.Comment, error) {
+func (s *PostService) CreateComment(ctx context.Context, postID, authorID, content, parentID string, media []models.MediaRef) (*models.Comment, error) {
 	oid, err := parseID(postID)
 	if err != nil {
 		return nil, err
@@ -589,6 +589,7 @@ func (s *PostService) CreateComment(ctx context.Context, postID, authorID, conte
 		ParentID:  rootID,
 		AuthorID:  authorID,
 		Content:   content,
+		Media:     media,
 		CreatedAt: now,
 		UpdatedAt: now,
 	}

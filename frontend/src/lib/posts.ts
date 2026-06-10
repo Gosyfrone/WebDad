@@ -47,6 +47,7 @@ interface ApiComment {
   parent_id?: string
   author_id: string
   content: string
+  media?: { url: string; type: 'image' | 'video' }[]
   reply_count?: number
   created_at: string
 }
@@ -115,6 +116,7 @@ export interface PostComment {
   parentId: string
   author: PostAuthor
   content: string
+  media: PostMedia[]
   /** Nombre de réponses (pertinent pour un commentaire racine). */
   replyCount: number
   createdAt: string
@@ -252,6 +254,7 @@ async function toComment(c: ApiComment): Promise<PostComment> {
     parentId: c.parent_id ?? '',
     author: await resolveAuthor(c.author_id),
     content: c.content,
+    media: (c.media ?? []).map((m) => ({ url: resolveMediaUrl(m.url), type: m.type })),
     replyCount: c.reply_count ?? 0,
     createdAt: c.created_at,
     canDelete: canDelete(c.author_id),
@@ -466,12 +469,17 @@ export async function createComment(
   postId: string,
   content: string,
   parentId?: string,
+  media: PostMedia[] = [],
 ): Promise<PostComment> {
+  const payload: Record<string, unknown> = { content }
+  if (parentId) payload.parent_id = parentId
+  if (media.length > 0) payload.media = media
+
   const created = await unwrap<ApiComment>(
     await apiFetch(`/posts/${postId}/comments`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(parentId ? { content, parent_id: parentId } : { content }),
+      body: JSON.stringify(payload),
     }),
   )
   return toComment(created)

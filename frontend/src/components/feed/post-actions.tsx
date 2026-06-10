@@ -179,7 +179,7 @@ export function PostActions({ post, commentCount, commentActive = false, onComme
       </div>
 
       <Dialog open={quoteOpen} onOpenChange={setQuoteOpen}>
-        <DialogContent className="panel top-24 translate-y-0 border p-4 shadow-[0_28px_80px_rgba(91,108,255,0.24)] sm:max-w-xl">
+        <DialogContent className="panel top-24 translate-y-0 border p-4 shadow-[0_28px_80px_rgba(91,108,255,0.24)] sm:max-h-[calc(100vh-8rem)] sm:max-w-xl sm:overflow-y-auto">
           <DialogHeader className="sr-only">
             <DialogTitle>Citer le post</DialogTitle>
             <DialogDescription>Composer un post avec le post cité en dessous.</DialogDescription>

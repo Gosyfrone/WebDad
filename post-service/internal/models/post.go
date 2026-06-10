@@ -60,6 +60,7 @@ type Comment struct {
 	ParentID   string        `bson:"parent_id,omitempty" json:"parent_id,omitempty"`
 	AuthorID   string        `bson:"author_id" json:"author_id"`
 	Content    string        `bson:"content" json:"content"`
+	Media      []MediaRef    `bson:"media,omitempty" json:"media,omitempty"`
 	ReplyCount int32         `bson:"reply_count" json:"reply_count"`
 	CreatedAt  time.Time     `bson:"created_at" json:"created_at"`
 	UpdatedAt  time.Time     `bson:"updated_at" json:"updated_at"`
@@ -94,6 +95,7 @@ type UpdatePostRequest struct {
 // du JWT, le post de l'URL. `parent_id` (optionnel) cible le commentaire auquel
 // on répond (rattaché à plat à la racine côté service).
 type CreateCommentRequest struct {
-	Content  string `json:"content" binding:"required,max=280"`
-	ParentID string `json:"parent_id"`
+	Content  string     `json:"content" binding:"max=280"`
+	Media    []MediaRef `json:"media" binding:"max=4,dive"`
+	ParentID string     `json:"parent_id"`
 }

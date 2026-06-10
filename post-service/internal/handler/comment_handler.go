@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -88,8 +89,12 @@ func (h *CommentHandler) CreatPostComment(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "payload invalide : " + err.Error()})
 		return
 	}
+	if strings.TrimSpace(req.Content) == "" && len(req.Media) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "contenu ou média requis"})
+		return
+	}
 
-	comment, err := h.service.CreateComment(c.Request.Context(), c.Param("id"), claims.UserID, req.Content, req.ParentID)
+	comment, err := h.service.CreateComment(c.Request.Context(), c.Param("id"), claims.UserID, strings.TrimSpace(req.Content), req.ParentID, req.Media)
 	if err != nil {
 		respondPostError(c, err)
 		return

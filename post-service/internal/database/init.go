@@ -124,10 +124,22 @@ var validators = map[string]bson.M{
 			"bsonType": "object",
 			"required": bson.A{"post_id", "author_id", "content", "created_at"},
 			"properties": bson.M{
-				"post_id":     bson.M{"bsonType": "string"},
-				"parent_id":   bson.M{"bsonType": bson.A{"string", "null"}},
-				"author_id":   bson.M{"bsonType": "string"},
-				"content":     bson.M{"bsonType": "string", "maxLength": 280},
+				"post_id":   bson.M{"bsonType": "string"},
+				"parent_id": bson.M{"bsonType": bson.A{"string", "null"}},
+				"author_id": bson.M{"bsonType": "string"},
+				"content":   bson.M{"bsonType": "string", "maxLength": 280},
+				"media": bson.M{
+					"bsonType": "array",
+					"maxItems": 4,
+					"items": bson.M{
+						"bsonType": "object",
+						"required": bson.A{"url", "type"},
+						"properties": bson.M{
+							"url":  bson.M{"bsonType": "string"},
+							"type": bson.M{"enum": bson.A{"image", "video"}},
+						},
+					},
+				},
 				"reply_count": bson.M{"bsonType": "int", "minimum": 0},
 				"is_hidden":   bson.M{"bsonType": "bool"},
 				"created_at":  bson.M{"bsonType": "date"},

@@ -4278,6 +4278,12 @@
         "content": {
           "type": "string"
         },
+        "media": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/models.MediaRef"
+          }
+        },
         "created_at": {
           "type": "string"
         },
@@ -4312,13 +4318,17 @@
     },
     "models.CreateCommentRequest": {
       "type": "object",
-      "required": [
-        "content"
-      ],
       "properties": {
         "content": {
           "type": "string",
           "maxLength": 280
+        },
+        "media": {
+          "type": "array",
+          "maxItems": 4,
+          "items": {
+            "$ref": "#/definitions/models.MediaRef"
+          }
         },
         "parent_id": {
           "type": "string"
