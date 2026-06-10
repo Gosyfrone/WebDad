@@ -347,6 +347,28 @@ services:
       retries: 5
       start_period: 5s
 
+  # Transport e-mail (SMTP Gmail). Pas de DB. Appelé en serveur-à-serveur par
+  # auth-service (POST /internal/send), jamais routé par la gateway.
+  mail-service:
+    build:
+      context: ./mail-service
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./mail-service/.env          # PORT, SMTP_*
+    environment:
+      MAIL_INTERNAL_SECRET: ${MAIL_INTERNAL_SECRET:?MAIL_INTERNAL_SECRET requis}  # secret partagé (racine)
+    ports:
+      - "8089:8089"
+    networks:
+      - webdad-net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8089/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
   api-gateway:
     build:
       context: ./api-gateway

@@ -71,7 +71,7 @@ dev port 3000, env `NEXT_PUBLIC_API_URL` (default `http://localhost:8080`).
 **Databases** — PostgreSQL (auth, user) · MongoDB (profil, post, message, notification) · MinIO (media).
 
 **Ports** — frontend 3000 · api-gateway 8080 · auth 8081 · user 8082 · profil 8083 · post 8084 ·
-message 8085 · notification 8086 · media 8087 · MinIO API 9000 / console 9001.
+message 8085 · notification 8086 · media 8087 · mail 8089 (interne, hors gateway) · MinIO API 9000 / console 9001.
 
 ## 3. Architecture summary
 

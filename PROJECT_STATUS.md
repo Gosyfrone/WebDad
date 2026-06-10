@@ -10,15 +10,16 @@
 
 | Service | Status | DB | Current state |
 |---|---|---|---|
-| Auth | 🟡 WIP | PostgreSQL | `/auth/{register,login,refresh,logout,validate}` + `/health`. JWT HS256 + bcrypt, access 15m + refresh 24h (rotation, revoke). Autonomous schema + optional admin seed. **TODO:** Go tests, refresh-reuse detection. |
+| Auth | 🟡 WIP | PostgreSQL | `/auth/{register,login,refresh,logout,validate}` + `/health`. JWT HS256 + bcrypt, access 15m + refresh 24h (rotation, revoke). Autonomous schema + optional admin seed. **TODO:** Go tests, refresh-reuse detection, email verification (hard-block login) + password reset (opaque tokens, `account_tokens`). |
 | User | 🟢 OK (v1) | PostgreSQL | repo/service/handlers, autonomous schema (`users`+`follows`+`follow_requests`). CRUD users, follow (public edge / private `pending`→accept/reject), followers/following lists+counts, search/suggestions, lazy provisioning on `/users/me`. **TODO:** repo integration tests. |
-| Post | 🟢 OK (v1) | MongoDB | Autonomous. CRUD posts with **profile-visibility-filtered reads**, reposts/quotes, profile pin (hidden in feeds), likes, 2-level threaded comments with media, denormalized int32 counters, **media `[]MediaRef` (cap 4)**, **bookmark collections + burst model**. **TODO:** post edit front (back ready). |
+| Post | 🟢 OK (v1) | MongoDB | Autonomous. CRUD posts with **profile-visibility-filtered reads**, reposts/quotes, profile pin (hidden in feeds), likes, 2-level threaded comments, denormalized int32 counters, **media `[]MediaRef` (cap 4)**, **bookmark collections + burst model**. **TODO:** post edit front (back ready). |
 | Profil | 🟢 OK (v1) | MongoDB | Autonomous. Owns decorative fields + **`visibility`**. `GET/PATCH /profils/me`, `POST` (unique creation), search, admin delete. `birth_date` set-once, display_name cooldown baseline. Avatar/banner upload wired. **TODO:** front aggregated read. |
-| Message | 🟢 OK | MongoDB | E2EE (DM/groups/communities), blind server, X25519 keys, cursor pagination, WS, **encrypted attachments** (no schema change), owner-only message edit with encrypted original preserved, server-side read cursor + app-wide unread badge, per-conversation mute. Back + UX complete. |
-| Notification | 🟢 OK | MongoDB | Aggregated (Instagram-style), ingest `/internal/events`, types like/comment/reply/mention/repost/quote/follow/follow_request/follow_request_accepted/follow_request_accept_confirm/message_mention/post_deleted, JWT API + WS. |
+| Message | 🟢 OK | MongoDB | E2EE (DM/groups/communities), blind server, X25519 keys, cursor pagination, WS, **encrypted attachments** (no schema change), server-side read cursor + app-wide unread badge, per-conversation mute. Back + UX complete. |
+| Notification | 🟢 OK | MongoDB | Aggregated (Instagram-style), ingest `/internal/events`, types like/comment/reply/mention/repost/quote/follow_request/message_mention/post_deleted, JWT API + WS. |
+| Mail | 🟡 WIP | — | **Phase 0 OK** : module Go autonome (8089), `POST /internal/send` (hors gateway, `MAIL_INTERNAL_SECRET`, best-effort) + `/health`, transport SMTP (`net/smtp`) ou repli console en dev. Symétrique de notification. **TODO Phase 1 :** intégration auth→mail (vérif e-mail + reset). |
 | Media | 🟢 OK | MinIO | Cross-cutting opaque storage, autonomous bucket. `POST /media` (sniff+caps), `POST /media/encrypted` (E2EE blob), public `GET /media/:id` (Range/seek), owner/admin delete. Wired on profils/posts/messages. |
 | API Gateway | 🟡 WIP | — | stdlib reverse proxy, prefix routing, WS proxy, CORS, media streaming. `/internal/events` not routed (server-to-server). **TODO:** JWT middleware to protect prefixes. |
-| Frontend | 🟡 WIP | — | Next.js 14, X-style responsive layout, refresh-token auth, business clients over `apiFetch`. Wired: feed/posts (like/comments with media/pin/repost/quote with media preview + live author identity after profile edit), bookmark collections, hydrated profile + privacy + hover preview, follow pending/accept/reject, Explorer + search history, E2EE messaging + attachments, notifications (badge+WS), translation, i18n FR/EN, dark mode, legal pages, muted words, @mentions, image/video upload (lightbox, Twitter-style autoplay). **TODO:** real role (admin placeholder), post edit. |
+| Frontend | 🟡 WIP | — | Next.js 14, X-style responsive layout, refresh-token auth, business clients over `apiFetch`. Wired: feed/posts (like/comments/pin/repost/quote), bookmark collections, hydrated profile + privacy, follow pending/accept/reject, Explorer + search history, E2EE messaging + attachments, notifications (badge+WS), translation, i18n FR/EN, dark mode, legal pages, muted words, @mentions, image/video upload (lightbox, Twitter-style autoplay). **TODO:** real role (admin placeholder), post edit. |
 
 ## Features
 
@@ -27,18 +28,20 @@
 | Registration / Login | Primary | 🟢 End-to-end (UI→BFF→gateway→auth), provisioning, username pre-check, logout + session guard. |
 | JWT auth + protected routes | Primary | 🟢 access 15m + refresh 24h + `/auth/validate`, front single-flight refresh + `(app)` guard. **TODO:** gateway JWT middleware. |
 | Role management (User/Mod/Admin) | Primary | 🟡 Role in JWT, user-service enforces admin delete, role-based nav. **TODO:** generalize to other services, real role front. |
-| Post creation/reading | Primary | 🟢 End-to-end, infinite feed (For you / Following), visibility-filtered, likes, threaded comments with images/videos/GIF uploads, reposts/quotes, pin, emoji, images/videos. **TODO:** post edit. |
-| User profile | Primary | 🟡 View + edit + by-username page, private-account locking, real avatar/banner upload, web hover preview from shared profile links, feed author identity updates instantly after edit. **TODO:** wire aggregated user+profil+post read. |
+| Post creation/reading | Primary | 🟢 End-to-end, infinite feed (For you / Following), visibility-filtered, likes, threaded comments, reposts/quotes, pin, emoji, images/videos. **TODO:** post edit. |
+| User profile | Primary | 🟡 View + edit + by-username page, private-account locking, real avatar/banner upload. **TODO:** wire aggregated user+profil+post read. |
 | Social graph (follow/followers) | Secondary | 🟢 follow + lists + counts + private requests + follower removal, front wired, e2e tested. |
 | Search / Explorer (accounts) | Secondary | 🟢 user + profil search, "Who to follow", per-account local search history. **TODO:** post search. |
 | Automatic post translation | Secondary | 🟢 BFF `/api/translate`, conservative client gate, posts + comments, cache, toggle. |
 | Muted words in feed | Secondary | 🟢 `/parametres`, per-account local persistence, feed masks others' matching posts. |
-| Private encrypted messaging (E2EE) | Secondary | 🟢 End-to-end (back + UX). DM/groups admin-proof, hybrid communities, server-side read state + app-wide badge, per-conversation mute, encrypted attachments, owner-only edit with original shown subdued. |
-| Real-time notifications | Secondary | 🟢 End-to-end (e2e live), Instagram aggregation, + `follow` + `message_mention` + `follow_request` + `follow_request_accepted` + `follow_request_accept_confirm`, WS, badge, detail page. |
+| Private encrypted messaging (E2EE) | Secondary | 🟢 End-to-end (back + UX). DM/groups admin-proof, hybrid communities, server-side read state + app-wide badge, per-conversation mute, encrypted attachments. |
+| Real-time notifications | Secondary | 🟢 End-to-end (e2e live), Instagram aggregation, + `message_mention` + `follow_request`, WS, badge, detail page. |
 | Mentions (@handle) | Secondary | 🟢 End-to-end: posts/comments autocomplete + clickable render; messages (E2EE) member-ids only → `message_mention`. i18n FR/EN. |
 | Bookmarks (collections) | Secondary | 🟢 End-to-end, collections (many-to-many) + non-deletable default, burst model, `/signets` page. |
 | Image / video upload | Secondary | 🟢 Complete (Phases 0→3): media-service + MinIO + gateway `/media`; avatar/banner; post media; encrypted message attachments. |
 | GIFs (Tenor/Giphy) | Secondary | 🔴 TODO (plan in DECISIONS.md). |
+| Vérification e-mail | Secondary | 🔴 TODO (plan défini — DECISIONS.md). Blocage dur login non-vérifié, mail Gmail SMTP, tokens opaques 24h. |
+| Mot de passe oublié | Secondary | 🔴 TODO (plan défini — DECISIONS.md). Anti-énumération, token reset 1h, révocation des sessions. |
 | Moderation | Secondary | 🔴 TODO |
 | Admin panel | Secondary | 🔴 TODO |
 | Internationalization (FR/EN) | Secondary | 🟢 Home-grown, all UI translated, localized dates. **TODO:** per-account persistence. |

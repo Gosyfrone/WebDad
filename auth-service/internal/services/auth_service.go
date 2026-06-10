@@ -214,10 +214,14 @@ func (s *AuthService) EnsureDefaultAdmin(email, password string) error {
 		return fmt.Errorf("hash admin : %w", err)
 	}
 
+	// email_verified=true : l'admin de démo n'a pas de vraie boîte mail, on le
+	// garde donc utilisable malgré le blocage login des comptes non vérifiés
+	// (Phase 1). DO UPDATE rend le marquage idempotent même sur une base où
+	// l'admin existait déjà avant l'ajout de la colonne.
 	const q = `
-		INSERT INTO credentials (id, email, password, role)
-		VALUES ($1, $2, $3, $4)
-		ON CONFLICT (id) DO NOTHING`
+		INSERT INTO credentials (id, email, password, role, email_verified)
+		VALUES ($1, $2, $3, $4, true)
+		ON CONFLICT (id) DO UPDATE SET email_verified = true`
 
 	if _, err := s.db.Exec(q, defaultAdminID, email, string(hash), models.RoleAdmin); err != nil {
 		return fmt.Errorf("seed admin : %w", err)

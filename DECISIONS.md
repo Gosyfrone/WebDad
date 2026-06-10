@@ -27,6 +27,29 @@
   401s on expiry (`code: token_expired` distinguishes expiry→refresh from invalid→no-refresh); the **front drives** refresh.
 - **Inter-service auth:** JWT in header (grading requirement).
 
+## Email (vérification & reset)
+
+- **`mail-service` dédié pour le transport SMTP ; la logique-token reste dans auth-service (PG).**
+  `POST /internal/send` hors gateway, authentifié par `MAIL_INTERNAL_SECRET` (`X-Internal-Secret`),
+  appelé en best-effort par auth — symétrique de notification-service (2nd consommateur d'événements
+  internes). Secrets SMTP isolés dans `mail-service/.env`, mailer réutilisable.
+- **Tokens vérif/reset = opaques aléatoires, stockés SHA-256 hachés, usage unique (`used_at`), TTL
+  vérif 24h / reset 1h.** Réutilise le pattern refresh-token : révocables sans denylist (vs JWT
+  auto-portant), une fuite de table ne livre aucun token. Table unique `account_tokens(purpose enum
+  'verify'|'reset', …)`. Toute nouvelle demande invalide les précédents du même `(user_id, purpose)` ;
+  un reset réussi **révoque toutes les sessions** (`DELETE refresh_tokens`).
+- **Login non-vérifié = blocage dur** (`403 email_not_verified`, aucun token émis). En conséquence,
+  **register n'émet plus de tokens** : il insère, envoie le mail et renvoie `201` (le front redirige
+  vers une page publique « consulte ta boîte mail » ; le provisioning user se fait au 1er login
+  réussi). **Admin seedé forcé `email_verified=true`** (pas de vraie boîte) pour garder un compte
+  démo. Le renvoi de mail de vérif est accessible depuis la page login (les users existants passent
+  `email_verified=false` et doivent se vérifier).
+- **Anti-énumération** sur `forgot-password` (réponse `200` générique, que l'email existe ou non).
+- **Liens dans le mail → pages front** (`APP_BASE_URL/verify-email|reset-password?token=…`), pas
+  l'API directement : maîtrise de l'UX (succès/expiré/erreur), API qui reste JSON-only.
+- **Dev sans SMTP configuré = transport console** : le mailer logge le mail + le lien sur stdout au
+  lieu d'envoyer (zéro dépendance Gmail en dev, on clique le lien depuis les logs).
+
 ## Gateway
 
 - **Thin reverse proxy (stdlib).** Prefix→URL table, transparent forward, preserves prefix. Mince + "we built it"
