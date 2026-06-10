@@ -286,7 +286,7 @@ export function BookmarksView() {
             <Button
               onClick={() => void submitForm()}
               disabled={!name.trim() || saving}
-              className="bg-gradient-to-r from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] text-white"
+              className="bg-gradient-to-r from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] text-white"
             >
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : t('bookmarks.save')}
             </Button>
@@ -331,7 +331,7 @@ function Pill({
       className={cn(
         'flex shrink-0 items-center rounded-full px-4 py-1.5 text-sm font-medium transition-colors',
         active
-          ? 'bg-gradient-to-r from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] text-white shadow-sm'
+          ? 'bg-gradient-to-r from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] text-white shadow-sm'
           : 'border border-border text-muted-foreground hover:bg-accent',
       )}
     >

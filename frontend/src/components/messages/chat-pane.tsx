@@ -420,7 +420,7 @@ export function ChatPane({
                 onClick={handleSubmit}
                 disabled={!canSend || sending || (isEditing ? !draft.trim() : !draft.trim() && attachments.length === 0)}
                 aria-label={t(isEditing ? 'messages.save_edit' : 'messages.send')}
-                className="h-11 w-11 shrink-0 rounded-full bg-gradient-to-r from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] text-white"
+                className="h-11 w-11 shrink-0 rounded-full bg-gradient-to-r from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] text-white"
               >
                 {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
               </Button>
@@ -568,7 +568,7 @@ function MessageBubble({
               className={cn(
                 'max-w-full rounded-2xl px-3.5 py-2 text-sm shadow-sm',
                 message.mine
-                  ? 'bg-gradient-to-r from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] text-white'
+                  ? 'bg-gradient-to-r from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] text-white'
                   : 'glass border text-foreground',
               )}
             >

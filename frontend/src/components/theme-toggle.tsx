@@ -45,9 +45,7 @@ export function ThemeToggle() {
 
   return (
     <div className="px-2 py-1">
-      <span className="text-xs font-medium text-muted-foreground">{t('theme.title')}</span>
-
-      <div className="mt-2 flex flex-col gap-1">
+      <div className="flex flex-col gap-1">
         {/* Interrupteur clair / sombre */}
         <div className="flex items-center justify-between rounded-lg px-1 py-2">
           <span className="text-sm">{t('theme.appearance')}</span>

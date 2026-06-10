@@ -264,7 +264,7 @@ export function PostCard({ post, showPinBadge = false, onDeleted, onUpdated }: P
       <ProfilLink author={post.author} className="mt-0.5 shrink-0 transition hover:opacity-90">
         <Avatar className="h-10 w-10">
           {post.author.avatarUrl && <AvatarImage src={post.author.avatarUrl} alt="" />}
-          <AvatarFallback className="bg-gradient-to-br from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] font-bold text-white">
+          <AvatarFallback className="bg-gradient-to-br from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] font-bold text-white">
             {initialOf(post.author.displayName)}
           </AvatarFallback>
         </Avatar>

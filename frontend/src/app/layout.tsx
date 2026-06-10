@@ -4,6 +4,7 @@ import { ThemeProvider } from '@/components/theme-provider'
 import { LanguageProvider } from '@/components/language-provider'
 import { RouteOriginTracker } from '@/components/route-origin-tracker'
 import { Toaster } from '@/components/ui/toaster'
+import { CUSTOM_THEME_INLINE_SCRIPT } from '@/lib/custom-theme'
 import './globals.css'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -24,6 +25,13 @@ export default function RootLayout({
 }) {
   return (
     <html lang="fr" suppressHydrationWarning>
+      <head>
+        {/*
+          Applique le thème personnalisé (variables CSS pré-calculées en
+          localStorage) AVANT le premier paint, pour éviter tout flash de
+          couleur. Logique dans lib/custom-theme.ts. */}
+        <script dangerouslySetInnerHTML={{ __html: CUSTOM_THEME_INLINE_SCRIPT }} />
+      </head>
       <body className={inter.className}>
         {/*
           Thème par défaut : clair. `enableSystem` est activé pour permettre

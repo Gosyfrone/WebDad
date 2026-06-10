@@ -260,7 +260,7 @@ export function EditProfilDialog({
 
         <DialogFooter className="shrink-0 border-t p-4">
           <Button
-            className="w-full rounded-full bg-gradient-to-r from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] font-bold text-white shadow-[0_18px_44px_rgba(91,108,255,0.3)] transition hover:scale-[1.01] sm:w-auto"
+            className="w-full rounded-full bg-gradient-to-r from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] font-bold text-white shadow-[0_18px_44px_rgba(91,108,255,0.3)] transition hover:scale-[1.01] sm:w-auto"
             disabled={!canSave || saving}
             onClick={handleSubmit}
           >

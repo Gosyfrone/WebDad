@@ -262,6 +262,21 @@
 - **Theme:** light/dark (next-themes) + brand accent. Brand gradient violet→indigo→cyan (logo "B"), glassmorphism.
   **Tokenized surfaces** (CSS vars in `globals.css`, light values = exact current state, dark declension) → dark lives in one
   place, light unchanged. ⚠️ a `bg-*`/`border-*` utility overrides `@layer components` classes.
+- **Custom theme (user-chosen colors)** = a 3rd dimension over light/dark + accent. 3 targets, each independent:
+  **background** repaints the whole reading space — `--background` + `--bg-page` (solid) + glow layers→`none` **and** the glass
+  surfaces `--column`/`--glass`/`--glass-strong` (background-color → hex) + `--panel`/`--panel-y` (background-**image** → must be a
+  `linear-gradient(hex,hex)`, a raw hex is invalid there); **text** → `--foreground`/`--card-foreground`/`--popover-foreground`;
+  **primary** → `--primary`/`--ring` + auto-contrasted `--primary-foreground` (WCAG luminance) **and the brand-gradient action
+  buttons**. The "Breeze"/"Follow"/FAB/badges were a hardcoded `from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF]` (≠ `--primary`, hence
+  invisible to the picker); they now read `from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)]` (defaults in
+  `:root`), and the primary target collapses the 3 stops onto the chosen solid color. Overrides set as inline styles on
+  `<html>`, so they win over the stylesheet regardless of mode. **Zero dependency**: home-grown HSV color wheel (`ColorWheel`,
+  conic-gradient hue + radius saturation + value slider + hex/RGB) — `node_modules` is root-owned so `npm i react-colorful` is
+  out, and an in-repo wheel is defense-friendlier. Color math is pure/tested (`lib/color.ts`); apply/persist logic pure where it
+  matters (`buildCustomThemeVars` in `lib/custom-theme.ts`). **Persist both** source hexes (to reopen the editor) **and the
+  pre-computed CSS-var map** in localStorage → a tiny inline `<head>` script applies the map before first paint (no FOUC, no color
+  math shipped in the blocking script). Palette button opens a `Dialog` held as a **sibling** of the dropdown/Sheet (not inside),
+  opened on a deferred `setTimeout(0)` to dodge the Radix close↔open focus race.
 - **Responsive mobile-first, pivot `lg` (1024).** <lg: `MobileHeader` (left drawer Sheet) + bottom `MobileTabBar` + `ComposeFab`;
   ≥lg sidebar; ≥xl right column. Manual edge-swipe to open the drawer (Radix Sheet has no native swipe).
 - **Identity is clickable → profile everywhere** (`UserListItem` stretched link; the Follow button is raised `z-10`).

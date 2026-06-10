@@ -50,7 +50,7 @@ export function LegalShell({ title, updatedAt, current, children }: LegalShellPr
 
         <article className="glass-strong relative mt-4 overflow-hidden rounded-[30px] border shadow-[0_30px_90px_rgba(0,0,0,0.18)] backdrop-blur-2xl">
           {/* Liseré dégradé de marque en tête de carte */}
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF]" />
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)]" />
 
           <div className="px-6 py-9 sm:px-10 sm:py-11">
             <span className="inline-flex w-fit items-center gap-2 rounded-full border border-white/70 bg-white/80 px-3 py-1 text-xs font-semibold text-[#5B6CFF] shadow-sm dark:border-white/10 dark:bg-white/5 dark:text-[#9DA8FF]">

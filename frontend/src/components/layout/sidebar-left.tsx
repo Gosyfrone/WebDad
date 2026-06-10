@@ -11,6 +11,7 @@ import {
   LogOut,
   Mail,
   MoreHorizontal,
+  Palette,
   Search,
   Settings,
   Settings2,
@@ -27,6 +28,7 @@ import { useNotifications } from '@/components/notifications-provider'
 import { useMessages } from '@/components/messages-provider'
 import { useT } from '@/components/language-provider'
 import { ThemeToggle } from '@/components/theme-toggle'
+import { CustomThemeDialog } from '@/components/custom-theme-dialog'
 import type { ProfilDetails, UserRole } from '@/types'
 import { CreatePostDialog } from '@/components/feed/create-post-dialog'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -75,6 +77,7 @@ export function SidebarLeft() {
   const session = useSession()
   const { unreadCount } = useNotifications()
   const { unreadCount: msgUnread } = useMessages()
+  const [themeDialogOpen, setThemeDialogOpen] = useState(false)
   const [account, setAccount] = useState({
     displayName: '',
     username: '',
@@ -177,7 +180,7 @@ export function SidebarLeft() {
                 {showBadge && (
                   <span
                     aria-label={badgeAria}
-                    className="absolute -right-2 -top-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-gradient-to-r from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] px-1 text-[11px] font-bold leading-none text-white shadow"
+                    className="absolute -right-2 -top-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-gradient-to-r from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] px-1 text-[11px] font-bold leading-none text-white shadow"
                   >
                     {badgeCount > 99 ? '99+' : badgeCount}
                   </span>
@@ -192,7 +195,7 @@ export function SidebarLeft() {
         <CreatePostDialog>
           <Button
             size="lg"
-            className="mt-4 w-[90%] rounded-full bg-gradient-to-r from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] text-base font-bold text-white shadow-[0_18px_44px_rgba(91,108,255,0.3)] transition hover:scale-[1.015]"
+            className="mt-4 w-[90%] rounded-full bg-gradient-to-r from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] text-base font-bold text-white shadow-[0_18px_44px_rgba(91,108,255,0.3)] transition hover:scale-[1.015]"
           >
             {t('nav.post')}
           </Button>
@@ -231,6 +234,16 @@ export function SidebarLeft() {
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <ThemeToggle />
+            <DropdownMenuItem
+              onSelect={() => {
+                // Laisse le menu se fermer, puis ouvre la popup au tick suivant
+                // (évite la course de focus Radix dropdown ↔ dialog).
+                setTimeout(() => setThemeDialogOpen(true), 0)
+              }}
+            >
+              <Palette className="mr-2 h-4 w-4" />
+              {t('theme.customize')}
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
               <Link href={ROUTES.parametres}>
@@ -244,6 +257,10 @@ export function SidebarLeft() {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+
+        {/* Popup de thème personnalisé (frère du menu : ne se démonte pas
+            quand le dropdown se ferme). */}
+        <CustomThemeDialog open={themeDialogOpen} onOpenChange={setThemeDialogOpen} />
       </div>
     </aside>
   )

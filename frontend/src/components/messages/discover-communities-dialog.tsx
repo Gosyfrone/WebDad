@@ -121,7 +121,7 @@ export function DiscoverCommunitiesDialog({
             <ul className="divide-y divide-border">
               {items.map((c) => (
                 <li key={c.id} className="flex items-center gap-3 py-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] text-white">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] text-white">
                     <Globe className="h-5 w-5" aria-hidden />
                   </div>
                   <div className="flex min-w-0 flex-1 flex-col">
