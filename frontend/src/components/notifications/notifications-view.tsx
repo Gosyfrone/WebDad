@@ -21,8 +21,11 @@ const TYPE_ICON: Record<NotificationType, { Icon: React.ElementType; className: 
   mention: { Icon: AtSign, className: 'text-[#47D9FF]' },
   repost: { Icon: Repeat2, className: 'text-emerald-500' },
   quote: { Icon: Quote, className: 'text-[#8D3DFF]' },
+  follow: { Icon: UserPlus, className: 'text-emerald-500' },
   message_mention: { Icon: Send, className: 'text-[#8D3DFF]' },
   follow_request: { Icon: UserPlus, className: 'text-emerald-500' },
+  follow_request_accepted: { Icon: UserPlus, className: 'text-emerald-500' },
+  follow_request_accept_confirm: { Icon: UserPlus, className: 'text-emerald-500' },
 }
 
 export function NotificationsView() {
@@ -64,8 +67,16 @@ export function NotificationsView() {
         return count > 0
           ? t('notifications.message_mention_other', { name, count })
           : t('notifications.message_mention_one', { name })
+      case 'follow':
+        return count > 0
+          ? t('notifications.follow_other', { name, count })
+          : t('notifications.follow_one', { name })
       case 'follow_request':
         return t('notifications.follow_request', { name })
+      case 'follow_request_accepted':
+        return t('notifications.follow_request_accepted', { name })
+      case 'follow_request_accept_confirm':
+        return t('notifications.follow_request_accept_confirm', { name })
     }
   }
 
@@ -93,7 +104,7 @@ export function NotificationsView() {
                   !n.isRead && 'bg-[#5B6CFF]/5',
                 )}
               >
-                {n.type !== 'follow_request' && (
+                {!['follow', 'follow_request', 'follow_request_accepted', 'follow_request_accept_confirm'].includes(n.type) && (
                   <Link
                     href={notificationHref(n)}
                     aria-label={describe(n)}
@@ -117,20 +128,34 @@ export function NotificationsView() {
                 </div>
 
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm leading-snug">
-                    <ProfilLink author={n.actor} className="relative z-10 font-semibold hover:underline">
-                      {n.actor.displayName}
-                    </ProfilLink>{' '}
-                    {/* describe() commence toujours par « {name} » → on retire le nom
-                        (déjà rendu en lien gras) + l'espace qui suit. */}
-                    <span className="text-foreground/90">
-                      {describe(n).slice(n.actor.displayName.length + 1)}
-                    </span>
-                  </p>
+                  {n.type === 'follow_request_accept_confirm' ? (
+                    <p className="text-sm leading-snug">
+                      <span className="text-foreground/90">
+                        {t('notifications.follow_request_accept_confirm_prefix')}{' '}
+                      </span>
+                      <ProfilLink author={n.actor} className="relative z-10 font-semibold hover:underline">
+                        {n.actor.displayName}
+                      </ProfilLink>
+                    </p>
+                  ) : (
+                    <p className="text-sm leading-snug">
+                      <ProfilLink author={n.actor} className="relative z-10 font-semibold hover:underline">
+                        {n.actor.displayName}
+                      </ProfilLink>{' '}
+                      {/* describe() commence toujours par « {name} » → on retire le nom
+                          (déjà rendu en lien gras) + l'espace qui suit. */}
+                      <span className="text-foreground/90">
+                        {describe(n).slice(n.actor.displayName.length + 1)}
+                      </span>
+                    </p>
+                  )}
                   <span className="text-xs text-muted-foreground">{timeAgo(n.updatedAt, locale)}</span>
                   {n.type === 'follow_request' && (
                     <div className="relative z-10 mt-2 flex gap-2">
-                      <Button size="sm" onClick={() => acceptFollowRequest(n.actor.id).then(loadInitial)}>
+                      <Button
+                        size="sm"
+                        onClick={() => acceptFollowRequest(n.actor.id).then(loadInitial)}
+                      >
                         {t('notifications.accept')}
                       </Button>
                       <Button

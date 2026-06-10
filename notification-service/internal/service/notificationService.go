@@ -67,18 +67,21 @@ func (s *NotificationService) HandleEvent(ctx context.Context, ev models.Event) 
 		}
 		return nil
 
-	case models.EventFollowRequestAccepted, models.EventFollowRequestRejected:
+	case models.EventFollowRequestRejected:
+		return nil
+
+	case models.TypeFollowRequestAccepted:
 		if ev.RecipientID == "" || ev.ActorID == "" || ev.RecipientID == ev.ActorID {
 			return nil
 		}
-		status := "accepted"
-		if ev.Type == models.EventFollowRequestRejected {
-			status = "rejected"
+		s.pushFollowRequestDecision(ev.RecipientID, ev.ActorID, "accepted")
+		gk, ok := groupKeyFor(ev)
+		if !ok {
+			return nil
 		}
-		s.pushFollowRequestDecision(ev.RecipientID, ev.ActorID, status)
-		return nil
+		return s.applyToGroup(ctx, ev.RecipientID, gk, ev)
 
-	case models.TypeLike, models.TypeComment, models.TypeReply, models.TypeRepost, models.TypeQuote, models.TypeFollowRequest:
+	case models.TypeLike, models.TypeComment, models.TypeReply, models.TypeRepost, models.TypeQuote, models.TypeFollow, models.TypeFollowRequest, models.TypeFollowRequestAcceptConfirm:
 		recipient := ev.RecipientID
 		if recipient == "" || recipient == ev.ActorID {
 			return nil // pas de notification à soi-même
@@ -274,6 +277,9 @@ func groupKeyFor(ev models.Event) (string, bool) {
 			return "", false
 		}
 		return "quote:" + ev.PostID, true
+	case models.TypeFollow:
+		// Tous les nouveaux abonnés d'un même destinataire s'agrègent.
+		return "follow", true
 	case models.TypeMention:
 		// Une mention ne s'agrège pas entre sources : le groupe est la source
 		// (le commentaire si présent, sinon le post).
@@ -297,6 +303,16 @@ func groupKeyFor(ev models.Event) (string, bool) {
 			return "", false
 		}
 		return "follow_request:" + ev.ActorID, true
+	case models.TypeFollowRequestAccepted:
+		if ev.ActorID == "" {
+			return "", false
+		}
+		return "follow_request_accepted:" + ev.ActorID, true
+	case models.TypeFollowRequestAcceptConfirm:
+		if ev.ActorID == "" {
+			return "", false
+		}
+		return "follow_request_accept_confirm:" + ev.ActorID, true
 	}
 	return "", false
 }

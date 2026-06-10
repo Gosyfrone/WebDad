@@ -176,11 +176,16 @@ export const messages: Record<Locale, Messages> = {
     'notifications.mention': '{name} vous a mentionné',
     'notifications.message_mention_one': '{name} vous a mentionné dans un message',
     'notifications.message_mention_other': '{name} vous a mentionné dans {count} messages',
+    'notifications.follow_one': "{name} s'est abonné(e) à vous",
+    'notifications.follow_other': "{name} et {count} autres personnes se sont abonnées à vous",
 
     // — Mentions (@handle) —
     'mentions.view_in_search': 'Voir dans la recherche',
     'mentions.user_not_found': 'Compte introuvable',
     'notifications.follow_request': '{name} demande à vous suivre',
+    'notifications.follow_request_accepted': '{name} a accepté votre demande',
+    'notifications.follow_request_accept_confirm': 'Vous avez accepté la demande de {name}',
+    'notifications.follow_request_accept_confirm_prefix': 'Vous avez accepté la demande de',
     'notifications.accept': 'Accepter',
     'notifications.reject': 'Refuser',
 
@@ -661,11 +666,16 @@ export const messages: Record<Locale, Messages> = {
     'notifications.mention': '{name} mentioned you',
     'notifications.message_mention_one': '{name} mentioned you in a message',
     'notifications.message_mention_other': '{name} mentioned you in {count} messages',
+    'notifications.follow_one': '{name} followed you',
+    'notifications.follow_other': '{name} and {count} others followed you',
 
     // — Mentions (@handle) —
     'mentions.view_in_search': 'View in search',
     'mentions.user_not_found': 'Account not found',
     'notifications.follow_request': '{name} requested to follow you',
+    'notifications.follow_request_accepted': '{name} accepted your request',
+    'notifications.follow_request_accept_confirm': "You accepted {name}'s request",
+    'notifications.follow_request_accept_confirm_prefix': "You accepted the request from",
     'notifications.accept': 'Accept',
     'notifications.reject': 'Reject',
 

@@ -278,6 +278,7 @@ func (s *UserService) Follow(ctx context.Context, followerID, followerEmail, fol
 	if err := s.repo.Follow(followerID, followingID); err != nil {
 		return "", fmt.Errorf("follow : %w", err)
 	}
+	s.emitFollow(followerID, followingID)
 	return FollowStatusFollowing, nil
 }
 
@@ -299,6 +300,7 @@ func (s *UserService) AcceptFollowRequest(ownerID, followerID string) error {
 		return ErrFollowRequestNotFound
 	}
 	s.emitFollowRequest(followerID, ownerID, true)
+	s.emitFollowRequestAcceptConfirm(followerID, ownerID)
 	s.emitFollowRequestDecision(ownerID, followerID, client.TypeFollowRequestAccepted)
 	return nil
 }
@@ -315,7 +317,6 @@ func (s *UserService) RejectFollowRequest(ownerID, followerID string) error {
 		return fmt.Errorf("reject follow request : %w", err)
 	}
 	s.emitFollowRequest(followerID, ownerID, true)
-	s.emitFollowRequestDecision(ownerID, followerID, client.TypeFollowRequestRejected)
 	return nil
 }
 
@@ -336,6 +337,28 @@ func (s *UserService) emitFollowRequest(followerID, followingID string, retract 
 		ActorID:     followerID,
 		RecipientID: followingID,
 		Retract:     retract,
+	})
+}
+
+func (s *UserService) emitFollow(followerID, followingID string) {
+	if s.notification == nil {
+		return
+	}
+	s.notification.Emit(client.Event{
+		Type:        client.TypeFollow,
+		ActorID:     followerID,
+		RecipientID: followingID,
+	})
+}
+
+func (s *UserService) emitFollowRequestAcceptConfirm(followerID, ownerID string) {
+	if s.notification == nil {
+		return
+	}
+	s.notification.Emit(client.Event{
+		Type:        client.TypeFollowRequestAcceptConfirm,
+		ActorID:     followerID,
+		RecipientID: ownerID,
 	})
 }
 
