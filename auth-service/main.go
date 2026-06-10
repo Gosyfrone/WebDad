@@ -9,6 +9,7 @@ import (
 	"github.com/webdad/auth-service/internal/config"
 	"github.com/webdad/auth-service/internal/db"
 	"github.com/webdad/auth-service/internal/eraser"
+	"github.com/webdad/auth-service/internal/notify"
 	"github.com/webdad/auth-service/internal/router"
 	"github.com/webdad/auth-service/internal/services"
 )
@@ -29,7 +30,17 @@ func main() {
 		log.Fatalf("[%s] schéma : %v", serviceName, err)
 	}
 
-	auth := services.New(conn, cfg.JWTSecret, cfg.JWTExpiry, cfg.RefreshExpiry)
+	// Client mail (best-effort). Secret absent → mailer nil : l'envoi devient un
+	// no-op loggé et auth reste bootable seul.
+	var mailer services.Mailer
+	if cfg.MailInternalSecret != "" {
+		mailer = notify.NewMailClient(cfg.MailServiceURL, cfg.MailInternalSecret)
+		log.Printf("[%s] mail-service configuré (%s)", serviceName, cfg.MailServiceURL)
+	} else {
+		log.Printf("[%s] WARNING: MAIL_INTERNAL_SECRET absent — envoi d'e-mails désactivé (no-op)", serviceName)
+	}
+
+	auth := services.New(conn, cfg.JWTSecret, cfg.JWTExpiry, cfg.RefreshExpiry, mailer, cfg.AppBaseURL)
 
 	if cfg.SeedAdmin {
 		if err := auth.EnsureDefaultAdmin(cfg.SeedAdminEmail, cfg.SeedAdminPassword); err != nil {

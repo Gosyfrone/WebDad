@@ -18,6 +18,7 @@ type User struct {
 	PasswordHash  string     `json:"-"` // colonne `password` (hash bcrypt)
 	Role          string     `json:"role"`
 	IsActive      bool       `json:"is_active"`
+	EmailVerified bool       `json:"email_verified"`
 	DeactivatedAt *time.Time `json:"deactivated_at,omitempty"` // date du bannissement (NULL si actif)
 	CreatedAt     time.Time  `json:"created_at"`
 }
@@ -46,6 +47,18 @@ type RegisterRequest struct {
 type LoginRequest struct {
 	Email    string `json:"email" binding:"required,email"`
 	Password string `json:"password" binding:"required"`
+}
+
+// VerifyEmailRequest : payload de POST /auth/verify-email/confirm (token en clair
+// extrait du lien reçu par e-mail).
+type VerifyEmailRequest struct {
+	Token string `json:"token" binding:"required"`
+}
+
+// RequestVerifyRequest : payload de POST /auth/verify-email/request (renvoi du
+// mail de vérification). Réponse générique (anti-énumération).
+type RequestVerifyRequest struct {
+	Email string `json:"email" binding:"required,email"`
 }
 
 // RefreshRequest : payload de POST /auth/refresh et /auth/logout. Le refresh

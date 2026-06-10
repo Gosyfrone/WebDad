@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 
 import { apiUrl } from '@/lib/config'
 import { provisionUser } from '@/lib/provision'
-import { setRefreshCookie } from '@/lib/server/auth-cookie'
 
 type AuthPayload = {
   data?: {
@@ -71,22 +70,13 @@ export async function POST(request: NextRequest) {
   }
 
   const accessToken = payload?.data?.token ?? null
-  const refreshToken = payload?.data?.refresh_token ?? null
 
-  // L'access token repart au client (→ localStorage) ; le refresh token reste
-  // dans un cookie httpOnly posé ici (jamais exposé au JS).
-  const nextResponse = NextResponse.json(
-    { accessToken, user: payload?.data?.user, message: 'Inscription réussie.' },
-    { status: upstreamResponse.status }
-  )
-
-  if (refreshToken) {
-    setRefreshCookie(nextResponse, refreshToken)
-  }
-
-  // Provisioning : crée la ligne `users` avec le username CHOISI par l'utilisateur
-  // (POST /users). L'inscription auto-connecte, d'où le provisioning ici.
-  // Best-effort + repli dérivé email si le handle est pris (cf. lib/provision).
+  // Blocage dur (vérification d'e-mail) : l'access token émis par auth NE repart
+  // PAS au client et le cookie refresh N'est PAS posé. On l'utilise UNIQUEMENT
+  // côté serveur, le temps de provisionner l'identité (users + profil) avec le
+  // username/birth_date/gender du formulaire, puis on le jette. L'utilisateur
+  // n'a donc aucune session : il doit d'abord vérifier son e-mail puis se
+  // connecter. Best-effort + repli dérivé email si le handle est pris.
   if (accessToken) {
     await provisionUser(accessToken, {
       username: body.username,
@@ -95,5 +85,9 @@ export async function POST(request: NextRequest) {
     })
   }
 
-  return nextResponse
+  // 201 sans token : le front redirige vers la page « consulte ta boîte mail ».
+  return NextResponse.json(
+    { message: 'Inscription réussie.', emailVerificationRequired: true },
+    { status: upstreamResponse.status }
+  )
 }

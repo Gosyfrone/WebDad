@@ -12,6 +12,8 @@ export const ROUTES = {
   // Espace public (route group (auth))
   login: '/login',
   register: '/register',
+  checkEmail: '/check-email',
+  verifyEmail: '/verify-email',
   // Pages légales (route group (legal), publiques)
   mentionsLegales: '/mentions-legales',
   cgu: '/cgu',

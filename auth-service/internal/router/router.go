@@ -35,6 +35,10 @@ func New(auth *services.AuthService) *gin.Engine {
 	{
 		authGroup.POST("/register", h.Register)
 		authGroup.POST("/login", h.Login)
+		// Vérification d'e-mail (PUBLIQUES, pas de middleware JWT) :
+		// confirm consomme le token du lien ; request (re)envoie le mail.
+		authGroup.POST("/verify-email/confirm", h.ConfirmVerifyEmail)
+		authGroup.POST("/verify-email/request", h.RequestVerifyEmail)
 		// /auth/refresh : échange le refresh token (cookie httpOnly relayé par
 		// le BFF) contre une nouvelle paire access+refresh (rotation).
 		authGroup.POST("/refresh", h.Refresh)

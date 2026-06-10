@@ -16,7 +16,7 @@ import (
 // @Accept      json
 // @Produce     json
 // @Param       body body models.RegisterRequest true "Email + mot de passe (min 8 chars)"
-// @Success     201 {object} models.AuthUser "Compte créé — data: {token, refresh_token, user}"
+// @Success     201 {object} models.AuthUser "Compte créé, mail de vérification envoyé (best-effort) — data: {token, refresh_token, user}"
 // @Failure     400 {object} map[string]string "Payload invalide"
 // @Failure     409 {object} map[string]string "Email déjà utilisé"
 // @Failure     500 {object} map[string]string "Erreur interne"

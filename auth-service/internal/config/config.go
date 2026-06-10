@@ -26,6 +26,12 @@ type Config struct {
 	SeedAdminEmail    string
 	SeedAdminPassword string
 
+	// Intégration mail (vérification d'e-mail). MailInternalSecret/MailServiceURL
+	// absents → l'envoi devient un no-op loggé (auth reste bootable seul).
+	MailServiceURL     string // base URL du mail-service (POST /internal/send)
+	MailInternalSecret string // secret partagé X-Internal-Secret (= .env racine)
+	AppBaseURL         string // base URL du front (liens dans les e-mails)
+
 	// Effacement RGPD automatique des comptes bannis. URLs des services à purger
 	// (vide → étape ignorée). AccountPurgeAfter : ancienneté du bannissement avant
 	// purge (défaut 5 ans) ; AccountPurgeSweepInterval : période de balayage
@@ -65,6 +71,10 @@ func Load() *Config {
 
 	cfg.JWTExpiry = mustParseDuration("JWT_EXPIRY", "15m")
 	cfg.RefreshExpiry = mustParseDuration("REFRESH_EXPIRY", "24h")
+
+	cfg.MailServiceURL = getEnv("MAIL_SERVICE_URL", "http://localhost:8089")
+	cfg.MailInternalSecret = os.Getenv("MAIL_INTERNAL_SECRET")
+	cfg.AppBaseURL = getEnv("APP_BASE_URL", "http://localhost:3000")
 
 	cfg.SeedAdmin = getEnv("SEED_DEFAULT_ADMIN", "false") == "true"
 	cfg.SeedAdminEmail = getEnv("SEED_ADMIN_EMAIL", "admin@webdad.local")

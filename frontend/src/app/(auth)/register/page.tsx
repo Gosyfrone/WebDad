@@ -31,7 +31,6 @@ import {
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { LegalLinks } from '@/components/legal/legal-links'
-import { setAccessToken } from '@/lib/auth-client'
 import { ROUTES } from '@/lib/routes'
 import { useT } from '@/components/language-provider'
 
@@ -46,19 +45,6 @@ type FormErrors = Partial<{
 }>
 
 type Gender = 'male' | 'female' | ''
-
-type RegisterResponse = {
-  token?: string
-  accessToken?: string
-  jwt?: string
-  data?: {
-    token?: string
-    accessToken?: string
-    jwt?: string
-  }
-  message?: string
-  error?: string
-}
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const passwordPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/
@@ -81,20 +67,6 @@ function getMessage(error: unknown, fallback: string): string {
   if (typeof error === 'string' && error.trim()) return error
   if (error instanceof Error && error.message.trim()) return error.message
   return fallback
-}
-
-function extractToken(payload: RegisterResponse | null): string | null {
-  if (!payload || typeof payload !== 'object') return null
-
-  return (
-    payload.token ??
-    payload.accessToken ??
-    payload.jwt ??
-    payload.data?.token ??
-    payload.data?.accessToken ??
-    payload.data?.jwt ??
-    null
-  )
 }
 
 function mapServerError(message: string): FormErrors {
@@ -263,16 +235,13 @@ export default function RegisterPage() {
         return
       }
 
-      const token = extractToken(payload as RegisterResponse | null)
-
-      // L'access token court (15 min) vit en localStorage ; le refresh token
-      // a été posé en cookie httpOnly par le BFF (/api/auth/register).
-      if (token) {
-        setAccessToken(token)
-      }
-
-      router.replace(token ? ROUTES.feed : ROUTES.login)
-      router.refresh()
+      // Blocage dur (vérification d'e-mail) : le register ne crée AUCUNE session
+      // côté client (pas de token renvoyé). On redirige vers la page « consulte
+      // ta boîte mail » ; l'utilisateur devra vérifier son adresse puis se
+      // connecter.
+      router.replace(
+        `${ROUTES.checkEmail}?email=${encodeURIComponent(email.trim())}`
+      )
     } catch (error) {
       setErrors({
         form: getMessage(error, t('auth.err.network')),

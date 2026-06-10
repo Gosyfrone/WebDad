@@ -56,7 +56,7 @@
             }
           },
           "403": {
-            "description": "Compte désactivé",
+            "description": "Compte désactivé ou e-mail non vérifié (code: email_not_verified)",
             "schema": {
               "type": "object",
               "additionalProperties": {
@@ -205,7 +205,7 @@
         ],
         "responses": {
           "201": {
-            "description": "Compte créé — data: {token, refresh_token, user}",
+            "description": "Compte créé, mail de vérification envoyé (best-effort) — data: {token, refresh_token, user}",
             "schema": {
               "$ref": "#/definitions/models.AuthUser"
             }
@@ -604,6 +604,105 @@
           },
           "500": {
             "description": "Erreur interne",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/verify-email/confirm": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "auth"
+        ],
+        "summary": "Confirmer la vérification d'e-mail",
+        "parameters": [
+          {
+            "description": "Token de vérification (issu du lien e-mail)",
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/models.VerifyEmailRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Adresse vérifiée — data: {message}",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "400": {
+            "description": "Token invalide ou expiré (code: invalid_token)",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "500": {
+            "description": "Erreur interne",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/verify-email/request": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "auth"
+        ],
+        "summary": "Renvoyer le mail de vérification",
+        "parameters": [
+          {
+            "description": "Adresse e-mail",
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/models.RequestVerifyRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Réponse générique — data: {message}",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "400": {
+            "description": "Payload invalide",
             "schema": {
               "type": "object",
               "additionalProperties": {
@@ -4491,6 +4590,28 @@
       "properties": {
         "is_active": {
           "type": "boolean"
+        }
+      }
+    },
+    "models.RequestVerifyRequest": {
+      "type": "object",
+      "required": [
+        "email"
+      ],
+      "properties": {
+        "email": {
+          "type": "string"
+        }
+      }
+    },
+    "models.VerifyEmailRequest": {
+      "type": "object",
+      "required": [
+        "token"
+      ],
+      "properties": {
+        "token": {
+          "type": "string"
         }
       }
     },

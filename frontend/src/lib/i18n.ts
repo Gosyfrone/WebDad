@@ -470,6 +470,33 @@ export const messages: Record<Locale, Messages> = {
     'auth.register.err.confirm_mismatch': 'Les mots de passe ne correspondent pas.',
     'auth.register.err.failed': "L'inscription a échoué. Vérifie les informations saisies.",
 
+    // — Vérification d'e-mail —
+    'auth.check_email.title': 'Vérifie ta boîte mail',
+    'auth.check_email.subtitle':
+      "Un lien de vérification vient d'être envoyé à {email}. Clique dessus pour activer ton compte.",
+    'auth.check_email.subtitle_generic':
+      "Un lien de vérification vient d'être envoyé à ton adresse. Clique dessus pour activer ton compte.",
+    'auth.check_email.hint':
+      "Pense à regarder dans tes spams. Le lien expire dans 24 heures.",
+    'auth.check_email.resend': 'Renvoyer le lien de vérification',
+    'auth.check_email.back_to_login': 'Retour à la connexion',
+    'auth.verify.login_blocked':
+      "Ton adresse e-mail n'est pas encore vérifiée. Vérifie ta boîte mail pour activer ton compte.",
+    'auth.verify.resend_cta': 'Renvoyer le mail de vérification',
+    'auth.verify.resending': 'Envoi en cours…',
+    'auth.verify.resend_done':
+      "Si un compte non vérifié correspond à cette adresse, un e-mail vient d'être envoyé.",
+    'auth.verify.resend_label': 'Ton adresse e-mail',
+    'auth.verify.loading_title': 'Vérification en cours…',
+    'auth.verify.loading_desc': 'Un instant, on confirme ton adresse e-mail.',
+    'auth.verify.success_title': 'Adresse vérifiée !',
+    'auth.verify.success_desc':
+      'Ton compte est activé. Tu peux maintenant te connecter.',
+    'auth.verify.go_to_login': 'Se connecter',
+    'auth.verify.invalid_title': 'Lien invalide ou expiré',
+    'auth.verify.invalid_desc':
+      "Ce lien de vérification est invalide ou a expiré. Demande-en un nouveau ci-dessous.",
+
     // — Commun (toasts) —
     'common.action_failed': 'Action impossible',
     'common.delete_failed': 'Suppression impossible',
@@ -1030,6 +1057,33 @@ export const messages: Record<Locale, Messages> = {
     'auth.register.err.confirm_max': 'The confirmation is limited to 250 characters.',
     'auth.register.err.confirm_mismatch': "Passwords don't match.",
     'auth.register.err.failed': 'Sign-up failed. Check the information entered.',
+
+    // — Email verification —
+    'auth.check_email.title': 'Check your inbox',
+    'auth.check_email.subtitle':
+      'A verification link has just been sent to {email}. Click it to activate your account.',
+    'auth.check_email.subtitle_generic':
+      'A verification link has just been sent to your address. Click it to activate your account.',
+    'auth.check_email.hint':
+      'Remember to check your spam folder. The link expires in 24 hours.',
+    'auth.check_email.resend': 'Resend verification link',
+    'auth.check_email.back_to_login': 'Back to sign in',
+    'auth.verify.login_blocked':
+      "Your email address isn't verified yet. Check your inbox to activate your account.",
+    'auth.verify.resend_cta': 'Resend verification email',
+    'auth.verify.resending': 'Sending…',
+    'auth.verify.resend_done':
+      'If an unverified account matches this address, an email has just been sent.',
+    'auth.verify.resend_label': 'Your email address',
+    'auth.verify.loading_title': 'Verifying…',
+    'auth.verify.loading_desc': 'One moment, we are confirming your email address.',
+    'auth.verify.success_title': 'Email verified!',
+    'auth.verify.success_desc':
+      'Your account is now active. You can sign in.',
+    'auth.verify.go_to_login': 'Sign in',
+    'auth.verify.invalid_title': 'Invalid or expired link',
+    'auth.verify.invalid_desc':
+      'This verification link is invalid or has expired. Request a new one below.',
 
     // — Common (toasts) —
     'common.action_failed': 'Action failed',

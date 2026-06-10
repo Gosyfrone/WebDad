@@ -13,6 +13,8 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -33,6 +35,16 @@ var (
 	// ErrInsufficientPrivilege : l'acteur n'a pas le niveau pour agir sur la
 	// cible (ex. un modérateur tente de bannir un autre modérateur / un admin).
 	ErrInsufficientPrivilege = errors.New("privilèges insuffisants pour cette cible")
+	// ErrEmailNotVerified : login refusé tant que l'adresse n'est pas vérifiée.
+	ErrEmailNotVerified = errors.New("adresse e-mail non vérifiée")
+	// ErrInvalidToken : token de vérification inconnu / expiré / déjà consommé.
+	ErrInvalidToken = errors.New("token invalide ou expiré")
+)
+
+// Usages des account_tokens + TTL de la vérification d'e-mail.
+const (
+	purposeVerify  = "verify"
+	verifyTokenTTL = 24 * time.Hour
 )
 
 // defaultAdminID : UUID figé de l'admin par défaut, partagé avec les autres
@@ -48,21 +60,32 @@ type Claims struct {
 	jwt.RegisteredClaims
 }
 
-// AuthService regroupe les dépendances (DB + paramètres JWT).
+// Mailer envoie un e-mail transactionnel (implémenté par internal/notify).
+// Best-effort : l'appelant logge l'erreur sans la propager.
+type Mailer interface {
+	Send(to, subject, html, text string) error
+}
+
+// AuthService regroupe les dépendances (DB + paramètres JWT + mailer).
 type AuthService struct {
 	db            *sql.DB
 	jwtSecret     []byte
 	jwtExpiry     time.Duration
 	refreshExpiry time.Duration
+	mailer        Mailer // nil = envoi d'e-mails désactivé (no-op loggé)
+	appBaseURL    string // base URL du front (liens dans les e-mails)
 }
 
-// New construit le service.
-func New(db *sql.DB, jwtSecret string, jwtExpiry, refreshExpiry time.Duration) *AuthService {
+// New construit le service. mailer peut être nil (mail non configuré) : l'envoi
+// devient alors un no-op loggé et auth reste pleinement fonctionnel.
+func New(db *sql.DB, jwtSecret string, jwtExpiry, refreshExpiry time.Duration, mailer Mailer, appBaseURL string) *AuthService {
 	return &AuthService{
 		db:            db,
 		jwtSecret:     []byte(jwtSecret),
 		jwtExpiry:     jwtExpiry,
 		refreshExpiry: refreshExpiry,
+		mailer:        mailer,
+		appBaseURL:    appBaseURL,
 	}
 }
 
@@ -90,6 +113,12 @@ func (s *AuthService) Register(email, password string) (string, string, *models.
 		return "", "", nil, fmt.Errorf("insertion utilisateur : %w", err)
 	}
 
+	// Envoi du mail de vérification (best-effort). Les tokens sont tout de même
+	// émis : le BFF s'en sert UNIQUEMENT côté serveur pour le provisioning
+	// (users+profils) puis les jette — le client n'obtient pas de session, le
+	// blocage réel est appliqué au login (email_verified). Cf. DECISIONS.md.
+	s.sendVerificationMail(u)
+
 	return s.issueTokens(u)
 }
 
@@ -97,12 +126,12 @@ func (s *AuthService) Register(email, password string) (string, string, *models.
 // token + l'utilisateur.
 func (s *AuthService) Login(email, password string) (string, string, *models.User, error) {
 	const q = `
-		SELECT id, email, password, role, is_active, created_at
+		SELECT id, email, password, role, is_active, email_verified, created_at
 		FROM credentials WHERE email = $1`
 
 	u := &models.User{}
 	err := s.db.QueryRow(q, email).
-		Scan(&u.ID, &u.Email, &u.PasswordHash, &u.Role, &u.IsActive, &u.CreatedAt)
+		Scan(&u.ID, &u.Email, &u.PasswordHash, &u.Role, &u.IsActive, &u.EmailVerified, &u.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", "", nil, ErrInvalidCredentials
 	}
@@ -115,6 +144,11 @@ func (s *AuthService) Login(email, password string) (string, string, *models.Use
 	}
 	if bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(password)) != nil {
 		return "", "", nil, ErrInvalidCredentials
+	}
+	// Blocage dur : un compte non vérifié ne peut pas se connecter (aucun token
+	// émis). Vérifié APRÈS le bcrypt pour ne pas révéler l'existence du compte.
+	if !u.EmailVerified {
+		return "", "", nil, ErrEmailNotVerified
 	}
 
 	return s.issueTokens(u)
@@ -171,6 +205,136 @@ func (s *AuthService) Logout(rawToken string) error {
 		return fmt.Errorf("révocation refresh token : %w", err)
 	}
 	return nil
+}
+
+// VerifyEmail consomme un token de vérification et marque l'adresse vérifiée.
+// Renvoie ErrInvalidToken si le token est inconnu / expiré / déjà utilisé.
+func (s *AuthService) VerifyEmail(rawToken string) error {
+	userID, err := s.consumeAccountToken(rawToken, purposeVerify)
+	if err != nil {
+		return err
+	}
+	if _, err := s.db.Exec(`UPDATE credentials SET email_verified = true WHERE id = $1`, userID); err != nil {
+		return fmt.Errorf("activation email_verified : %w", err)
+	}
+	return nil
+}
+
+// ResendVerification renvoie un mail de vérification. ANTI-ÉNUMÉRATION : renvoie
+// TOUJOURS nil — l'appelant ne peut pas distinguer un compte inexistant, déjà
+// vérifié, ou non vérifié. Le mail n'est (ré)envoyé que dans ce dernier cas.
+func (s *AuthService) ResendVerification(email string) error {
+	const q = `
+		SELECT id, email, role, is_active, email_verified, created_at
+		FROM credentials WHERE email = $1`
+
+	u := &models.User{}
+	err := s.db.QueryRow(q, email).
+		Scan(&u.ID, &u.Email, &u.Role, &u.IsActive, &u.EmailVerified, &u.CreatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil // compte inexistant : no-op silencieux (anti-énumération).
+	}
+	if err != nil {
+		log.Printf("[auth-service] resend vérif (lecture) pour %s : %v", email, err)
+		return nil
+	}
+	if u.EmailVerified {
+		return nil // déjà vérifié : rien à faire.
+	}
+
+	s.sendVerificationMail(u)
+	return nil
+}
+
+// sendVerificationMail crée un token de vérification (TTL 24h) et envoie le
+// lien par mail. Best-effort : toute erreur est loggée, jamais propagée (ne
+// casse ni le register ni le resend).
+func (s *AuthService) sendVerificationMail(u *models.User) {
+	if s.mailer == nil {
+		log.Printf("[auth-service] mail désactivé : vérif pour %s non envoyée", u.Email)
+		return
+	}
+
+	raw, err := s.createAccountToken(u.ID, purposeVerify, verifyTokenTTL)
+	if err != nil {
+		log.Printf("[auth-service] création token vérif pour %s : %v", u.Email, err)
+		return
+	}
+
+	link := fmt.Sprintf("%s/verify-email?token=%s",
+		strings.TrimRight(s.appBaseURL, "/"), url.QueryEscape(raw))
+
+	subject := "Confirme ton adresse e-mail — Breezy"
+	text := fmt.Sprintf(
+		"Bienvenue sur Breezy !\n\n"+
+			"Confirme ton adresse e-mail en ouvrant ce lien :\n%s\n\n"+
+			"Ce lien expire dans 24 heures. Si tu n'es pas à l'origine de cette "+
+			"inscription, ignore ce message.",
+		link)
+	html := fmt.Sprintf(
+		`<p>Bienvenue sur <strong>Breezy</strong> !</p>`+
+			`<p>Confirme ton adresse e-mail en cliquant sur le bouton ci-dessous :</p>`+
+			`<p><a href="%s">Vérifier mon adresse e-mail</a></p>`+
+			`<p>Ou copie ce lien dans ton navigateur :<br>%s</p>`+
+			`<p>Ce lien expire dans 24 heures. Si tu n'es pas à l'origine de cette `+
+			`inscription, ignore ce message.</p>`,
+		link, link)
+
+	if err := s.mailer.Send(u.Email, subject, html, text); err != nil {
+		log.Printf("[auth-service] envoi mail vérif à %s : %v", u.Email, err)
+	}
+}
+
+// createAccountToken invalide d'abord les tokens non consommés du même
+// (user_id, purpose), puis crée un nouveau jeton opaque haché (SHA-256) et
+// retourne sa valeur EN CLAIR (à insérer dans le lien). TTL via expires_at.
+func (s *AuthService) createAccountToken(userID, purpose string, ttl time.Duration) (string, error) {
+	if _, err := s.db.Exec(
+		`DELETE FROM account_tokens WHERE user_id = $1 AND purpose = $2 AND used_at IS NULL`,
+		userID, purpose,
+	); err != nil {
+		return "", fmt.Errorf("invalidation anciens tokens : %w", err)
+	}
+
+	raw, err := randomToken()
+	if err != nil {
+		return "", err
+	}
+
+	const q = `INSERT INTO account_tokens (user_id, purpose, token_hash, expires_at) VALUES ($1, $2, $3, $4)`
+	if _, err := s.db.Exec(q, userID, purpose, hashToken(raw), time.Now().Add(ttl)); err != nil {
+		return "", fmt.Errorf("création account token : %w", err)
+	}
+	return raw, nil
+}
+
+// consumeAccountToken valide un token (lookup par hash) puis le marque consommé
+// (used_at = NOW()). Usage unique : refuse un token inconnu, déjà utilisé,
+// expiré ou de mauvais purpose. Renvoie le user_id associé.
+func (s *AuthService) consumeAccountToken(rawToken, purpose string) (string, error) {
+	const q = `
+		SELECT id, user_id, expires_at, used_at
+		FROM account_tokens WHERE token_hash = $1 AND purpose = $2`
+
+	var id, userID string
+	var expiresAt time.Time
+	var usedAt sql.NullTime
+	err := s.db.QueryRow(q, hashToken(rawToken), purpose).
+		Scan(&id, &userID, &expiresAt, &usedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", ErrInvalidToken
+	}
+	if err != nil {
+		return "", fmt.Errorf("lecture account token : %w", err)
+	}
+	if usedAt.Valid || time.Now().After(expiresAt) {
+		return "", ErrInvalidToken
+	}
+
+	if _, err := s.db.Exec(`UPDATE account_tokens SET used_at = NOW() WHERE id = $1`, id); err != nil {
+		return "", fmt.Errorf("consommation account token : %w", err)
+	}
+	return userID, nil
 }
 
 // issueTokens signe un access token (court) et crée un refresh token (long,

@@ -38,10 +38,17 @@
   auto-portant), une fuite de table ne livre aucun token. Table unique `account_tokens(purpose enum
   'verify'|'reset', …)`. Toute nouvelle demande invalide les précédents du même `(user_id, purpose)` ;
   un reset réussi **révoque toutes les sessions** (`DELETE refresh_tokens`).
-- **Login non-vérifié = blocage dur** (`403 email_not_verified`, aucun token émis). En conséquence,
-  **register n'émet plus de tokens** : il insère, envoie le mail et renvoie `201` (le front redirige
-  vers une page publique « consulte ta boîte mail » ; le provisioning user se fait au 1er login
-  réussi). **Admin seedé forcé `email_verified=true`** (pas de vraie boîte) pour garder un compte
+- **Login non-vérifié = blocage dur** (`403 email_not_verified`, aucun token émis), vérifié
+  *après* le bcrypt pour ne pas révéler l'existence du compte.
+- **Provisioning préservé au register, sans session client (décision Phase 1).** `auth/register`
+  continue d'émettre les tokens, mais le BFF Next s'en sert **uniquement côté serveur** pour
+  provisionner l'identité (`POST /users` + `POST /profils`, avec `username`/`birth_date`/`gender`
+  du formulaire) puis les **jette** : il ne pose PAS le cookie refresh et ne renvoie PAS l'access
+  token. Le client n'obtient donc **aucune session** et atterrit sur une page publique « consulte ta
+  boîte mail » ; le blocage réel est appliqué au login. *Choisi plutôt que « register sans token +
+  provisioning au 1er login » : cette variante imposerait de charrier `birth_date`/`gender` (qui
+  n'existent que dans le formulaire register) jusqu'au login via un stockage temporaire — plus lourd
+  et fragile.* **Admin seedé forcé `email_verified=true`** (pas de vraie boîte) pour garder un compte
   démo. Le renvoi de mail de vérif est accessible depuis la page login (les users existants passent
   `email_verified=false` et doivent se vérifier).
 - **Anti-énumération** sur `forgot-password` (réponse `200` générique, que l'email existe ou non).
