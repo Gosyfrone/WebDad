@@ -139,6 +139,11 @@ several well-chosen secondary features · **all 3 roles functional** · pro slid
 - **Published doc:** `https://gosyfrone.github.io/WebDad/` (Redoc, auto-deployed on `push develop` via `pages.yml`).
 - Local preview: `make swagger-site` → `http://localhost:8088`.
 
+## 9. Current handoff
+
+- 2026-06-10: quote/repost media rendering implemented on the frontend; quoted posts now show image/video previews, and Docker exposes the app on port 3000.
+- 2026-06-10: suggested commit message for this change: `fix(posts): show quoted media in quotes`.
+
 ---
 
 *This file is the lean entry point. Current status, decisions, architecture detail and history live in the

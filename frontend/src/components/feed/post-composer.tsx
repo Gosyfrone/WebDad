@@ -323,6 +323,49 @@ function QuotePreview({ post }: { post: FeedPost }) {
       <p className="line-clamp-4 whitespace-pre-wrap break-words text-foreground/75">
         {post.content}
       </p>
+      {post.media.length > 0 && <QuoteMediaPreview media={post.media} />}
+    </div>
+  )
+}
+
+function QuoteMediaPreview({ media }: { media: PostMedia[] }) {
+  return (
+    <div
+      className={cn(
+        'mt-2 grid gap-1.5 overflow-hidden rounded-xl border border-border',
+        media.length > 1 ? 'grid-cols-2' : 'grid-cols-1',
+      )}
+    >
+      {media.map((m, i) => {
+        const cellClass = cn(
+          media.length === 1 ? 'max-h-64' : 'aspect-square',
+          media.length === 3 && i === 0 && 'row-span-2 aspect-auto',
+        )
+        return (
+          <div
+            key={m.url}
+            className={cn('overflow-hidden bg-background/50', media.length === 3 && i === 0 && 'row-span-2')}
+          >
+            {m.type === 'video' ? (
+              <video
+                src={resolveMediaUrl(m.url)}
+                className={cn('h-full w-full object-cover', media.length === 1 ? 'max-h-64 aspect-video' : cellClass)}
+                muted
+                playsInline
+                controls
+              />
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={resolveMediaUrl(m.url)}
+                alt=""
+                loading="lazy"
+                className={cn('h-full w-full object-cover', cellClass)}
+              />
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }

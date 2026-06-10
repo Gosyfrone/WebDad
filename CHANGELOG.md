@@ -4,6 +4,8 @@
 
 ---
 
+*Last updated: 10/06/2026 — fix(posts quotes) : **les citations affichent maintenant les images/vidéos du post cité**. Front uniquement : `QuotedPost` rend une galerie média compacte dans les posts citants ; la popup `PostComposer` affiche aussi les médias dans l'aperçu avant publication. Le repost simple reste inchangé côté back : il renvoie déjà le post original annoté, donc ses médias passent par le rendu existant. Vérifs : `npm run lint`, `npx tsc --noEmit`. App disponible sur `http://localhost:3000` via `webdad-frontend-1`.*
+
 *Last updated: 10/06/2026 — docs(api) : **Swagger Phase 3 — GitHub Pages Redoc UI**. `doc/index.html` (Redoc CDN, charge `./openapi.json`). Workflow `.github/workflows/pages.yml` : déclenchement `push develop` + `workflow_dispatch`, permissions `pages:write`/`id-token:write`, `actions/configure-pages@v5` + `upload-pages-artifact@v3` (source `doc/`) + `deploy-pages@v4`. Cible `make swagger-site` (serveur local port 8088). URL : `https://gosyfrone.github.io/WebDad/`. Activation manuelle requise : Settings > Pages > Source = GitHub Actions.*
 
 *Last updated: 10/06/2026 — ci(swagger) : **Phase 2 — job CI drift check + lint**. Nouveau job `swagger` dans `.github/workflows/ci-go.yml` : (1) installe `swag@latest` + `pyyaml`, régénère le spec via `make swagger` ; (2) **drift check** `git diff --exit-code doc/openapi.{json,yaml}` → échec bloquant avec message `run \`make swagger\` and commit` ; (3) **validation OpenAPI** `swagger validate doc/openapi.json` (`go-swagger`, Go pur, purpose-built Swagger 2.0 — pas de runtime Node/Java). Path triggers étendus : `doc/**` + `scripts/swagger-aggregate.sh`. Spec committé propre → drift check passe sur l'état actuel de la branche. YAML workflow validé (`python3 yaml.safe_load`).*

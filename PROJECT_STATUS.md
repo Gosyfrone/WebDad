@@ -18,7 +18,7 @@
 | Notification | 🟢 OK | MongoDB | Aggregated (Instagram-style), ingest `/internal/events`, types like/comment/reply/mention/repost/quote/follow_request/message_mention/post_deleted, JWT API + WS. |
 | Media | 🟢 OK | MinIO | Cross-cutting opaque storage, autonomous bucket. `POST /media` (sniff+caps), `POST /media/encrypted` (E2EE blob), public `GET /media/:id` (Range/seek), owner/admin delete. Wired on profils/posts/messages. |
 | API Gateway | 🟡 WIP | — | stdlib reverse proxy, prefix routing, WS proxy, CORS, media streaming. `/internal/events` not routed (server-to-server). **TODO:** JWT middleware to protect prefixes. |
-| Frontend | 🟡 WIP | — | Next.js 14, X-style responsive layout, refresh-token auth, business clients over `apiFetch`. Wired: feed/posts (like/comments/pin/repost/quote), bookmark collections, hydrated profile + privacy, follow pending/accept/reject, Explorer + search history, E2EE messaging + attachments, notifications (badge+WS), translation, i18n FR/EN, dark mode, legal pages, muted words, @mentions, image/video upload (lightbox, Twitter-style autoplay). **TODO:** real role (admin placeholder), post edit. |
+| Frontend | 🟡 WIP | — | Next.js 14, X-style responsive layout, refresh-token auth, business clients over `apiFetch`. Wired: feed/posts (like/comments/pin/repost/quote with media preview), bookmark collections, hydrated profile + privacy, follow pending/accept/reject, Explorer + search history, E2EE messaging + attachments, notifications (badge+WS), translation, i18n FR/EN, dark mode, legal pages, muted words, @mentions, image/video upload (lightbox, Twitter-style autoplay). **TODO:** real role (admin placeholder), post edit. |
 
 ## Features
 

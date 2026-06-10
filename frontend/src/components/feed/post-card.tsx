@@ -499,17 +499,26 @@ export function PostCard({ post, showPinBadge = false, onDeleted, onUpdated }: P
  * absolues (résolues dans `toFeedPost`). Cache navigateur géré par le
  * media-service (`Cache-Control: immutable`) ; lazy-loading des images.
  */
-function MediaGallery({ media, onOpen }: { media: PostMedia[]; onOpen?: (index: number) => void }) {
+function MediaGallery({
+  media,
+  onOpen,
+  compact = false,
+}: {
+  media: PostMedia[]
+  onOpen?: (index: number) => void
+  compact?: boolean
+}) {
   return (
     <div
       className={cn(
-        'mt-2 grid gap-1.5 overflow-hidden rounded-2xl border border-border',
+        'mt-2 grid gap-1.5 overflow-hidden border border-border',
+        compact ? 'rounded-xl' : 'rounded-2xl',
         media.length === 1 ? 'grid-cols-1' : 'grid-cols-2',
       )}
     >
       {media.map((m, i) => {
         const sizing = cn(
-          media.length === 1 ? 'max-h-[32rem]' : 'aspect-square',
+          media.length === 1 ? (compact ? 'max-h-64' : 'max-h-[32rem]') : 'aspect-square',
           media.length === 3 && i === 0 && 'row-span-2 aspect-auto',
         )
         // Cellule vidéo : un ratio défini est nécessaire (le `<video>` interne
@@ -520,9 +529,32 @@ function MediaGallery({ media, onOpen }: { media: PostMedia[]; onOpen?: (index: 
         )
         // Vidéo : lecture auto en muet + boucle + vitesse (cf. FeedVideo), pas
         // d'ouverture en vue photo. L'image s'ouvre en grand au clic.
-        return m.type === 'video' ? (
-          <FeedVideo key={m.url} src={m.url} className={videoCell} />
-        ) : (
+        if (m.type === 'video') {
+          return <FeedVideo key={m.url} src={m.url} className={videoCell} />
+        }
+
+        const image = (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={m.url}
+            alt=""
+            loading="lazy"
+            className={cn('h-full w-full object-cover transition group-hover:brightness-95', sizing)}
+          />
+        )
+
+        if (!onOpen) {
+          return (
+            <div
+              key={m.url}
+              className={cn('group relative block overflow-hidden', media.length === 3 && i === 0 && 'row-span-2')}
+            >
+              {image}
+            </div>
+          )
+        }
+
+        return (
           <button
             key={m.url}
             type="button"
@@ -530,13 +562,7 @@ function MediaGallery({ media, onOpen }: { media: PostMedia[]; onOpen?: (index: 
             className={cn('group relative block overflow-hidden', media.length === 3 && i === 0 && 'row-span-2')}
             aria-label="Agrandir l'image"
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={m.url}
-              alt=""
-              loading="lazy"
-              className={cn('h-full w-full object-cover transition group-hover:brightness-95', sizing)}
-            />
+            {image}
           </button>
         )
       })}
@@ -560,6 +586,7 @@ function QuotedPost({ post }: { post: FeedPost }) {
       <p className="line-clamp-5 whitespace-pre-wrap break-words text-sm text-foreground/75">
         {post.content}
       </p>
+      {post.media.length > 0 && <MediaGallery media={post.media} compact />}
     </div>
   )
 }
