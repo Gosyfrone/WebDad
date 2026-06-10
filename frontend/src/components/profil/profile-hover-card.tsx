@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { Loader2, UserRound } from 'lucide-react'
 
 import { getCommonFollowers } from '@/lib/api'
-import { getPublicProfil } from '@/lib/profil-client'
+import { getPublicProfil, subscribeProfilUpdated } from '@/lib/profil-client'
 import { cn, initialOf } from '@/lib/utils'
 import { useFollow } from '@/lib/use-follow'
 import type { ProfilDetails, RelationUser } from '@/types'
@@ -101,6 +101,21 @@ export function ProfileHoverCard({
       clearCloseTimer()
     }
   }, [])
+
+  // Resync the preview after a self profile edit: refresh the module cache and,
+  // if this card is currently showing the edited user, replace the live data.
+  useEffect(
+    () =>
+      subscribeProfilUpdated((updated) => {
+        profilePreviewCache.set(updated.username, updated)
+        setState((current) =>
+          current.status === 'ready' && current.profil.userId === updated.userId
+            ? { ...current, profil: updated }
+            : current,
+        )
+      }),
+    [],
+  )
 
   async function loadCommonFollowers(profil: ProfilDetails) {
     const cached = commonFollowersCache.get(profil.userId)
