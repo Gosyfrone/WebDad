@@ -139,6 +139,16 @@ several well-chosen secondary features · **all 3 roles functional** · pro slid
 - **Published doc:** `https://gosyfrone.github.io/WebDad/` (Redoc, auto-deployed on `push develop` via `pages.yml`).
 - Local preview: `make swagger-site` → `http://localhost:8088`.
 
+## 9. Current handoff
+
+- 2026-06-10: quote/repost media rendering implemented on the frontend; quoted posts now show image/video previews, and Docker exposes the app on port 3000.
+- 2026-06-10: suggested commit message for this change: `fix(posts): show quoted media in quotes`.
+- 2026-06-10: comment media support implemented end-to-end; comments/replies accept up to 4 uploaded images/videos/GIFs via media-service and render them in `CommentSection`.
+- 2026-06-10: desktop quote dialogs now scroll when quoted media plus newly attached media exceed the viewport height.
+- 2026-06-10: suggested French commit message for the latest changes: `feat(commentaires): ajouter les medias et le scroll des citations`.
+- 2026-06-10: Swagger annotation/docs updated for comment media; `doc/openapi.{json,yaml}` regenerated through the aggregation script in a temporary Go Linux container because local Windows `make swagger` cannot launch WSL bash.
+- 2026-06-10: suggested commit message for the Swagger/doc update: `docs(swagger): mettre a jour les annotations et la spec OpenAPI des commentaires`.
+
 ---
 
 *This file is the lean entry point. Current status, decisions, architecture detail and history live in the

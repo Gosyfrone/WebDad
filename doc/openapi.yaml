@@ -1564,7 +1564,7 @@ paths:
         name: id
         in: path
         required: true
-      - description: Contenu + parent_id optionnel
+      - description: Contenu texte et/ou médias + parent_id optionnel
         name: body
         in: body
         required: true
@@ -2761,6 +2761,10 @@ definitions:
         type: string
       id:
         type: string
+      media:
+        type: array
+        items:
+          $ref: '#/definitions/models.MediaRef'
       parent_id:
         type: string
       post_id:
@@ -2779,12 +2783,15 @@ definitions:
         maxLength: 60
   models.CreateCommentRequest:
     type: object
-    required:
-    - content
     properties:
       content:
         type: string
         maxLength: 280
+      media:
+        type: array
+        maxItems: 4
+        items:
+          $ref: '#/definitions/models.MediaRef'
       parent_id:
         type: string
   models.CreatePostRequest:
