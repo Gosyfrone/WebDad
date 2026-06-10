@@ -18,7 +18,7 @@
 | Notification | 🟢 OK | MongoDB | Aggregated (Instagram-style), ingest `/internal/events`, types like/comment/reply/mention/repost/quote/follow/follow_request/follow_request_accepted/follow_request_accept_confirm/message_mention/post_deleted, JWT API + WS. |
 | Media | 🟢 OK | MinIO | Cross-cutting opaque storage, autonomous bucket. `POST /media` (sniff+caps), `POST /media/encrypted` (E2EE blob), public `GET /media/:id` (Range/seek), owner/admin delete. Wired on profils/posts/messages. |
 | API Gateway | 🟡 WIP | — | stdlib reverse proxy, prefix routing, WS proxy, CORS, media streaming. `/internal/events` not routed (server-to-server). **TODO:** JWT middleware to protect prefixes. |
-| Frontend | 🟡 WIP | — | Next.js 14, X-style responsive layout, refresh-token auth, business clients over `apiFetch`. Wired: feed/posts (like/comments with media/pin/repost/quote with media preview), bookmark collections, hydrated profile + privacy + hover preview, follow pending/accept/reject, Explorer + search history, E2EE messaging + attachments, notifications (badge+WS), translation, i18n FR/EN, dark mode, legal pages, muted words, @mentions, image/video upload (lightbox, Twitter-style autoplay). **TODO:** real role (admin placeholder), post edit. |
+| Frontend | 🟡 WIP | — | Next.js 14, X-style responsive layout, refresh-token auth, business clients over `apiFetch`. Wired: feed/posts (like/comments with media/pin/repost/quote with media preview + live author identity after profile edit), bookmark collections, hydrated profile + privacy + hover preview, follow pending/accept/reject, Explorer + search history, E2EE messaging + attachments, notifications (badge+WS), translation, i18n FR/EN, dark mode, legal pages, muted words, @mentions, image/video upload (lightbox, Twitter-style autoplay). **TODO:** real role (admin placeholder), post edit. |
 
 ## Features
 
@@ -28,7 +28,7 @@
 | JWT auth + protected routes | Primary | 🟢 access 15m + refresh 24h + `/auth/validate`, front single-flight refresh + `(app)` guard. **TODO:** gateway JWT middleware. |
 | Role management (User/Mod/Admin) | Primary | 🟡 Role in JWT, user-service enforces admin delete, role-based nav. **TODO:** generalize to other services, real role front. |
 | Post creation/reading | Primary | 🟢 End-to-end, infinite feed (For you / Following), visibility-filtered, likes, threaded comments with images/videos/GIF uploads, reposts/quotes, pin, emoji, images/videos. **TODO:** post edit. |
-| User profile | Primary | 🟡 View + edit + by-username page, private-account locking, real avatar/banner upload, web hover preview from shared profile links. **TODO:** wire aggregated user+profil+post read. |
+| User profile | Primary | 🟡 View + edit + by-username page, private-account locking, real avatar/banner upload, web hover preview from shared profile links, feed author identity updates instantly after edit. **TODO:** wire aggregated user+profil+post read. |
 | Social graph (follow/followers) | Secondary | 🟢 follow + lists + counts + private requests + follower removal, front wired, e2e tested. |
 | Search / Explorer (accounts) | Secondary | 🟢 user + profil search, "Who to follow", per-account local search history. **TODO:** post search. |
 | Automatic post translation | Secondary | 🟢 BFF `/api/translate`, conservative client gate, posts + comments, cache, toggle. |

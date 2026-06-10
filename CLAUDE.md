@@ -10,6 +10,8 @@
 > - Knowledge graph in `graphify-out/` — query it before reading source (see Operating Rules).
 > - Latest session note: 10/06/2026 — message edit security review found no plaintext leak or auth bypass; remaining watchpoints are payload/rate limits; details in `CHANGELOG.md`.
 
+*Last Codex sync: 10/06/2026 — commit naming requested for the live feed/profile identity propagation fix.*
+
 ---
 
 ## ⚠️ CLAUDE OPERATING RULES (HIGH PRIORITY — do not weaken)

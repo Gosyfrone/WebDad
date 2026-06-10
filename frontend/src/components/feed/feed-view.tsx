@@ -10,8 +10,10 @@ import {
   subscribeMutedWords,
 } from '@/lib/content-filters'
 import { getMe } from '@/lib/api'
+import { subscribeProfilUpdated } from '@/lib/profil-client'
 import { useInfiniteScroll } from '@/lib/use-infinite-scroll'
 import {
+  applyProfilUpdateToPosts,
   listFeed,
   listFollowingFeed,
   currentUserId,
@@ -154,6 +156,14 @@ export function FeedView() {
             : [post, ...prev],
         ),
       ),
+    [],
+  )
+
+  useEffect(
+    () =>
+      subscribeProfilUpdated((profil) => {
+        setPosts((prev) => applyProfilUpdateToPosts(prev, profil))
+      }),
     [],
   )
 
