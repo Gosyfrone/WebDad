@@ -8,21 +8,22 @@ env:
   IMAGE_BASE: ghcr.io/${{ github.repository_owner }}/webdad
 
 jobs:
-  # ── 1. Calcul du tag et de l'environnement cible ─────────────────
+  # ── 1. Calcul du tag image ───────────────────────────────────────
+  # main et develop déploient TOUS DEUX sur l'environnement production
+  # (develop = prod réelle ; main = dépôt de code). Tag image distinct par
+  # branche pour que les deux coexistent dans GHCR ; le déploiement pull le
+  # tag de la branche poussée.
   prepare:
     runs-on: ubuntu-latest
     outputs:
       tag: ${{ steps.meta.outputs.tag }}
-      env: ${{ steps.meta.outputs.env }}
     steps:
       - id: meta
         run: |
           if [ "${{ github.ref_name }}" = "main" ]; then
-            echo "tag=latest"       >> $GITHUB_OUTPUT
-            echo "env=production"   >> $GITHUB_OUTPUT
+            echo "tag=latest" >> $GITHUB_OUTPUT
           else
             echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
-            echo "env=staging"      >> $GITHUB_OUTPUT
           fi
 
   # ── 2. Build & push de chaque service en parallèle ───────────────
@@ -81,34 +82,33 @@ jobs:
 
   # ── 3. Déploiement ────────────────────────────────────────────────
   deploy:
-    name: Deploy → ${{ needs.prepare.outputs.env }}
+    name: Deploy → production
     needs: [prepare, build-push]
     runs-on: ubuntu-latest
-    environment: ${{ needs.prepare.outputs.env }}
+    environment: production
 
     steps:
-      # TODO: activer une fois le VPS OVH provisionné.
-      # Ajouter OVH_HOST, OVH_USER, OVH_SSH_KEY dans les secrets de
-      # l'environnement GitHub ("production" et "staging").
-      #
-      # - name: Deploy via SSH
-      #   uses: appleboy/ssh-action@v1
-      #   with:
-      #     host:     ${{ secrets.OVH_HOST }}
-      #     username: ${{ secrets.OVH_USER }}
-      #     key:      ${{ secrets.OVH_SSH_KEY }}
-      #     script: |
-      #       cd /opt/breezy
-      #       echo "${{ secrets.GITHUB_TOKEN }}" \
-      #         | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-      #       IMAGE_TAG=${{ needs.prepare.outputs.tag }} \
-      #         docker compose -f docker-compose.prod.yml pull
-      #       IMAGE_TAG=${{ needs.prepare.outputs.tag }} \
-      #         docker compose -f docker-compose.prod.yml up -d --remove-orphans
-
-      - name: Placeholder — OVH non configuré
-        run: |
-          echo "Déploiement en attente de configuration OVH."
-          echo "Environnement : ${{ needs.prepare.outputs.env }}"
-          echo "Image tag     : ${{ needs.prepare.outputs.tag }}"
-          echo "Secrets requis: OVH_HOST · OVH_USER · OVH_SSH_KEY"
+      # Secrets requis dans l'environnement GitHub "production" :
+      #   OVH_HOST · OVH_USER · OVH_SSH_KEY
+      # Prérequis VPS : repo cloné dans /opt/breezy, <service>/.env + .env racine
+      # remplis, Caddyfile présent, Docker + compose installés, user dans le
+      # groupe docker.
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host:     ${{ secrets.OVH_HOST }}
+          username: ${{ secrets.OVH_USER }}
+          key:      ${{ secrets.OVH_SSH_KEY }}
+          script: |
+            cd /opt/breezy
+            # Synchronise le checkout sur la branche qui vient d'être poussée
+            # (main ou develop déploient la même prod ; -B force le suivi
+            # propre même en alternant de branche).
+            git fetch origin ${{ github.ref_name }}
+            git checkout -B ${{ github.ref_name }} origin/${{ github.ref_name }}
+            echo "${{ secrets.GITHUB_TOKEN }}" \
+              | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            IMAGE_TAG=${{ needs.prepare.outputs.tag }} \
+              docker compose -f docker-compose.prod.yml pull
+            IMAGE_TAG=${{ needs.prepare.outputs.tag }} \
+              docker compose -f docker-compose.prod.yml up -d --remove-orphans
