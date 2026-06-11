@@ -3,6 +3,7 @@ package handlers
 import (
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -10,12 +11,13 @@ import (
 	"github.com/webdad/auth-service/internal/services"
 )
 
-// Login : POST /auth/login — vérifie les credentials, retourne un JWT.
+// Login : POST /auth/login — vérifie les credentials par email ou user_id, retourne un JWT.
 // @Summary     Se connecter
+// @Description Accepte `email` pour le login classique, ou `user_id` quand le BFF a résolu un username via user-service. `password` est toujours requis.
 // @Tags        auth
 // @Accept      json
 // @Produce     json
-// @Param       body body models.LoginRequest true "Credentials"
+// @Param       body body models.LoginRequest true "Credentials (email ou user_id + password)"
 // @Success     200 {object} models.AuthUser "Connexion réussie — data: {token, refresh_token, user}"
 // @Failure     400 {object} map[string]string "Payload invalide"
 // @Failure     401 {object} map[string]string "Credentials invalides"
@@ -29,7 +31,24 @@ func (h *Handler) Login(c *gin.Context) {
 		return
 	}
 
-	token, refresh, user, err := h.auth.Login(req.Email, req.Password)
+	email := strings.TrimSpace(req.Email)
+	userID := strings.TrimSpace(req.UserID)
+	if email == "" && userID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "email ou user_id requis"})
+		return
+	}
+
+	var (
+		token   string
+		refresh string
+		user    *models.User
+		err     error
+	)
+	if userID != "" {
+		token, refresh, user, err = h.auth.LoginByUserID(userID, req.Password)
+	} else {
+		token, refresh, user, err = h.auth.Login(email, req.Password)
+	}
 	if err != nil {
 		switch {
 		case errors.Is(err, services.ErrInvalidCredentials):

@@ -26,6 +26,9 @@
   rotation is the basis for future reuse-detection. The **back never auto-renews** — it signs `exp` and
   401s on expiry (`code: token_expired` distinguishes expiry→refresh from invalid→no-refresh); the **front drives** refresh.
 - **Inter-service auth:** JWT in header (grading requirement).
+- **Username login orchestration stays in the BFF.** `username` remains owned by user-service:
+  the Next BFF resolves `username -> user_id` through the gateway, then calls auth-service with
+  `user_id + password`. Auth-service still owns only credentials/JWT and never joins user data.
 
 ## Email (vérification & reset)
 

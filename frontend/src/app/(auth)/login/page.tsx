@@ -4,13 +4,13 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
+  AtSign,
   Bell,
   CircleAlert,
   Eye,
   EyeOff,
   Heart,
   Lock,
-  Mail,
   MessageCircle,
   Search,
   Sparkles,
@@ -33,12 +33,10 @@ import { ROUTES } from '@/lib/routes'
 import { useT } from '@/components/language-provider'
 
 type FormErrors = Partial<{
-  email: string
+  identifier: string
   password: string
   form: string
 }>
-
-const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 function getMessage(error: unknown, fallback: string): string {
   if (typeof error === 'string' && error.trim()) return error
@@ -49,7 +47,7 @@ function getMessage(error: unknown, fallback: string): string {
 export default function LoginPage() {
   const t = useT()
   const router = useRouter()
-  const [email, setEmail] = React.useState('')
+  const [identifier, setIdentifier] = React.useState('')
   const [password, setPassword] = React.useState('')
   const [showPassword, setShowPassword] = React.useState(false)
   const [errors, setErrors] = React.useState<FormErrors>({})
@@ -61,12 +59,10 @@ export default function LoginPage() {
 
   const validate = React.useCallback((): FormErrors => {
     const nextErrors: FormErrors = {}
-    const trimmedEmail = email.trim()
+    const trimmedIdentifier = identifier.trim()
 
-    if (!trimmedEmail) {
-      nextErrors.email = t('auth.err.email_required')
-    } else if (!emailPattern.test(trimmedEmail)) {
-      nextErrors.email = t('auth.err.email_invalid')
+    if (!trimmedIdentifier) {
+      nextErrors.identifier = t('auth.err.identifier_required')
     }
 
     if (!password) {
@@ -76,7 +72,7 @@ export default function LoginPage() {
     }
 
     return nextErrors
-  }, [email, password, t])
+  }, [identifier, password, t])
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -97,7 +93,7 @@ export default function LoginPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          email: email.trim(),
+          identifier: identifier.trim(),
           password,
         }),
       })
@@ -141,9 +137,9 @@ export default function LoginPage() {
   }
 
   const handleResendVerification = async () => {
-    const trimmedEmail = email.trim()
+    const trimmedEmail = identifier.trim()
     if (!trimmedEmail) {
-      setErrors({ email: t('auth.err.email_required') })
+      setErrors({ identifier: t('auth.err.identifier_required') })
       return
     }
 
@@ -340,36 +336,36 @@ export default function LoginPage() {
           <CardContent className="relative px-5 pb-5 sm:px-8 sm:pb-7">
             <form className="space-y-3.5" onSubmit={handleSubmit} noValidate>
               <div className="space-y-1.5">
-                <label htmlFor="email" className="text-sm font-medium text-foreground/80">
-                  {t('auth.email_label')}
+                <label htmlFor="identifier" className="text-sm font-medium text-foreground/80">
+                  {t('auth.login.identifier_label')}
                 </label>
 
                 <div className="group relative">
-                  <Mail className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground transition group-focus-within:text-[#5B6CFF]" />
+                  <AtSign className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground transition group-focus-within:text-[#5B6CFF]" />
 
                   <Input
-                    id="email"
-                    name="email"
-                    type="email"
-                    autoComplete="email"
-                    inputMode="email"
-                    placeholder={t('auth.email_placeholder')}
+                    id="identifier"
+                    name="identifier"
+                    type="text"
+                    autoComplete="username"
+                    inputMode="text"
+                    placeholder={t('auth.login.identifier_placeholder')}
                     className="h-12 rounded-2xl border-white/70 bg-white/90 pl-11 text-[15px] shadow-sm shadow-slate-200/60 transition-all placeholder:text-muted-foreground hover:border-[#47D9FF]/70 focus-visible:border-[#5B6CFF] focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15 dark:border-white/15 dark:bg-white/5"
-                    value={email}
+                    value={identifier}
                     onChange={(event) => {
-                      setEmail(event.target.value)
-                      if (errors.email) {
-                        setErrors((current) => ({ ...current, email: undefined }))
+                      setIdentifier(event.target.value)
+                      if (errors.identifier) {
+                        setErrors((current) => ({ ...current, identifier: undefined }))
                       }
                     }}
-                    aria-invalid={Boolean(errors.email)}
-                    aria-describedby={errors.email ? 'email-error' : undefined}
+                    aria-invalid={Boolean(errors.identifier)}
+                    aria-describedby={errors.identifier ? 'identifier-error' : undefined}
                   />
                 </div>
 
-                {errors.email ? (
-                  <p id="email-error" className="text-xs text-red-600">
-                    {errors.email}
+                {errors.identifier ? (
+                  <p id="identifier-error" className="text-xs text-red-600">
+                    {errors.identifier}
                   </p>
                 ) : null}
               </div>

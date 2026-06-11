@@ -382,6 +382,7 @@ export const messages: Record<Locale, Messages> = {
     'auth.err.email_required': "L'adresse e-mail est requise.",
     'auth.err.email_invalid': 'Saisis une adresse e-mail valide.',
     'auth.err.email_max': "L'adresse e-mail est limitée à 50 caractères.",
+    'auth.err.identifier_required': "L'adresse e-mail ou le username est requis.",
     'auth.err.password_required': 'Le mot de passe est requis.',
     'auth.err.password_min': 'Le mot de passe doit contenir au moins 8 caractères.',
     'auth.err.network': "Impossible de contacter l'API. Réessaie dans un instant.",
@@ -400,6 +401,8 @@ export const messages: Record<Locale, Messages> = {
     'auth.login.title': "Reprends ton fil là où tu l'as laissé.",
     'auth.login.subtitle':
       'Connecte-toi à Breezy, retrouve tes messages, tes posts et les conversations qui bougent.',
+    'auth.login.identifier_label': 'Adresse e-mail ou Username',
+    'auth.login.identifier_placeholder': 'toi@exemple.com ou username',
     'auth.login.forgot': 'Mot de passe oublié ?',
     'auth.login.submit': 'Se connecter',
     'auth.login.submitting': 'Connexion en cours…',
@@ -994,6 +997,7 @@ export const messages: Record<Locale, Messages> = {
     'auth.err.email_required': 'Email address is required.',
     'auth.err.email_invalid': 'Enter a valid email address.',
     'auth.err.email_max': 'Email address is limited to 50 characters.',
+    'auth.err.identifier_required': 'Email address or username is required.',
     'auth.err.password_required': 'Password is required.',
     'auth.err.password_min': 'Password must be at least 8 characters.',
     'auth.err.network': "Couldn't reach the API. Try again in a moment.",
@@ -1012,6 +1016,8 @@ export const messages: Record<Locale, Messages> = {
     'auth.login.title': 'Pick up your feed where you left off.',
     'auth.login.subtitle':
       'Sign in to Breezy and find your messages, your posts and the conversations that move.',
+    'auth.login.identifier_label': 'Email address or Username',
+    'auth.login.identifier_placeholder': 'you@example.com or username',
     'auth.login.forgot': 'Forgot password?',
     'auth.login.submit': 'Sign in',
     'auth.login.submitting': 'Signing in…',

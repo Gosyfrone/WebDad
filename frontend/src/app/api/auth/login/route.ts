@@ -15,8 +15,18 @@ type AuthPayload = {
   code?: string
 }
 
+type UserLookupPayload = {
+  data?: {
+    id?: string
+  }
+  error?: string
+  message?: string
+}
+
+const emailLikePattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
 export async function POST(request: NextRequest) {
-  let body: { email?: string; password?: string }
+  let body: { email?: string; identifier?: string; password?: string }
 
   try {
     body = await request.json()
@@ -27,11 +37,54 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  if (!body.email || !body.password) {
+  const identifier = (body.identifier ?? body.email ?? '').trim()
+
+  if (!identifier || !body.password) {
     return NextResponse.json(
-      { error: 'L’adresse e-mail et le mot de passe sont requis.' },
+      { error: 'L’identifiant et le mot de passe sont requis.' },
       { status: 400 }
     )
+  }
+
+  let loginBody: { email?: string; user_id?: string; password: string } = {
+    password: body.password,
+  }
+
+  if (emailLikePattern.test(identifier)) {
+    loginBody = { ...loginBody, email: identifier }
+  } else {
+    let userResponse: Response
+    try {
+      userResponse = await fetch(
+        apiUrl(`/users/by-username/${encodeURIComponent(identifier)}`),
+        { cache: 'no-store' }
+      )
+    } catch {
+      return NextResponse.json(
+        { error: 'Impossible de joindre l’API Gateway.' },
+        { status: 502 }
+      )
+    }
+
+    if (!userResponse.ok) {
+      return NextResponse.json(
+        { error: 'Les identifiants fournis sont invalides.' },
+        { status: 401 }
+      )
+    }
+
+    const userPayload = (await userResponse.json().catch(() => null)) as
+      | UserLookupPayload
+      | null
+    const userId = userPayload?.data?.id
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'Les identifiants fournis sont invalides.' },
+        { status: 401 }
+      )
+    }
+
+    loginBody = { ...loginBody, user_id: userId }
   }
 
   let upstreamResponse: Response
@@ -40,7 +93,7 @@ export async function POST(request: NextRequest) {
     upstreamResponse = await fetch(apiUrl('/auth/login'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: body.email, password: body.password }),
+      body: JSON.stringify(loginBody),
     })
   } catch {
     return NextResponse.json(

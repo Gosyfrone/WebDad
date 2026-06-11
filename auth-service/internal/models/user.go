@@ -43,9 +43,11 @@ type RegisterRequest struct {
 	Password string `json:"password" binding:"required,min=8"`
 }
 
-// LoginRequest : payload de POST /auth/login.
+// LoginRequest : payload de POST /auth/login. Le BFF envoie `email` pour le
+// login classique, ou `user_id` après résolution d'un username via user-service.
 type LoginRequest struct {
-	Email    string `json:"email" binding:"required,email"`
+	Email    string `json:"email,omitempty" binding:"omitempty,email"`
+	UserID   string `json:"user_id,omitempty"`
 	Password string `json:"password" binding:"required"`
 }
 

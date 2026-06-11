@@ -27,7 +27,7 @@ import (
 // Erreurs métier (mappées vers des codes HTTP par les handlers).
 var (
 	ErrEmailTaken          = errors.New("email déjà utilisé")
-	ErrInvalidCredentials  = errors.New("email ou mot de passe invalide")
+	ErrInvalidCredentials  = errors.New("identifiant ou mot de passe invalide")
 	ErrUserInactive        = errors.New("compte désactivé")
 	ErrInvalidRefreshToken = errors.New("refresh token invalide ou expiré")
 	ErrUserNotFound        = errors.New("utilisateur introuvable")
@@ -131,8 +131,22 @@ func (s *AuthService) Login(email, password string) (string, string, *models.Use
 		SELECT id, email, password, role, is_active, email_verified, created_at
 		FROM credentials WHERE email = $1`
 
+	return s.loginWithQuery(q, email, password)
+}
+
+// LoginByUserID vérifie les credentials à partir de l'id auth. Utilisé par le
+// BFF après résolution d'un username dans user-service.
+func (s *AuthService) LoginByUserID(userID, password string) (string, string, *models.User, error) {
+	const q = `
+		SELECT id, email, password, role, is_active, email_verified, created_at
+		FROM credentials WHERE id = $1`
+
+	return s.loginWithQuery(q, userID, password)
+}
+
+func (s *AuthService) loginWithQuery(query, identifier, password string) (string, string, *models.User, error) {
 	u := &models.User{}
-	err := s.db.QueryRow(q, email).
+	err := s.db.QueryRow(query, identifier).
 		Scan(&u.ID, &u.Email, &u.PasswordHash, &u.Role, &u.IsActive, &u.EmailVerified, &u.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", "", nil, ErrInvalidCredentials
