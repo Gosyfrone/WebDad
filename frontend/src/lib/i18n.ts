@@ -416,6 +416,9 @@ export const messages: Record<Locale, Messages> = {
     'trends.empty': 'Aucune tendance pour le moment.',
     'search_suggestions.trend': 'Tendance',
     'search_suggestions.empty': 'Aucune suggestion trouvée.',
+    'search_suggestions.recent': 'Recherches récentes',
+    'search_suggestions.clear_all': 'Tout effacer',
+    'search_suggestions.remove_one': 'Supprimer {label}',
 
     // — Navigation mobile —
     'nav.main_aria': 'Navigation principale',
@@ -1117,6 +1120,9 @@ export const messages: Record<Locale, Messages> = {
     'trends.empty': 'No trends yet.',
     'search_suggestions.trend': 'Trending',
     'search_suggestions.empty': 'No suggestions found.',
+    'search_suggestions.recent': 'Recent searches',
+    'search_suggestions.clear_all': 'Clear all',
+    'search_suggestions.remove_one': 'Remove {label}',
 
     // — Mobile navigation —
     'nav.main_aria': 'Main navigation',

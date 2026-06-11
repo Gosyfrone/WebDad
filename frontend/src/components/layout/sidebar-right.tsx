@@ -5,12 +5,20 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { Search } from 'lucide-react'
 
-import { listHashtagTrends, type HashtagTrend } from '@/lib/posts'
+import { currentUserId, listHashtagTrends, type HashtagTrend } from '@/lib/posts'
 import { ROUTES, hashtagHref, searchHref } from '@/lib/routes'
 import { useAuthGate } from '@/components/auth-prompt-provider'
+import {
+  addSuggestionHistoryEntry,
+  clearSuggestionHistory,
+  readSuggestionHistory,
+  removeSuggestionHistoryEntry,
+  type SuggestionHistoryEntry,
+} from '@/lib/search-suggestion-history'
 import { useT } from '@/components/language-provider'
 import { WhoToFollow } from '@/components/layout/who-to-follow'
 import { LegalLinks } from '@/components/legal/legal-links'
+import { SearchSuggestionsDropdown } from '@/components/search/search-suggestions-dropdown'
 
 export function SidebarRight() {
   const t = useT()
@@ -19,6 +27,9 @@ export function SidebarRight() {
   const router = useRouter()
   const [trends, setTrends] = useState<HashtagTrend[]>([])
   const [query, setQuery] = useState('')
+  const [searchFocused, setSearchFocused] = useState(false)
+  const [history, setHistory] = useState<SuggestionHistoryEntry[]>([])
+  const historyOwnerId = currentUserId()
 
   useEffect(() => {
     let cancelled = false
@@ -34,6 +45,10 @@ export function SidebarRight() {
     }
   }, [pathname])
 
+  useEffect(() => {
+    setHistory(readSuggestionHistory(historyOwnerId))
+  }, [historyOwnerId])
+
   // La messagerie occupe toute la largeur (chat à deux volets) : pas de colonne
   // « Qui suivre » sur /messages.
   if (pathname?.startsWith(ROUTES.messages)) return null
@@ -42,6 +57,25 @@ export function SidebarRight() {
     event.preventDefault()
     const href = searchHref(query)
     if (href !== ROUTES.explorer) router.push(href)
+  }
+
+  function pickSearchSuggestion(
+    href: string,
+    entry?: Omit<SuggestionHistoryEntry, 'visitedAt'>,
+  ) {
+    if (entry) setHistory(addSuggestionHistoryEntry(historyOwnerId, entry))
+    setSearchFocused(false)
+    setQuery('')
+    router.push(href)
+  }
+
+  function clearRecentSearches() {
+    clearSuggestionHistory(historyOwnerId)
+    setHistory([])
+  }
+
+  function removeRecentSearch(entryId: string) {
+    setHistory(removeSuggestionHistoryEntry(historyOwnerId, entryId))
   }
 
   return (
@@ -53,8 +87,18 @@ export function SidebarRight() {
           type="search"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
+          onFocus={() => setSearchFocused(true)}
+          onBlur={() => setSearchFocused(false)}
           placeholder={t('search.placeholder')}
           className="glass w-full rounded-full border py-2.5 pl-10 pr-4 text-sm backdrop-blur placeholder:text-muted-foreground focus:border-[#5B6CFF] focus:bg-white focus:outline-none dark:focus:bg-white/10"
+        />
+        <SearchSuggestionsDropdown
+          query={query}
+          open={searchFocused}
+          history={history}
+          onPick={pickSearchSuggestion}
+          onClearHistory={clearRecentSearches}
+          onRemoveHistory={removeRecentSearch}
         />
       </form>
 

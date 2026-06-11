@@ -8,9 +8,9 @@
 > - **[CHANGELOG.md](CHANGELOG.md)** — session work log · **[CHANGELOG_ARCHIVE.md](CHANGELOG_ARCHIVE.md)** — resolved issues / debugging history.
 > - **[PROMPTING.md](PROMPTING.md)** — token-efficient workflow + prompt templates (read on demand, NOT auto-loaded; user may say *"from PROMPTING.md, write me the prompt for: …"*).
 > - Knowledge graph in `graphify-out/` — query it before reading source (see Operating Rules).
-> - Latest session note: 11/06/2026 — hashtag search has an X-style dropdown with trend/profile suggestions, and Swagger regenerated; details in `CHANGELOG.md`.
+> - Latest session note: 11/06/2026 — right-column Trends search now shares the X-style hashtag/profile dropdown and keeps recent clicked searches; details in `CHANGELOG.md`.
 
-*Last Codex sync: 11/06/2026 — hashtag/profile suggestions dropdown implemented and documented.*
+*Last Codex sync: 11/06/2026 — right-column search suggestions/history implemented and documented.*
 
 ---
 
@@ -176,6 +176,8 @@ several well-chosen secondary features · **all 3 roles functional** · pro slid
 - 2026-06-11: runtime check after hashtag/search UX follow-up: restarted `webdad-post-service-1` and `webdad-frontend-1`; `http://localhost:3000/login` returns 200, `/feed?hashtag=test&tab=top` redirects 307 to `/login` when unauthenticated, gateway `GET /posts?hashtag=test&sort=top&limit=1` returns 200, and Docker exposes `webdad-frontend-1` on `0.0.0.0:3000->3000/tcp`. `graphify update .` still unavailable because `graphify` is not installed.
 - 2026-06-11: hashtag results search dropdown implemented after validation. On `/feed?hashtag=...`, typing in the top search bar opens an X-style dark dropdown: first 3 matching hashtag trends from `GET /posts/trends?q=...&limit=3`, then profile suggestions. Clicking a hashtag opens `/feed?hashtag=...&tab=top`; clicking a user opens `/profil/<username>` directly. Explorer/search now finds users by `@username`, plain username, or display_name. Swagger regenerated for the new `q` query param on `/posts/trends`. Vérifs: post-service `go test . ./internal/...`, frontend `npm run build`.
 - 2026-06-11: runtime check after hashtag suggestions dropdown: restarted `webdad-post-service-1` and `webdad-frontend-1`; `http://localhost:3000/login` returns 200, `/feed?hashtag=test&tab=top` redirects 307 to `/login` when unauthenticated, gateway `GET /posts/trends?q=te&limit=3` returns 200 with filtered data, and Docker exposes `webdad-frontend-1` on `0.0.0.0:3000->3000/tcp`. `graphify update .` still unavailable because `graphify` is not installed.
+- 2026-06-11: right-column Trends search follow-up implemented after validation. The sidebar search now uses the same X-style dropdown as hashtag pages: while typing it shows up to 3 matching hashtag suggestions, then profiles; clicking a suggestion navigates directly and stores it in local per-user history. With an empty focused field, recent searches appear with "clear all" and per-item removal. No backend/Swagger change required. Vérif: frontend `npm run build`.
+- 2026-06-11: runtime check after right-column search history follow-up: restarted `webdad-frontend-1`; `http://localhost:3000/login` returns 200 and Docker exposes `webdad-frontend-1` on `0.0.0.0:3000->3000/tcp`. `graphify update .` still unavailable because `graphify` is not installed.
 
 ---
 

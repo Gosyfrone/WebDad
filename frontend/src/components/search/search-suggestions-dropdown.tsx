@@ -1,11 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Hash, Loader2, Search } from 'lucide-react'
+import { Clock3, Hash, Loader2, Search, X } from 'lucide-react'
 
 import { searchUsers } from '@/lib/api'
 import { listHashtagTrends, type HashtagTrend } from '@/lib/posts'
 import { hashtagHref, profilHref } from '@/lib/routes'
+import type { SuggestionHistoryEntry } from '@/lib/search-suggestion-history'
 import type { RelationUser } from '@/types'
 import { useT } from '@/components/language-provider'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -13,12 +14,18 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 interface SearchSuggestionsDropdownProps {
   query: string
   open: boolean
-  onPick: (href: string) => void
+  history?: SuggestionHistoryEntry[]
+  onClearHistory?: () => void
+  onRemoveHistory?: (id: string) => void
+  onPick: (href: string, entry?: Omit<SuggestionHistoryEntry, 'visitedAt'>) => void
 }
 
 export function SearchSuggestionsDropdown({
   query,
   open,
+  history = [],
+  onClearHistory,
+  onRemoveHistory,
   onPick,
 }: SearchSuggestionsDropdownProps) {
   const t = useT()
@@ -60,7 +67,67 @@ export function SearchSuggestionsDropdown({
     }
   }, [debounced, open])
 
-  if (!open || !query.trim()) return null
+  if (!open) return null
+
+  const trimmedQuery = query.trim()
+
+  if (!trimmedQuery) {
+    if (history.length === 0) return null
+    return (
+      <div className="absolute left-0 right-0 top-[calc(100%+0.45rem)] z-50 max-h-[70vh] overflow-y-auto rounded-[18px] border border-white/10 bg-black text-white shadow-2xl shadow-black/40 ring-1 ring-white/10">
+        <div className="flex items-center justify-between gap-3 px-5 py-3">
+          <div className="flex min-w-0 items-center gap-2 text-[15px] font-bold">
+            <Clock3 className="h-4 w-4 shrink-0 text-white/60" aria-hidden />
+            <span className="truncate">{t('search_suggestions.recent')}</span>
+          </div>
+          {onClearHistory && (
+            <button
+              type="button"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={onClearHistory}
+              className="shrink-0 text-sm font-semibold text-[#47D9FF] transition-colors hover:text-white"
+            >
+              {t('search_suggestions.clear_all')}
+            </button>
+          )}
+        </div>
+        {history.map((entry) => (
+          <SuggestionButton key={entry.id} onPick={() => onPick(entry.href)}>
+            {entry.kind === 'profile' ? (
+              <Avatar className="h-10 w-10 shrink-0">
+                {entry.avatarUrl && <AvatarImage src={entry.avatarUrl} alt={entry.label} />}
+                <AvatarFallback>{initialsFromText(entry.label, entry.subtitle)}</AvatarFallback>
+              </Avatar>
+            ) : (
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-white">
+                <Search className="h-6 w-6" aria-hidden />
+              </span>
+            )}
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[15px] font-bold leading-5">{entry.label}</span>
+              <span className="block truncate text-[15px] leading-5 text-white/45">
+                {entry.subtitle}
+              </span>
+            </span>
+            {onRemoveHistory && (
+              <button
+                type="button"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  onRemoveHistory(entry.id)
+                }}
+                className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-white/45 transition hover:bg-white/10 hover:text-white"
+                aria-label={t('search_suggestions.remove_one', { label: entry.label })}
+              >
+                <X className="h-4 w-4" aria-hidden />
+              </button>
+            )}
+          </SuggestionButton>
+        ))}
+      </div>
+    )
+  }
 
   const hasContent = hashtags.length > 0 || users.length > 0
 
@@ -75,7 +142,15 @@ export function SearchSuggestionsDropdown({
           {hashtags.map((trend) => (
             <SuggestionButton
               key={trend.tag}
-              onPick={() => onPick(hashtagHref(trend.tag, 'top'))}
+              onPick={() =>
+                onPick(hashtagHref(trend.tag, 'top'), {
+                  id: `hashtag:${trend.tag}`,
+                  kind: 'hashtag',
+                  label: `#${trend.tag}`,
+                  subtitle: t('search_suggestions.trend'),
+                  href: hashtagHref(trend.tag, 'top'),
+                })
+              }
             >
               <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-white">
                 <Search className="h-6 w-6" aria-hidden />
@@ -94,7 +169,16 @@ export function SearchSuggestionsDropdown({
           {users.map((user) => (
             <SuggestionButton
               key={user.id}
-              onPick={() => onPick(profilHref(user.username))}
+              onPick={() =>
+                onPick(profilHref(user.username), {
+                  id: `profile:${user.id}`,
+                  kind: 'profile',
+                  label: user.displayName,
+                  subtitle: `@${user.username}`,
+                  href: profilHref(user.username),
+                  avatarUrl: user.avatarUrl,
+                })
+              }
             >
               <Avatar className="h-10 w-10 shrink-0">
                 {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user.displayName} />}
@@ -146,5 +230,9 @@ function SuggestionButton({
 }
 
 function initials(user: RelationUser): string {
-  return (user.displayName.charAt(0) || user.username.charAt(0) || '?').toUpperCase()
+  return initialsFromText(user.displayName, user.username)
+}
+
+function initialsFromText(label: string, subtitle: string): string {
+  return (label.charAt(0) || subtitle.charAt(0) || '?').toUpperCase()
 }

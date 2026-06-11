@@ -158,6 +158,8 @@
   media attachments. Search routing is shared on the front: `#tag` opens hashtag results, while plain text remains
   account/profile search in Explorer. `/posts/trends?q=...` supports prefix suggestions for the hashtag search
   dropdown; the same visibility filtering applies before counting, so suggestions do not leak private authors.
+  The right-column search stores only clicked suggestion metadata in localStorage per user (`breezy-suggestion-history`)
+  because it is cosmetic UX state, not a domain datum worth a backend service.
 - **Bookmarks = collections (many-to-many) + non-deletable default collection + burst model.** Bookmarks reference a
   post → same service as likes/reposts. Many-to-many because a post can be filed in several collections. **Burst model**
   (Instagram "save"): a short click within `BOOKMARK_SESSION_WINDOW` auto-files into the last collection (`filed`),
