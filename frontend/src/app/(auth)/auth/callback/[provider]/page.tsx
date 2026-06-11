@@ -14,8 +14,15 @@ function CallbackContent({ provider }: { provider: string }) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [error, setError] = React.useState<string | null>(null)
+  // Le code OAuth est à usage unique : on garantit un seul échange même sous le
+  // double-montage de React StrictMode (dev), sinon le 2e POST réutilise un code
+  // déjà consommé et fait flasher une fausse erreur sur un login pourtant réussi.
+  const exchangeStarted = React.useRef(false)
 
   React.useEffect(() => {
+    if (exchangeStarted.current) return
+    exchangeStarted.current = true
+
     const code = searchParams.get('code')
     const state = searchParams.get('state')
 
