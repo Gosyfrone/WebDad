@@ -22,10 +22,10 @@ func TestBrandedEmailHTML(t *testing.T) {
 	}
 
 	for _, want := range []string{
-		"Bienvenue sur Breezy",         // heading
-		"Confirme ton adresse.",        // intro / pré-en-tête
-		"Vérifier mon adresse",         // libellé du bouton
-		link,                           // CTA + repli copiable
+		"Bienvenue sur Breezy",               // heading
+		"Confirme ton adresse.",              // intro / pré-en-tête
+		"Vérifier mon adresse",               // libellé du bouton
+		link,                                 // CTA + repli copiable
 		"https://breezy.app/logo_breezy.png", // logo dérivé du baseURL (slash final normalisé)
 		"Ce lien expire dans 24 heures.",     // footnote
 	} {
