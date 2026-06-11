@@ -56,11 +56,11 @@ type UserKey struct {
 type KeyBackup struct {
 	ID                bson.ObjectID `bson:"_id,omitempty" json:"id"`
 	UserID            string        `bson:"user_id" json:"user_id"`
-	Salt              string        `bson:"salt" json:"salt"`                                 // sel Argon2id (base64)
-	Nonce             string        `bson:"nonce" json:"nonce"`                               // nonce XChaCha20 de l'emballage (base64)
-	WrappedPrivateKey string        `bson:"wrapped_private_key" json:"wrapped_private_key"`   // clé privée emballée (base64)
-	KDFParams         string        `bson:"kdf_params" json:"kdf_params"`                     // paramètres Argon2id (JSON: m,t,p)
-	PublicKey         string        `bson:"public_key" json:"public_key"`                     // clé publique associée (vérif. post-déballage)
+	Salt              string        `bson:"salt" json:"salt"`                               // sel Argon2id (base64)
+	Nonce             string        `bson:"nonce" json:"nonce"`                             // nonce XChaCha20 de l'emballage (base64)
+	WrappedPrivateKey string        `bson:"wrapped_private_key" json:"wrapped_private_key"` // clé privée emballée (base64)
+	KDFParams         string        `bson:"kdf_params" json:"kdf_params"`                   // paramètres Argon2id (JSON: m,t,p)
+	PublicKey         string        `bson:"public_key" json:"public_key"`                   // clé publique associée (vérif. post-déballage)
 	CreatedAt         time.Time     `bson:"created_at" json:"created_at"`
 	UpdatedAt         time.Time     `bson:"updated_at" json:"updated_at"`
 }
