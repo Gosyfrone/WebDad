@@ -1,0 +1,114 @@
+name: Build & Deploy
+
+on:
+  push:
+    branches: [main, develop]
+
+env:
+  IMAGE_BASE: ghcr.io/${{ github.repository_owner }}/webdad
+
+jobs:
+  # ── 1. Calcul du tag et de l'environnement cible ─────────────────
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+      env: ${{ steps.meta.outputs.env }}
+    steps:
+      - id: meta
+        run: |
+          if [ "${{ github.ref_name }}" = "main" ]; then
+            echo "tag=latest"       >> $GITHUB_OUTPUT
+            echo "env=production"   >> $GITHUB_OUTPUT
+          else
+            echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            echo "env=staging"      >> $GITHUB_OUTPUT
+          fi
+
+  # ── 2. Build & push de chaque service en parallèle ───────────────
+  build-push:
+    name: ${{ matrix.name }}
+    needs: prepare
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: auth-service,        context: ./auth-service }
+          - { name: user-service,        context: ./user-service }
+          - { name: profil-service,      context: ./profil-service }
+          - { name: post-service,        context: ./post-service }
+          - { name: message-service,     context: ./message-service }
+          - { name: notification-service, context: ./notification-service }
+          - { name: media-service,       context: ./media-service }
+          - { name: mail-service,        context: ./mail-service }
+          - { name: api-gateway,         context: ./api-gateway }
+          - { name: frontend,            context: ./frontend }
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build args (frontend uniquement)
+        id: args
+        run: |
+          if [ "${{ matrix.name }}" = "frontend" ]; then
+            echo "value=NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }}" >> $GITHUB_OUTPUT
+          else
+            echo "value=" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build & push
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.context }}
+          push: true
+          tags: ${{ env.IMAGE_BASE }}/${{ matrix.name }}:${{ needs.prepare.outputs.tag }}
+          build-args: ${{ steps.args.outputs.value }}
+          cache-from: type=registry,ref=${{ env.IMAGE_BASE }}/${{ matrix.name }}:buildcache
+          cache-to:   type=registry,ref=${{ env.IMAGE_BASE }}/${{ matrix.name }}:buildcache,mode=max
+
+  # ── 3. Déploiement ────────────────────────────────────────────────
+  deploy:
+    name: Deploy → ${{ needs.prepare.outputs.env }}
+    needs: [prepare, build-push]
+    runs-on: ubuntu-latest
+    environment: ${{ needs.prepare.outputs.env }}
+
+    steps:
+      # TODO: activer une fois le VPS OVH provisionné.
+      # Ajouter OVH_HOST, OVH_USER, OVH_SSH_KEY dans les secrets de
+      # l'environnement GitHub ("production" et "staging").
+      #
+      # - name: Deploy via SSH
+      #   uses: appleboy/ssh-action@v1
+      #   with:
+      #     host:     ${{ secrets.OVH_HOST }}
+      #     username: ${{ secrets.OVH_USER }}
+      #     key:      ${{ secrets.OVH_SSH_KEY }}
+      #     script: |
+      #       cd /opt/breezy
+      #       echo "${{ secrets.GITHUB_TOKEN }}" \
+      #         | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+      #       IMAGE_TAG=${{ needs.prepare.outputs.tag }} \
+      #         docker compose -f docker-compose.prod.yml pull
+      #       IMAGE_TAG=${{ needs.prepare.outputs.tag }} \
+      #         docker compose -f docker-compose.prod.yml up -d --remove-orphans
+
+      - name: Placeholder — OVH non configuré
+        run: |
+          echo "Déploiement en attente de configuration OVH."
+          echo "Environnement : ${{ needs.prepare.outputs.env }}"
+          echo "Image tag     : ${{ needs.prepare.outputs.tag }}"
+          echo "Secrets requis: OVH_HOST · OVH_USER · OVH_SSH_KEY"

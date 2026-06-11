@@ -1,0 +1,391 @@
+networks:
+  webdad-net:
+    driver: bridge
+
+volumes:
+  postgres-auth-data:
+  postgres-user-data:
+  mongo-profil-data:
+  mongo-post-data:
+  mongo-message-data:
+  mongo-notification-data:
+  minio-data:
+
+# ────────────────────────────────────────────────────────────────────
+# Compose de PRODUCTION — utilise les images GHCR, pas de build local.
+#
+# Usage sur le VPS :
+#   IMAGE_TAG=latest docker compose -f docker-compose.prod.yml pull
+#   IMAGE_TAG=latest docker compose -f docker-compose.prod.yml up -d
+#
+# Prérequis :
+#   - .env (racine) renseigné avec les vraies clés (voir .env.prod.example)
+#   - <service>/.env renseignés (voir .env.prod.example)
+#   - docker login ghcr.io -u <github-user> --password-stdin
+#
+# Ports DB intentionnellement non exposés à l'hôte (sécurité).
+# IMAGE_TAG : "latest" pour main, "develop" pour la branche develop.
+# ────────────────────────────────────────────────────────────────────
+
+services:
+
+  # ─── Bases de données ────────────────────────────────────────────
+  postgres-auth:
+    image: postgres:16-alpine
+    restart: always
+    env_file:
+      - ./auth-service/.env
+    volumes:
+      - postgres-auth-data:/var/lib/postgresql/data
+    networks:
+      - webdad-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  postgres-user:
+    image: postgres:16-alpine
+    restart: always
+    env_file:
+      - ./user-service/.env
+    volumes:
+      - postgres-user-data:/var/lib/postgresql/data
+    networks:
+      - webdad-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mongo-profil:
+    image: mongo:7
+    restart: always
+    env_file:
+      - ./profil-service/.env
+    volumes:
+      - mongo-profil-data:/data/db
+    networks:
+      - webdad-net
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  mongo-post:
+    image: mongo:7
+    restart: always
+    env_file:
+      - ./post-service/.env
+    volumes:
+      - mongo-post-data:/data/db
+    networks:
+      - webdad-net
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  mongo-message:
+    image: mongo:7
+    restart: always
+    env_file:
+      - ./message-service/.env
+    volumes:
+      - mongo-message-data:/data/db
+    networks:
+      - webdad-net
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  mongo-notification:
+    image: mongo:7
+    restart: always
+    env_file:
+      - ./notification-service/.env
+    volumes:
+      - mongo-notification-data:/data/db
+    networks:
+      - webdad-net
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  minio:
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+    restart: always
+    command: server /data --console-address ":9001"
+    env_file:
+      - ./media-service/.env
+    volumes:
+      - minio-data:/data
+    networks:
+      - webdad-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # ─── Services Go ─────────────────────────────────────────────────
+  auth-service:
+    image: ghcr.io/gosyfrone/webdad/auth-service:${IMAGE_TAG:-latest}
+    restart: always
+    env_file:
+      - ./auth-service/.env
+    environment:
+      GIN_MODE: release
+      DB_HOST: postgres-auth
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET requis}
+      JWT_EXPIRY: ${JWT_EXPIRY:-15m}
+      MAIL_SERVICE_URL: http://mail-service:8089
+      MAIL_INTERNAL_SECRET: ${MAIL_INTERNAL_SECRET:?MAIL_INTERNAL_SECRET requis}
+      APP_BASE_URL: ${APP_BASE_URL:?APP_BASE_URL requis}
+    ports:
+      - "8081:8081"
+    networks:
+      - webdad-net
+    depends_on:
+      postgres-auth:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8081/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  user-service:
+    image: ghcr.io/gosyfrone/webdad/user-service:${IMAGE_TAG:-latest}
+    restart: always
+    env_file:
+      - ./user-service/.env
+    environment:
+      GIN_MODE: release
+      DB_HOST: postgres-user
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET requis}
+      PROFIL_SERVICE_URL: http://profil-service:8083
+      NOTIFICATION_SERVICE_URL: http://notification-service:8086
+      INTERNAL_EVENT_SECRET: ${INTERNAL_EVENT_SECRET:?INTERNAL_EVENT_SECRET requis}
+    ports:
+      - "8082:8082"
+    networks:
+      - webdad-net
+    depends_on:
+      postgres-user:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8082/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  profil-service:
+    image: ghcr.io/gosyfrone/webdad/profil-service:${IMAGE_TAG:-latest}
+    restart: always
+    env_file:
+      - ./profil-service/.env
+    environment:
+      GIN_MODE: release
+      MONGO_HOST: mongo-profil
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET requis}
+    ports:
+      - "8083:8083"
+    networks:
+      - webdad-net
+    depends_on:
+      mongo-profil:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8083/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  post-service:
+    image: ghcr.io/gosyfrone/webdad/post-service:${IMAGE_TAG:-latest}
+    restart: always
+    env_file:
+      - ./post-service/.env
+    environment:
+      GIN_MODE: release
+      MONGO_HOST: mongo-post
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET requis}
+      NOTIFICATION_SERVICE_URL: http://notification-service:8086
+      INTERNAL_EVENT_SECRET: ${INTERNAL_EVENT_SECRET:?INTERNAL_EVENT_SECRET requis}
+      USER_SERVICE_URL: http://user-service:8082
+      PROFIL_SERVICE_URL: http://profil-service:8083
+      INTERNAL_SECRET: ${INTERNAL_SECRET:-}
+    ports:
+      - "8084:8084"
+    networks:
+      - webdad-net
+    depends_on:
+      mongo-post:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8084/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  message-service:
+    image: ghcr.io/gosyfrone/webdad/message-service:${IMAGE_TAG:-latest}
+    restart: always
+    env_file:
+      - ./message-service/.env
+    environment:
+      GIN_MODE: release
+      MONGO_HOST: mongo-message
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET requis}
+      NOTIFICATION_SERVICE_URL: http://notification-service:8086
+      INTERNAL_EVENT_SECRET: ${INTERNAL_EVENT_SECRET:?INTERNAL_EVENT_SECRET requis}
+    ports:
+      - "8085:8085"
+    networks:
+      - webdad-net
+    depends_on:
+      mongo-message:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8085/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  notification-service:
+    image: ghcr.io/gosyfrone/webdad/notification-service:${IMAGE_TAG:-latest}
+    restart: always
+    env_file:
+      - ./notification-service/.env
+    environment:
+      GIN_MODE: release
+      MONGO_HOST: mongo-notification
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET requis}
+      INTERNAL_EVENT_SECRET: ${INTERNAL_EVENT_SECRET:?INTERNAL_EVENT_SECRET requis}
+      USER_SERVICE_URL: http://user-service:8082
+    ports:
+      - "8086:8086"
+    networks:
+      - webdad-net
+    depends_on:
+      mongo-notification:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8086/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  media-service:
+    image: ghcr.io/gosyfrone/webdad/media-service:${IMAGE_TAG:-latest}
+    restart: always
+    env_file:
+      - ./media-service/.env
+    environment:
+      GIN_MODE: release
+      MINIO_ENDPOINT: minio:9000
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET requis}
+    ports:
+      - "8087:8087"
+    networks:
+      - webdad-net
+    depends_on:
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8087/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  mail-service:
+    image: ghcr.io/gosyfrone/webdad/mail-service:${IMAGE_TAG:-latest}
+    restart: always
+    env_file:
+      - ./mail-service/.env
+    environment:
+      GIN_MODE: release
+      MAIL_INTERNAL_SECRET: ${MAIL_INTERNAL_SECRET:?MAIL_INTERNAL_SECRET requis}
+    ports:
+      - "8089:8089"
+    networks:
+      - webdad-net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8089/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  api-gateway:
+    image: ghcr.io/gosyfrone/webdad/api-gateway:${IMAGE_TAG:-latest}
+    restart: always
+    env_file:
+      - ./api-gateway/.env
+    environment:
+      GIN_MODE: release
+      AUTH_SERVICE_URL: http://auth-service:8081
+      USER_SERVICE_URL: http://user-service:8082
+      PROFIL_SERVICE_URL: http://profil-service:8083
+      POST_SERVICE_URL: http://post-service:8084
+      MESSAGE_SERVICE_URL: http://message-service:8085
+      NOTIFICATION_SERVICE_URL: http://notification-service:8086
+      MEDIA_SERVICE_URL: http://media-service:8087
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET requis}
+    ports:
+      - "8080:8080"
+    networks:
+      - webdad-net
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      user-service:
+        condition: service_healthy
+      profil-service:
+        condition: service_healthy
+      post-service:
+        condition: service_healthy
+      message-service:
+        condition: service_healthy
+      notification-service:
+        condition: service_healthy
+      media-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  frontend:
+    image: ghcr.io/gosyfrone/webdad/frontend:${IMAGE_TAG:-latest}
+    restart: always
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:?NEXT_PUBLIC_API_URL requis}
+      API_INTERNAL_URL: http://api-gateway:8080
+      TRANSLATION_API_URL: ${TRANSLATION_API_URL:-https://libretranslate.de/translate}
+      TRANSLATION_API_KEY: ${TRANSLATION_API_KEY:-}
+    ports:
+      - "3000:3000"
+    networks:
+      - webdad-net
+    depends_on:
+      api-gateway:
+        condition: service_healthy
