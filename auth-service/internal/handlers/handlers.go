@@ -2,14 +2,18 @@
 // Réponses standardisées : succès = {"data": ...}, erreur = {"error": ...}.
 package handlers
 
-import "github.com/webdad/auth-service/internal/services"
+import (
+	"github.com/webdad/auth-service/internal/oauth"
+	"github.com/webdad/auth-service/internal/services"
+)
 
 // Handler porte les dépendances partagées par les handlers.
 type Handler struct {
-	auth *services.AuthService
+	auth  *services.AuthService
+	oauth *oauth.Registry
 }
 
 // New construit le groupe de handlers.
-func New(auth *services.AuthService) *Handler {
-	return &Handler{auth: auth}
+func New(auth *services.AuthService, oauthReg *oauth.Registry) *Handler {
+	return &Handler{auth: auth, oauth: oauthReg}
 }

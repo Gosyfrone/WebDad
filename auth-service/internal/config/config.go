@@ -44,6 +44,13 @@ type Config struct {
 
 	AccountPurgeAfter         time.Duration
 	AccountPurgeSweepInterval time.Duration
+
+	// OAuth OIDC (Login with Google). Un provider sans ClientID est simplement
+	// ignoré (endpoints → 404). Le redirect URI front est dérivé de
+	// OAuthRedirectBaseURL : <base>/auth/callback/<provider>.
+	OAuthRedirectBaseURL string
+	GoogleClientID       string
+	GoogleClientSecret   string
 }
 
 // Load construit la config. Charge les .env best-effort (ignorés s'ils
@@ -90,6 +97,10 @@ func Load() *Config {
 	cfg.MediaServiceURL = getEnv("MEDIA_SERVICE_URL", defaultServiceURL("media-service", "8087"))
 	cfg.AccountPurgeAfter = parseDurationOr("ACCOUNT_PURGE_AFTER", 43800*time.Hour) // ~5 ans
 	cfg.AccountPurgeSweepInterval = parseDurationOr("ACCOUNT_PURGE_SWEEP_INTERVAL", 12*time.Hour)
+
+	cfg.OAuthRedirectBaseURL = getEnv("OAUTH_REDIRECT_BASE_URL", "http://localhost:3000")
+	cfg.GoogleClientID = os.Getenv("GOOGLE_CLIENT_ID")
+	cfg.GoogleClientSecret = os.Getenv("GOOGLE_CLIENT_SECRET")
 
 	return cfg
 }

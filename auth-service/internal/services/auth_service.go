@@ -39,6 +39,9 @@ var (
 	ErrEmailNotVerified = errors.New("adresse e-mail non vérifiée")
 	// ErrInvalidToken : token de vérification inconnu / expiré / déjà consommé.
 	ErrInvalidToken = errors.New("token invalide ou expiré")
+	// ErrNoLocalPassword : tentative de login classique sur un compte créé via
+	// un provider externe (password NULL). Le front doit rediriger vers OAuth.
+	ErrNoLocalPassword = errors.New("ce compte se connecte via un fournisseur externe (Google) ; aucun mot de passe n'est défini")
 )
 
 // Usages des account_tokens + TTL de la vérification d'e-mail.
@@ -146,8 +149,9 @@ func (s *AuthService) LoginByUserID(userID, password string) (string, string, *m
 
 func (s *AuthService) loginWithQuery(query, identifier, password string) (string, string, *models.User, error) {
 	u := &models.User{}
+	var pwHash sql.NullString // NULL pour les comptes OAuth (sans mot de passe)
 	err := s.db.QueryRow(query, identifier).
-		Scan(&u.ID, &u.Email, &u.PasswordHash, &u.Role, &u.IsActive, &u.EmailVerified, &u.CreatedAt)
+		Scan(&u.ID, &u.Email, &pwHash, &u.Role, &u.IsActive, &u.EmailVerified, &u.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", "", nil, ErrInvalidCredentials
 	}
@@ -158,13 +162,68 @@ func (s *AuthService) loginWithQuery(query, identifier, password string) (string
 	if !u.IsActive {
 		return "", "", nil, ErrUserInactive
 	}
-	if bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(password)) != nil {
+	// Compte sans mot de passe local (créé via OAuth) : login classique refusé
+	// avec un message clair plutôt qu'un 401 générique.
+	if !pwHash.Valid || pwHash.String == "" {
+		return "", "", nil, ErrNoLocalPassword
+	}
+	if bcrypt.CompareHashAndPassword([]byte(pwHash.String), []byte(password)) != nil {
 		return "", "", nil, ErrInvalidCredentials
 	}
 	// Blocage dur : un compte non vérifié ne peut pas se connecter (aucun token
 	// émis). Vérifié APRÈS le bcrypt pour ne pas révéler l'existence du compte.
 	if !u.EmailVerified {
 		return "", "", nil, ErrEmailNotVerified
+	}
+
+	return s.issueTokens(u)
+}
+
+// LoginWithOAuth connecte un utilisateur à partir d'une identité OIDC vérifiée
+// (email + subject du provider). Rapprochement par email :
+//   - compte existant → on le connecte et on renseigne provider_subject s'il
+//     n'est pas déjà lié (le compte local conserve son mot de passe) ;
+//   - aucun compte → création d'un compte (role=user) SANS mot de passe
+//     (password NULL), avec provider + provider_subject renseignés.
+//
+// Émet ensuite NOS tokens (access + refresh), exactement comme Login.
+func (s *AuthService) LoginWithOAuth(provider, subject, email string) (string, string, *models.User, error) {
+	u := &models.User{}
+
+	const sel = `
+		SELECT id, email, role, is_active, created_at, provider
+		FROM credentials WHERE email = $1`
+	err := s.db.QueryRow(sel, email).
+		Scan(&u.ID, &u.Email, &u.Role, &u.IsActive, &u.CreatedAt, &u.Provider)
+
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		// Création : compte OAuth sans mot de passe local.
+		const ins = `
+			INSERT INTO credentials (email, password, role, provider, provider_subject)
+			VALUES ($1, NULL, $2, $3, $4)
+			RETURNING id, email, role, is_active, created_at, provider`
+		if err := s.db.QueryRow(ins, email, models.RoleUser, provider, subject).
+			Scan(&u.ID, &u.Email, &u.Role, &u.IsActive, &u.CreatedAt, &u.Provider); err != nil {
+			return "", "", nil, fmt.Errorf("création compte OAuth : %w", err)
+		}
+
+	case err != nil:
+		return "", "", nil, fmt.Errorf("lecture utilisateur : %w", err)
+
+	default:
+		if !u.IsActive {
+			return "", "", nil, ErrUserInactive
+		}
+		// Rapprochement : renseigne provider_subject uniquement s'il est absent
+		// (on ne réécrase pas un lien existant → pas de prise de contrôle via un
+		// autre compte externe partageant l'email).
+		const upd = `
+			UPDATE credentials SET provider_subject = $1
+			WHERE id = $2 AND provider_subject IS NULL`
+		if _, err := s.db.Exec(upd, subject, u.ID); err != nil {
+			return "", "", nil, fmt.Errorf("rapprochement compte OAuth : %w", err)
+		}
 	}
 
 	return s.issueTokens(u)

@@ -22,6 +22,7 @@ import (
 // @Failure     400 {object} map[string]string "Payload invalide"
 // @Failure     401 {object} map[string]string "Credentials invalides"
 // @Failure     403 {object} map[string]string "Compte désactivé ou e-mail non vérifié (code: email_not_verified)"
+// @Failure     409 {object} map[string]string "Compte sans mot de passe (connexion via Google)"
 // @Failure     500 {object} map[string]string "Erreur interne"
 // @Router      /auth/login [post]
 func (h *Handler) Login(c *gin.Context) {
@@ -53,6 +54,9 @@ func (h *Handler) Login(c *gin.Context) {
 		switch {
 		case errors.Is(err, services.ErrInvalidCredentials):
 			c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		case errors.Is(err, services.ErrNoLocalPassword):
+			// 409 : conflit de méthode d'auth (le compte passe par un provider).
+			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
 		case errors.Is(err, services.ErrUserInactive):
 			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
 		case errors.Is(err, services.ErrEmailNotVerified):

@@ -117,6 +117,7 @@ export default function RegisterPage() {
     React.useState(false)
   const [errors, setErrors] = React.useState<FormErrors>({})
   const [isSubmitting, setIsSubmitting] = React.useState(false)
+  const [oauthLoading, setOauthLoading] = React.useState<string | null>(null)
   const todayDate = React.useMemo(() => toDateInputValue(new Date()), [])
   const minimumAgeBirthDate = React.useMemo(() => {
     const date = new Date()
@@ -179,6 +180,23 @@ export default function RegisterPage() {
 
     return nextErrors
   }, [birthDate, email, gender, minimumAgeBirthDate, password, passwordConfirmation, todayDate, username, t])
+
+  const handleOAuth = async (provider: string) => {
+    setOauthLoading(provider)
+    try {
+      const response = await fetch(`/api/auth/oauth/${provider}`)
+      const payload = await response.json().catch(() => null)
+      if (!response.ok || !payload?.url) {
+        setErrors({ form: payload?.error ?? t('auth.oauth.error') })
+        setOauthLoading(null)
+        return
+      }
+      window.location.href = payload.url
+    } catch {
+      setErrors({ form: t('auth.err.network') })
+      setOauthLoading(null)
+    }
+  }
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -802,10 +820,12 @@ export default function RegisterPage() {
                   <div className="h-px flex-1 bg-gradient-to-r from-transparent via-border to-transparent" />
                 </div>
 
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 gap-2">
                   <button
                     type="button"
-                    className="flex h-9 items-center justify-center gap-2 rounded-2xl border border-white/70 bg-white/85 transition hover:scale-[1.01] hover:bg-white hover:shadow-md dark:border-white/15 dark:bg-white/10 dark:hover:bg-white/20"
+                    disabled={oauthLoading !== null || isSubmitting}
+                    onClick={() => handleOAuth('google')}
+                    className="flex h-9 items-center justify-center gap-2 rounded-2xl border border-gray-300 bg-white transition hover:scale-[1.01] hover:bg-white hover:shadow-md disabled:cursor-not-allowed disabled:opacity-70"
                   >
                     <Image
                       src="/google-logo.jpg"
@@ -813,23 +833,8 @@ export default function RegisterPage() {
                       width={17}
                       height={17}
                     />
-                    <span className="text-sm font-medium text-foreground/80">
-                      Google
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
-                    className="flex h-9 items-center justify-center gap-2 rounded-2xl border border-white/70 bg-white/85 transition hover:scale-[1.01] hover:bg-white hover:shadow-md dark:border-white/15 dark:bg-white/10 dark:hover:bg-white/20"
-                  >
-                    <Image
-                      src="/microsoft-logo.png"
-                      alt="Microsoft"
-                      width={17}
-                      height={17}
-                    />
-                    <span className="text-sm font-medium text-foreground/80">
-                      Microsoft
+                    <span className="text-sm font-medium text-gray-800">
+                      {oauthLoading === 'google' ? t('auth.oauth.loading') : 'Google'}
                     </span>
                   </button>
                 </div>

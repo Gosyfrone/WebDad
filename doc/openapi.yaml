@@ -46,6 +46,12 @@ paths:
             type: object
             additionalProperties:
               type: string
+        '409':
+          description: Compte sans mot de passe (connexion via Google)
+          schema:
+            type: object
+            additionalProperties:
+              type: string
         '500':
           description: Erreur interne
           schema:
@@ -70,6 +76,96 @@ paths:
       responses:
         '200':
           description: Déconnecté
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '500':
+          description: Erreur interne
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /auth/oauth/{provider}/exchange:
+    post:
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      tags:
+      - auth
+      summary: Finaliser une connexion OAuth (Google)
+      parameters:
+      - enum:
+        - google
+        type: string
+        description: Fournisseur OIDC
+        name: provider
+        in: path
+        required: true
+      - description: Code d'autorisation
+        name: body
+        in: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.OAuthExchangeRequest'
+      responses:
+        '200':
+          description: 'Connexion réussie — data: {token, refresh_token, user}'
+          schema:
+            $ref: '#/definitions/models.AuthUser'
+        '400':
+          description: Payload invalide
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '401':
+          description: Échange/vérification OAuth échoué ou email non vérifié
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '403':
+          description: Compte désactivé
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '404':
+          description: Provider non supporté/configuré
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '500':
+          description: Erreur interne
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /auth/oauth/{provider}/url:
+    get:
+      produces:
+      - application/json
+      tags:
+      - auth
+      summary: Démarrer une connexion OAuth (Google)
+      parameters:
+      - enum:
+        - google
+        type: string
+        description: Fournisseur OIDC
+        name: provider
+        in: path
+        required: true
+      responses:
+        '200':
+          description: 'data: {url, state}'
+          schema:
+            $ref: '#/definitions/models.OAuthURLData'
+        '404':
+          description: Provider non supporté/configuré
           schema:
             type: object
             additionalProperties:
@@ -3059,6 +3155,24 @@ definitions:
         type: string
       user_id:
         type: string
+  models.OAuthExchangeRequest:
+    type: object
+    required:
+    - code
+    properties:
+      code:
+        type: string
+      state:
+        type: string
+  models.OAuthURLData:
+    type: object
+    properties:
+      state:
+        type: string
+        example: a1b2c3d4e5f6
+      url:
+        type: string
+        example: https://accounts.google.com/o/oauth2/auth?...
   models.RefreshRequest:
     type: object
     properties:

@@ -56,7 +56,28 @@ CREATE TABLE IF NOT EXISTS account_tokens (
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- ─── Connexion via fournisseurs OIDC (Login with Google / Microsoft) ──
+-- ALTER idempotents : la base existante est migrée au boot sans script externe.
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'auth_provider') THEN
+        CREATE TYPE auth_provider AS ENUM ('local', 'google', 'microsoft');
+    END IF;
+END$$;
+
+-- provider : origine du compte ('local' par défaut → comportement inchangé).
+ALTER TABLE credentials ADD COLUMN IF NOT EXISTS provider auth_provider NOT NULL DEFAULT 'local';
+-- provider_subject : claim `sub` du provider (identifiant stable côté Google/MS).
+ALTER TABLE credentials ADD COLUMN IF NOT EXISTS provider_subject TEXT;
+-- Comptes OAuth : aucun mot de passe local → password devient nullable.
+ALTER TABLE credentials ALTER COLUMN password DROP NOT NULL;
+
 CREATE INDEX IF NOT EXISTS idx_credentials_email ON credentials(email);
+-- Unicité (provider, subject) quand renseigné : un même compte externe ne peut
+-- être lié qu'une fois (les lignes sans subject ne sont pas contraintes).
+CREATE UNIQUE INDEX IF NOT EXISTS idx_credentials_provider_subject
+    ON credentials(provider, provider_subject)
+    WHERE provider_subject IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id ON refresh_tokens(user_id);
 CREATE INDEX IF NOT EXISTS idx_refresh_tokens_token ON refresh_tokens(token);
 -- Lookup à la consommation (token_hash, déjà UNIQUE) + invalidation des tokens

@@ -438,6 +438,11 @@ export const messages: Record<Locale, Messages> = {
     'auth.login.account_disabled':
       'Compte désactivé, veuillez contacter le support de Breezy.',
 
+    // — OAuth —
+    'auth.oauth.loading': 'Connexion en cours…',
+    'auth.oauth.error': 'La connexion a échoué. Réessaie depuis la page de connexion.',
+    'auth.oauth.back_to_login': 'Retour à la connexion',
+
     // — Register —
     'auth.register.demo.kicker': 'Nouveau sur Breezy',
     'auth.register.demo.heading': 'Crée ton espace.',
@@ -1077,6 +1082,11 @@ export const messages: Record<Locale, Messages> = {
     'auth.login.failed': 'Sign-in failed. Check your credentials.',
     'auth.login.account_disabled':
       'Account disabled — please contact Breezy support.',
+
+    // — OAuth —
+    'auth.oauth.loading': 'Signing in…',
+    'auth.oauth.error': 'Sign-in failed. Try again from the sign-in page.',
+    'auth.oauth.back_to_login': 'Back to sign in',
 
     // — Register —
     'auth.register.demo.kicker': 'New to Breezy',

@@ -9,6 +9,7 @@ import (
 
 	"github.com/webdad/auth-service/internal/handlers"
 	"github.com/webdad/auth-service/internal/middleware"
+	"github.com/webdad/auth-service/internal/oauth"
 	"github.com/webdad/auth-service/internal/services"
 )
 
@@ -19,9 +20,9 @@ const serviceName = "auth-service"
 var startedAt = time.Now()
 
 // New construit le routeur Gin avec toutes les routes du service.
-func New(auth *services.AuthService) *gin.Engine {
+func New(auth *services.AuthService, oauthReg *oauth.Registry) *gin.Engine {
 	r := gin.Default()
-	h := handlers.New(auth)
+	h := handlers.New(auth, oauthReg)
 
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
@@ -65,6 +66,14 @@ func New(auth *services.AuthService) *gin.Engine {
 			admin.PATCH("/:id/role", middleware.AdminOnly(), h.SetRole)
 			// Effacement RGPD : purge définitive des identifiants (admin).
 			admin.DELETE("/:id", middleware.AdminOnly(), h.DeleteUser)
+		}
+
+		// OAuth OIDC (Login with Google) — l'échange code→tokens et
+		// la vérification de l'ID token se font côté serveur.
+		oauthGroup := authGroup.Group("/oauth/:provider")
+		{
+			oauthGroup.GET("/url", h.OAuthURL)
+			oauthGroup.POST("/exchange", h.OAuthExchange)
 		}
 	}
 

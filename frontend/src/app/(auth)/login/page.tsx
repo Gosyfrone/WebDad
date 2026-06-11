@@ -56,6 +56,7 @@ export default function LoginPage() {
   const [needsVerification, setNeedsVerification] = React.useState(false)
   const [isResending, setIsResending] = React.useState(false)
   const [resendNotice, setResendNotice] = React.useState<string | null>(null)
+  const [oauthLoading, setOauthLoading] = React.useState<string | null>(null)
 
   const validate = React.useCallback((): FormErrors => {
     const nextErrors: FormErrors = {}
@@ -73,6 +74,23 @@ export default function LoginPage() {
 
     return nextErrors
   }, [identifier, password, t])
+
+  const handleOAuth = async (provider: string) => {
+    setOauthLoading(provider)
+    try {
+      const response = await fetch(`/api/auth/oauth/${provider}`)
+      const payload = await response.json().catch(() => null)
+      if (!response.ok || !payload?.url) {
+        setErrors({ form: payload?.error ?? t('auth.oauth.error') })
+        setOauthLoading(null)
+        return
+      }
+      window.location.href = payload.url
+    } catch {
+      setErrors({ form: t('auth.err.network') })
+      setOauthLoading(null)
+    }
+  }
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -483,10 +501,12 @@ export default function LoginPage() {
                   <div className="h-px flex-1 bg-gradient-to-r from-transparent via-border to-transparent" />
                 </div>
 
-                <div className="grid grid-cols-2 gap-2.5">
+                <div className="grid grid-cols-1 gap-2.5">
                   <button
                     type="button"
-                    className="flex h-11 items-center justify-center gap-2 rounded-2xl border border-white/70 bg-white/85 transition hover:scale-[1.01] hover:bg-white hover:shadow-md dark:border-white/15 dark:bg-white/10 dark:hover:bg-white/20"
+                    disabled={oauthLoading !== null || isSubmitting}
+                    onClick={() => handleOAuth('google')}
+                    className="flex h-11 items-center justify-center gap-2 rounded-2xl border border-gray-300 bg-white transition hover:scale-[1.01] hover:bg-white hover:shadow-md disabled:cursor-not-allowed disabled:opacity-70"
                   >
                     <Image
                       src="/google-logo.jpg"
@@ -494,23 +514,8 @@ export default function LoginPage() {
                       width={18}
                       height={18}
                     />
-                    <span className="text-sm font-medium text-foreground/80">
-                      Google
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
-                    className="flex h-11 items-center justify-center gap-2 rounded-2xl border border-white/70 bg-white/85 transition hover:scale-[1.01] hover:bg-white hover:shadow-md dark:border-white/15 dark:bg-white/10 dark:hover:bg-white/20"
-                  >
-                    <Image
-                      src="/microsoft-logo.png"
-                      alt="Microsoft"
-                      width={18}
-                      height={18}
-                    />
-                    <span className="text-sm font-medium text-foreground/80">
-                      Microsoft
+                    <span className="text-sm font-medium text-gray-800">
+                      {oauthLoading === 'google' ? t('auth.oauth.loading') : 'Google'}
                     </span>
                   </button>
                 </div>
