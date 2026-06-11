@@ -1,0 +1,18 @@
+# ────────────────────────────────────────────────────────────────────
+# Reverse proxy Breezy — HTTPS automatique via Let's Encrypt.
+# Caddy obtient et renouvelle les certificats tout seul (ports 80/443).
+#
+# DNS requis (A → IPv4, AAAA → IPv6 du VPS) :
+#   breezy.philippeluu.fr
+#   api.breezy.philippeluu.fr
+# ────────────────────────────────────────────────────────────────────
+
+# Frontend (Next.js)
+breezy.philippeluu.fr {
+	reverse_proxy frontend:3000
+}
+
+# API Gateway (appelée par le navigateur avec le Bearer token)
+api.breezy.philippeluu.fr {
+	reverse_proxy api-gateway:8080
+}
