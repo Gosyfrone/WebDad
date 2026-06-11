@@ -137,9 +137,9 @@ export default function LoginPage() {
   }
 
   const handleResendVerification = async () => {
-    const trimmedEmail = email.trim()
+    const trimmedEmail = identifier.trim()
     if (!trimmedEmail) {
-      setErrors({ email: t('auth.err.email_required') })
+      setErrors({ identifier: t('auth.err.identifier_required') })
       return
     }
 
