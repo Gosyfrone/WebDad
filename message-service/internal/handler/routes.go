@@ -37,6 +37,12 @@ func RegisterRoutes(
 
 		// Registre de clés publiques (E2EE).
 		messages.PUT("/keys", auth, keyH.PublishKey)
+		// Sauvegarde chiffrée de la clé privée (multi-appareils, zero-knowledge).
+		// ⚠️ Déclarées AVANT /keys/:userId pour que « backup » ne soit pas capturé
+		// comme un userId par le routeur.
+		messages.PUT("/keys/backup", auth, keyH.PutBackup)
+		messages.GET("/keys/backup", auth, keyH.GetBackup)
+		messages.GET("/keys/backup/status", auth, keyH.BackupStatus)
 		messages.GET("/keys/:userId", auth, keyH.GetKey)
 
 		// Annuaire public des communautés (découverte + recherche).

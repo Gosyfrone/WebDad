@@ -13,6 +13,7 @@ import (
 func respondError(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, service.ErrConversationNotFound), errors.Is(err, service.ErrKeyNotFound),
+		errors.Is(err, service.ErrBackupNotFound),
 		errors.Is(err, service.ErrMessageNotFound),
 		errors.Is(err, service.ErrTargetNotMember):
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})

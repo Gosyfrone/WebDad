@@ -157,6 +157,25 @@
 - **"Read" state is server data** (`members.last_read_at`), multi-device; `GET /unread-count` computes from metadata only
   (never the `ciphertext`) → E2EE intact. **Mute** (`members.muted_at`) excludes from the badge but stays unread in the list.
   Chosen over per-device localStorage (tranché with the user).
+- **Passphrase key backup (multi-device), zero-knowledge** (11/06/2026, validated with user). The X25519 private key was
+  per-device only → unreadable on a 2nd device. Now the private key is wrapped client-side (`XChaCha20-Poly1305`) under a
+  KEK derived from a **user passphrase** (Argon2id, **19 MiB / t=2 = OWASP minimum**, chosen for mobile: the pure-JS KDF is
+  synchronous and 64 MiB/t=3 froze the main thread ~15-25 s on phones → "infinite spinner"; an **auto-upgrade** re-wraps any
+  heavier legacy backup with the light params on the next unlock). The KDF runs in a **Web Worker** (`key-backup.worker.ts`,
+  driven by `key-backup-async.ts`, sync fallback) so the UI stays responsive during derivation. Stored server-side in
+  `key_backups` as an opaque blob
+  (`salt`, `nonce`, `wrapped_private_key`, `kdf_params`, `public_key`). Server never sees the passphrase nor the private key
+  → **admin-proof preserved**. The IndexedDB identity is now **scoped per `userId`** (was a single global `self` record
+  shared by every account on the browser → wrong key reused across accounts); a one-shot migration adopts the legacy `self`
+  key for an account **only if** its public key matches the one that account already published. State machine: `ready`
+  (local key + backup) / `unlock` (backup but no local key → other device: download blob, Argon2id-derive, unwrap; wrong
+  passphrase ⇒ Poly1305 auth fails) / **`setup`** (no backup → define passphrase; reuses the local key if present so
+  **existing users back up their current key**, else generates one). UI: `PassphraseGate` blurs the messages view until the
+  identity is available. Routes declared **before**
+  `/keys/:userId` (else `backup` is captured as a userId). **Assumed limits:** forgotten passphrase = unrecoverable backup
+  (the point of zero-knowledge); **admin reset deferred** — the only crypto-honest semantics is "wipe backup → new identity"
+  (escrow would break DM admin-proof, ruled out); a device with no local key and no backup generates a fresh key (prior
+  history stays unreadable there, same as before).
 
 ## Notifications
 

@@ -18,6 +18,7 @@ import (
 // MessageRepository agrège les collections du domaine messagerie.
 type MessageRepository struct {
 	keys          *mongo.Collection
+	keyBackups    *mongo.Collection
 	conversations *mongo.Collection
 	members       *mongo.Collection
 	messages      *mongo.Collection
@@ -26,6 +27,7 @@ type MessageRepository struct {
 func NewMessageRepository(db *mongo.Database) *MessageRepository {
 	return &MessageRepository{
 		keys:          db.Collection("user_keys"),
+		keyBackups:    db.Collection("key_backups"),
 		conversations: db.Collection("conversations"),
 		members:       db.Collection("members"),
 		messages:      db.Collection("messages"),
@@ -39,6 +41,9 @@ func NewMessageRepository(db *mongo.Database) *MessageRepository {
 // il était propriétaire devient orphelin (compromis assumé, cf. CLAUDE.md §6).
 func (r *MessageRepository) PurgeUser(ctx context.Context, userID string) error {
 	if _, err := r.keys.DeleteMany(ctx, bson.M{"user_id": userID}); err != nil {
+		return err
+	}
+	if _, err := r.keyBackups.DeleteMany(ctx, bson.M{"user_id": userID}); err != nil {
 		return err
 	}
 	if _, err := r.members.DeleteMany(ctx, bson.M{"user_id": userID}); err != nil {
@@ -68,6 +73,42 @@ func (r *MessageRepository) GetKey(ctx context.Context, userID string) (*models.
 		return nil, err
 	}
 	return &k, nil
+}
+
+// --- Sauvegarde chiffrée de la clé privée -----------------------------------
+
+// UpsertBackup enregistre/remplace la sauvegarde chiffrée d'un utilisateur
+// (idempotent). Les champs sont des blobs opaques (cf. models.KeyBackup).
+func (r *MessageRepository) UpsertBackup(ctx context.Context, userID string, b models.PutBackupRequest) error {
+	now := time.Now()
+	update := bson.M{
+		"$set": bson.M{
+			"salt":                b.Salt,
+			"nonce":               b.Nonce,
+			"wrapped_private_key": b.WrappedPrivateKey,
+			"kdf_params":          b.KDFParams,
+			"public_key":          b.PublicKey,
+			"updated_at":          now,
+		},
+		"$setOnInsert": bson.M{"user_id": userID, "created_at": now},
+	}
+	_, err := r.keyBackups.UpdateOne(ctx, bson.M{"user_id": userID}, update, options.UpdateOne().SetUpsert(true))
+	return err
+}
+
+// GetBackup renvoie la sauvegarde chiffrée d'un utilisateur (mongo.ErrNoDocuments si absente).
+func (r *MessageRepository) GetBackup(ctx context.Context, userID string) (*models.KeyBackup, error) {
+	var b models.KeyBackup
+	if err := r.keyBackups.FindOne(ctx, bson.M{"user_id": userID}).Decode(&b); err != nil {
+		return nil, err
+	}
+	return &b, nil
+}
+
+// BackupExists indique si une sauvegarde chiffrée existe pour cet utilisateur.
+func (r *MessageRepository) BackupExists(ctx context.Context, userID string) (bool, error) {
+	n, err := r.keyBackups.CountDocuments(ctx, bson.M{"user_id": userID}, options.Count().SetLimit(1))
+	return n > 0, err
 }
 
 // --- Conversations -----------------------------------------------------------

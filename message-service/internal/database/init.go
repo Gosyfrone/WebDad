@@ -10,7 +10,7 @@ import (
 )
 
 // collectionOrder fige l'ordre de création (déterministe pour les logs/tests).
-var collectionOrder = []string{"user_keys", "conversations", "members", "messages"}
+var collectionOrder = []string{"user_keys", "key_backups", "conversations", "members", "messages"}
 
 // EnsureSchema crée les collections (avec validateurs $jsonSchema) et les index
 // du message-service, de façon idempotente. Le service possède ainsi son schéma
@@ -93,6 +93,25 @@ var validators = map[string]bson.M{
 			},
 		},
 	},
+	// Sauvegarde CHIFFRÉE de la clé privée d'identité (zero-knowledge). Le serveur
+	// ne stocke que des blobs opaques : clé privée emballée par une clé dérivée
+	// (Argon2id) d'une phrase de passe que seul l'utilisateur connaît.
+	"key_backups": {
+		"$jsonSchema": bson.M{
+			"bsonType": "object",
+			"required": bson.A{"user_id", "salt", "nonce", "wrapped_private_key", "kdf_params", "public_key", "created_at"},
+			"properties": bson.M{
+				"user_id":             bson.M{"bsonType": "string"},
+				"salt":                bson.M{"bsonType": "string"},
+				"nonce":               bson.M{"bsonType": "string"},
+				"wrapped_private_key": bson.M{"bsonType": "string"},
+				"kdf_params":          bson.M{"bsonType": "string"},
+				"public_key":          bson.M{"bsonType": "string"},
+				"created_at":          bson.M{"bsonType": "date"},
+				"updated_at":          bson.M{"bsonType": "date"},
+			},
+		},
+	},
 	// Conversations : dm (2 membres), group (≤32 talkers), community (talkers +
 	// viewers). `dm_key` = paire d'ids triée « a:b » (dédup des DM, index unique).
 	"conversations": {
@@ -159,6 +178,9 @@ var validators = map[string]bson.M{
 // indexes : index par collection.
 var indexes = map[string][]mongo.IndexModel{
 	"user_keys": {
+		{Keys: bson.D{{Key: "user_id", Value: 1}}, Options: options.Index().SetUnique(true)},
+	},
+	"key_backups": {
 		{Keys: bson.D{{Key: "user_id", Value: 1}}, Options: options.Index().SetUnique(true)},
 	},
 	"conversations": {

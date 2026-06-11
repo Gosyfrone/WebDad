@@ -11,6 +11,8 @@ import {
   decryptMessage,
   ensureMyKeys,
   getConversation,
+  getIdentityState,
+  type IdentityState,
   listConversations,
   listMessagesPage,
   muteConversation,
@@ -35,6 +37,7 @@ import { CreateCommunityDialog } from '@/components/messages/create-community-di
 import { DiscoverCommunitiesDialog } from '@/components/messages/discover-communities-dialog'
 import { NewDMDialog } from '@/components/messages/new-dm-dialog'
 import { NewGroupDialog } from '@/components/messages/new-group-dialog'
+import { PassphraseGate } from '@/components/messages/passphrase-gate'
 
 type DialogKind = 'dm' | 'group' | 'community' | 'discover' | 'info' | null
 
@@ -112,6 +115,9 @@ export function MessagesView() {
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  // État de l'identité E2EE de l'appareil (null = en cours de détection). Tant
+  // qu'il n'est pas `ready`, la vue est floutée derrière la PassphraseGate.
+  const [identityState, setIdentityState] = useState<IdentityState | null>(null)
   const [liveMessage, setLiveMessage] = useState<ChatMessage | null>(null)
   const [liveUpdatedMessage, setLiveUpdatedMessage] = useState<ChatMessage | null>(null)
   const [dialog, setDialog] = useState<DialogKind>(null)
@@ -178,11 +184,21 @@ export function MessagesView() {
     })
   }, [])
 
-  // Chargement initial (publie ma clé publique puis liste + aperçus).
+  // Chargement initial : détermine d'abord l'état de l'identité E2EE. Si une clé
+  // est présente sur cet appareil (`ready`), on publie la clé publique puis on
+  // liste les conversations. Sinon (setup/unlock), on laisse la PassphraseGate
+  // prendre le relais — pas de chargement tant que l'identité n'est pas dispo.
   useEffect(() => {
     let cancelled = false
-    ensureMyKeys()
-      .then(() => loadConversations())
+    getIdentityState()
+      .then(async (state) => {
+        if (cancelled) return
+        setIdentityState(state)
+        if (state === 'ready') {
+          await ensureMyKeys()
+          await loadConversations()
+        }
+      })
       .catch(() => {})
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -190,6 +206,17 @@ export function MessagesView() {
     return () => {
       cancelled = true
     }
+  }, [loadConversations])
+
+  // Appelé par la PassphraseGate après définition/déblocage réussi : l'identité
+  // est désormais disponible localement → on charge la messagerie.
+  const handleUnlocked = useCallback(() => {
+    setIdentityState('ready')
+    setLoading(true)
+    ensureMyKeys()
+      .then(() => loadConversations())
+      .catch(() => {})
+      .finally(() => setLoading(false))
   }, [loadConversations])
 
   /**
@@ -290,7 +317,8 @@ export function MessagesView() {
   const dmTarget = searchParams.get('dm')
   const handledDmRef = useRef<string | null>(null)
   useEffect(() => {
-    if (!dmTarget || handledDmRef.current === dmTarget) return
+    // Attend que l'identité soit disponible (déblocage passé) avant d'ouvrir.
+    if (!dmTarget || identityState !== 'ready' || handledDmRef.current === dmTarget) return
     handledDmRef.current = dmTarget
     ensureMyKeys()
       .then(() => startDM(dmTarget))
@@ -303,14 +331,14 @@ export function MessagesView() {
       })
       .catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dmTarget])
+  }, [dmTarget, identityState])
 
   // Point d'entrée depuis une notification de mention : /messages?conv=<id> →
   // ouvre la conversation existante.
   const convTarget = searchParams.get('conv')
   const handledConvRef = useRef<string | null>(null)
   useEffect(() => {
-    if (!convTarget || handledConvRef.current === convTarget) return
+    if (!convTarget || identityState !== 'ready' || handledConvRef.current === convTarget) return
     handledConvRef.current = convTarget
     ensureMyKeys()
       .then(() => getConversation(convTarget))
@@ -320,7 +348,7 @@ export function MessagesView() {
       })
       .catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [convTarget])
+  }, [convTarget, identityState])
 
   /** Marque une conversation lue : serveur (`markRead`) + état local optimiste
    *  (curseur `lastReadAt` avancé + pastille effacée), après capture de l'ancre. */
@@ -400,13 +428,20 @@ export function MessagesView() {
   const anchorForSelected =
     selected && dividerAnchor.convId === selected.id ? dividerAnchor.anchor : null
 
+  const gated = identityState !== null && identityState !== 'ready'
+
+  // Floute/inerte les volets tant que l'identité E2EE n'est pas disponible : la
+  // PassphraseGate (positionnée absolue, hors flou) prend alors le relais.
+  const blurWhenGated = gated && 'pointer-events-none select-none blur-md'
+
   return (
-    <div className="flex h-[calc(100dvh-7.5rem)] overflow-hidden lg:h-screen">
+    <div className="relative flex h-[calc(100dvh-7.5rem)] overflow-hidden lg:h-screen">
       {/* Volet liste */}
       <div
         className={cn(
           'h-full w-full shrink-0 lg:w-[360px] lg:border-r',
           selectedId ? 'hidden lg:flex lg:flex-col' : 'flex flex-col',
+          blurWhenGated,
         )}
       >
         <ConversationList
@@ -432,6 +467,7 @@ export function MessagesView() {
         className={cn(
           'h-full min-w-0 flex-1',
           selectedId ? 'flex flex-col' : 'hidden lg:flex lg:flex-col',
+          blurWhenGated,
         )}
       >
         {selected ? (
@@ -464,6 +500,15 @@ export function MessagesView() {
           </div>
         )}
       </div>
+
+      {/* Protection par phrase de passe (définir / débloquer) — par-dessus le
+          contenu flouté tant que l'identité E2EE n'est pas disponible ici. */}
+      {gated && identityState && (
+        <PassphraseGate
+          mode={identityState === 'unlock' ? 'unlock' : 'setup'}
+          onUnlocked={handleUnlocked}
+        />
+      )}
 
       {/* Modales */}
       <NewDMDialog

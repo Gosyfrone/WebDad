@@ -45,6 +45,9 @@ func TestProtectedRoutes_RequireAuth(t *testing.T) {
 		{http.MethodGet, "/messages/communities"},
 		{http.MethodPut, "/messages/keys"},
 		{http.MethodGet, "/messages/keys/u1"},
+		{http.MethodPut, "/messages/keys/backup"},
+		{http.MethodGet, "/messages/keys/backup"},
+		{http.MethodGet, "/messages/keys/backup/status"},
 	}
 
 	for _, tc := range cases {

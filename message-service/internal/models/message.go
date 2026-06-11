@@ -45,6 +45,26 @@ type UserKey struct {
 	UpdatedAt time.Time     `bson:"updated_at" json:"updated_at"`
 }
 
+// KeyBackup — sauvegarde CHIFFRÉE de la clé privée d'identité d'un utilisateur,
+// permettant de retrouver sa messagerie sur un autre appareil.
+//
+// Zero-knowledge : la clé privée est emballée côté client par une clé dérivée
+// (Argon2id) d'une PHRASE DE PASSE choisie par l'utilisateur. Le serveur ne
+// stocke qu'un blob opaque (`salt`, `nonce`, `wrapped_private_key`, paramètres
+// KDF) : il ne voit jamais la passphrase ni la clé privée. La propriété
+// admin-proof des DM est donc préservée (cf. CLAUDE.md §6).
+type KeyBackup struct {
+	ID                bson.ObjectID `bson:"_id,omitempty" json:"id"`
+	UserID            string        `bson:"user_id" json:"user_id"`
+	Salt              string        `bson:"salt" json:"salt"`                                 // sel Argon2id (base64)
+	Nonce             string        `bson:"nonce" json:"nonce"`                               // nonce XChaCha20 de l'emballage (base64)
+	WrappedPrivateKey string        `bson:"wrapped_private_key" json:"wrapped_private_key"`   // clé privée emballée (base64)
+	KDFParams         string        `bson:"kdf_params" json:"kdf_params"`                     // paramètres Argon2id (JSON: m,t,p)
+	PublicKey         string        `bson:"public_key" json:"public_key"`                     // clé publique associée (vérif. post-déballage)
+	CreatedAt         time.Time     `bson:"created_at" json:"created_at"`
+	UpdatedAt         time.Time     `bson:"updated_at" json:"updated_at"`
+}
+
 // Conversation — document de la collection `conversations`.
 //
 // Pour un groupe, le NOM est chiffré avec la clé de contenu du groupe : `Title`
@@ -160,6 +180,23 @@ type CommunityListItem struct {
 // PublishKeyRequest : corps de PUT /messages/keys (publier sa clé publique).
 type PublishKeyRequest struct {
 	PublicKey string `json:"public_key" binding:"required"`
+}
+
+// PutBackupRequest : corps de PUT /messages/keys/backup — enregistre/remplace la
+// sauvegarde chiffrée de la clé privée. Tous les champs sont des blobs opaques
+// produits côté client ; le serveur ne les interprète pas.
+type PutBackupRequest struct {
+	Salt              string `json:"salt" binding:"required"`
+	Nonce             string `json:"nonce" binding:"required"`
+	WrappedPrivateKey string `json:"wrapped_private_key" binding:"required"`
+	KDFParams         string `json:"kdf_params" binding:"required"`
+	PublicKey         string `json:"public_key" binding:"required"`
+}
+
+// BackupStatusResponse : corps de GET /messages/keys/backup/status — indique si
+// une sauvegarde existe (pilote l'UI « définir » vs « débloquer »).
+type BackupStatusResponse struct {
+	Exists bool `json:"exists"`
 }
 
 // CreateConversationRequest : corps de POST /messages/conversations.

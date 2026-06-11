@@ -70,3 +70,85 @@ func (h *KeyHandler) GetKey(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"data": key})
 }
+
+// PutBackup : PUT /messages/keys/backup — enregistre/remplace MA sauvegarde
+// chiffrée de clé privée (id dérivé du JWT). Le serveur stocke un blob opaque :
+// il ne voit ni la passphrase ni la clé privée (zero-knowledge).
+// @Summary     Enregistrer la sauvegarde chiffrée de sa clé privée
+// @Tags        messages
+// @Accept      json
+// @Produce     json
+// @Security    BearerAuth
+// @Param       body body models.PutBackupRequest true "Sauvegarde chiffrée (blobs base64)"
+// @Success     200 {object} map[string]string
+// @Failure     400 {object} map[string]string
+// @Failure     401 {object} map[string]string
+// @Router      /messages/keys/backup [put]
+func (h *KeyHandler) PutBackup(c *gin.Context) {
+	claims, ok := middleware.ClaimsFrom(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "claims absents"})
+		return
+	}
+
+	var req models.PutBackupRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "payload invalide : " + err.Error()})
+		return
+	}
+
+	if err := h.service.PutBackup(c.Request.Context(), claims.UserID, req); err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": gin.H{"user_id": claims.UserID}})
+}
+
+// GetBackup : GET /messages/keys/backup — récupère MA sauvegarde chiffrée (pour
+// la déballer sur un autre appareil avec ma passphrase). 404 si aucune.
+// @Summary     Récupérer la sauvegarde chiffrée de sa clé privée
+// @Tags        messages
+// @Produce     json
+// @Security    BearerAuth
+// @Success     200 {object} models.KeyBackup
+// @Failure     401 {object} map[string]string
+// @Failure     404 {object} map[string]string
+// @Router      /messages/keys/backup [get]
+func (h *KeyHandler) GetBackup(c *gin.Context) {
+	claims, ok := middleware.ClaimsFrom(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "claims absents"})
+		return
+	}
+
+	backup, err := h.service.GetBackup(c.Request.Context(), claims.UserID)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": backup})
+}
+
+// BackupStatus : GET /messages/keys/backup/status — indique si J'AI une
+// sauvegarde (pilote l'UI « définir une passphrase » vs « débloquer »).
+// @Summary     Savoir si une sauvegarde chiffrée existe
+// @Tags        messages
+// @Produce     json
+// @Security    BearerAuth
+// @Success     200 {object} models.BackupStatusResponse
+// @Failure     401 {object} map[string]string
+// @Router      /messages/keys/backup/status [get]
+func (h *KeyHandler) BackupStatus(c *gin.Context) {
+	claims, ok := middleware.ClaimsFrom(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "claims absents"})
+		return
+	}
+
+	exists, err := h.service.BackupStatus(c.Request.Context(), claims.UserID)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": models.BackupStatusResponse{Exists: exists}})
+}
