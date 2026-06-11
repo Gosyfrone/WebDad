@@ -14,8 +14,8 @@
 | User | 🟢 OK (v1) | PostgreSQL | repo/service/handlers, autonomous schema (`users`+`follows`+`follow_requests`). CRUD users, follow (public edge / private `pending`→accept/reject), followers/following lists+counts, search/suggestions, lazy provisioning on `/users/me`. **TODO:** repo integration tests. |
 | Post | 🟢 OK (v1) | MongoDB | Autonomous. CRUD posts with **profile-visibility-filtered reads**, reposts/quotes, profile pin (hidden in feeds), likes, 2-level threaded comments, denormalized int32 counters, **media `[]MediaRef` (cap 4)**, **bookmark collections + burst model**. **TODO:** post edit front (back ready). |
 | Profil | 🟢 OK (v1) | MongoDB | Autonomous. Owns decorative fields + **`visibility`**. `GET/PATCH /profils/me`, `POST` (unique creation), search, admin delete. `birth_date` set-once, display_name cooldown baseline. Avatar/banner upload wired. **TODO:** front aggregated read. |
-| Message | 🟢 OK | MongoDB | E2EE (DM/groups/communities), blind server, X25519 keys, cursor pagination, WS, **encrypted attachments** (no schema change), server-side read cursor + app-wide unread badge, per-conversation mute. Back + UX complete. |
-| Notification | 🟢 OK | MongoDB | Aggregated (Instagram-style), ingest `/internal/events`, types like/comment/reply/mention/repost/quote/follow_request/message_mention/post_deleted, JWT API + WS. |
+| Message | 🟢 OK | MongoDB | E2EE (DM/groups/communities), blind server, X25519 keys, cursor pagination, WS, **encrypted attachments** (no schema change), owner-only message edit with encrypted original preserved, server-side read cursor + app-wide unread badge, per-conversation mute, **passphrase-protected key backup (`key_backups`, zero-knowledge, multi-device)**. Back + UX complete. **TODO:** admin passphrase reset (deferred). |
+| Notification | 🟢 OK | MongoDB | Aggregated (Instagram-style), ingest `/internal/events`, types like/comment/reply/mention/repost/quote/follow/follow_request/follow_request_accepted/follow_request_accept_confirm/message_mention/post_deleted, JWT API + WS. |
 | Mail | 🟡 WIP | — | **Phases 0+1 OK (code)** : module Go autonome (8089), `POST /internal/send` (hors gateway, `MAIL_INTERNAL_SECRET`, best-effort) + `/health`, transport SMTP (`net/smtp`) ou repli console en dev. **Phase 1 : intégration auth→mail câblée** (register envoie le mail de vérif, client `internal/notify` best-effort). **Phase 2 : mail de reset câblé** (`sendResetMail`, lien 1h, best-effort, même client). **Templates HTML de marque** (coquille partagée `brandedEmailHTML`, clear mode, vérif + reset) ✓. 🟢 après e2e `make dev` validé (vérif + reset). **TODO Phase 3 :** rate-limiting, emails EN. |
 | Media | 🟢 OK | MinIO | Cross-cutting opaque storage, autonomous bucket. `POST /media` (sniff+caps), `POST /media/encrypted` (E2EE blob), public `GET /media/:id` (Range/seek), owner/admin delete. Wired on profils/posts/messages. |
 | API Gateway | 🟡 WIP | — | stdlib reverse proxy, prefix routing, WS proxy, CORS, media streaming. `/internal/events` not routed (server-to-server). **TODO:** JWT middleware to protect prefixes. |
@@ -34,8 +34,8 @@
 | Search / Explorer (accounts) | Secondary | 🟢 user + profil search, "Who to follow", per-account local search history. **TODO:** post search. |
 | Automatic post translation | Secondary | 🟢 BFF `/api/translate`, conservative client gate, posts + comments, cache, toggle. |
 | Muted words in feed | Secondary | 🟢 `/parametres`, per-account local persistence, feed masks others' matching posts. |
-| Private encrypted messaging (E2EE) | Secondary | 🟢 End-to-end (back + UX). DM/groups admin-proof, hybrid communities, server-side read state + app-wide badge, per-conversation mute, encrypted attachments. |
-| Real-time notifications | Secondary | 🟢 End-to-end (e2e live), Instagram aggregation, + `message_mention` + `follow_request`, WS, badge, detail page. |
+| Private encrypted messaging (E2EE) | Secondary | 🟢 End-to-end (back + UX). DM/groups admin-proof, hybrid communities, server-side read state + app-wide badge, per-conversation mute, encrypted attachments, owner-only edit with original shown subdued, **passphrase key backup (zero-knowledge, multi-device)**. |
+| Real-time notifications | Secondary | 🟢 End-to-end (e2e live), Instagram aggregation, + `follow` + `message_mention` + `follow_request` + `follow_request_accepted` + `follow_request_accept_confirm`, WS, badge, detail page. |
 | Mentions (@handle) | Secondary | 🟢 End-to-end: posts/comments autocomplete + clickable render; messages (E2EE) member-ids only → `message_mention`. i18n FR/EN. |
 | Bookmarks (collections) | Secondary | 🟢 End-to-end, collections (many-to-many) + non-deletable default, burst model, `/signets` page. |
 | Image / video upload | Secondary | 🟢 Complete (Phases 0→3): media-service + MinIO + gateway `/media`; avatar/banner; post media; encrypted message attachments. |
@@ -78,8 +78,10 @@
 - **Access token in localStorage** (XSS-exposed, mitigated by 15m lifetime; refresh stays httpOnly).
 - **CORS:** data calls go browser→gateway directly (`Authorization: Bearer`); verify `CORS_ALLOWED_ORIGINS`.
 - **Followers/following counters calculated (COUNT)** per read — fine at project scale; denormalize if load requires.
-- **Messaging:** communities are admin-readable (server key); identity key is per device (new device can't decrypt
-  old history → "key unavailable" banner). Perspectives: key rotation, ownership transfer, backup passphrase.
+- **Messaging:** communities are admin-readable (server key). The identity key can now follow the user across devices via
+  the **passphrase backup** (zero-knowledge); a forgotten passphrase = unrecoverable backup, and a device with neither a
+  local key nor a backup still generates a fresh key (prior history unreadable there). Perspectives: key rotation, ownership
+  transfer, **admin passphrase reset** (deferred — "wipe backup → new identity" semantics, no escrow to keep DM admin-proof).
 - **Notifications:** emission best-effort (lost if notif-service down at T); in-memory badge may over-count by 1
   (self-corrects); badge increments even while `/notifications` is open; `last_actor` cosmetic blur after retract.
 

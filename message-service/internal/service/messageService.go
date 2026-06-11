@@ -26,6 +26,7 @@ var (
 	ErrNotMember            = errors.New("vous n'êtes pas membre de cette conversation")
 	ErrCannotWrite          = errors.New("écriture non autorisée (lecture seule)")
 	ErrKeyNotFound          = errors.New("clé publique introuvable pour cet utilisateur")
+	ErrBackupNotFound       = errors.New("aucune sauvegarde chiffrée pour cet utilisateur")
 	ErrSelfConversation     = errors.New("impossible de démarrer une conversation avec soi-même")
 	ErrMissingEnvelope      = errors.New("enveloppe de clé manquante pour un membre")
 	ErrInvalidGroup         = errors.New("groupe invalide (créateur absent des enveloppes ou aucun membre)")
@@ -91,6 +92,28 @@ func (s *MessageService) GetKey(ctx context.Context, userID string) (*models.Use
 		return nil, ErrKeyNotFound
 	}
 	return k, err
+}
+
+// --- Sauvegarde chiffrée de la clé privée -----------------------------------
+
+// PutBackup enregistre/remplace la sauvegarde chiffrée de la clé privée de
+// l'utilisateur (blobs opaques produits côté client, cf. modèle zero-knowledge).
+func (s *MessageService) PutBackup(ctx context.Context, userID string, b models.PutBackupRequest) error {
+	return s.repo.UpsertBackup(ctx, userID, b)
+}
+
+// GetBackup renvoie la sauvegarde chiffrée de l'utilisateur (404 si absente).
+func (s *MessageService) GetBackup(ctx context.Context, userID string) (*models.KeyBackup, error) {
+	b, err := s.repo.GetBackup(ctx, userID)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return nil, ErrBackupNotFound
+	}
+	return b, err
+}
+
+// BackupStatus indique si une sauvegarde existe (pilote l'UI définir/débloquer).
+func (s *MessageService) BackupStatus(ctx context.Context, userID string) (bool, error) {
+	return s.repo.BackupExists(ctx, userID)
 }
 
 // --- Conversations -----------------------------------------------------------

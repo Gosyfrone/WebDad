@@ -2598,6 +2598,88 @@ paths:
             type: object
             additionalProperties:
               type: string
+  /messages/keys/backup:
+    get:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - messages
+      summary: Récupérer la sauvegarde chiffrée de sa clé privée
+      responses:
+        '200':
+          description: OK
+          schema:
+            $ref: '#/definitions/models.KeyBackup'
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '404':
+          description: Not Found
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+    put:
+      security:
+      - BearerAuth: []
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      tags:
+      - messages
+      summary: Enregistrer la sauvegarde chiffrée de sa clé privée
+      parameters:
+      - description: Sauvegarde chiffrée (blobs base64)
+        name: body
+        in: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.PutBackupRequest'
+      responses:
+        '200':
+          description: OK
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '400':
+          description: Bad Request
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /messages/keys/backup/status:
+    get:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - messages
+      summary: Savoir si une sauvegarde chiffrée existe
+      responses:
+        '200':
+          description: OK
+          schema:
+            $ref: '#/definitions/models.BackupStatusResponse'
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
   /messages/keys/{userId}:
     get:
       security:
@@ -3342,6 +3424,11 @@ definitions:
       content:
         type: string
         maxLength: 280
+  models.BackupStatusResponse:
+    type: object
+    properties:
+      exists:
+        type: boolean
   models.ConversationView:
     type: object
     properties:
@@ -3422,12 +3509,57 @@ definitions:
           type: string
       nonce:
         type: string
+  models.KeyBackup:
+    type: object
+    properties:
+      created_at:
+        type: string
+      id:
+        type: string
+      kdf_params:
+        description: 'paramètres Argon2id (JSON: m,t,p)'
+        type: string
+      nonce:
+        description: nonce XChaCha20 de l'emballage (base64)
+        type: string
+      public_key:
+        description: clé publique associée (vérif. post-déballage)
+        type: string
+      salt:
+        description: sel Argon2id (base64)
+        type: string
+      updated_at:
+        type: string
+      user_id:
+        type: string
+      wrapped_private_key:
+        description: clé privée emballée (base64)
+        type: string
   models.PublishKeyRequest:
     type: object
     required:
     - public_key
     properties:
       public_key:
+        type: string
+  models.PutBackupRequest:
+    type: object
+    required:
+    - kdf_params
+    - nonce
+    - public_key
+    - salt
+    - wrapped_private_key
+    properties:
+      kdf_params:
+        type: string
+      nonce:
+        type: string
+      public_key:
+        type: string
+      salt:
+        type: string
+      wrapped_private_key:
         type: string
   models.SendMessageRequest:
     type: object

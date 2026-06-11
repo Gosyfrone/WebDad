@@ -69,6 +69,11 @@ export function generateContentKey(): Uint8Array {
   return randomBytes(CONTENT_KEY_LEN)
 }
 
+/** Recalcule la clé publique X25519 à partir d'une clé privée (restauration). */
+export function derivePublicKey(privateKey: Uint8Array): Uint8Array {
+  return x25519.getPublicKey(privateKey)
+}
+
 // --- Sealed box (emballage de la clé de contenu pour un destinataire) --------
 
 /**

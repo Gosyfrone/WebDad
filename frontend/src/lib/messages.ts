@@ -20,17 +20,26 @@ import { API_URL } from '@/lib/config'
 import {
   decryptSymmetric,
   decryptText,
+  derivePublicKey,
   encryptSymmetric,
   encryptText,
   fromBase64,
   generateContentKey,
+  generateIdentityKeyPair,
   openKeyEnvelope,
   sealKeyForRecipient,
   toBase64,
   type KeyPair,
 } from '@/lib/crypto'
+import {
+  sameKDFParams,
+  DEFAULT_KDF_PARAMS,
+  parseKDFParams,
+  type BackupBlob,
+} from '@/lib/key-backup'
+import { createBackupAsync, openBackupAsync } from '@/lib/key-backup-async'
 import { fetchMediaBytes, uploadEncryptedMedia } from '@/lib/media'
-import { loadOrCreateIdentity } from '@/lib/key-store'
+import { getLegacyIdentity, getStoredIdentity, setStoredIdentity } from '@/lib/key-store'
 
 export class MessageApiError extends Error {
   status: number
@@ -208,22 +217,148 @@ async function expectOk(res: Response, message: string): Promise<void> {
 let identityPromise: Promise<KeyPair> | null = null
 
 /**
- * Charge (ou crée) l'identité de l'appareil et publie sa clé publique au
- * service. Mémoïsé : un seul aller IndexedDB + une seule publication par session.
+ * Levée par `ensureMyKeys` quand aucune clé n'existe sur cet appareil : l'UI
+ * doit d'abord faire DÉFINIR ou DÉBLOQUER une phrase de passe (cf. PassphraseGate).
+ */
+export class IdentityLockedError extends Error {
+  constructor() {
+    super('identité E2EE verrouillée : phrase de passe requise')
+    this.name = 'IdentityLockedError'
+  }
+}
+
+/** État de l'identité E2EE sur cet appareil (pilote l'UI de la messagerie). */
+export type IdentityState =
+  | 'ready' // clé locale ET sauvegarde présentes → messagerie utilisable
+  | 'setup' // pas de sauvegarde → définir une phrase de passe (clé locale réutilisée si présente, sinon générée)
+  | 'unlock' // sauvegarde serveur mais pas de clé locale → débloquer
+
+/** Publie la clé publique (idempotent) et mémoïse l'identité pour la session. */
+async function publishAndMemoize(identity: KeyPair): Promise<KeyPair> {
+  await apiFetch('/messages/keys', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ public_key: toBase64(identity.publicKey) }),
+  })
+  identityPromise = Promise.resolve(identity)
+  return identity
+}
+
+/**
+ * Renvoie l'identité de CE compte (mémoïsée) et publie sa clé publique.
+ * **Ne génère plus de clé automatiquement** : si aucune n'existe localement,
+ * lève `IdentityLockedError` — c'est à l'UI de déclencher définir/débloquer.
  */
 export function ensureMyKeys(): Promise<KeyPair> {
-  if (!identityPromise) {
-    identityPromise = (async () => {
-      const identity = await loadOrCreateIdentity()
-      await apiFetch('/messages/keys', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ public_key: toBase64(identity.publicKey) }),
-      })
-      return identity
-    })()
+  if (identityPromise) return identityPromise
+  // On ne mémoïse PAS un rejet (pour pouvoir réessayer après déverrouillage) :
+  // seul publishAndMemoize, en cas de succès, peuple identityPromise.
+  return (async () => {
+    const local = await getStoredIdentity(currentUserId())
+    if (!local) throw new IdentityLockedError()
+    return publishAndMemoize(local)
+  })()
+}
+
+/**
+ * Migration ponctuelle : adopte l'ancienne clé NON scopée (`self`, d'avant le
+ * scoping par compte) pour CE compte **uniquement si** sa clé publique
+ * correspond à celle déjà publiée par le compte. Sinon (clé d'un autre compte de
+ * ce navigateur, ou compte sans clé publiée), on ne touche à rien.
+ */
+async function migrateLegacyIdentity(userId: string): Promise<void> {
+  if (!userId) return
+  if (await getStoredIdentity(userId)) return // déjà scopée → rien à migrer
+  const legacy = await getLegacyIdentity()
+  if (!legacy) return
+  try {
+    const published = await fetchPeerPublicKey(userId)
+    if (published === toBase64(legacy.publicKey)) {
+      await setStoredIdentity(userId, legacy)
+    }
+  } catch {
+    // 404 : ce compte n'a jamais publié de clé → la clé `self` est celle d'un
+    // autre compte de ce navigateur, on ne l'adopte pas.
   }
-  return identityPromise
+}
+
+/**
+ * Détermine l'état de l'identité E2EE de CE compte :
+ *   - clé locale + sauvegarde → `ready` ;
+ *   - sauvegarde sans clé locale → `unlock` (autre appareil) ;
+ *   - pas de sauvegarde → `setup` (compte neuf OU compte existant à sauvegarder).
+ */
+export async function getIdentityState(): Promise<IdentityState> {
+  const userId = currentUserId()
+  await migrateLegacyIdentity(userId)
+  const [local, status] = await Promise.all([
+    getStoredIdentity(userId),
+    unwrap<{ exists: boolean }>(await apiFetch('/messages/keys/backup/status')),
+  ])
+  if (local && status.exists) return 'ready'
+  if (!local && status.exists) return 'unlock'
+  return 'setup' // pas de sauvegarde : à définir (clé locale réutilisée si présente)
+}
+
+/** Emballe l'identité avec la phrase de passe (paramètres KDF courants) et
+ *  enregistre la sauvegarde chiffrée côté serveur. */
+async function uploadBackup(identity: KeyPair, passphrase: string): Promise<void> {
+  const blob = await createBackupAsync(identity.privateKey, identity.publicKey, passphrase)
+  await apiFetch('/messages/keys/backup', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(blob),
+  })
+}
+
+/**
+ * Définition de la phrase de passe : protège l'identité et la sauvegarde
+ * (chiffrée) côté serveur. Réutilise la clé locale de CE compte si elle existe
+ * (préserve l'historique déchiffrable) ; sinon en génère une nouvelle.
+ */
+export async function setupPassphrase(passphrase: string): Promise<void> {
+  const userId = currentUserId()
+  const identity = (await getStoredIdentity(userId)) ?? generateIdentityKeyPair()
+  await uploadBackup(identity, passphrase)
+  await setStoredIdentity(userId, identity)
+  await publishAndMemoize(identity)
+}
+
+/**
+ * Déblocage sur un nouvel appareil : récupère la sauvegarde chiffrée, la déballe
+ * avec la phrase de passe, persiste l'identité localement. Lève si la phrase est
+ * incorrecte (échec d'authentification au déballage).
+ *
+ * Auto-upgrade : si la sauvegarde a été créée avec des paramètres Argon2id plus
+ * lourds que ceux courants (cas des anciennes sauvegardes 64 Mio, lentes sur
+ * mobile), on la ré-emballe avec les paramètres légers actuels → les déblocages
+ * ultérieurs (autres appareils) deviennent rapides.
+ */
+export async function unlockWithPassphrase(passphrase: string): Promise<void> {
+  const blob = await unwrap<BackupBlob>(await apiFetch('/messages/keys/backup'))
+  const privateKey = await openBackupAsync(blob, passphrase)
+  const identity: KeyPair = { privateKey, publicKey: derivePublicKey(privateKey) }
+  await setStoredIdentity(currentUserId(), identity)
+  await publishAndMemoize(identity)
+
+  // Réparation opportuniste des sauvegardes lourdes — **fire-and-forget** :
+  // l'accès est déjà débloqué (identité locale), on ne fait PAS attendre
+  // l'utilisateur le re-emballage + l'upload.
+  void maybeUpgradeBackup(blob, identity, passphrase)
+}
+
+/** Ré-emballe la sauvegarde avec les paramètres KDF courants si elle a été créée
+ *  avec des paramètres plus lourds (best-effort, silencieux). */
+function maybeUpgradeBackup(blob: BackupBlob, identity: KeyPair, passphrase: string): Promise<void> {
+  return (async () => {
+    try {
+      if (!sameKDFParams(parseKDFParams(blob), DEFAULT_KDF_PARAMS)) {
+        await uploadBackup(identity, passphrase)
+      }
+    } catch {
+      /* upgrade best-effort : on ignore tout échec */
+    }
+  })()
 }
 
 /** Id de l'utilisateur courant, lu dans les claims du JWT (ou '' sans session). */
