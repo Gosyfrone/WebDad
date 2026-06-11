@@ -18,6 +18,7 @@ type User struct {
 	PasswordHash  string     `json:"-"` // colonne `password` (hash bcrypt)
 	Role          string     `json:"role"`
 	IsActive      bool       `json:"is_active"`
+	EmailVerified bool       `json:"email_verified"`
 	DeactivatedAt *time.Time `json:"deactivated_at,omitempty"` // date du bannissement (NULL si actif)
 	CreatedAt     time.Time  `json:"created_at"`
 }
@@ -46,6 +47,31 @@ type RegisterRequest struct {
 type LoginRequest struct {
 	Email    string `json:"email" binding:"required,email"`
 	Password string `json:"password" binding:"required"`
+}
+
+// VerifyEmailRequest : payload de POST /auth/verify-email/confirm (token en clair
+// extrait du lien reçu par e-mail).
+type VerifyEmailRequest struct {
+	Token string `json:"token" binding:"required"`
+}
+
+// RequestVerifyRequest : payload de POST /auth/verify-email/request (renvoi du
+// mail de vérification). Réponse générique (anti-énumération).
+type RequestVerifyRequest struct {
+	Email string `json:"email" binding:"required,email"`
+}
+
+// ForgotPasswordRequest : payload de POST /auth/password/forgot. Réponse
+// TOUJOURS générique (anti-énumération), que le compte existe ou non.
+type ForgotPasswordRequest struct {
+	Email string `json:"email" binding:"required,email"`
+}
+
+// ResetPasswordRequest : payload de POST /auth/password/reset (token en clair
+// extrait du lien reçu par e-mail + nouveau mot de passe).
+type ResetPasswordRequest struct {
+	Token       string `json:"token" binding:"required"`
+	NewPassword string `json:"new_password" binding:"required,min=8"`
 }
 
 // RefreshRequest : payload de POST /auth/refresh et /auth/logout. Le refresh

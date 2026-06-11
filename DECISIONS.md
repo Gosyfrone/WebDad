@@ -27,6 +27,56 @@
   401s on expiry (`code: token_expired` distinguishes expiry→refresh from invalid→no-refresh); the **front drives** refresh.
 - **Inter-service auth:** JWT in header (grading requirement).
 
+## Email (vérification & reset)
+
+- **`mail-service` dédié pour le transport SMTP ; la logique-token reste dans auth-service (PG).**
+  `POST /internal/send` hors gateway, authentifié par `MAIL_INTERNAL_SECRET` (`X-Internal-Secret`),
+  appelé en best-effort par auth — symétrique de notification-service (2nd consommateur d'événements
+  internes). Secrets SMTP isolés dans `mail-service/.env`, mailer réutilisable.
+- **Tokens vérif/reset = opaques aléatoires, stockés SHA-256 hachés, usage unique (`used_at`), TTL
+  vérif 24h / reset 1h.** Réutilise le pattern refresh-token : révocables sans denylist (vs JWT
+  auto-portant), une fuite de table ne livre aucun token. Table unique `account_tokens(purpose enum
+  'verify'|'reset', …)`. Toute nouvelle demande invalide les précédents du même `(user_id, purpose)` ;
+  un reset réussi **révoque toutes les sessions** (`DELETE refresh_tokens`) — un changement de
+  mot de passe doit déconnecter partout. **Un reset réussi pose aussi `email_verified=true` :**
+  cliquer le lien (envoyé à l'adresse du compte, TTL 1h) prouve la possession de la boîte, donc
+  débloque un compte non vérifié sans vérification séparée — le reset est un second chemin de
+  preuve d'adresse, équivalent au lien de vérification.
+- **`forgot-password` = anti-énumération stricte** : `ForgotPassword(email)` renvoie TOUJOURS `nil`
+  et le handler répond TOUJOURS `200` générique, que le compte existe, soit actif, ou non ; le mail
+  n'est envoyé (best-effort) que pour un compte existant ET actif. La page front affiche le même
+  écran de confirmation dans tous les cas.
+- **Login non-vérifié = blocage dur** (`403 email_not_verified`, aucun token émis), vérifié
+  *après* le bcrypt pour ne pas révéler l'existence du compte.
+- **Vérification d'e-mail = auto-login (révise la position « pas de session avant login »).**
+  `POST /auth/verify-email/confirm` consomme le token, pose `email_verified=true` *et* émet une
+  session (access + refresh, comme `/login`) ; le BFF Next pose le cookie refresh httpOnly et renvoie
+  l'access token, la page `verify-email` stocke ce dernier et redirige vers le **feed**. Justifié par
+  la même logique que le lien de reset : cliquer le lien (token usage unique, TTL 24h, envoyé à
+  l'adresse du compte) **prouve la possession de la boîte** → facteur d'authentification suffisant.
+  Garde : un compte désactivé (`is_active=false`) reste bloqué (`403`, aucune session). Le no-session
+  ne vaut donc plus que pour le **register** (provisioning serveur, ci-dessous), pas pour la vérif.
+- **Provisioning préservé au register, sans session client (décision Phase 1).** `auth/register`
+  continue d'émettre les tokens, mais le BFF Next s'en sert **uniquement côté serveur** pour
+  provisionner l'identité (`POST /users` + `POST /profils`, avec `username`/`birth_date`/`gender`
+  du formulaire) puis les **jette** : il ne pose PAS le cookie refresh et ne renvoie PAS l'access
+  token. Le client n'obtient donc **aucune session** et atterrit sur une page publique « consulte ta
+  boîte mail » ; le blocage réel est appliqué au login. *Choisi plutôt que « register sans token +
+  provisioning au 1er login » : cette variante imposerait de charrier `birth_date`/`gender` (qui
+  n'existent que dans le formulaire register) jusqu'au login via un stockage temporaire — plus lourd
+  et fragile.* **Admin seedé forcé `email_verified=true`** (pas de vraie boîte) pour garder un compte
+  démo. Le renvoi de mail de vérif est accessible depuis la page login (les users existants passent
+  `email_verified=false` et doivent se vérifier).
+- **Liens dans le mail → pages front** (`APP_BASE_URL/verify-email|reset-password?token=…`), pas
+  l'API directement : maîtrise de l'UX (succès/expiré/erreur), API qui reste JSON-only.
+- **Corps HTML des e-mails = coquille de marque partagée** (`services/mail_template.go`,
+  `brandedEmailHTML`, pure & testée) : layout table + styles inline (compat Outlook/Gmail/Apple Mail),
+  direction graphique clear mode (dégradé `#8D3DFF→#5B6CFF→#47D9FF`, logo via `APP_BASE_URL`), bouton
+  « bulletproof » (repli couleur solide). Vérif et reset la réutilisent → cohérence visuelle, un seul
+  point de maintenance. La version **texte** reste sobre (délivrabilité).
+- **Dev sans SMTP configuré = transport console** : le mailer logge le mail + le lien sur stdout au
+  lieu d'envoyer (zéro dépendance Gmail en dev, on clique le lien depuis les logs).
+
 ## Gateway
 
 - **Thin reverse proxy (stdlib).** Prefix→URL table, transparent forward, preserves prefix. Mince + "we built it"

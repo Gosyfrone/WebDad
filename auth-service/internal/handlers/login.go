@@ -19,7 +19,7 @@ import (
 // @Success     200 {object} models.AuthUser "Connexion réussie — data: {token, refresh_token, user}"
 // @Failure     400 {object} map[string]string "Payload invalide"
 // @Failure     401 {object} map[string]string "Credentials invalides"
-// @Failure     403 {object} map[string]string "Compte désactivé"
+// @Failure     403 {object} map[string]string "Compte désactivé ou e-mail non vérifié (code: email_not_verified)"
 // @Failure     500 {object} map[string]string "Erreur interne"
 // @Router      /auth/login [post]
 func (h *Handler) Login(c *gin.Context) {
@@ -36,6 +36,9 @@ func (h *Handler) Login(c *gin.Context) {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		case errors.Is(err, services.ErrUserInactive):
 			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		case errors.Is(err, services.ErrEmailNotVerified):
+			// Code machine pour que le front propose le renvoi du mail de vérif.
+			c.JSON(http.StatusForbidden, gin.H{"error": err.Error(), "code": "email_not_verified"})
 		default:
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "connexion impossible"})
 		}

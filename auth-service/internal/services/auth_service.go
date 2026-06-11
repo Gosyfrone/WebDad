@@ -13,6 +13,8 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -33,6 +35,18 @@ var (
 	// ErrInsufficientPrivilege : l'acteur n'a pas le niveau pour agir sur la
 	// cible (ex. un modérateur tente de bannir un autre modérateur / un admin).
 	ErrInsufficientPrivilege = errors.New("privilèges insuffisants pour cette cible")
+	// ErrEmailNotVerified : login refusé tant que l'adresse n'est pas vérifiée.
+	ErrEmailNotVerified = errors.New("adresse e-mail non vérifiée")
+	// ErrInvalidToken : token de vérification inconnu / expiré / déjà consommé.
+	ErrInvalidToken = errors.New("token invalide ou expiré")
+)
+
+// Usages des account_tokens + TTL de la vérification d'e-mail.
+const (
+	purposeVerify  = "verify"
+	purposeReset   = "reset"
+	verifyTokenTTL = 24 * time.Hour
+	resetTokenTTL  = 1 * time.Hour
 )
 
 // defaultAdminID : UUID figé de l'admin par défaut, partagé avec les autres
@@ -48,21 +62,32 @@ type Claims struct {
 	jwt.RegisteredClaims
 }
 
-// AuthService regroupe les dépendances (DB + paramètres JWT).
+// Mailer envoie un e-mail transactionnel (implémenté par internal/notify).
+// Best-effort : l'appelant logge l'erreur sans la propager.
+type Mailer interface {
+	Send(to, subject, html, text string) error
+}
+
+// AuthService regroupe les dépendances (DB + paramètres JWT + mailer).
 type AuthService struct {
 	db            *sql.DB
 	jwtSecret     []byte
 	jwtExpiry     time.Duration
 	refreshExpiry time.Duration
+	mailer        Mailer // nil = envoi d'e-mails désactivé (no-op loggé)
+	appBaseURL    string // base URL du front (liens dans les e-mails)
 }
 
-// New construit le service.
-func New(db *sql.DB, jwtSecret string, jwtExpiry, refreshExpiry time.Duration) *AuthService {
+// New construit le service. mailer peut être nil (mail non configuré) : l'envoi
+// devient alors un no-op loggé et auth reste pleinement fonctionnel.
+func New(db *sql.DB, jwtSecret string, jwtExpiry, refreshExpiry time.Duration, mailer Mailer, appBaseURL string) *AuthService {
 	return &AuthService{
 		db:            db,
 		jwtSecret:     []byte(jwtSecret),
 		jwtExpiry:     jwtExpiry,
 		refreshExpiry: refreshExpiry,
+		mailer:        mailer,
+		appBaseURL:    appBaseURL,
 	}
 }
 
@@ -90,6 +115,12 @@ func (s *AuthService) Register(email, password string) (string, string, *models.
 		return "", "", nil, fmt.Errorf("insertion utilisateur : %w", err)
 	}
 
+	// Envoi du mail de vérification (best-effort). Les tokens sont tout de même
+	// émis : le BFF s'en sert UNIQUEMENT côté serveur pour le provisioning
+	// (users+profils) puis les jette — le client n'obtient pas de session, le
+	// blocage réel est appliqué au login (email_verified). Cf. DECISIONS.md.
+	s.sendVerificationMail(u)
+
 	return s.issueTokens(u)
 }
 
@@ -97,12 +128,12 @@ func (s *AuthService) Register(email, password string) (string, string, *models.
 // token + l'utilisateur.
 func (s *AuthService) Login(email, password string) (string, string, *models.User, error) {
 	const q = `
-		SELECT id, email, password, role, is_active, created_at
+		SELECT id, email, password, role, is_active, email_verified, created_at
 		FROM credentials WHERE email = $1`
 
 	u := &models.User{}
 	err := s.db.QueryRow(q, email).
-		Scan(&u.ID, &u.Email, &u.PasswordHash, &u.Role, &u.IsActive, &u.CreatedAt)
+		Scan(&u.ID, &u.Email, &u.PasswordHash, &u.Role, &u.IsActive, &u.EmailVerified, &u.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", "", nil, ErrInvalidCredentials
 	}
@@ -115,6 +146,11 @@ func (s *AuthService) Login(email, password string) (string, string, *models.Use
 	}
 	if bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(password)) != nil {
 		return "", "", nil, ErrInvalidCredentials
+	}
+	// Blocage dur : un compte non vérifié ne peut pas se connecter (aucun token
+	// émis). Vérifié APRÈS le bcrypt pour ne pas révéler l'existence du compte.
+	if !u.EmailVerified {
+		return "", "", nil, ErrEmailNotVerified
 	}
 
 	return s.issueTokens(u)
@@ -173,6 +209,241 @@ func (s *AuthService) Logout(rawToken string) error {
 	return nil
 }
 
+// VerifyEmail consomme un token de vérification, marque l'adresse vérifiée et
+// ouvre une session dans la foulée (access + refresh) : cliquer le lien prouve
+// la possession de la boîte, l'utilisateur entre donc directement dans l'app
+// sans se reconnecter. Renvoie ErrInvalidToken si le token est inconnu /
+// expiré / déjà utilisé, ErrUserInactive si le compte a été désactivé entre-temps.
+func (s *AuthService) VerifyEmail(rawToken string) (string, string, *models.User, error) {
+	userID, err := s.consumeAccountToken(rawToken, purposeVerify)
+	if err != nil {
+		return "", "", nil, err
+	}
+
+	// UPDATE ... RETURNING : on marque vérifié ET on récupère l'utilisateur en
+	// une requête, pour pouvoir lui émettre une session immédiatement.
+	const q = `
+		UPDATE credentials SET email_verified = true
+		WHERE id = $1
+		RETURNING id, email, role, is_active, email_verified, created_at`
+	u := &models.User{}
+	if err := s.db.QueryRow(q, userID).
+		Scan(&u.ID, &u.Email, &u.Role, &u.IsActive, &u.EmailVerified, &u.CreatedAt); err != nil {
+		return "", "", nil, fmt.Errorf("activation email_verified : %w", err)
+	}
+	if !u.IsActive {
+		return "", "", nil, ErrUserInactive // compte banni : pas de session.
+	}
+
+	return s.issueTokens(u)
+}
+
+// ResendVerification renvoie un mail de vérification. ANTI-ÉNUMÉRATION : renvoie
+// TOUJOURS nil — l'appelant ne peut pas distinguer un compte inexistant, déjà
+// vérifié, ou non vérifié. Le mail n'est (ré)envoyé que dans ce dernier cas.
+func (s *AuthService) ResendVerification(email string) error {
+	const q = `
+		SELECT id, email, role, is_active, email_verified, created_at
+		FROM credentials WHERE email = $1`
+
+	u := &models.User{}
+	err := s.db.QueryRow(q, email).
+		Scan(&u.ID, &u.Email, &u.Role, &u.IsActive, &u.EmailVerified, &u.CreatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil // compte inexistant : no-op silencieux (anti-énumération).
+	}
+	if err != nil {
+		log.Printf("[auth-service] resend vérif (lecture) pour %s : %v", email, err)
+		return nil
+	}
+	if u.EmailVerified {
+		return nil // déjà vérifié : rien à faire.
+	}
+
+	s.sendVerificationMail(u)
+	return nil
+}
+
+// sendVerificationMail crée un token de vérification (TTL 24h) et envoie le
+// lien par mail. Best-effort : toute erreur est loggée, jamais propagée (ne
+// casse ni le register ni le resend).
+func (s *AuthService) sendVerificationMail(u *models.User) {
+	if s.mailer == nil {
+		log.Printf("[auth-service] mail désactivé : vérif pour %s non envoyée", u.Email)
+		return
+	}
+
+	raw, err := s.createAccountToken(u.ID, purposeVerify, verifyTokenTTL)
+	if err != nil {
+		log.Printf("[auth-service] création token vérif pour %s : %v", u.Email, err)
+		return
+	}
+
+	link := fmt.Sprintf("%s/verify-email?token=%s",
+		strings.TrimRight(s.appBaseURL, "/"), url.QueryEscape(raw))
+
+	subject := "Confirme ton adresse e-mail — Breezy"
+	text := fmt.Sprintf(
+		"Bienvenue sur Breezy !\n\n"+
+			"Confirme ton adresse e-mail en ouvrant ce lien :\n%s\n\n"+
+			"Ce lien expire dans 24 heures. Si tu n'es pas à l'origine de cette "+
+			"inscription, ignore ce message.",
+		link)
+	htmlBody := brandedEmailHTML(s.appBaseURL,
+		"Bienvenue sur Breezy 👋",
+		"Plus qu'une étape : confirme ton adresse e-mail pour activer ton compte et rejoindre la conversation.",
+		"Vérifier mon adresse e-mail", link,
+		"Ce lien expire dans 24 heures. Si tu n'es pas à l'origine de cette inscription, ignore simplement ce message.")
+
+	if err := s.mailer.Send(u.Email, subject, htmlBody, text); err != nil {
+		log.Printf("[auth-service] envoi mail vérif à %s : %v", u.Email, err)
+	}
+}
+
+// ForgotPassword déclenche l'envoi d'un mail de réinitialisation. ANTI-
+// ÉNUMÉRATION : renvoie TOUJOURS nil — l'appelant ne peut pas distinguer un
+// compte inexistant ou inactif. Le mail n'est envoyé que pour un compte actif.
+func (s *AuthService) ForgotPassword(email string) error {
+	const q = `
+		SELECT id, email, role, is_active, email_verified, created_at
+		FROM credentials WHERE email = $1`
+
+	u := &models.User{}
+	err := s.db.QueryRow(q, email).
+		Scan(&u.ID, &u.Email, &u.Role, &u.IsActive, &u.EmailVerified, &u.CreatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil // compte inexistant : no-op silencieux (anti-énumération).
+	}
+	if err != nil {
+		log.Printf("[auth-service] forgot password (lecture) pour %s : %v", email, err)
+		return nil
+	}
+	if !u.IsActive {
+		return nil // compte désactivé : pas de reset.
+	}
+
+	s.sendResetMail(u)
+	return nil
+}
+
+// ResetPassword consomme un token de reset puis remplace le mot de passe. Le
+// lien reset prouvant la possession de l'adresse, on en profite pour marquer
+// l'e-mail vérifié (débloque un compte non vérifié). Toutes les sessions sont
+// révoquées (DELETE refresh_tokens). Renvoie ErrInvalidToken si le token est
+// inconnu / expiré / déjà utilisé.
+func (s *AuthService) ResetPassword(rawToken, newPassword string) error {
+	userID, err := s.consumeAccountToken(rawToken, purposeReset)
+	if err != nil {
+		return err
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("hash du nouveau mot de passe : %w", err)
+	}
+
+	if _, err := s.db.Exec(
+		`UPDATE credentials SET password = $1, email_verified = true WHERE id = $2`,
+		string(hash), userID,
+	); err != nil {
+		return fmt.Errorf("mise à jour du mot de passe : %w", err)
+	}
+
+	// Révoque toutes les sessions ouvertes : un reset doit déconnecter partout.
+	if _, err := s.db.Exec(`DELETE FROM refresh_tokens WHERE user_id = $1`, userID); err != nil {
+		return fmt.Errorf("révocation des sessions : %w", err)
+	}
+	return nil
+}
+
+// sendResetMail crée un token de reset (TTL 1h) et envoie le lien par mail.
+// Best-effort : toute erreur est loggée, jamais propagée (ne casse pas le flux
+// forgot, qui reste anti-énumération).
+func (s *AuthService) sendResetMail(u *models.User) {
+	if s.mailer == nil {
+		log.Printf("[auth-service] mail désactivé : reset pour %s non envoyé", u.Email)
+		return
+	}
+
+	raw, err := s.createAccountToken(u.ID, purposeReset, resetTokenTTL)
+	if err != nil {
+		log.Printf("[auth-service] création token reset pour %s : %v", u.Email, err)
+		return
+	}
+
+	link := fmt.Sprintf("%s/reset-password?token=%s",
+		strings.TrimRight(s.appBaseURL, "/"), url.QueryEscape(raw))
+
+	subject := "Réinitialise ton mot de passe — Breezy"
+	text := fmt.Sprintf(
+		"Tu as demandé à réinitialiser ton mot de passe Breezy.\n\n"+
+			"Choisis un nouveau mot de passe en ouvrant ce lien :\n%s\n\n"+
+			"Ce lien expire dans 1 heure. Si tu n'es pas à l'origine de cette "+
+			"demande, ignore ce message : ton mot de passe reste inchangé.",
+		link)
+	htmlBody := brandedEmailHTML(s.appBaseURL,
+		"Réinitialise ton mot de passe 🔒",
+		"Tu as demandé à changer ton mot de passe Breezy. Choisis-en un nouveau en un clic — c'est rapide et sécurisé.",
+		"Choisir un nouveau mot de passe", link,
+		"Ce lien expire dans 1 heure. Si tu n'es pas à l'origine de cette demande, ignore ce message : ton mot de passe reste inchangé.")
+
+	if err := s.mailer.Send(u.Email, subject, htmlBody, text); err != nil {
+		log.Printf("[auth-service] envoi mail reset à %s : %v", u.Email, err)
+	}
+}
+
+// createAccountToken invalide d'abord les tokens non consommés du même
+// (user_id, purpose), puis crée un nouveau jeton opaque haché (SHA-256) et
+// retourne sa valeur EN CLAIR (à insérer dans le lien). TTL via expires_at.
+func (s *AuthService) createAccountToken(userID, purpose string, ttl time.Duration) (string, error) {
+	if _, err := s.db.Exec(
+		`DELETE FROM account_tokens WHERE user_id = $1 AND purpose = $2 AND used_at IS NULL`,
+		userID, purpose,
+	); err != nil {
+		return "", fmt.Errorf("invalidation anciens tokens : %w", err)
+	}
+
+	raw, err := randomToken()
+	if err != nil {
+		return "", err
+	}
+
+	const q = `INSERT INTO account_tokens (user_id, purpose, token_hash, expires_at) VALUES ($1, $2, $3, $4)`
+	if _, err := s.db.Exec(q, userID, purpose, hashToken(raw), time.Now().Add(ttl)); err != nil {
+		return "", fmt.Errorf("création account token : %w", err)
+	}
+	return raw, nil
+}
+
+// consumeAccountToken valide un token (lookup par hash) puis le marque consommé
+// (used_at = NOW()). Usage unique : refuse un token inconnu, déjà utilisé,
+// expiré ou de mauvais purpose. Renvoie le user_id associé.
+func (s *AuthService) consumeAccountToken(rawToken, purpose string) (string, error) {
+	const q = `
+		SELECT id, user_id, expires_at, used_at
+		FROM account_tokens WHERE token_hash = $1 AND purpose = $2`
+
+	var id, userID string
+	var expiresAt time.Time
+	var usedAt sql.NullTime
+	err := s.db.QueryRow(q, hashToken(rawToken), purpose).
+		Scan(&id, &userID, &expiresAt, &usedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", ErrInvalidToken
+	}
+	if err != nil {
+		return "", fmt.Errorf("lecture account token : %w", err)
+	}
+	if usedAt.Valid || time.Now().After(expiresAt) {
+		return "", ErrInvalidToken
+	}
+
+	if _, err := s.db.Exec(`UPDATE account_tokens SET used_at = NOW() WHERE id = $1`, id); err != nil {
+		return "", fmt.Errorf("consommation account token : %w", err)
+	}
+	return userID, nil
+}
+
 // issueTokens signe un access token (court) et crée un refresh token (long,
 // persisté haché). Retourné par Register/Login/Refresh.
 func (s *AuthService) issueTokens(u *models.User) (string, string, *models.User, error) {
@@ -214,10 +485,14 @@ func (s *AuthService) EnsureDefaultAdmin(email, password string) error {
 		return fmt.Errorf("hash admin : %w", err)
 	}
 
+	// email_verified=true : l'admin de démo n'a pas de vraie boîte mail, on le
+	// garde donc utilisable malgré le blocage login des comptes non vérifiés
+	// (Phase 1). DO UPDATE rend le marquage idempotent même sur une base où
+	// l'admin existait déjà avant l'ajout de la colonne.
 	const q = `
-		INSERT INTO credentials (id, email, password, role)
-		VALUES ($1, $2, $3, $4)
-		ON CONFLICT (id) DO NOTHING`
+		INSERT INTO credentials (id, email, password, role, email_verified)
+		VALUES ($1, $2, $3, $4, true)
+		ON CONFLICT (id) DO UPDATE SET email_verified = true`
 
 	if _, err := s.db.Exec(q, defaultAdminID, email, string(hash), models.RoleAdmin); err != nil {
 		return fmt.Errorf("seed admin : %w", err)

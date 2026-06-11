@@ -12,6 +12,7 @@ on:
       - "message-service/**"
       - "notification-service/**"
       - "media-service/**"
+      - "mail-service/**"
       - "api-gateway/**"
       - "doc/**"
       - "scripts/swagger-aggregate.sh"
@@ -40,6 +41,7 @@ jobs:
           - message-service
           - notification-service
           - media-service
+          - mail-service
           - api-gateway
     defaults:
       run:

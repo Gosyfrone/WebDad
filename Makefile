@@ -1,11 +1,11 @@
 .PHONY: help env env-sync sync-one up dev dev-down dev-logs down build logs ps clean reset db-only \
-        logs-gateway logs-auth logs-user logs-profil logs-post logs-message logs-notification logs-media logs-front logs-db \
-        sh-auth sh-user sh-profil sh-post sh-message sh-notification sh-media sh-gateway \
+        logs-gateway logs-auth logs-user logs-profil logs-post logs-message logs-notification logs-media logs-mail logs-front logs-db \
+        sh-auth sh-user sh-profil sh-post sh-message sh-notification sh-media sh-mail sh-gateway \
         psql-auth psql-user mongo-profil-cli mongo-post-cli mongo-message-cli mongo-notification-cli \
         swagger swagger-site
 
 # Services possédant un .env propre (chargé par compose via env_file)
-SERVICES := auth-service user-service profil-service post-service message-service notification-service media-service api-gateway
+SERVICES := auth-service user-service profil-service post-service message-service notification-service media-service mail-service api-gateway
 
 # Invocation compose en mode DEV (overlay hot-reload par-dessus la base)
 DEV := docker compose -f docker-compose.yml -f docker-compose.dev.yml
@@ -29,8 +29,8 @@ help:
 	@echo "  make reset     Reset complet (données supprimées)"
 	@echo "  make db-only   Démarrer seulement les BDD"
 	@echo ""
-	@echo "  Logs d'un service : make logs-auth | logs-user | logs-profil | logs-post | logs-message | logs-notification | logs-media | logs-front | logs-gateway | logs-db"
-	@echo "  Shell d'un service: make sh-auth | sh-user | sh-profil | sh-post | sh-message | sh-notification | sh-media | sh-gateway"
+	@echo "  Logs d'un service : make logs-auth | logs-user | logs-profil | logs-post | logs-message | logs-notification | logs-media | logs-mail | logs-front | logs-gateway | logs-db"
+	@echo "  Shell d'un service: make sh-auth | sh-user | sh-profil | sh-post | sh-message | sh-notification | sh-media | sh-mail | sh-gateway"
 	@echo "  CLI BDD           : make psql-auth | psql-user | mongo-profil-cli | mongo-post-cli | mongo-message-cli | mongo-notification-cli"
 	@echo "  make swagger        Générer + agréger le spec OpenAPI (doc/openapi.{json,yaml})"
 	@echo "  make swagger-site   Servir la doc Redoc localement → http://localhost:8088"
@@ -107,7 +107,7 @@ dev:
 
 # Logs des services applicatifs (front + Go), sans le bruit des BDD.
 dev-logs:
-	$(DEV) logs -f frontend api-gateway auth-service user-service profil-service post-service message-service notification-service media-service
+	$(DEV) logs -f frontend api-gateway auth-service user-service profil-service post-service message-service notification-service media-service mail-service
 
 dev-down:
 	$(DEV) down
@@ -161,6 +161,9 @@ logs-notification:
 logs-media:
 	docker compose logs -f media-service minio
 
+logs-mail:
+	docker compose logs -f mail-service
+
 logs-front:
 	docker compose logs -f frontend
 
@@ -188,6 +191,9 @@ sh-notification:
 
 sh-media:
 	docker compose exec media-service sh
+
+sh-mail:
+	docker compose exec mail-service sh
 
 sh-gateway:
 	docker compose exec api-gateway sh

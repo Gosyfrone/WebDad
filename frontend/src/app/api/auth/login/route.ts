@@ -12,6 +12,7 @@ type AuthPayload = {
   }
   message?: string
   error?: string
+  code?: string
 }
 
 export async function POST(request: NextRequest) {
@@ -56,6 +57,14 @@ export async function POST(request: NextRequest) {
   if (!upstreamResponse.ok) {
     const message =
       payload?.error ?? payload?.message ?? 'Les identifiants fournis sont invalides.'
+    // E-mail non vérifié : on relaie le code machine pour que la page login
+    // propose le renvoi du mail de vérification.
+    if (payload?.code === 'email_not_verified') {
+      return NextResponse.json(
+        { error: message, code: 'email_not_verified' },
+        { status: upstreamResponse.status }
+      )
+    }
     return NextResponse.json({ error: message }, { status: upstreamResponse.status })
   }
 
@@ -75,7 +84,7 @@ export async function POST(request: NextRequest) {
 
   // Provisioning paresseux : crée la ligne `users` à partir du JWT (best-effort).
   if (accessToken) {
-    await provisionUser(accessToken)
+    void provisionUser(accessToken)
   }
 
   return nextResponse

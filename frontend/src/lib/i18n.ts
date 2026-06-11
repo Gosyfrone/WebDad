@@ -470,6 +470,57 @@ export const messages: Record<Locale, Messages> = {
     'auth.register.err.confirm_mismatch': 'Les mots de passe ne correspondent pas.',
     'auth.register.err.failed': "L'inscription a échoué. Vérifie les informations saisies.",
 
+    // — Vérification d'e-mail —
+    'auth.check_email.title': 'Vérifie ta boîte mail',
+    'auth.check_email.subtitle':
+      "Un lien de vérification vient d'être envoyé à {email}. Clique dessus pour activer ton compte.",
+    'auth.check_email.subtitle_generic':
+      "Un lien de vérification vient d'être envoyé à ton adresse. Clique dessus pour activer ton compte.",
+    'auth.check_email.hint':
+      "Pense à regarder dans tes spams. Le lien expire dans 24 heures.",
+    'auth.check_email.resend': 'Renvoyer le lien de vérification',
+    'auth.check_email.back_to_login': 'Retour à la connexion',
+    'auth.verify.login_blocked':
+      "Ton adresse e-mail n'est pas encore vérifiée. Vérifie ta boîte mail pour activer ton compte.",
+    'auth.verify.resend_cta': 'Renvoyer le mail de vérification',
+    'auth.verify.resending': 'Envoi en cours…',
+    'auth.verify.resend_done':
+      "Si un compte non vérifié correspond à cette adresse, un e-mail vient d'être envoyé.",
+    'auth.verify.resend_label': 'Ton adresse e-mail',
+    'auth.verify.loading_title': 'Vérification en cours…',
+    'auth.verify.loading_desc': 'Un instant, on confirme ton adresse e-mail.',
+    'auth.verify.success_title': 'Adresse vérifiée !',
+    'auth.verify.success_desc':
+      'Ton compte est activé et te voilà connecté. Bienvenue sur Breezy !',
+    'auth.verify.go_to_app': 'Accéder à Breezy',
+    'auth.verify.invalid_title': 'Lien invalide ou expiré',
+    'auth.verify.invalid_desc':
+      "Ce lien de vérification est invalide ou a expiré. Demande-en un nouveau ci-dessous.",
+    'auth.forgot.title': 'Mot de passe oublié ?',
+    'auth.forgot.subtitle':
+      "Saisis ton adresse e-mail : on t'envoie un lien pour choisir un nouveau mot de passe.",
+    'auth.forgot.submit': 'Envoyer le lien',
+    'auth.forgot.submitting': 'Envoi en cours…',
+    'auth.forgot.sent_title': 'Vérifie ta boîte mail',
+    'auth.forgot.sent_desc':
+      "Si un compte correspond à cette adresse, un e-mail avec un lien de réinitialisation vient d'être envoyé. Le lien expire dans 1 heure.",
+    'auth.reset.title': 'Nouveau mot de passe',
+    'auth.reset.subtitle': 'Choisis un nouveau mot de passe pour ton compte Breezy.',
+    'auth.reset.new_password_label': 'Nouveau mot de passe',
+    'auth.reset.confirm_password_label': 'Confirme le mot de passe',
+    'auth.reset.submit': 'Réinitialiser le mot de passe',
+    'auth.reset.submitting': 'Réinitialisation…',
+    'auth.reset.err.mismatch': 'Les deux mots de passe ne correspondent pas.',
+    'auth.reset.err.generic': 'La réinitialisation a échoué. Réessaie.',
+    'auth.reset.success_title': 'Mot de passe réinitialisé !',
+    'auth.reset.success_desc':
+      'Ton mot de passe a été mis à jour et toutes tes sessions ont été déconnectées. Connecte-toi avec ton nouveau mot de passe.',
+    'auth.reset.go_to_login': 'Se connecter',
+    'auth.reset.invalid_title': 'Lien invalide ou expiré',
+    'auth.reset.invalid_desc':
+      'Ce lien de réinitialisation est invalide, a expiré ou a déjà été utilisé. Demande-en un nouveau.',
+    'auth.reset.request_new': 'Demander un nouveau lien',
+
     // — Commun (toasts) —
     'common.action_failed': 'Action impossible',
     'common.delete_failed': 'Suppression impossible',
@@ -1030,6 +1081,57 @@ export const messages: Record<Locale, Messages> = {
     'auth.register.err.confirm_max': 'The confirmation is limited to 250 characters.',
     'auth.register.err.confirm_mismatch': "Passwords don't match.",
     'auth.register.err.failed': 'Sign-up failed. Check the information entered.',
+
+    // — Email verification —
+    'auth.check_email.title': 'Check your inbox',
+    'auth.check_email.subtitle':
+      'A verification link has just been sent to {email}. Click it to activate your account.',
+    'auth.check_email.subtitle_generic':
+      'A verification link has just been sent to your address. Click it to activate your account.',
+    'auth.check_email.hint':
+      'Remember to check your spam folder. The link expires in 24 hours.',
+    'auth.check_email.resend': 'Resend verification link',
+    'auth.check_email.back_to_login': 'Back to sign in',
+    'auth.verify.login_blocked':
+      "Your email address isn't verified yet. Check your inbox to activate your account.",
+    'auth.verify.resend_cta': 'Resend verification email',
+    'auth.verify.resending': 'Sending…',
+    'auth.verify.resend_done':
+      'If an unverified account matches this address, an email has just been sent.',
+    'auth.verify.resend_label': 'Your email address',
+    'auth.verify.loading_title': 'Verifying…',
+    'auth.verify.loading_desc': 'One moment, we are confirming your email address.',
+    'auth.verify.success_title': 'Email verified!',
+    'auth.verify.success_desc':
+      'Your account is active and you are now signed in. Welcome to Breezy!',
+    'auth.verify.go_to_app': 'Enter Breezy',
+    'auth.verify.invalid_title': 'Invalid or expired link',
+    'auth.verify.invalid_desc':
+      'This verification link is invalid or has expired. Request a new one below.',
+    'auth.forgot.title': 'Forgot your password?',
+    'auth.forgot.subtitle':
+      "Enter your email address and we'll send you a link to choose a new password.",
+    'auth.forgot.submit': 'Send the link',
+    'auth.forgot.submitting': 'Sending…',
+    'auth.forgot.sent_title': 'Check your inbox',
+    'auth.forgot.sent_desc':
+      'If an account matches this address, an email with a reset link has just been sent. The link expires in 1 hour.',
+    'auth.reset.title': 'New password',
+    'auth.reset.subtitle': 'Choose a new password for your Breezy account.',
+    'auth.reset.new_password_label': 'New password',
+    'auth.reset.confirm_password_label': 'Confirm password',
+    'auth.reset.submit': 'Reset password',
+    'auth.reset.submitting': 'Resetting…',
+    'auth.reset.err.mismatch': 'The two passwords do not match.',
+    'auth.reset.err.generic': 'Reset failed. Please try again.',
+    'auth.reset.success_title': 'Password reset!',
+    'auth.reset.success_desc':
+      'Your password has been updated and all your sessions have been signed out. Sign in with your new password.',
+    'auth.reset.go_to_login': 'Sign in',
+    'auth.reset.invalid_title': 'Invalid or expired link',
+    'auth.reset.invalid_desc':
+      'This reset link is invalid, has expired, or has already been used. Request a new one.',
+    'auth.reset.request_new': 'Request a new link',
 
     // — Common (toasts) —
     'common.action_failed': 'Action failed',

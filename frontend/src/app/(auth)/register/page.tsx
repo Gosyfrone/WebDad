@@ -31,7 +31,6 @@ import {
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { LegalLinks } from '@/components/legal/legal-links'
-import { setAccessToken } from '@/lib/auth-client'
 import { ROUTES } from '@/lib/routes'
 import { useT } from '@/components/language-provider'
 
@@ -46,19 +45,6 @@ type FormErrors = Partial<{
 }>
 
 type Gender = 'male' | 'female' | ''
-
-type RegisterResponse = {
-  token?: string
-  accessToken?: string
-  jwt?: string
-  data?: {
-    token?: string
-    accessToken?: string
-    jwt?: string
-  }
-  message?: string
-  error?: string
-}
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const passwordPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/
@@ -81,20 +67,6 @@ function getMessage(error: unknown, fallback: string): string {
   if (typeof error === 'string' && error.trim()) return error
   if (error instanceof Error && error.message.trim()) return error.message
   return fallback
-}
-
-function extractToken(payload: RegisterResponse | null): string | null {
-  if (!payload || typeof payload !== 'object') return null
-
-  return (
-    payload.token ??
-    payload.accessToken ??
-    payload.jwt ??
-    payload.data?.token ??
-    payload.data?.accessToken ??
-    payload.data?.jwt ??
-    null
-  )
 }
 
 function mapServerError(message: string): FormErrors {
@@ -263,16 +235,13 @@ export default function RegisterPage() {
         return
       }
 
-      const token = extractToken(payload as RegisterResponse | null)
-
-      // L'access token court (15 min) vit en localStorage ; le refresh token
-      // a été posé en cookie httpOnly par le BFF (/api/auth/register).
-      if (token) {
-        setAccessToken(token)
-      }
-
-      router.replace(token ? ROUTES.feed : ROUTES.login)
-      router.refresh()
+      // Blocage dur (vérification d'e-mail) : le register ne crée AUCUNE session
+      // côté client (pas de token renvoyé). On redirige vers la page « consulte
+      // ta boîte mail » ; l'utilisateur devra vérifier son adresse puis se
+      // connecter.
+      router.replace(
+        `${ROUTES.checkEmail}?email=${encodeURIComponent(email.trim())}`
+      )
     } catch (error) {
       setErrors({
         form: getMessage(error, t('auth.err.network')),
@@ -557,21 +526,19 @@ export default function RegisterPage() {
                       className="h-9 rounded-2xl border-white/70 bg-white/90 pl-11 text-sm shadow-sm shadow-slate-200/60 transition-all [color-scheme:light] hover:border-[#47D9FF]/70 focus-visible:border-[#5B6CFF] focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15 dark:border-white/15 dark:bg-white/5 dark:[color-scheme:dark]"
                       value={birthDate}
                       onChange={(event) => {
-                        setBirthDate(clampBirthDate(event.target.value, todayDate))
+                        // Valeur BRUTE pendant la frappe : ne pas clamper ici.
+                        // Taper l'année chiffre par chiffre produit des années
+                        // intermédiaires minuscules (0001→0019→…→1995) ; les
+                        // clamper à 1900 mid-saisie réécrirait le segment et
+                        // bloquerait l'utilisateur à l'an 1900. Le cap est appliqué
+                        // au blur (ci-dessous) + à la validation au submit.
+                        setBirthDate(event.target.value)
                         if (errors.birthDate) {
                           setErrors((current) => ({ ...current, birthDate: undefined }))
                         }
                       }}
-                      onInput={(event) => {
-                        const input = event.currentTarget
-                        const nextValue = clampBirthDate(input.value, todayDate)
-
-                        if (nextValue !== input.value) {
-                          input.value = nextValue
-                          setBirthDate(nextValue)
-                        }
-                      }}
                       onBlur={(event) => {
+                        // Saisie terminée : on cale la date dans [1900-01-01, aujourd'hui].
                         setBirthDate(clampBirthDate(event.currentTarget.value, todayDate))
                       }}
                       aria-invalid={Boolean(errors.birthDate)}

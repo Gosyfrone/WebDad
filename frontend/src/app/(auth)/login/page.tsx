@@ -54,6 +54,10 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = React.useState(false)
   const [errors, setErrors] = React.useState<FormErrors>({})
   const [isSubmitting, setIsSubmitting] = React.useState(false)
+  // Compte non vérifié : on bascule sur une bannière avec renvoi du mail.
+  const [needsVerification, setNeedsVerification] = React.useState(false)
+  const [isResending, setIsResending] = React.useState(false)
+  const [resendNotice, setResendNotice] = React.useState<string | null>(null)
 
   const validate = React.useCallback((): FormErrors => {
     const nextErrors: FormErrors = {}
@@ -83,6 +87,8 @@ export default function LoginPage() {
     if (Object.keys(nextErrors).length > 0) return
 
     setIsSubmitting(true)
+    setNeedsVerification(false)
+    setResendNotice(null)
 
     try {
       const response = await fetch('/api/auth/login', {
@@ -99,6 +105,13 @@ export default function LoginPage() {
       const payload = await response.json().catch(() => null)
 
       if (!response.ok) {
+        // E-mail non vérifié : bannière dédiée + bouton de renvoi (voie de
+        // secours des comptes existants verrouillés par la Phase 1).
+        if (payload?.code === 'email_not_verified') {
+          setNeedsVerification(true)
+          setErrors({})
+          return
+        }
         // 403 = compte désactivé/banni (auth-service ErrUserInactive). On ne
         // remonte pas le message brut du back (« compte désactivé » minuscule) :
         // on affiche un message dédié, localisé, qui oriente vers le support.
@@ -124,6 +137,31 @@ export default function LoginPage() {
       })
     } finally {
       setIsSubmitting(false)
+    }
+  }
+
+  const handleResendVerification = async () => {
+    const trimmedEmail = email.trim()
+    if (!trimmedEmail) {
+      setErrors({ email: t('auth.err.email_required') })
+      return
+    }
+
+    setIsResending(true)
+    setResendNotice(null)
+    try {
+      await fetch('/api/auth/verify-email/resend', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: trimmedEmail }),
+      })
+      // Réponse générique (anti-énumération) : on affiche toujours le même
+      // message, succès comme échec réseau.
+      setResendNotice(t('auth.verify.resend_done'))
+    } catch {
+      setResendNotice(t('auth.verify.resend_done'))
+    } finally {
+      setIsResending(false)
     }
   }
 
@@ -391,12 +429,37 @@ export default function LoginPage() {
 
               <div className="flex items-center justify-between text-sm">
                 <Link
-                  href={ROUTES.home}
+                  href={ROUTES.forgotPassword}
                   className="font-medium text-[#5B6CFF] underline-offset-4 transition hover:text-[#8D3DFF] hover:underline"
                 >
                   {t('auth.login.forgot')}
                 </Link>
               </div>
+
+              {needsVerification ? (
+                <div className="space-y-2 rounded-2xl border border-amber-300 bg-amber-50/90 px-4 py-3 text-sm text-amber-800 shadow-sm dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+                  <div className="flex items-start gap-3">
+                    <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" />
+                    <p>{t('auth.verify.login_blocked')}</p>
+                  </div>
+                  {resendNotice ? (
+                    <p className="pl-7 text-xs text-amber-700 dark:text-amber-300">
+                      {resendNotice}
+                    </p>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleResendVerification}
+                      disabled={isResending}
+                      className="ml-7 font-semibold underline underline-offset-4 transition hover:text-amber-900 disabled:cursor-not-allowed disabled:opacity-70 dark:hover:text-amber-100"
+                    >
+                      {isResending
+                        ? t('auth.verify.resending')
+                        : t('auth.verify.resend_cta')}
+                    </button>
+                  )}
+                </div>
+              ) : null}
 
               {errors.form ? (
                 <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50/90 px-4 py-2.5 text-sm text-red-700 shadow-sm dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
