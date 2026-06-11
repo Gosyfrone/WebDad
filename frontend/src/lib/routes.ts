@@ -39,6 +39,25 @@ export function profilHref(username: string): string {
   return `${ROUTES.profil}/${encodeURIComponent(username)}`
 }
 
+/** Lien vers le détail d'un post (`/posts/<id>`). */
+export function postHref(id: string): string {
+  return `/posts/${encodeURIComponent(id)}`
+}
+
+/** Lien vers les résultats d'un hashtag. */
+export function hashtagHref(tag: string, tab: 'top' | 'recent' | 'media' = 'top'): string {
+  const clean = tag.trim().replace(/^#/, '')
+  return `${ROUTES.feed}?hashtag=${encodeURIComponent(clean)}&tab=${tab}`
+}
+
+/** Destination d'une recherche globale : #tag => feed hashtag, sinon Explorer. */
+export function searchHref(query: string): string {
+  const q = query.trim()
+  if (!q) return ROUTES.explorer
+  if (q.startsWith('#')) return hashtagHref(q, 'top')
+  return `${ROUTES.explorer}?q=${encodeURIComponent(q)}`
+}
+
 /** Un lien de navigation affiché dans la barre de navigation. */
 export interface NavItem {
   /** Clé i18n du libellé (cf. lib/i18n.ts, namespace `nav`). */

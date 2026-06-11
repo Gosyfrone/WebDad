@@ -1,12 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { Search } from 'lucide-react'
 
 import { listHashtagTrends, type HashtagTrend } from '@/lib/posts'
-import { ROUTES } from '@/lib/routes'
+import { ROUTES, hashtagHref, searchHref } from '@/lib/routes'
 import { useAuthGate } from '@/components/auth-prompt-provider'
 import { useT } from '@/components/language-provider'
 import { WhoToFollow } from '@/components/layout/who-to-follow'
@@ -16,7 +16,9 @@ export function SidebarRight() {
   const t = useT()
   const pathname = usePathname()
   const { isVisitor } = useAuthGate()
+  const router = useRouter()
   const [trends, setTrends] = useState<HashtagTrend[]>([])
+  const [query, setQuery] = useState('')
 
   useEffect(() => {
     let cancelled = false
@@ -36,32 +38,39 @@ export function SidebarRight() {
   // « Qui suivre » sur /messages.
   if (pathname?.startsWith(ROUTES.messages)) return null
 
+  function submitSearch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const href = searchHref(query)
+    if (href !== ROUTES.explorer) router.push(href)
+  }
+
   return (
-    <aside className="sticky top-0 hidden h-screen w-[350px] flex-col gap-4 overflow-y-auto px-4 py-4 xl:flex">
+    <aside className="sticky top-0 hidden h-screen w-[350px] flex-col gap-3 overflow-y-auto px-4 py-3 xl:flex">
       {/* Search */}
-      <div className="relative">
+      <form onSubmit={submitSearch} className="relative">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
         <input
           type="search"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
           placeholder={t('search.placeholder')}
-          disabled
-          className="glass w-full rounded-full border py-2.5 pl-10 pr-4 text-sm backdrop-blur placeholder:text-muted-foreground focus:border-[#5B6CFF] focus:bg-white focus:outline-none disabled:cursor-not-allowed dark:focus:bg-white/10"
+          className="glass w-full rounded-full border py-2.5 pl-10 pr-4 text-sm backdrop-blur placeholder:text-muted-foreground focus:border-[#5B6CFF] focus:bg-white focus:outline-none dark:focus:bg-white/10"
         />
-      </div>
+      </form>
 
       {/* Tendances */}
       <div className="glass overflow-hidden rounded-[24px] border backdrop-blur-xl">
-        <h2 className="brand-text px-4 py-3 text-xl font-bold">{t('trends.title')}</h2>
+        <h2 className="brand-text px-4 py-2.5 text-lg font-bold">{t('trends.title')}</h2>
         {trends.length > 0 ? (
           trends.map((trend) => (
             <Link
               key={trend.tag}
-              href={`${ROUTES.feed}?hashtag=${encodeURIComponent(trend.tag)}`}
-              className="flex flex-col gap-0.5 px-4 py-3 transition-colors hover:bg-accent"
+              href={hashtagHref(trend.tag, 'top')}
+              className="flex flex-col gap-0.5 px-4 py-2 transition-colors hover:bg-accent"
             >
-              <span className="text-xs text-muted-foreground">{t('trends.trending')}</span>
+              <span className="text-[11px] leading-4 text-muted-foreground">{t('trends.trending')}</span>
               <span className="font-bold text-foreground">#{trend.tag}</span>
-              <span className="text-xs text-muted-foreground">
+              <span className="text-[11px] leading-4 text-muted-foreground">
                 {t(trend.count > 1 ? 'trends.posts_other' : 'trends.posts_one', {
                   count: formatTrendCount(trend.count),
                 })}

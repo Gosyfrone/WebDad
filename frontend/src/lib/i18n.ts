@@ -402,7 +402,7 @@ export const messages: Record<Locale, Messages> = {
     'admin.uptime_s': 's',
 
     // — Recherche / Tendances (colonne droite) —
-    'search.placeholder': 'Rechercher',
+    'search.placeholder': 'Rechercher un compte ou #hashtag',
     'trends.title': 'Tendances',
     'trends.trending': 'Tendance',
     'trends.t1.category': 'Technologie',
@@ -414,6 +414,8 @@ export const messages: Record<Locale, Messages> = {
     'trends.posts_one': '{count} post',
     'trends.posts_other': '{count} posts',
     'trends.empty': 'Aucune tendance pour le moment.',
+    'search_suggestions.trend': 'Tendance',
+    'search_suggestions.empty': 'Aucune suggestion trouvée.',
 
     // — Navigation mobile —
     'nav.main_aria': 'Navigation principale',
@@ -615,6 +617,15 @@ export const messages: Record<Locale, Messages> = {
       'Modifiez vos mots filtrés dans les paramètres pour les revoir dans le fil.',
     'feed.hashtag_filter': 'Filtre actif : {tag}',
     'feed.clear_hashtag_filter': 'Retirer le filtre hashtag',
+    'feed.hashtag_search_aria': 'Rechercher un compte ou un hashtag',
+    'feed.hashtag_search_placeholder': 'Rechercher @profil ou #hashtag',
+    'feed.hashtag_back': 'Retour',
+    'feed.hashtag_tab_top': 'À la une',
+    'feed.hashtag_tab_recent': 'Récent',
+    'feed.hashtag_tab_media': 'Média',
+    'feed.hashtag_no_media_title': 'Aucun média pour ce hashtag',
+    'feed.hashtag_no_media_msg': 'Les images et vidéos associées à ce hashtag apparaîtront ici.',
+    'feed.hashtag_media_open': 'Voir le post du média',
 
     // — Composer —
     'composer.placeholder': 'Ça breez ? 🌴',
@@ -735,9 +746,10 @@ export const messages: Record<Locale, Messages> = {
     'editprofil.saving': 'Enregistrement...',
 
     // — Explorer —
-    'explorer.search_placeholder': 'Rechercher un compte',
+    'explorer.search_placeholder': 'Rechercher un compte ou #hashtag',
     'explorer.hint_before': 'Astuce : commencez par',
-    'explorer.hint_after': 'pour chercher par identifiant.',
+    'explorer.hint_after': 'pour chercher un hashtag. Les comptes marchent avec ou sans @.',
+    'explorer.hashtag_result': 'Voir les posts de ce hashtag',
     'explorer.search_failed_title': 'Recherche impossible',
     'explorer.search_failed_msg': 'Réessayez dans un instant.',
     'explorer.empty_title': 'Rechercher sur Breezy',
@@ -1091,7 +1103,7 @@ export const messages: Record<Locale, Messages> = {
     'admin.uptime_s': 's',
 
     // — Search / Trends (right column) —
-    'search.placeholder': 'Search',
+    'search.placeholder': 'Search an account or #hashtag',
     'trends.title': 'Trends',
     'trends.trending': 'Trending',
     'trends.t1.category': 'Technology',
@@ -1103,6 +1115,8 @@ export const messages: Record<Locale, Messages> = {
     'trends.posts_one': '{count} post',
     'trends.posts_other': '{count} posts',
     'trends.empty': 'No trends yet.',
+    'search_suggestions.trend': 'Trending',
+    'search_suggestions.empty': 'No suggestions found.',
 
     // — Mobile navigation —
     'nav.main_aria': 'Main navigation',
@@ -1304,6 +1318,15 @@ export const messages: Record<Locale, Messages> = {
       'Edit your muted words in settings to show them in the feed again.',
     'feed.hashtag_filter': 'Active filter: {tag}',
     'feed.clear_hashtag_filter': 'Clear hashtag filter',
+    'feed.hashtag_search_aria': 'Search an account or hashtag',
+    'feed.hashtag_search_placeholder': 'Search @profile or #hashtag',
+    'feed.hashtag_back': 'Back',
+    'feed.hashtag_tab_top': 'Top',
+    'feed.hashtag_tab_recent': 'Recent',
+    'feed.hashtag_tab_media': 'Media',
+    'feed.hashtag_no_media_title': 'No media for this hashtag',
+    'feed.hashtag_no_media_msg': 'Images and videos attached to this hashtag will appear here.',
+    'feed.hashtag_media_open': 'Open the media post',
 
     // — Composer —
     'composer.placeholder': "What's breezing? 🌴",
@@ -1423,9 +1446,10 @@ export const messages: Record<Locale, Messages> = {
     'editprofil.saving': 'Saving...',
 
     // — Explore —
-    'explorer.search_placeholder': 'Search for an account',
+    'explorer.search_placeholder': 'Search for an account or #hashtag',
     'explorer.hint_before': 'Tip: start with',
-    'explorer.hint_after': 'to search by handle.',
+    'explorer.hint_after': 'to search a hashtag. Accounts work with or without @.',
+    'explorer.hashtag_result': 'View posts for this hashtag',
     'explorer.search_failed_title': 'Search failed',
     'explorer.search_failed_msg': 'Try again in a moment.',
     'explorer.empty_title': 'Search on Breezy',

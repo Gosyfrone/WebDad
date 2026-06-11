@@ -153,7 +153,11 @@
 - **Hashtags live on `posts` as normalized denormalized fields** (`hashtags: []string`, lowercase, no `#`) extracted
   on create/update. This keeps `GET /posts?hashtag=...` indexable in Mongo without a separate service or cross-DB
   search. Trends are counted in post-service after the same profile-visibility checks as the feed, so private profiles
-  cannot leak through hashtag counters.
+  cannot leak through hashtag counters. The hashtag results view exposes `sort=top` (likes, reposts, comments, then
+  recency) and `sort=recent`; the media tab reuses the same visibility-filtered post results and renders only their
+  media attachments. Search routing is shared on the front: `#tag` opens hashtag results, while plain text remains
+  account/profile search in Explorer. `/posts/trends?q=...` supports prefix suggestions for the hashtag search
+  dropdown; the same visibility filtering applies before counting, so suggestions do not leak private authors.
 - **Bookmarks = collections (many-to-many) + non-deletable default collection + burst model.** Bookmarks reference a
   post → same service as likes/reposts. Many-to-many because a post can be filed in several collections. **Burst model**
   (Instagram "save"): a short click within `BOOKMARK_SESSION_WINDOW` auto-files into the last collection (`filed`),

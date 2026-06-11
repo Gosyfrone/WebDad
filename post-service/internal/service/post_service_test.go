@@ -171,7 +171,7 @@ func TestWithinSessionWindow(t *testing.T) {
 // toucher au dépôt (court-circuit) — d'où le repo nil sans panic.
 func TestGetFeedEmpty(t *testing.T) {
 	s := NewPostService(nil, WithBookmarkWindow(5*time.Minute))
-	posts, err := s.GetFeed(context.Background(), nil, "", "", 20, 0)
+	posts, err := s.GetFeed(context.Background(), nil, "", "", "", 20, 0)
 	if err != nil {
 		t.Fatalf("GetFeed(nil) erreur inattendue : %v", err)
 	}
@@ -246,5 +246,21 @@ func TestExtractHashtags(t *testing.T) {
 		if got[i] != want[i] {
 			t.Fatalf("ExtractHashtags[%d] = %q, attendu %q (liste %v)", i, got[i], want[i], got)
 		}
+	}
+}
+
+func TestTrendQueryMatching(t *testing.T) {
+	query := normalizeTrendQuery(" #Br")
+	if query != "br" {
+		t.Fatalf("normalizeTrendQuery = %q, attendu br", query)
+	}
+	if !matchesTrendQuery("breezy", query) {
+		t.Fatal("breezy doit matcher le préfixe br")
+	}
+	if matchesTrendQuery("dev", query) {
+		t.Fatal("dev ne doit pas matcher le préfixe br")
+	}
+	if !matchesTrendQuery("dev", "") {
+		t.Fatal("une requête vide doit tout matcher")
 	}
 }

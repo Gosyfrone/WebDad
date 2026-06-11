@@ -1,11 +1,13 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { Clock3, Loader2, Search, Trash2, UserX, X } from 'lucide-react'
+import { Clock3, Hash, Loader2, Search, Trash2, UserX, X } from 'lucide-react'
 
 import { searchUsers } from '@/lib/api'
 import { currentUserId as readCurrentUserId } from '@/lib/posts'
+import { hashtagHref } from '@/lib/routes'
 import {
   addSearchHistoryEntry,
   clearSearchHistory,
@@ -20,10 +22,9 @@ import { UserListItem } from '@/components/profil/user-list-item'
 import { Button } from '@/components/ui/button'
 
 /**
- * Recherche de comptes (Explorer). Saisie debouncée (~300ms) : recherche par
- * nom affiché, ou par identifiant si la requête commence par « @ ». Les
- * résultats (alimentés user-service + profil-service) sont rendus via
- * `UserListItem` ; l'utilisateur courant est exclu de la liste.
+ * Recherche Explorer. Saisie debouncée (~300ms) : recherche de comptes par nom
+ * ou identifiant, et accès direct aux résultats d'un hashtag si la requête
+ * commence par « # ».
  */
 export function ExplorerView() {
   const t = useT()
@@ -59,6 +60,12 @@ export function ExplorerView() {
       setLoading(false)
       return
     }
+    if (isHashtagQuery(debounced)) {
+      setResults([])
+      setError(null)
+      setLoading(false)
+      return
+    }
     let cancelled = false
     setLoading(true)
     setError(null)
@@ -79,6 +86,7 @@ export function ExplorerView() {
 
   const visible = results.filter((u) => u.id !== currentUserId)
   const byHandle = debounced.startsWith('@')
+  const hashtagQuery = isHashtagQuery(debounced) ? debounced.replace(/^#/, '') : ''
   const saveHistory = (user: RelationUser) => {
     setHistory(addSearchHistoryEntry(historyOwnerId, user))
   }
@@ -110,7 +118,8 @@ export function ExplorerView() {
           />
         </div>
         <p className="mt-2 px-1 text-xs text-muted-foreground">
-          {t('explorer.hint_before')} <span className="font-bold">@</span>{' '}
+          {t('explorer.hint_before')}{' '}
+          <span className="font-bold">@</span> / <span className="font-bold">#</span>{' '}
           {t('explorer.hint_after')}
         </p>
       </div>
@@ -178,6 +187,21 @@ export function ExplorerView() {
             message={t('explorer.empty_msg')}
           />
         )
+      ) : hashtagQuery ? (
+        <Link
+          href={hashtagHref(hashtagQuery, 'top')}
+          className="mx-3 my-3 flex items-center gap-3 rounded-[24px] border bg-background/70 px-4 py-3 transition-colors hover:bg-accent"
+        >
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#5B6CFF]/10 text-[#5B6CFF] dark:bg-[#9aa6ff]/15 dark:text-[#9aa6ff]">
+            <Hash className="h-5 w-5" aria-hidden />
+          </span>
+          <span className="flex min-w-0 flex-col">
+            <span className="truncate font-bold text-foreground">#{hashtagQuery}</span>
+            <span className="truncate text-sm text-muted-foreground">
+              {t('explorer.hashtag_result')}
+            </span>
+          </span>
+        </Link>
       ) : loading ? (
         <div className="flex justify-center py-16">
           <Loader2 className="h-6 w-6 animate-spin text-[#5B6CFF] dark:text-[#9aa6ff]" />
@@ -215,6 +239,10 @@ export function ExplorerView() {
       )}
     </div>
   )
+}
+
+function isHashtagQuery(value: string): boolean {
+  return value.trim().startsWith('#') && value.trim().replace(/^#/, '').length > 0
 }
 
 function EmptyState({

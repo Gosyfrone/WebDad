@@ -194,12 +194,13 @@ func (s *PostService) CreatePost(ctx context.Context, authorID, content, quotePo
 }
 
 // GetPosts renvoie le fil global, du plus récent au plus ancien, paginé.
-func (s *PostService) GetPosts(ctx context.Context, viewerID, hashtag string, limit, offset int64) ([]models.Post, error) {
+func (s *PostService) GetPosts(ctx context.Context, viewerID, hashtag, sortMode string, limit, offset int64) ([]models.Post, error) {
 	hashtag = normalizeHashtag(hashtag)
+	sortMode = normalizePostSort(sortMode)
 	fetch := s.repo.GetAll
 	if hashtag != "" {
 		fetch = func(ctx context.Context, pageLimit, pageOffset int64) ([]models.Post, error) {
-			return s.repo.GetAllByHashtag(ctx, hashtag, pageLimit, pageOffset)
+			return s.repo.GetAllByHashtag(ctx, hashtag, sortMode, pageLimit, pageOffset)
 		}
 	}
 	return s.visibleFeedPage(ctx, viewerID, limit, offset, fetch)
@@ -481,19 +482,22 @@ func (s *PostService) GetByProfile(ctx context.Context, authorID, viewerID, hash
 // front fournit les ids suivis (seul le user-service connaît le graphe) ; la
 // sélection + le tri + la pagination sont faits côté DB ($in indexé). Liste
 // vide → aucun post (pas de requête inutile).
-func (s *PostService) GetFeed(ctx context.Context, authorIDs []string, viewerID, hashtag string, limit, offset int64) ([]models.Post, error) {
+func (s *PostService) GetFeed(ctx context.Context, authorIDs []string, viewerID, hashtag, sortMode string, limit, offset int64) ([]models.Post, error) {
 	if len(authorIDs) == 0 {
 		return []models.Post{}, nil
 	}
 	hashtag = normalizeHashtag(hashtag)
+	sortMode = normalizePostSort(sortMode)
 	return s.visibleFeedPage(ctx, viewerID, limit, offset, func(ctx context.Context, pageLimit, pageOffset int64) ([]models.Post, error) {
-		return s.repo.GetByAuthorsHashtag(ctx, authorIDs, hashtag, pageLimit, pageOffset)
+		return s.repo.GetByAuthorsHashtag(ctx, authorIDs, hashtag, sortMode, pageLimit, pageOffset)
 	})
 }
 
 // TrendingHashtags compte les hashtags des posts lisibles par le visiteur courant.
-func (s *PostService) TrendingHashtags(ctx context.Context, viewerID string, limit int64) ([]models.HashtagTrend, error) {
+// query filtre optionnellement sur un préfixe normalisé, utile pour les suggestions.
+func (s *PostService) TrendingHashtags(ctx context.Context, viewerID, query string, limit int64) ([]models.HashtagTrend, error) {
 	limit = clampLimit(limit)
+	query = normalizeTrendQuery(query)
 	counts := make(map[string]int64)
 	allowedByAuthor := make(map[string]bool)
 	sourceOffset := int64(0)
@@ -519,6 +523,9 @@ func (s *PostService) TrendingHashtags(ctx context.Context, viewerID string, lim
 				continue
 			}
 			for _, tag := range post.Hashtags {
+				if !matchesTrendQuery(tag, query) {
+					continue
+				}
 				counts[tag]++
 			}
 		}
@@ -1063,6 +1070,21 @@ func normalizeHashtag(raw string) string {
 		return ""
 	}
 	return tag
+}
+
+func normalizeTrendQuery(raw string) string {
+	return strings.ToLower(strings.TrimPrefix(strings.TrimSpace(raw), "#"))
+}
+
+func matchesTrendQuery(tag, query string) bool {
+	return query == "" || strings.HasPrefix(tag, query)
+}
+
+func normalizePostSort(raw string) string {
+	if strings.ToLower(strings.TrimSpace(raw)) == "top" {
+		return "top"
+	}
+	return "recent"
 }
 
 func hasLetter(value string) bool {

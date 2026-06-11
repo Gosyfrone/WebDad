@@ -199,11 +199,16 @@ export async function searchUsers(query: string): Promise<RelationUser[]> {
     return Promise.all((users ?? []).map(enrichFromUser))
   }
 
-  const profils = await unwrap<ApiProfil[]>(
-    await apiFetch(`/profils/search?q=${encodeURIComponent(q)}`),
-  )
-  const enriched = await Promise.all((profils ?? []).map(enrichFromProfil))
-  return enriched.filter((u): u is RelationUser => u !== null)
+  const [users, profils] = await Promise.all([
+    unwrap<ApiUser[]>(await apiFetch(`/users/search?q=${encodeURIComponent(q)}`)).catch(() => []),
+    unwrap<ApiProfil[]>(await apiFetch(`/profils/search?q=${encodeURIComponent(q)}`)).catch(() => []),
+  ])
+  const fromUsers = await Promise.all((users ?? []).map(enrichFromUser))
+  const fromProfils = await Promise.all((profils ?? []).map(enrichFromProfil))
+  return uniqueRelationUsers([
+    ...fromUsers,
+    ...fromProfils.filter((u): u is RelationUser => u !== null),
+  ])
 }
 
 /**
@@ -277,4 +282,13 @@ export async function rejectFollowRequest(followerId: string): Promise<void> {
 export async function removeFollower(userId: string): Promise<void> {
   const res = await apiFetch(`/users/me/followers/${userId}`, { method: 'DELETE' })
   if (!res.ok) throw new ApiError('Retrait impossible', res.status)
+}
+
+function uniqueRelationUsers(users: RelationUser[]): RelationUser[] {
+  const seen = new Set<string>()
+  return users.filter((user) => {
+    if (seen.has(user.id)) return false
+    seen.add(user.id)
+    return true
+  })
 }

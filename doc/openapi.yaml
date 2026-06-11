@@ -1408,6 +1408,10 @@ paths:
         description: 'Filtrer par hashtag (avec ou sans #)'
         name: hashtag
         in: query
+      - type: string
+        description: 'Tri des résultats hashtag: recent ou top (top = likes puis reposts)'
+        name: sort
+        in: query
       - type: integer
         description: Nb résultats
         name: limit
@@ -1756,6 +1760,10 @@ paths:
       - type: integer
         description: Nb de tendances
         name: limit
+        in: query
+      - type: string
+        description: Préfixe de hashtag à suggérer
+        name: q
         in: query
       responses:
         '200':

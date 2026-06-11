@@ -117,6 +117,8 @@ export interface HashtagTrend {
   count: number
 }
 
+export type HashtagPostSort = 'top' | 'recent'
+
 /** Commentaire enrichi pour l'affichage. */
 export interface PostComment {
   id: string
@@ -359,17 +361,27 @@ export async function mapPosts(raw: ApiPost[]): Promise<FeedPost[]> {
 }
 
 /** Fil global (« Pour toi »), paginé. */
-export async function listFeed(limit = 20, offset = 0, hashtag = ''): Promise<FeedPost[]> {
-  const params = feedParams(limit, offset, hashtag)
+export async function listFeed(
+  limit = 20,
+  offset = 0,
+  hashtag = '',
+  sort: HashtagPostSort = 'recent',
+): Promise<FeedPost[]> {
+  const params = feedParams(limit, offset, hashtag, sort)
   const raw = await unwrap<ApiPost[]>(await apiFetch(`/posts?${params}`))
   return mapPosts(raw)
 }
 
 /** Fil « Abonnements » : posts des comptes suivis (ids fournis par user-service). */
-export async function listFollowingFeed(limit = 20, offset = 0, hashtag = ''): Promise<FeedPost[]> {
+export async function listFollowingFeed(
+  limit = 20,
+  offset = 0,
+  hashtag = '',
+  sort: HashtagPostSort = 'recent',
+): Promise<FeedPost[]> {
   const ids = await followingIds()
   if (ids.length === 0) return []
-  const params = feedParams(limit, offset, hashtag)
+  const params = feedParams(limit, offset, hashtag, sort)
   params.set('author_ids', ids.join(','))
   const raw = await unwrap<ApiPost[]>(await apiFetch(`/posts?${params}`))
   return mapPosts(raw)
@@ -383,9 +395,13 @@ export async function listByAuthor(authorId: string, limit = 20, offset = 0): Pr
   return mapPosts(raw)
 }
 
-export async function listHashtagTrends(limit = 5): Promise<HashtagTrend[]> {
+export async function listHashtagTrends(limit = 5, query = ''): Promise<HashtagTrend[]> {
+  const params = new URLSearchParams()
+  params.set('limit', String(limit))
+  const q = query.trim().replace(/^#/, '')
+  if (q) params.set('q', q)
   const raw = await unwrap<HashtagTrend[]>(
-    await apiFetch(`/posts/trends?limit=${limit}`),
+    await apiFetch(`/posts/trends?${params}`),
   )
   return raw ?? []
 }
@@ -542,12 +558,20 @@ async function followingIds(): Promise<string[]> {
   return (users ?? []).map((u) => u.id)
 }
 
-function feedParams(limit: number, offset: number, hashtag = ''): URLSearchParams {
+function feedParams(
+  limit: number,
+  offset: number,
+  hashtag = '',
+  sort: HashtagPostSort = 'recent',
+): URLSearchParams {
   const params = new URLSearchParams()
   params.set('limit', String(limit))
   params.set('offset', String(offset))
   const tag = hashtag.trim().replace(/^#/, '')
-  if (tag) params.set('hashtag', tag)
+  if (tag) {
+    params.set('hashtag', tag)
+    params.set('sort', sort)
+  }
   return params
 }
 

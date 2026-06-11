@@ -8,9 +8,9 @@
 > - **[CHANGELOG.md](CHANGELOG.md)** — session work log · **[CHANGELOG_ARCHIVE.md](CHANGELOG_ARCHIVE.md)** — resolved issues / debugging history.
 > - **[PROMPTING.md](PROMPTING.md)** — token-efficient workflow + prompt templates (read on demand, NOT auto-loaded; user may say *"from PROMPTING.md, write me the prompt for: …"*).
 > - Knowledge graph in `graphify-out/` — query it before reading source (see Operating Rules).
-> - Latest session note: 11/06/2026 — hashtags are extracted server-side on posts, clickable in the frontend, feed-filterable via `?hashtag=...`, and trends are dynamic; Swagger regenerated; details in `CHANGELOG.md`.
+> - Latest session note: 11/06/2026 — hashtag search has an X-style dropdown with trend/profile suggestions, and Swagger regenerated; details in `CHANGELOG.md`.
 
-*Last Codex sync: 11/06/2026 — hashtag feed filtering and dynamic trends implemented and documented.*
+*Last Codex sync: 11/06/2026 — hashtag/profile suggestions dropdown implemented and documented.*
 
 ---
 
@@ -169,6 +169,13 @@ several well-chosen secondary features · **all 3 roles functional** · pro slid
 - 2026-06-11: local stack left running on `localhost:3000` (`webdad-frontend-1`) with `post-service` restarted healthy; `/login` returns 200, `/feed` redirects 307 to login when unauthenticated, and gateway `/posts/trends` returns 200. `graphify update .` could not run because `graphify` is not installed on this Windows host.
 - 2026-06-11: suggested commit message: `feat(posts): add hashtag filtering and trends`.
 - 2026-06-11: suggested French commit message: `feat(posts): ajouter le filtrage par hashtag et les tendances`.
+- 2026-06-11: hashtag UX follow-up implemented after validation. Trends remain Top 5 and link to `tab=top`; `/feed?hashtag=...` now shows a search-style hashtag header with back button plus `À la une` / `Récent` / `Média` tabs. Backend `GET /posts` accepts `sort=top|recent`; `top` orders by engagement counters then recency. Media tab renders only media attachments from hashtag posts. Swagger regenerated through Linux Go container. Vérifs: frontend `npm run build`, post-service `go test . ./internal/...` OK; full `go test ./...` still blocked by generated `docs` package missing `github.com/swaggo/swag` in `go.mod`.
+- 2026-06-11: runtime check after hashtag UX follow-up: restarted `webdad-post-service-1` and `webdad-frontend-1`; `http://localhost:3000/login` returns 200, `/feed?hashtag=test&tab=media` redirects 307 to login when unauthenticated, and gateway `GET /posts?hashtag=test&sort=top&limit=1` returns 200. `graphify update .` still unavailable because `graphify` is not installed.
+- 2026-06-11: suggested French commit message: `feat(feed): ajouter les onglets de resultats hashtag`.
+- 2026-06-11: hashtag/search UX follow-up implemented after validation. The hashtag results header now puts the back arrow left of the search field; shared search routing sends `#tag` to `/feed?hashtag=...&tab=top` and plain text to Explorer profile search. Explorer also handles `#hashtag` queries with a direct hashtag result. `À la une` sorts by likes, reposts, comments, then recency; the right Trends block spacing was tightened so the Top 5 stays visible. Swagger regenerated via Linux Go container. Vérifs: post-service `go test . ./internal/...`, frontend `npm run build`.
+- 2026-06-11: runtime check after hashtag/search UX follow-up: restarted `webdad-post-service-1` and `webdad-frontend-1`; `http://localhost:3000/login` returns 200, `/feed?hashtag=test&tab=top` redirects 307 to `/login` when unauthenticated, gateway `GET /posts?hashtag=test&sort=top&limit=1` returns 200, and Docker exposes `webdad-frontend-1` on `0.0.0.0:3000->3000/tcp`. `graphify update .` still unavailable because `graphify` is not installed.
+- 2026-06-11: hashtag results search dropdown implemented after validation. On `/feed?hashtag=...`, typing in the top search bar opens an X-style dark dropdown: first 3 matching hashtag trends from `GET /posts/trends?q=...&limit=3`, then profile suggestions. Clicking a hashtag opens `/feed?hashtag=...&tab=top`; clicking a user opens `/profil/<username>` directly. Explorer/search now finds users by `@username`, plain username, or display_name. Swagger regenerated for the new `q` query param on `/posts/trends`. Vérifs: post-service `go test . ./internal/...`, frontend `npm run build`.
+- 2026-06-11: runtime check after hashtag suggestions dropdown: restarted `webdad-post-service-1` and `webdad-frontend-1`; `http://localhost:3000/login` returns 200, `/feed?hashtag=test&tab=top` redirects 307 to `/login` when unauthenticated, gateway `GET /posts/trends?q=te&limit=3` returns 200 with filtered data, and Docker exposes `webdad-frontend-1` on `0.0.0.0:3000->3000/tcp`. `graphify update .` still unavailable because `graphify` is not installed.
 
 ---
 
