@@ -1,7 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Loader2, Users } from 'lucide-react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { Loader2, Users, X } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import { getAccessToken } from '@/lib/auth-client'
@@ -21,6 +22,7 @@ import {
   subscribePostCreated,
   type FeedPost,
 } from '@/lib/posts'
+import { ROUTES } from '@/lib/routes'
 import { CreatePost } from '@/components/feed/create-post'
 import { PostCard } from '@/components/feed/post-card'
 import { useAuthGate } from '@/components/auth-prompt-provider'
@@ -56,6 +58,9 @@ function applyPostUpdate(current: FeedPost[], updated: FeedPost): FeedPost[] {
 export function FeedView() {
   const t = useT()
   const { isVisitor } = useAuthGate()
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const selectedHashtag = (searchParams.get('hashtag') ?? '').trim().replace(/^#/, '')
   const [tab, setTab] = useState<FeedTab>('for-you')
   const [posts, setPosts] = useState<FeedPost[]>([])
   const [loading, setLoading] = useState(true)
@@ -71,9 +76,9 @@ export function FeedView() {
   const fetchPage = useCallback(
     (activeTab: FeedTab, offset: number) =>
       activeTab === 'for-you'
-        ? listFeed(FEED_PAGE, offset)
-        : listFollowingFeed(FEED_PAGE, offset),
-    [],
+        ? listFeed(FEED_PAGE, offset, selectedHashtag)
+        : listFollowingFeed(FEED_PAGE, offset, selectedHashtag),
+    [selectedHashtag],
   )
 
   // Chargement initial / changement d'onglet.
@@ -102,6 +107,10 @@ export function FeedView() {
       cancelled = true
     }
   }, [tab, fetchPage, t])
+
+  const clearHashtagFilter = useCallback(() => {
+    router.push(ROUTES.feed)
+  }, [router])
 
   const loadMore = useCallback(async () => {
     setLoadingMore(true)
@@ -200,6 +209,21 @@ export function FeedView() {
             </TabButton>
           )}
         </div>
+        {selectedHashtag && (
+          <div className="flex items-center justify-between border-t px-4 py-2 text-sm">
+            <span className="font-medium text-muted-foreground">
+              {t('feed.hashtag_filter', { tag: `#${selectedHashtag}` })}
+            </span>
+            <button
+              type="button"
+              onClick={clearHashtagFilter}
+              className="rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              aria-label={t('feed.clear_hashtag_filter')}
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Zone de création de post inline (masquée pour le visiteur) ; le FAB

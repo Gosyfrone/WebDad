@@ -171,7 +171,7 @@ func TestWithinSessionWindow(t *testing.T) {
 // toucher au dépôt (court-circuit) — d'où le repo nil sans panic.
 func TestGetFeedEmpty(t *testing.T) {
 	s := NewPostService(nil, WithBookmarkWindow(5*time.Minute))
-	posts, err := s.GetFeed(context.Background(), nil, "", 20, 0)
+	posts, err := s.GetFeed(context.Background(), nil, "", "", 20, 0)
 	if err != nil {
 		t.Fatalf("GetFeed(nil) erreur inattendue : %v", err)
 	}
@@ -233,5 +233,18 @@ func TestClampOffset(t *testing.T) {
 	}
 	if got := clampOffset(5); got != 5 {
 		t.Fatalf("clampOffset(5) = %d, attendu 5", got)
+	}
+}
+
+func TestExtractHashtags(t *testing.T) {
+	got := ExtractHashtags("Go #Breezy #breezy #Dev_2026 #123 #école fin#tag")
+	want := []string{"breezy", "dev_2026", "école"}
+	if len(got) != len(want) {
+		t.Fatalf("ExtractHashtags len = %d (%v), attendu %d (%v)", len(got), got, len(want), want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("ExtractHashtags[%d] = %q, attendu %q (liste %v)", i, got[i], want[i], got)
+		}
 	}
 }

@@ -1404,6 +1404,10 @@ paths:
         description: Fil abonnements (IDs séparés par virgule)
         name: author_ids
         in: query
+      - type: string
+        description: 'Filtrer par hashtag (avec ou sans #)'
+        name: hashtag
+        in: query
       - type: integer
         description: Nb résultats
         name: limit
@@ -1737,6 +1741,31 @@ paths:
               type: string
         '401':
           description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /posts/trends:
+    get:
+      produces:
+      - application/json
+      tags:
+      - posts
+      summary: Tendances hashtags
+      parameters:
+      - type: integer
+        description: Nb de tendances
+        name: limit
+        in: query
+      responses:
+        '200':
+          description: OK
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/models.HashtagTrend'
+        '500':
+          description: Internal Server Error
           schema:
             type: object
             additionalProperties:
@@ -3456,6 +3485,13 @@ definitions:
           $ref: '#/definitions/models.MediaRef'
       quote_post_id:
         type: string
+  models.HashtagTrend:
+    type: object
+    properties:
+      count:
+        type: integer
+      tag:
+        type: string
   models.MediaRef:
     type: object
     required:
@@ -3479,6 +3515,10 @@ definitions:
         type: string
       created_at:
         type: string
+      hashtags:
+        type: array
+        items:
+          type: string
       hidden_at:
         type: string
       hidden_by:

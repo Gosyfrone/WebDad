@@ -411,6 +411,9 @@ export const messages: Record<Locale, Messages> = {
     'trends.t2.posts': '8,1 K posts',
     'trends.t3.category': 'Cloud',
     'trends.t3.posts': '5,6 K posts',
+    'trends.posts_one': '{count} post',
+    'trends.posts_other': '{count} posts',
+    'trends.empty': 'Aucune tendance pour le moment.',
 
     // — Navigation mobile —
     'nav.main_aria': 'Navigation principale',
@@ -610,6 +613,8 @@ export const messages: Record<Locale, Messages> = {
     'feed.filtered_empty_title': 'Tous les posts visibles sont filtrés',
     'feed.filtered_empty_msg':
       'Modifiez vos mots filtrés dans les paramètres pour les revoir dans le fil.',
+    'feed.hashtag_filter': 'Filtre actif : {tag}',
+    'feed.clear_hashtag_filter': 'Retirer le filtre hashtag',
 
     // — Composer —
     'composer.placeholder': 'Ça breez ? 🌴',
@@ -1095,6 +1100,9 @@ export const messages: Record<Locale, Messages> = {
     'trends.t2.posts': '8.1K posts',
     'trends.t3.category': 'Cloud',
     'trends.t3.posts': '5.6K posts',
+    'trends.posts_one': '{count} post',
+    'trends.posts_other': '{count} posts',
+    'trends.empty': 'No trends yet.',
 
     // — Mobile navigation —
     'nav.main_aria': 'Main navigation',
@@ -1294,6 +1302,8 @@ export const messages: Record<Locale, Messages> = {
     'feed.filtered_empty_title': 'All visible posts are muted',
     'feed.filtered_empty_msg':
       'Edit your muted words in settings to show them in the feed again.',
+    'feed.hashtag_filter': 'Active filter: {tag}',
+    'feed.clear_hashtag_filter': 'Clear hashtag filter',
 
     // — Composer —
     'composer.placeholder': "What's breezing? 🌴",

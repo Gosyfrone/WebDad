@@ -1,6 +1,7 @@
 'use client'
 
 import { Fragment, useState } from 'react'
+import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
@@ -15,6 +16,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 
 const MENTION_CLASS = 'font-semibold text-[#5B6CFF] hover:underline dark:text-[#9aa6ff]'
+const HASHTAG_CLASS = 'font-semibold text-[#5B6CFF] hover:underline dark:text-[#9aa6ff]'
 // Variante sur fond d'accent (bulle « mine » au dégradé violet/cyan, texte
 // blanc) : le bleu de marque se fondrait dans le dégradé → blanc gras souligné.
 const MENTION_CLASS_ACCENT =
@@ -30,7 +32,7 @@ export function MentionText({ text, className }: { text: string; className?: str
     <span className={className}>
       {segments.map((seg, i) =>
         seg.type === 'text' ? (
-          <Fragment key={i}>{seg.text}</Fragment>
+          <Fragment key={i}>{renderHashtags(seg.text, `text-${i}`)}</Fragment>
         ) : (
           <Link key={i} href={profilHref(seg.handle)} className={MENTION_CLASS}>
             {seg.raw}
@@ -39,6 +41,33 @@ export function MentionText({ text, className }: { text: string; className?: str
       )}
     </span>
   )
+}
+
+function renderHashtags(text: string, keyPrefix: string): ReactNode[] {
+  const nodes: ReactNode[] = []
+  const re = /(^|[^\p{L}\p{N}_#])#([\p{L}\p{N}_]{1,64})/gu
+  let last = 0
+  let match: RegExpExecArray | null
+
+  while ((match = re.exec(text)) !== null) {
+    const boundary = match[1]
+    const tag = match[2]
+    const hashIndex = match.index + boundary.length
+    if (!/\p{L}/u.test(tag)) continue
+    if (hashIndex > last) nodes.push(text.slice(last, hashIndex))
+    nodes.push(
+      <Link
+        key={`${keyPrefix}-${hashIndex}`}
+        href={`${ROUTES.feed}?hashtag=${encodeURIComponent(tag.toLowerCase())}`}
+        className={HASHTAG_CLASS}
+      >
+        #{tag}
+      </Link>,
+    )
+    last = re.lastIndex
+  }
+  if (last < text.length) nodes.push(text.slice(last))
+  return nodes
 }
 
 /**

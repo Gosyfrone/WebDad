@@ -150,6 +150,10 @@
 - **Pin:** `pinned_at` on the post, owner-only, one pin per profile; profile read sorts by it, but feeds return a
   copy **without** `pinned_at` so another's pin never personalizes the global feed (front exception `canPin` keeps
   instant visual feedback for the author).
+- **Hashtags live on `posts` as normalized denormalized fields** (`hashtags: []string`, lowercase, no `#`) extracted
+  on create/update. This keeps `GET /posts?hashtag=...` indexable in Mongo without a separate service or cross-DB
+  search. Trends are counted in post-service after the same profile-visibility checks as the feed, so private profiles
+  cannot leak through hashtag counters.
 - **Bookmarks = collections (many-to-many) + non-deletable default collection + burst model.** Bookmarks reference a
   post → same service as likes/reposts. Many-to-many because a post can be filed in several collections. **Burst model**
   (Instagram "save"): a short click within `BOOKMARK_SESSION_WINDOW` auto-files into the last collection (`filed`),

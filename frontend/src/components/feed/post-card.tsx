@@ -55,6 +55,7 @@ import { FeedVideo } from '@/components/feed/feed-video'
 import { PostComposer } from '@/components/feed/post-composer'
 import { PostPhotoModal } from '@/components/feed/post-photo-modal'
 import { TranslatedContent } from '@/components/feed/translated-content'
+import { MentionText } from '@/components/mention/mention-text'
 import { ProfilLink } from '@/components/profil/profil-link'
 
 interface PostCardProps {
@@ -602,9 +603,10 @@ function QuotedPost({ post }: { post: FeedPost }) {
           </ProfilLink>
         )}
       </div>
-      <p className="line-clamp-5 whitespace-pre-wrap break-words text-sm text-foreground/75">
-        {post.content}
-      </p>
+      <MentionText
+        text={post.content}
+        className="line-clamp-5 whitespace-pre-wrap break-words text-sm text-foreground/75"
+      />
       {post.media.length > 0 && <MediaGallery media={post.media} compact />}
     </div>
   )

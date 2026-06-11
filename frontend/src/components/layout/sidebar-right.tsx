@@ -1,28 +1,36 @@
 'use client'
 
+import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Search } from 'lucide-react'
 
+import { listHashtagTrends, type HashtagTrend } from '@/lib/posts'
 import { ROUTES } from '@/lib/routes'
 import { useAuthGate } from '@/components/auth-prompt-provider'
 import { useT } from '@/components/language-provider'
 import { WhoToFollow } from '@/components/layout/who-to-follow'
 import { LegalLinks } from '@/components/legal/legal-links'
 
-/**
- * Tendances décoratives (placeholder, pas de back). Les libellés viennent du
- * dictionnaire i18n ; les hashtags restent tels quels (identifiants de marque).
- */
-const TRENDS = [
-  { categoryKey: 'trends.t1.category', topic: '#Microservices', postsKey: 'trends.t1.posts' },
-  { categoryKey: 'trends.t2.category', topic: '#NextJS', postsKey: 'trends.t2.posts' },
-  { categoryKey: 'trends.t3.category', topic: '#Docker', postsKey: 'trends.t3.posts' },
-]
-
 export function SidebarRight() {
   const t = useT()
   const pathname = usePathname()
   const { isVisitor } = useAuthGate()
+  const [trends, setTrends] = useState<HashtagTrend[]>([])
+
+  useEffect(() => {
+    let cancelled = false
+    listHashtagTrends(5)
+      .then((list) => {
+        if (!cancelled) setTrends(list)
+      })
+      .catch(() => {
+        if (!cancelled) setTrends([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [pathname])
 
   // La messagerie occupe toute la largeur (chat à deux volets) : pas de colonne
   // « Qui suivre » sur /messages.
@@ -44,18 +52,25 @@ export function SidebarRight() {
       {/* Tendances */}
       <div className="glass overflow-hidden rounded-[24px] border backdrop-blur-xl">
         <h2 className="brand-text px-4 py-3 text-xl font-bold">{t('trends.title')}</h2>
-        {TRENDS.map((trend) => (
-          <div
-            key={trend.topic}
-            className="flex cursor-not-allowed flex-col gap-0.5 px-4 py-3 transition-colors hover:bg-accent"
-          >
-            <span className="text-xs text-muted-foreground">
-              {t(trend.categoryKey)} · {t('trends.trending')}
-            </span>
-            <span className="font-bold text-foreground">{trend.topic}</span>
-            <span className="text-xs text-muted-foreground">{t(trend.postsKey)}</span>
-          </div>
-        ))}
+        {trends.length > 0 ? (
+          trends.map((trend) => (
+            <Link
+              key={trend.tag}
+              href={`${ROUTES.feed}?hashtag=${encodeURIComponent(trend.tag)}`}
+              className="flex flex-col gap-0.5 px-4 py-3 transition-colors hover:bg-accent"
+            >
+              <span className="text-xs text-muted-foreground">{t('trends.trending')}</span>
+              <span className="font-bold text-foreground">#{trend.tag}</span>
+              <span className="text-xs text-muted-foreground">
+                {t(trend.count > 1 ? 'trends.posts_other' : 'trends.posts_one', {
+                  count: formatTrendCount(trend.count),
+                })}
+              </span>
+            </Link>
+          ))
+        ) : (
+          <p className="px-4 pb-4 text-sm text-muted-foreground">{t('trends.empty')}</p>
+        )}
       </div>
 
       {/* Qui suivre (réservé aux membres : appels au graphe social authentifiés). */}
@@ -65,4 +80,10 @@ export function SidebarRight() {
       <LegalLinks className="px-4 pb-2" />
     </aside>
   )
+}
+
+function formatTrendCount(count: number): string {
+  if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M`
+  if (count >= 1_000) return `${(count / 1_000).toFixed(1)}K`
+  return String(count)
 }

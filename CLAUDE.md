@@ -8,9 +8,9 @@
 > - **[CHANGELOG.md](CHANGELOG.md)** — session work log · **[CHANGELOG_ARCHIVE.md](CHANGELOG_ARCHIVE.md)** — resolved issues / debugging history.
 > - **[PROMPTING.md](PROMPTING.md)** — token-efficient workflow + prompt templates (read on demand, NOT auto-loaded; user may say *"from PROMPTING.md, write me the prompt for: …"*).
 > - Knowledge graph in `graphify-out/` — query it before reading source (see Operating Rules).
-> - Latest session note: 10/06/2026 — login now accepts email or username in one field; BFF resolves username through user-service then auth-service checks credentials by user_id; Swagger regenerated; details in `CHANGELOG.md`.
+> - Latest session note: 11/06/2026 — hashtags are extracted server-side on posts, clickable in the frontend, feed-filterable via `?hashtag=...`, and trends are dynamic; Swagger regenerated; details in `CHANGELOG.md`.
 
-*Last Codex sync: 10/06/2026 — email-or-username login implemented and documented.*
+*Last Codex sync: 11/06/2026 — hashtag feed filtering and dynamic trends implemented and documented.*
 
 ---
 
@@ -165,6 +165,10 @@ several well-chosen secondary features · **all 3 roles functional** · pro slid
 - 2026-06-10: suggested French commit message for the latest changes: `feat(commentaires): ajouter les medias et le scroll des citations`.
 - 2026-06-10: Swagger annotation/docs updated for comment media; `doc/openapi.{json,yaml}` regenerated through the aggregation script in a temporary Go Linux container because local Windows `make swagger` cannot launch WSL bash.
 - 2026-06-10: suggested commit message for the Swagger/doc update: `docs(swagger): mettre a jour les annotations et la spec OpenAPI des commentaires`.
+- 2026-06-11: hashtag/trends feature implemented. post-service extracts normalized hashtags on create/update, exposes `GET /posts?hashtag=...` and `GET /posts/trends` with visibility-aware trend counts; frontend renders clickable hashtags, filters the feed through `/feed?hashtag=...`, and loads dynamic right-column trends. Swagger regenerated via Linux Go container because local `make swagger` still fails to launch Windows bash. Vérifs: post-service `go test ./...`, frontend `npm run build`.
+- 2026-06-11: local stack left running on `localhost:3000` (`webdad-frontend-1`) with `post-service` restarted healthy; `/login` returns 200, `/feed` redirects 307 to login when unauthenticated, and gateway `/posts/trends` returns 200. `graphify update .` could not run because `graphify` is not installed on this Windows host.
+- 2026-06-11: suggested commit message: `feat(posts): add hashtag filtering and trends`.
+- 2026-06-11: suggested French commit message: `feat(posts): ajouter le filtrage par hashtag et les tendances`.
 
 ---
 

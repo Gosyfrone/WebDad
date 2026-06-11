@@ -73,6 +73,7 @@ func (h *PostHandler) CreatePost(c *gin.Context) {
 // @Produce     json
 // @Param       author_id  query string false "Fil d'un auteur"
 // @Param       author_ids query string false "Fil abonnements (IDs séparés par virgule)"
+// @Param       hashtag    query string false "Filtrer par hashtag (avec ou sans #)"
 // @Param       limit      query int    false "Nb résultats"
 // @Param       offset     query int    false "Décalage"
 // @Success     200 {array} models.Post
@@ -87,19 +88,42 @@ func (h *PostHandler) ListPosts(c *gin.Context) {
 	if claims, ok := middleware.ClaimsFrom(c); ok {
 		viewerID = claims.UserID
 	}
+	hashtag := c.Query("hashtag")
 	switch {
 	case c.Query("author_ids") != "":
-		posts, err = h.service.GetFeed(c.Request.Context(), splitIDs(c.Query("author_ids")), viewerID, pageLimit(c), pageOffset(c))
+		posts, err = h.service.GetFeed(c.Request.Context(), splitIDs(c.Query("author_ids")), viewerID, hashtag, pageLimit(c), pageOffset(c))
 	case c.Query("author_id") != "":
-		posts, err = h.service.GetByProfile(c.Request.Context(), c.Query("author_id"), viewerID, pageLimit(c), pageOffset(c))
+		posts, err = h.service.GetByProfile(c.Request.Context(), c.Query("author_id"), viewerID, hashtag, pageLimit(c), pageOffset(c))
 	default:
-		posts, err = h.service.GetPosts(c.Request.Context(), viewerID, pageLimit(c), pageOffset(c))
+		posts, err = h.service.GetPosts(c.Request.Context(), viewerID, hashtag, pageLimit(c), pageOffset(c))
 	}
 	if err != nil {
 		respondPostError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"data": posts})
+}
+
+// ListHashtagTrends : GET /posts/trends — hashtags les plus utilisés dans les
+// posts lisibles par le visiteur courant (JWT optionnel).
+// @Summary     Tendances hashtags
+// @Tags        posts
+// @Produce     json
+// @Param       limit query int false "Nb de tendances"
+// @Success     200 {array} models.HashtagTrend
+// @Failure     500 {object} map[string]string
+// @Router      /posts/trends [get]
+func (h *PostHandler) ListHashtagTrends(c *gin.Context) {
+	viewerID := ""
+	if claims, ok := middleware.ClaimsFrom(c); ok {
+		viewerID = claims.UserID
+	}
+	trends, err := h.service.TrendingHashtags(c.Request.Context(), viewerID, pageLimit(c))
+	if err != nil {
+		respondPostError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": trends})
 }
 
 // GetPost : GET /posts/:id (public). Un post masqué par la modération n'est
