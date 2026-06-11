@@ -479,13 +479,18 @@ paths:
           $ref: '#/definitions/models.VerifyEmailRequest'
       responses:
         '200':
-          description: 'Adresse vérifiée — data: {message}'
+          description: 'Adresse vérifiée et session ouverte — data: {message, token,
+            refresh_token, user}'
+          schema:
+            $ref: '#/definitions/models.AuthUser'
+        '400':
+          description: 'Token invalide ou expiré (code: invalid_token)'
           schema:
             type: object
             additionalProperties:
               type: string
-        '400':
-          description: 'Token invalide ou expiré (code: invalid_token)'
+        '403':
+          description: Compte désactivé
           schema:
             type: object
             additionalProperties:
@@ -2985,20 +2990,6 @@ definitions:
       password:
         type: string
         minLength: 8
-  models.UpdateRoleRequest:
-    type: object
-    required:
-    - role
-    properties:
-      role:
-        type: string
-  models.UpdateStatusRequest:
-    type: object
-    required:
-    - is_active
-    properties:
-      is_active:
-        type: boolean
   models.RequestVerifyRequest:
     type: object
     required:
@@ -3017,6 +3008,20 @@ definitions:
         minLength: 8
       token:
         type: string
+  models.UpdateRoleRequest:
+    type: object
+    required:
+    - role
+    properties:
+      role:
+        type: string
+  models.UpdateStatusRequest:
+    type: object
+    required:
+    - is_active
+    properties:
+      is_active:
+        type: boolean
   models.VerifyEmailRequest:
     type: object
     required:
