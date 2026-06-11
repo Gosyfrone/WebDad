@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
 
   // Provisioning paresseux : crée la ligne `users` à partir du JWT (best-effort).
   if (accessToken) {
-    await provisionUser(accessToken)
+    void provisionUser(accessToken)
   }
 
   return nextResponse

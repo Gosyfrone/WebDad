@@ -40,10 +40,13 @@ function VerifyEmailContent() {
       setStatus('invalid')
       return
     }
+    // verifyOnce garantit déjà un POST unique (y compris sous le double-montage
+    // de React StrictMode en dev) : pas de flag `cancelled` ni de cleanup, qui
+    // annuleraient le seul fetch émis et laisseraient le status bloqué sur
+    // « loading » alors que l'e-mail a bien été vérifié côté serveur.
     if (verifyOnce.current) return
     verifyOnce.current = true
 
-    let cancelled = false
     ;(async () => {
       try {
         const response = await fetch('/api/auth/verify-email', {
@@ -52,7 +55,6 @@ function VerifyEmailContent() {
           body: JSON.stringify({ token }),
         })
         const payload = await response.json().catch(() => null)
-        if (cancelled) return
         if (response.ok) {
           // Session ouverte par le BFF (cookie refresh httpOnly) : on stocke
           // l'access token pour entrer directement dans l'app, sans reconnexion.
@@ -62,13 +64,9 @@ function VerifyEmailContent() {
           setStatus('invalid')
         }
       } catch {
-        if (!cancelled) setStatus('invalid')
+        setStatus('invalid')
       }
     })()
-
-    return () => {
-      cancelled = true
-    }
   }, [token])
 
   const handleResend = async () => {

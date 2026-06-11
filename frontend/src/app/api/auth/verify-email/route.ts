@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
   // Provisioning paresseux best-effort (idempotent) : l'identité a déjà été
   // créée au register, on s'aligne sur le flux login par robustesse.
   if (accessToken) {
-    await provisionUser(accessToken)
+    void provisionUser(accessToken)
   }
 
   return nextResponse
