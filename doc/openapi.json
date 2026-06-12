@@ -2593,7 +2593,7 @@
         "summary": "Créer un post",
         "parameters": [
           {
-            "description": "Contenu (texte et/ou médias)",
+            "description": "Contenu (texte, médias et/ou sondage)",
             "name": "body",
             "in": "body",
             "required": true,
@@ -4053,6 +4053,156 @@
             "description": "OK",
             "schema": {
               "$ref": "#/definitions/models.Post"
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/posts/{id}/poll/close": {
+      "post": {
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "posts"
+        ],
+        "summary": "Terminer son sondage",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "Post ID",
+            "name": "id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/models.Post"
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/posts/{id}/poll/vote": {
+      "post": {
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "posts"
+        ],
+        "summary": "Voter à un sondage",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "Post ID",
+            "name": "id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "description": "Choix du sondage",
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/models.VotePollRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/models.Post"
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
             }
           },
           "401": {
@@ -5989,6 +6139,34 @@
         }
       }
     },
+    "models.CreatePollRequest": {
+      "type": "object",
+      "required": [
+        "duration_minutes"
+      ],
+      "properties": {
+        "audience": {
+          "type": "string",
+          "enum": [
+            "everyone",
+            "followers"
+          ]
+        },
+        "choices": {
+          "type": "array",
+          "maxItems": 4,
+          "minItems": 2,
+          "items": {
+            "type": "string"
+          }
+        },
+        "duration_minutes": {
+          "type": "integer",
+          "maximum": 10080,
+          "minimum": 1
+        }
+      }
+    },
     "models.CreatePostRequest": {
       "type": "object",
       "properties": {
@@ -6002,6 +6180,9 @@
           "items": {
             "$ref": "#/definitions/models.MediaRef"
           }
+        },
+        "poll": {
+          "$ref": "#/definitions/models.CreatePollRequest"
         },
         "quote_post_id": {
           "type": "string"
@@ -6034,6 +6215,58 @@
         },
         "url": {
           "type": "string"
+        }
+      }
+    },
+    "models.Poll": {
+      "type": "object",
+      "properties": {
+        "audience": {
+          "type": "string"
+        },
+        "can_close": {
+          "type": "boolean"
+        },
+        "can_view_results": {
+          "type": "boolean"
+        },
+        "choices": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/models.PollChoice"
+          }
+        },
+        "closed_at": {
+          "type": "string"
+        },
+        "ends_at": {
+          "type": "string"
+        },
+        "total_votes": {
+          "type": "integer"
+        },
+        "voted_choice_id": {
+          "type": "string"
+        },
+        "winner_choice_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "models.PollChoice": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "votes_count": {
+          "type": "integer"
         }
       }
     },
@@ -6083,6 +6316,9 @@
         "pinned_at": {
           "type": "string"
         },
+        "poll": {
+          "$ref": "#/definitions/models.Poll"
+        },
         "purge_at": {
           "description": "PurgeAt : date prévue de purge définitive (transient = hidden_at + rétention),\ncalculée à la lecture de la corbeille pour l'affichage front. NON stockée.",
           "type": "string"
@@ -6125,6 +6361,17 @@
         "content": {
           "type": "string",
           "maxLength": 280
+        }
+      }
+    },
+    "models.VotePollRequest": {
+      "type": "object",
+      "required": [
+        "choice_id"
+      ],
+      "properties": {
+        "choice_id": {
+          "type": "string"
         }
       }
     },

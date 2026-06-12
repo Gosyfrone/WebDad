@@ -32,7 +32,7 @@ func NewPostHandler(svc *service.PostService, serviceName string) *PostHandler {
 // @Accept      json
 // @Produce     json
 // @Security    BearerAuth
-// @Param       body body models.CreatePostRequest true "Contenu (texte et/ou médias)"
+// @Param       body body models.CreatePostRequest true "Contenu (texte, médias et/ou sondage)"
 // @Success     201 {object} models.Post
 // @Failure     400 {object} map[string]string
 // @Failure     401 {object} map[string]string
@@ -49,19 +49,81 @@ func (h *PostHandler) CreatePost(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "payload invalide : " + err.Error()})
 		return
 	}
-	// Un post doit porter du texte OU au moins un média (pas les deux vides).
-	if strings.TrimSpace(req.Content) == "" && len(req.Media) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "post vide : texte ou média requis"})
+	// Un post doit porter du texte, au moins un média OU un sondage.
+	if strings.TrimSpace(req.Content) == "" && len(req.Media) == 0 && req.Poll == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "post vide : texte, média ou sondage requis"})
 		return
 	}
 
-	post, err := h.service.CreatePost(c.Request.Context(), claims.UserID, req.Content, req.QuotePostID, req.Media)
+	post, err := h.service.CreatePost(c.Request.Context(), claims.UserID, req.Content, req.QuotePostID, req.Media, req.Poll)
 	if err != nil {
 		respondPostError(c, err)
 		return
 	}
 	logging.FromGin(c).Info("post créé", "post_id", post.ID)
 	c.JSON(http.StatusCreated, gin.H{"data": post})
+}
+
+// VotePoll : POST /posts/:id/poll/vote — enregistre le vote de l'utilisateur courant.
+// @Summary     Voter à un sondage
+// @Tags        posts
+// @Accept      json
+// @Produce     json
+// @Security    BearerAuth
+// @Param       id path string true "Post ID"
+// @Param       body body models.VotePollRequest true "Choix du sondage"
+// @Success     200 {object} models.Post
+// @Failure     400 {object} map[string]string
+// @Failure     401 {object} map[string]string
+// @Failure     403 {object} map[string]string
+// @Failure     404 {object} map[string]string
+// @Router      /posts/{id}/poll/vote [post]
+func (h *PostHandler) VotePoll(c *gin.Context) {
+	claims, ok := middleware.ClaimsFrom(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "claims absents"})
+		return
+	}
+
+	var req models.VotePollRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "payload invalide : " + err.Error()})
+		return
+	}
+
+	post, err := h.service.VotePoll(c.Request.Context(), c.Param("id"), claims.UserID, req.ChoiceID)
+	if err != nil {
+		respondPostError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": post})
+}
+
+// ClosePoll : POST /posts/:id/poll/close — termine manuellement un sondage.
+// @Summary     Terminer son sondage
+// @Tags        posts
+// @Produce     json
+// @Security    BearerAuth
+// @Param       id path string true "Post ID"
+// @Success     200 {object} models.Post
+// @Failure     400 {object} map[string]string
+// @Failure     401 {object} map[string]string
+// @Failure     403 {object} map[string]string
+// @Failure     404 {object} map[string]string
+// @Router      /posts/{id}/poll/close [post]
+func (h *PostHandler) ClosePoll(c *gin.Context) {
+	claims, ok := middleware.ClaimsFrom(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "claims absents"})
+		return
+	}
+
+	post, err := h.service.ClosePoll(c.Request.Context(), c.Param("id"), claims.UserID)
+	if err != nil {
+		respondPostError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": post})
 }
 
 // ListPosts : GET /posts — fil paginé (public). Trois modes :
@@ -417,10 +479,14 @@ func respondPostError(c *gin.Context, err error) {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 	case errors.Is(err, service.ErrInvalidID):
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	case errors.Is(err, service.ErrInvalidPoll):
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 	case errors.Is(err, service.ErrForbidden), errors.Is(err, service.ErrDefaultCollection):
 		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
 	case errors.Is(err, service.ErrPrivateProfil):
 		logging.FromGin(c).Warn("accès refusé : profil privé")
+		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+	case errors.Is(err, service.ErrPollClosed), errors.Is(err, service.ErrPollAlreadyVoted):
 		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
 	case errors.Is(err, service.ErrDependencyUnavailable):
 		logging.FromGin(c).Warn("dépendance inter-services indisponible", "error", err)

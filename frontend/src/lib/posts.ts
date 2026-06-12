@@ -34,6 +34,7 @@ export interface ApiPost {
   content: string
   hashtags?: string[]
   media?: { url: string; type: 'image' | 'video' }[]
+  poll?: ApiPoll
   quote_post_id?: string
   likes_count: number
   comments_count: number
@@ -42,6 +43,24 @@ export interface ApiPost {
   reposted_by_id?: string
   reposted_at?: string
   created_at: string
+}
+
+export interface ApiPoll {
+  choices: ApiPollChoice[]
+  ends_at: string
+  closed_at?: string
+  audience: PollAudience
+  total_votes: number
+  voted_choice_id?: string
+  winner_choice_ids?: string[]
+  can_view_results: boolean
+  can_close: boolean
+}
+
+export interface ApiPollChoice {
+  id: string
+  label: string
+  votes_count: number
 }
 
 interface ApiComment {
@@ -97,6 +116,7 @@ export interface FeedPost {
   content: string
   hashtags: string[]
   media: PostMedia[]
+  poll: PostPoll | null
   quotePostId: string
   quotedPost: FeedPost | null
   likesCount: number
@@ -117,6 +137,32 @@ export interface FeedPost {
   canDelete: boolean
   /** L'utilisateur courant peut-il épingler/désépingler ce post ? */
   canPin: boolean
+}
+
+export type PollAudience = 'everyone' | 'followers'
+
+export interface PostPollChoice {
+  id: string
+  label: string
+  votesCount: number
+}
+
+export interface PostPoll {
+  choices: PostPollChoice[]
+  endsAt: string
+  closedAt: string
+  audience: PollAudience
+  totalVotes: number
+  votedChoiceId: string
+  winnerChoiceIds: string[]
+  canViewResults: boolean
+  canClose: boolean
+}
+
+export interface CreatePollPayload {
+  choices: string[]
+  durationMinutes: number
+  audience: PollAudience
 }
 
 export interface HashtagTrend {
@@ -283,6 +329,7 @@ async function toFeedPost(
     content: p.content,
     hashtags: p.hashtags ?? [],
     media: (p.media ?? []).map((m) => ({ url: resolveMediaUrl(m.url), type: m.type })),
+    poll: p.poll ? toPostPoll(p.poll) : null,
     quotePostId: p.quote_post_id ?? '',
     quotedPost,
     likesCount: p.likes_count ?? 0,
@@ -298,6 +345,24 @@ async function toFeedPost(
     bookmarked: bookmarkedIds.has(p.id),
     canDelete: !p.reposted_by_id && canDelete(p.author_id),
     canPin: currentUserId() === p.author_id,
+  }
+}
+
+function toPostPoll(poll: ApiPoll): PostPoll {
+  return {
+    choices: (poll.choices ?? []).map((choice) => ({
+      id: choice.id,
+      label: choice.label,
+      votesCount: choice.votes_count ?? 0,
+    })),
+    endsAt: poll.ends_at,
+    closedAt: poll.closed_at ?? '',
+    audience: poll.audience === 'followers' ? 'followers' : 'everyone',
+    totalVotes: poll.total_votes ?? 0,
+    votedChoiceId: poll.voted_choice_id ?? '',
+    winnerChoiceIds: poll.winner_choice_ids ?? [],
+    canViewResults: Boolean(poll.can_view_results),
+    canClose: Boolean(poll.can_close),
   }
 }
 
@@ -458,10 +523,18 @@ export async function createPost(
   content: string,
   media: PostMedia[] = [],
   quotePostId?: string,
+  poll?: CreatePollPayload,
 ): Promise<FeedPost> {
   const payload: Record<string, unknown> = { content }
   if (media.length > 0) payload.media = media
   if (quotePostId) payload.quote_post_id = quotePostId
+  if (poll) {
+    payload.poll = {
+      choices: poll.choices,
+      duration_minutes: poll.durationMinutes,
+      audience: poll.audience,
+    }
+  }
 
   const created = await unwrap<ApiPost>(
     await apiFetch('/posts', {
@@ -471,6 +544,34 @@ export async function createPost(
     }),
   )
   return toFeedPost(created, new Set(), new Set())
+}
+
+export async function votePoll(postId: string, choiceId: string): Promise<FeedPost> {
+  const updated = await unwrap<ApiPost>(
+    await apiFetch(`/posts/${postId}/poll/vote`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ choice_id: choiceId }),
+    }),
+  )
+  const [likedIds, repostedIds, bookmarkedIds] = await Promise.all([
+    getLikedIds(),
+    getRepostedIds(),
+    getBookmarkedIds(),
+  ])
+  return toFeedPost(updated, likedIds, repostedIds, bookmarkedIds)
+}
+
+export async function closePoll(postId: string): Promise<FeedPost> {
+  const updated = await unwrap<ApiPost>(
+    await apiFetch(`/posts/${postId}/poll/close`, { method: 'POST' }),
+  )
+  const [likedIds, repostedIds, bookmarkedIds] = await Promise.all([
+    getLikedIds(),
+    getRepostedIds(),
+    getBookmarkedIds(),
+  ])
+  return toFeedPost(updated, likedIds, repostedIds, bookmarkedIds)
 }
 
 /** Épingle un post sur le profil de l'auteur courant ; renvoie le post à jour. */

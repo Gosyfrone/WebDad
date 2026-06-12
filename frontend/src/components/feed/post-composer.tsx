@@ -1,13 +1,21 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Image as ImageIcon, Smile, BarChart2, Loader2, Pin, X } from 'lucide-react'
+import { Image as ImageIcon, ListChecks, Loader2, Pin, Plus, Smile, Trash2, X } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import { getAccessToken } from '@/lib/auth-client'
 import { getMyProfil, subscribeProfilUpdated } from '@/lib/profil-client'
 import { resolveMediaUrl, uploadMedia } from '@/lib/media'
-import { createPost, notifyPostCreated, pinPost, type FeedPost, type PostMedia } from '@/lib/posts'
+import {
+  createPost,
+  notifyPostCreated,
+  pinPost,
+  type CreatePollPayload,
+  type FeedPost,
+  type PollAudience,
+  type PostMedia,
+} from '@/lib/posts'
 import { useToast } from '@/hooks/use-toast'
 import type { ProfilDetails } from '@/types'
 import { useMention } from '@/lib/use-mention'
@@ -64,6 +72,12 @@ export function PostComposer({
   const [initial, setInitial] = useState('U')
   const [submitting, setSubmitting] = useState(false)
   const [pinOnProfile, setPinOnProfile] = useState(false)
+  const [pollOpen, setPollOpen] = useState(false)
+  const [pollChoices, setPollChoices] = useState(['', ''])
+  const [pollDays, setPollDays] = useState(0)
+  const [pollHours, setPollHours] = useState(0)
+  const [pollMinutes, setPollMinutes] = useState(10)
+  const [pollAudience, setPollAudience] = useState<PollAudience>('everyone')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const mention = useMention({
@@ -77,7 +91,8 @@ export function PostComposer({
     search: hashtagSearchGlobal,
   })
   const remaining = MAX_CHARS - content.length
-  const isEmpty = content.trim().length === 0 && media.length === 0
+  const pollPayload = buildPollPayload(pollOpen, pollChoices, pollDays, pollHours, pollMinutes, pollAudience)
+  const isEmpty = content.trim().length === 0 && media.length === 0 && !pollPayload
   const isOver = remaining < 0
 
   // Avatar de l'utilisateur courant (resync sur édition du profil, comme la
@@ -104,13 +119,14 @@ export function PostComposer({
     if (isEmpty || isOver || submitting || uploadingMedia) return
     setSubmitting(true)
     try {
-      const created = await createPost(content.trim(), media, quotePost?.id)
+      const created = await createPost(content.trim(), media, quotePost?.id, pollPayload)
       const post = pinOnProfile ? await pinPost(created.id) : created
       notifyPostCreated(post) // le fil prépend sans refetch
       onPosted?.(content)
       setContent('')
       setMedia([])
       setPinOnProfile(false)
+      resetPoll()
     } catch {
       toast({ title: t('composer.post_failed'), variant: 'destructive' })
     } finally {
@@ -165,6 +181,27 @@ export function PostComposer({
     })
   }
 
+  function resetPoll() {
+    setPollOpen(false)
+    setPollChoices(['', ''])
+    setPollDays(0)
+    setPollHours(0)
+    setPollMinutes(10)
+    setPollAudience('everyone')
+  }
+
+  function updatePollChoice(index: number, value: string) {
+    setPollChoices((prev) => prev.map((choice, i) => (i === index ? value : choice)))
+  }
+
+  function addPollChoice() {
+    setPollChoices((prev) => (prev.length >= 4 ? prev : [...prev, '']))
+  }
+
+  function removePollChoice(index: number) {
+    setPollChoices((prev) => (prev.length <= 2 ? prev : prev.filter((_, i) => i !== index)))
+  }
+
   return (
     <div className={cn('flex gap-3', className)}>
       <Avatar className="mt-1 h-10 w-10 shrink-0 shadow-[0_12px_30px_rgba(91,108,255,0.22)]">
@@ -213,6 +250,24 @@ export function PostComposer({
           <MediaPreviews media={media} onRemove={removeMedia} removeLabel={t('composer.media_remove')} />
         )}
 
+        {pollOpen && (
+          <PollPanel
+            choices={pollChoices}
+            days={pollDays}
+            hours={pollHours}
+            minutes={pollMinutes}
+            audience={pollAudience}
+            onChoiceChange={updatePollChoice}
+            onAddChoice={addPollChoice}
+            onRemoveChoice={removePollChoice}
+            onDaysChange={setPollDays}
+            onHoursChange={setPollHours}
+            onMinutesChange={setPollMinutes}
+            onAudienceChange={setPollAudience}
+            onRemove={resetPoll}
+          />
+        )}
+
         {quotePost && (
           <QuotePreview post={quotePost} />
         )}
@@ -243,16 +298,6 @@ export function PostComposer({
               onChange={handleFiles}
               className="sr-only"
             />
-            <EmojiPicker onSelect={insertEmoji}>
-              <button
-                type="button"
-                aria-label={t('composer.add_emoji')}
-                className="rounded-full p-2 transition-colors hover:bg-primary/10"
-              >
-                <Smile className="h-5 w-5" />
-              </button>
-            </EmojiPicker>
-            <ActionIcon icon={BarChart2} label={t('composer.add_poll')} />
             <button
               type="button"
               aria-label={t('composer.pin_profile')}
@@ -265,6 +310,27 @@ export function PostComposer({
             >
               <Pin className={cn('h-5 w-5', pinOnProfile && 'fill-current')} />
             </button>
+            <button
+              type="button"
+              aria-label={t('composer.add_poll')}
+              aria-pressed={pollOpen}
+              onClick={() => setPollOpen((v) => !v)}
+              className={cn(
+                'rounded-full p-2 transition-colors hover:bg-primary/10',
+                pollOpen && 'bg-primary/10 text-primary',
+              )}
+            >
+              <ListChecks className="h-5 w-5" />
+            </button>
+            <EmojiPicker onSelect={insertEmoji}>
+              <button
+                type="button"
+                aria-label={t('composer.add_emoji')}
+                className="rounded-full p-2 transition-colors hover:bg-primary/10"
+              >
+                <Smile className="h-5 w-5" />
+              </button>
+            </EmojiPicker>
           </div>
 
           <div className="flex items-center gap-3">
@@ -286,7 +352,7 @@ export function PostComposer({
             <Button
               size="sm"
               className="rounded-full bg-gradient-to-r from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] font-bold text-white shadow-[0_12px_30px_rgba(91,108,255,0.28)]"
-              disabled={isEmpty || isOver || submitting}
+              disabled={isEmpty || isOver || submitting || uploadingMedia}
               onClick={handleSubmit}
             >
               {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : label}
@@ -295,6 +361,152 @@ export function PostComposer({
         </div>
       </div>
     </div>
+  )
+}
+
+function buildPollPayload(
+  open: boolean,
+  choices: string[],
+  days: number,
+  hours: number,
+  minutes: number,
+  audience: PollAudience,
+): CreatePollPayload | undefined {
+  if (!open) return undefined
+  const cleaned = choices.map((choice) => choice.trim()).filter(Boolean)
+  const durationMinutes = days * 24 * 60 + hours * 60 + minutes
+  if (cleaned.length < 2 || durationMinutes < 1) return undefined
+  return { choices: cleaned, durationMinutes, audience }
+}
+
+function PollPanel({
+  choices,
+  days,
+  hours,
+  minutes,
+  audience,
+  onChoiceChange,
+  onAddChoice,
+  onRemoveChoice,
+  onDaysChange,
+  onHoursChange,
+  onMinutesChange,
+  onAudienceChange,
+  onRemove,
+}: {
+  choices: string[]
+  days: number
+  hours: number
+  minutes: number
+  audience: PollAudience
+  onChoiceChange: (index: number, value: string) => void
+  onAddChoice: () => void
+  onRemoveChoice: (index: number) => void
+  onDaysChange: (value: number) => void
+  onHoursChange: (value: number) => void
+  onMinutesChange: (value: number) => void
+  onAudienceChange: (value: PollAudience) => void
+  onRemove: () => void
+}) {
+  const t = useT()
+  return (
+    <div className="overflow-hidden rounded-2xl border border-border bg-background/35">
+      <div className="space-y-3 p-3">
+        {choices.map((choice, index) => (
+          <div key={index} className="flex items-center gap-2">
+            <div className="grid h-12 w-12 shrink-0 place-items-center rounded-lg border border-dashed border-border bg-muted/60 text-muted-foreground">
+              <ImageIcon className="h-5 w-5" />
+            </div>
+            <input
+              value={choice}
+              onChange={(e) => onChoiceChange(index, e.target.value)}
+              placeholder={t('composer.poll_choice', { number: index + 1 })}
+              maxLength={80}
+              className="h-12 min-w-0 flex-1 rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-primary"
+            />
+            {choices.length > 2 && (
+              <button
+                type="button"
+                aria-label={t('composer.poll_remove_choice')}
+                onClick={() => onRemoveChoice(index)}
+                className="rounded-full p-2 text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+        ))}
+        {choices.length < 4 && (
+          <button
+            type="button"
+            onClick={onAddChoice}
+            className="ml-auto flex items-center gap-1 rounded-full px-2 py-1 text-sm font-semibold text-primary transition hover:bg-primary/10"
+          >
+            <Plus className="h-4 w-4" />
+            {t('composer.poll_add_choice')}
+          </button>
+        )}
+      </div>
+
+      <div className="border-t border-border p-3">
+        <p className="mb-2 text-sm font-semibold">{t('composer.poll_duration')}</p>
+        <div className="grid grid-cols-3 gap-2">
+          <NumberSelect label={t('composer.poll_days')} value={days} max={7} onChange={onDaysChange} />
+          <NumberSelect label={t('composer.poll_hours')} value={hours} max={23} onChange={onHoursChange} />
+          <NumberSelect label={t('composer.poll_minutes')} value={minutes} max={59} onChange={onMinutesChange} />
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-3 border-t border-border p-3 sm:flex-row sm:items-center sm:justify-between">
+        <label className="flex items-center gap-2 text-sm font-semibold text-primary">
+          <select
+            value={audience}
+            onChange={(e) => onAudienceChange(e.target.value as PollAudience)}
+            className="rounded-md border border-border bg-background px-2 py-1 text-foreground outline-none focus:border-primary"
+          >
+            <option value="everyone">{t('composer.poll_everyone')}</option>
+            <option value="followers">{t('composer.poll_followers')}</option>
+          </select>
+        </label>
+        <button
+          type="button"
+          onClick={onRemove}
+          className="flex items-center justify-center gap-2 rounded-full px-3 py-1.5 text-sm font-semibold text-red-500 transition hover:bg-red-500/10"
+        >
+          <Trash2 className="h-4 w-4" />
+          {t('composer.poll_remove')}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function NumberSelect({
+  label,
+  value,
+  max,
+  onChange,
+}: {
+  label: string
+  value: number
+  max: number
+  onChange: (value: number) => void
+}) {
+  return (
+    <label className="flex min-w-0 flex-col gap-1 rounded-md border border-border bg-background px-3 py-2 text-xs text-muted-foreground">
+      {label}
+      <select
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="bg-transparent text-base text-foreground outline-none"
+      >
+        {Array.from({ length: max + 1 }, (_, n) => (
+          <option key={n} value={n}>
+            {n}
+          </option>
+        ))}
+      </select>
+    </label>
   )
 }
 
@@ -395,17 +607,5 @@ function QuoteMediaPreview({ media }: { media: PostMedia[] }) {
         )
       })}
     </div>
-  )
-}
-
-function ActionIcon({ icon: Icon, label }: { icon: React.ElementType; label: string }) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      className="rounded-full p-2 transition-colors hover:bg-primary/10"
-    >
-      <Icon className="h-5 w-5" />
-    </button>
   )
 }
