@@ -1,14 +1,9 @@
 import { redirect } from 'next/navigation'
 
-// TODO : remplacer par une vraie vérification de session (cookie / JWT côté serveur).
-// Pour l'instant : redirige toujours vers /login. Quand l'auth sera branchée,
-// rediriger vers /feed si l'utilisateur est connecté.
+// Racine → fil d'actualité. `/feed` est public (mode visiteur) : un utilisateur
+// non connecté y voit le fil public avec l'invite de connexion ; un membre y
+// voit l'expérience complète. La garde de session vit dans le middleware et côté
+// composants (cf. AuthPromptProvider).
 export default function HomePage() {
-  const isAuthenticated = false
-
-  if (isAuthenticated) {
-    redirect('/feed')
-  }
-
-  redirect('/login')
+  redirect('/feed')
 }

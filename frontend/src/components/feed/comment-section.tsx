@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Image as ImageIcon, Loader2, Smile, Trash2, X } from 'lucide-react'
 
 import { cn, initialOf, timeAgo } from '@/lib/utils'
+import { getAccessToken } from '@/lib/auth-client'
 import { useInfiniteScroll } from '@/lib/use-infinite-scroll'
 import { resolveMediaUrl, uploadMedia } from '@/lib/media'
 import {
@@ -17,6 +18,7 @@ import {
 import { useToast } from '@/hooks/use-toast'
 import { useMention } from '@/lib/use-mention'
 import { mentionSearchGlobal } from '@/lib/mention-search'
+import { useAuthGate } from '@/components/auth-prompt-provider'
 import { useLanguage } from '@/components/language-provider'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -50,6 +52,7 @@ interface CommentSectionProps {
 export function CommentSection({ postId, onCountChange }: CommentSectionProps) {
   const { toast } = useToast()
   const { t } = useLanguage()
+  const { isVisitor, promptLogin } = useAuthGate()
   const [comments, setComments] = useState<PostComment[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -179,7 +182,16 @@ export function CommentSection({ postId, onCountChange }: CommentSectionProps) {
 
   return (
     <div className="mt-2 border-t border-border pt-3">
-      {/* Composer racine */}
+      {/* Composer racine — remplacé par une invite de connexion pour le visiteur. */}
+      {isVisitor ? (
+        <button
+          type="button"
+          onClick={promptLogin}
+          className="w-full rounded-full border border-border bg-background/60 px-4 py-2 text-left text-sm text-muted-foreground transition-colors hover:bg-accent"
+        >
+          {t('comment.placeholder')}
+        </button>
+      ) : (
       <div className="flex flex-col gap-2">
         {media.length > 0 && (
           <CommentMediaPreviews media={media} onRemove={removeMedia} removeLabel={t('composer.media_remove')} />
@@ -249,6 +261,7 @@ export function CommentSection({ postId, onCountChange }: CommentSectionProps) {
           </Button>
         </div>
       </div>
+      )}
 
       {/* Liste */}
       <div className="mt-3 flex flex-col gap-3">
@@ -302,6 +315,7 @@ interface CommentThreadProps {
 function CommentThread({ postId, comment, onRemove, onCountChange }: CommentThreadProps) {
   const { toast } = useToast()
   const { t } = useLanguage()
+  const { promptLogin } = useAuthGate()
   const [replies, setReplies] = useState<PostComment[]>([])
   const [replyCount, setReplyCount] = useState(comment.replyCount)
   const [open, setOpen] = useState(false)
@@ -348,6 +362,11 @@ function CommentThread({ postId, comment, onRemove, onCountChange }: CommentThre
   }
 
   function openReplyTo(to: { id: string; username: string }) {
+    // Visiteur : invite à se connecter plutôt que d'ouvrir le composer de réponse.
+    if (!getAccessToken()) {
+      promptLogin()
+      return
+    }
     setTarget(to)
     setContent(to.username ? `@${to.username} ` : '')
     setComposerOpen(true)

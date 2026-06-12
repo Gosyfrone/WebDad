@@ -4,14 +4,15 @@ import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LogOut, Palette, Settings } from 'lucide-react'
+import { LogIn, LogOut, Palette, Settings } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
-import { logout } from '@/lib/auth-client'
+import { getAccessToken, logout } from '@/lib/auth-client'
 import { getMyProfil, subscribeProfilUpdated } from '@/lib/profil-client'
 import { useSession } from '@/lib/session'
 import { ROUTES, navItemsForRole } from '@/lib/routes'
 import type { ProfilDetails } from '@/types'
+import { useAuthGate } from '@/components/auth-prompt-provider'
 import { useT } from '@/components/language-provider'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { CustomThemeDialog } from '@/components/custom-theme-dialog'
@@ -46,6 +47,7 @@ export function MobileHeader() {
   const t = useT()
   const pathname = usePathname()
   const session = useSession()
+  const { isVisitor } = useAuthGate()
   const hidden = pathname?.startsWith(ROUTES.profil) ?? false
   const [open, setOpen] = useState(false)
   const [themeDialogOpen, setThemeDialogOpen] = useState(false)
@@ -77,6 +79,8 @@ export function MobileHeader() {
     }
 
     async function loadAccount() {
+      // Visiteur : pas de profil (et `/profils/me` renverrait 401 → redirection).
+      if (!getAccessToken()) return
       try {
         const profil = await getMyProfil()
         if (!cancelled) applyProfil(profil)
@@ -93,9 +97,10 @@ export function MobileHeader() {
     }
   }, [])
 
-  // Ouverture par swipe depuis le bord gauche (→ droite).
+  // Ouverture par swipe depuis le bord gauche (→ droite). Désactivée pour le
+  // visiteur (pas de tiroir de navigation).
   useEffect(() => {
-    if (hidden) return
+    if (hidden || isVisitor) return
 
     let startX = 0
     let startY = 0
@@ -124,7 +129,7 @@ export function MobileHeader() {
       window.removeEventListener('touchstart', onTouchStart)
       window.removeEventListener('touchend', onTouchEnd)
     }
-  }, [hidden])
+  }, [hidden, isVisitor])
 
   if (hidden) return null
 
@@ -132,7 +137,18 @@ export function MobileHeader() {
 
   return (
     <header className="panel sticky top-0 z-[60] isolate flex h-14 items-center border-b px-3 shadow-sm backdrop-blur-2xl lg:hidden">
-      {/* Photo de profil -> tiroir de navigation latéral gauche */}
+      {/* Visiteur : pas de tiroir → lien direct vers la connexion. */}
+      {isVisitor ? (
+        <Link
+          href={ROUTES.login}
+          aria-label={t('visitor.login')}
+          className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-bold text-[#5B6CFF] transition-colors hover:bg-accent dark:text-[#9aa6ff]"
+        >
+          <LogIn className="h-5 w-5" aria-hidden />
+          <span>{t('visitor.login')}</span>
+        </Link>
+      ) : (
+      /* Photo de profil -> tiroir de navigation latéral gauche */
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetTrigger asChild>
           <button
@@ -225,6 +241,7 @@ export function MobileHeader() {
           </div>
         </SheetContent>
       </Sheet>
+      )}
 
       {/* Logo Breezy centré */}
       <Link

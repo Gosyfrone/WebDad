@@ -92,6 +92,15 @@ export const messages: Record<Locale, Messages> = {
     'nav.post': 'Breezer',
     'nav.compose': 'Composer une publication',
     'nav.search': 'Recherche',
+
+    // — Mode visiteur (non connecté) —
+    'visitor.login': 'Se connecter',
+    'visitor.register': "S'inscrire",
+    'visitor.cta_aria': 'Se connecter ou s’inscrire',
+    'visitor.prompt_title': 'Rejoins Breezy',
+    'visitor.prompt_desc':
+      'Connecte-toi ou crée un compte pour aimer, commenter, reposter et suivre des comptes.',
+
     'bookmarks.title': 'Signets',
     'bookmarks.all': 'Tous',
     'bookmarks.default_name': 'Mes signets',
@@ -770,6 +779,15 @@ export const messages: Record<Locale, Messages> = {
     'nav.open_menu': 'Open navigation menu',
     'nav.post': 'Breeze',
     'nav.compose': 'Compose a post',
+
+    // — Visitor mode (signed out) —
+    'visitor.login': 'Log in',
+    'visitor.register': 'Sign up',
+    'visitor.cta_aria': 'Log in or sign up',
+    'visitor.prompt_title': 'Join Breezy',
+    'visitor.prompt_desc':
+      'Log in or create an account to like, comment, repost and follow people.',
+
     'bookmarks.title': 'Bookmarks',
     'bookmarks.all': 'All',
     'bookmarks.default_name': 'My bookmarks',

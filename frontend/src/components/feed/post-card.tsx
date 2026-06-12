@@ -33,6 +33,7 @@ import { quickBookmark, removeBookmarkEverywhere } from '@/lib/bookmarks'
 import { BookmarkDialog } from '@/components/feed/bookmark-dialog'
 import { ToastAction } from '@/components/ui/toast'
 import { useToast } from '@/hooks/use-toast'
+import { useAuthGate } from '@/components/auth-prompt-provider'
 import { useLanguage } from '@/components/language-provider'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
@@ -75,6 +76,7 @@ interface PostCardProps {
  */
 export function PostCard({ post, showPinBadge = false, onDeleted, onUpdated }: PostCardProps) {
   const { toast } = useToast()
+  const { isVisitor, promptLogin, requireAuth } = useAuthGate()
   const { t, locale } = useLanguage()
 
   const [liked, setLiked] = useState(post.liked)
@@ -236,6 +238,8 @@ export function PostCard({ post, showPinBadge = false, onDeleted, onUpdated }: P
   }
 
   function startLongPress() {
+    // Visiteur : pas de sélecteur de collection (signets réservés aux membres).
+    if (isVisitor) return
     longPress.current = false
     longPressTimer.current = setTimeout(() => {
       longPress.current = true
@@ -254,6 +258,11 @@ export function PostCard({ post, showPinBadge = false, onDeleted, onUpdated }: P
     // Un appui long a déjà ouvert le sélecteur → on n'enchaîne pas le clic court.
     if (longPress.current) {
       longPress.current = false
+      return
+    }
+    // Visiteur : invite à se connecter (signets réservés aux membres).
+    if (isVisitor) {
+      promptLogin()
       return
     }
     void quickToggleBookmark()
@@ -373,7 +382,17 @@ export function PostCard({ post, showPinBadge = false, onDeleted, onUpdated }: P
             className="hover:text-primary hover:bg-primary/10"
             activeClassName="text-primary"
           />
-          <Popover open={repostMenuOpen} onOpenChange={setRepostMenuOpen}>
+          <Popover
+            open={repostMenuOpen}
+            onOpenChange={(o) => {
+              // Visiteur : invite à se connecter plutôt que d'ouvrir le menu repost.
+              if (o && isVisitor) {
+                promptLogin()
+                return
+              }
+              setRepostMenuOpen(o)
+            }}
+          >
             <PopoverTrigger asChild>
               <button
                 aria-label={t('post.repost')}
@@ -417,7 +436,7 @@ export function PostCard({ post, showPinBadge = false, onDeleted, onUpdated }: P
             count={likeCount}
             label={t('post.like')}
             active={liked}
-            onClick={toggleLike}
+            onClick={requireAuth(toggleLike)}
             burstKey={likeBurst}
             className="hover:text-red-500 hover:bg-red-500/10"
             activeClassName="text-red-500 fill-red-500"

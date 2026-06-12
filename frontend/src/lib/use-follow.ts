@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 
 import { follow, getFollowingIds, getMe, getPendingFollowRequestIds, unfollow } from '@/lib/api'
+import { getAccessToken } from '@/lib/auth-client'
 import { subscribeFollowRequestDecision } from '@/lib/notifications'
 import type { RelationUser } from '@/types'
 import { useToast } from '@/hooks/use-toast'
@@ -37,7 +38,9 @@ export function useFollow(enabled = true) {
   const [loaded, setLoaded] = useState(!enabled)
 
   useEffect(() => {
-    if (!enabled) {
+    // Visiteur (pas de token) : pas de graphe social à charger. `getMe` renverrait
+    // 401 → redirection forcée vers /login. On reste « non chargé/non suivi ».
+    if (!enabled || !getAccessToken()) {
       setLoaded(true)
       return
     }

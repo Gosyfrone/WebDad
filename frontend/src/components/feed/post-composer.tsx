@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Image as ImageIcon, Smile, BarChart2, Loader2, Pin, X } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
+import { getAccessToken } from '@/lib/auth-client'
 import { getMyProfil, subscribeProfilUpdated } from '@/lib/profil-client'
 import { resolveMediaUrl, uploadMedia } from '@/lib/media'
 import { createPost, notifyPostCreated, pinPost, type FeedPost, type PostMedia } from '@/lib/posts'
@@ -79,7 +80,10 @@ export function PostComposer({
       setAvatarUrl(profil.avatarUrl)
       setInitial((profil.displayName || profil.username || 'U').charAt(0).toUpperCase())
     }
-    getMyProfil().then(apply).catch(() => {})
+    // Sans token (visiteur, ou course d'hydratation avant que `isVisitor` ne
+    // bascule) : pas de profil à charger. `/profils/me` renverrait 401 →
+    // refresh raté → redirection forcée vers /login.
+    if (getAccessToken()) getMyProfil().then(apply).catch(() => {})
     const unsubscribe = subscribeProfilUpdated(apply)
     return () => {
       cancelled = true

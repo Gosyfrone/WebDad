@@ -3,10 +3,11 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Bell, Mail, Search } from 'lucide-react'
+import { Bell, LogIn, Mail, Search } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import { ROUTES } from '@/lib/routes'
+import { useAuthGate } from '@/components/auth-prompt-provider'
 import { useNotifications } from '@/components/notifications-provider'
 import { useMessages } from '@/components/messages-provider'
 import { useT } from '@/components/language-provider'
@@ -26,6 +27,12 @@ const TABS: TabItem[] = [
   { href: ROUTES.messages, labelKey: 'nav.messages', icon: Mail },
 ]
 
+/** Onglets du visiteur : seul le fil public est accessible, + une entrée connexion. */
+const VISITOR_TABS: TabItem[] = [
+  { href: ROUTES.feed, labelKey: 'nav.home', icon: null },
+  { href: ROUTES.login, labelKey: 'visitor.login', icon: LogIn },
+]
+
 /**
  * Barre de navigation fixée en bas (masquée ≥ lg), façon X.com mobile.
  * « Accueil » utilise le logo Breezy seul (`logo_only.png`).
@@ -33,15 +40,17 @@ const TABS: TabItem[] = [
 export function MobileTabBar() {
   const t = useT()
   const pathname = usePathname()
+  const { isVisitor } = useAuthGate()
   const { unreadCount } = useNotifications()
   const { unreadCount: msgUnread } = useMessages()
+  const tabs = isVisitor ? VISITOR_TABS : TABS
 
   return (
     <nav
       aria-label={t('nav.main_aria')}
       className="panel fixed inset-x-0 bottom-0 z-40 flex h-14 border-t shadow-[0_-18px_44px_rgba(91,108,255,0.12)] backdrop-blur-2xl lg:hidden"
     >
-      {TABS.map((tab) => {
+      {tabs.map((tab) => {
         const active = pathname === tab.href
         const Icon = tab.icon
         const badgeCount =

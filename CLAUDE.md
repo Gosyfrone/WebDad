@@ -151,6 +151,8 @@ several well-chosen secondary features · **all 3 roles functional** · pro slid
 
 ## 9. Current handoff
 
+- 2026-06-12: **vue visiteur** (fil public sans inscription). Front-only, zéro backend (post-service expose déjà la lecture publique via `OptionalJWTAuth`). Nouveau `AuthPromptProvider`/`useAuthGate` (`isVisitor`/`requireAuth`/`promptLogin`, monté dans le layout `(app)`) ; `middleware.ts` ouvre `/feed`+`/posts/:id` ; `/`→`/feed`. Pièce centrale = garder tous les appels `/me` derrière `getAccessToken()` (sinon 401→refresh raté→redirection forcée /login). Actions réservées (like/repost/citer/signet/commentaire) → modale connexion ; aperçu profil au survol désactivé pour le visiteur. i18n `visitor.*`. `tsc --noEmit` propre. Aucun changement backend → Swagger non régénéré. Détails CHANGELOG + DECISIONS « Vue visiteur ».
+- 2026-06-12: suggested commit message: `feat(visitor): vue visiteur du fil public sans inscription`.
 - 2026-06-10: login page now uses one "Adresse e-mail ou Username" field; username login is resolved by the Next BFF through user-service, then auth-service authenticates by `user_id`.
 - 2026-06-10: Swagger annotation/docs updated for the new login contract; local `make swagger` still fails on Windows bash, so the aggregate spec was regenerated in a temporary Go Linux container with `GOBIN` aligned to the script.
 - 2026-06-10: suggested commit message for this change: `feat(auth): allow login with email or username`.

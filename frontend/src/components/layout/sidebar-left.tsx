@@ -20,10 +20,11 @@ import {
 } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
-import { logout } from '@/lib/auth-client'
+import { getAccessToken, logout } from '@/lib/auth-client'
 import { getMyProfil, subscribeProfilUpdated } from '@/lib/profil-client'
 import { useSession } from '@/lib/session'
 import { ROUTES } from '@/lib/routes'
+import { useAuthGate } from '@/components/auth-prompt-provider'
 import { useNotifications } from '@/components/notifications-provider'
 import { useMessages } from '@/components/messages-provider'
 import { useT } from '@/components/language-provider'
@@ -75,6 +76,7 @@ export function SidebarLeft() {
   const t = useT()
   const pathname = usePathname()
   const session = useSession()
+  const { isVisitor } = useAuthGate()
   const { unreadCount } = useNotifications()
   const { unreadCount: msgUnread } = useMessages()
   const [themeDialogOpen, setThemeDialogOpen] = useState(false)
@@ -87,9 +89,14 @@ export function SidebarLeft() {
   // Rôle réel issu du JWT (cf. lib/session). `null` au 1er rendu (hydratation),
   // puis renseigné au montage → les liens Modération/Admin apparaissent ensuite.
   const role = session?.role ?? null
-  const visibleItems = NAV_ITEMS.filter(
-    (item) => !item.roles || (role !== null && item.roles.includes(role)),
-  )
+  // Visiteur : seul « Accueil » (le fil public) reste accessible — les autres
+  // entrées (recherche, notifications, messages, signets, profil, modération…)
+  // requièrent une session.
+  const visibleItems = isVisitor
+    ? NAV_ITEMS.filter((item) => item.href === ROUTES.feed)
+    : NAV_ITEMS.filter(
+        (item) => !item.roles || (role !== null && item.roles.includes(role)),
+      )
   const fallbackInitial = (account.displayName || account.username || 'U')
     .charAt(0)
     .toUpperCase()
@@ -110,6 +117,9 @@ export function SidebarLeft() {
     }
 
     async function loadAccount() {
+      // Visiteur (pas de token) : pas de profil à charger (et `/profils/me`
+      // renverrait 401 → redirection forcée vers /login).
+      if (!getAccessToken()) return
       try {
         const profil = await getMyProfil()
         if (!cancelled) {
@@ -191,18 +201,34 @@ export function SidebarLeft() {
           )
         })}
 
-        {/* Post button : ouvre la popup de publication */}
-        <CreatePostDialog>
-          <Button
-            size="lg"
-            className="mt-4 w-[90%] rounded-full bg-gradient-to-r from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] text-base font-bold text-white shadow-[0_18px_44px_rgba(91,108,255,0.3)] transition hover:scale-[1.015]"
-          >
-            {t('nav.post')}
-          </Button>
-        </CreatePostDialog>
+        {/* Post button : ouvre la popup de publication (masqué pour le visiteur). */}
+        {!isVisitor && (
+          <CreatePostDialog>
+            <Button
+              size="lg"
+              className="mt-4 w-[90%] rounded-full bg-gradient-to-r from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] text-base font-bold text-white shadow-[0_18px_44px_rgba(91,108,255,0.3)] transition hover:scale-[1.015]"
+            >
+              {t('nav.post')}
+            </Button>
+          </CreatePostDialog>
+        )}
       </div>
 
-      {/* Bas de la sidebar : menu utilisateur */}
+      {/* Bas de la sidebar : menu utilisateur — ou appel à la connexion (visiteur) */}
+      {isVisitor ? (
+        <div className="flex flex-col gap-2" aria-label={t('visitor.cta_aria')}>
+          <Button
+            asChild
+            size="lg"
+            className="w-full rounded-full bg-gradient-to-r from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] text-base font-bold text-white shadow-[0_18px_44px_rgba(91,108,255,0.3)] transition hover:scale-[1.015]"
+          >
+            <Link href={ROUTES.login}>{t('visitor.login')}</Link>
+          </Button>
+          <Button asChild size="lg" variant="outline" className="w-full rounded-full text-base font-bold">
+            <Link href={ROUTES.register}>{t('visitor.register')}</Link>
+          </Button>
+        </div>
+      ) : (
       <div className="flex flex-col gap-2">
         {/* User menu : identité réelle chargée via profil-service */}
         <DropdownMenu>
@@ -262,6 +288,7 @@ export function SidebarLeft() {
             quand le dropdown se ferme). */}
         <CustomThemeDialog open={themeDialogOpen} onOpenChange={setThemeDialogOpen} />
       </div>
+      )}
     </aside>
   )
 }
