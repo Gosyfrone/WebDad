@@ -5293,6 +5293,13 @@
         "location": {
           "type": "string"
         },
+        "visibility": {
+          "type": "string",
+          "enum": [
+            "public",
+            "private"
+          ]
+        },
         "website": {
           "type": "string"
         }
