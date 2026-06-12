@@ -64,6 +64,7 @@ interface ApiProfil {
   user_id: string
   display_name?: string
   avatar_url?: string
+  visibility?: 'public' | 'private'
 }
 
 // --- Types front -------------------------------------------------------------
@@ -74,6 +75,7 @@ export interface PostAuthor {
   username: string
   displayName: string
   avatarUrl: string
+  visibility: 'public' | 'private'
 }
 
 /** Média attaché à un post (URL prête à l'affichage + nature). */
@@ -175,6 +177,7 @@ function authorFromProfil(profil: ProfilDetails): PostAuthor {
     username: profil.username,
     displayName: profil.displayName || profil.username || 'Utilisateur',
     avatarUrl: profil.avatarUrl,
+    visibility: profil.visibility,
   }
 }
 
@@ -234,6 +237,7 @@ function resolveAuthor(userId: string): Promise<PostAuthor> {
       username: user?.username ?? '',
       displayName: profil?.display_name?.trim() || user?.username || 'Utilisateur',
       avatarUrl: resolveMediaUrl(profil?.avatar_url),
+      visibility: profil?.visibility === 'private' ? 'private' : 'public',
     }
   })()
 

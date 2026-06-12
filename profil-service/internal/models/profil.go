@@ -65,4 +65,5 @@ type UpdateProfilRequest struct {
 	Location    *string    `json:"location"     binding:"omitempty"`
 	BirthDate   *time.Time `json:"birth_date"   binding:"omitempty"`
 	Gender      *string    `json:"gender"       binding:"omitempty,oneof=male female"`
+	Visibility  *string    `json:"visibility"   binding:"omitempty,oneof=public private"`
 }
