@@ -2,7 +2,6 @@ package handler
 
 import (
 	"errors"
-	"log"
 	"net/http"
 	"strconv"
 
@@ -265,11 +264,6 @@ func respondProfilError(c *gin.Context, err error) {
 	case errors.Is(err, service.ErrDisplayNameCooldown):
 		c.JSON(http.StatusTooManyRequests, gin.H{"error": err.Error()})
 	default:
-		// Erreur non métier (typiquement une écriture Mongo refusée, ex.
-		// DocumentValidationFailure code 121 sur un document legacy non
-		// conforme). On logue l'erreur BRUTE — invisible côté client — pour
-		// rendre ce 500 diagnosticable sans rejouer le scénario.
-		log.Printf("[profil] erreur interne non mappée : %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "erreur interne"})
 	}
 }
