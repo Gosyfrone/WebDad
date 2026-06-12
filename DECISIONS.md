@@ -110,6 +110,17 @@
 - **Profil: `POST` = the ONLY creation (`display_name` required); `GET /profils/me` is read-only (404 if absent).**
   No write-on-GET, no guessed display_name. Front handles the 404 (POST-if-absent). profil-service never calls
   user-service at runtime; the BFF aligns `display_name = username` at register.
+- **OAuth first-login onboarding gate (front).** A Google sign-up creates `credentials` (auth) + lazily a
+  `users` row (derived handle via `GET /users/me`) but **no profil** → invisible in Explorer (`/profils/search`)
+  though mentionable via `@` (`/users/search`). Rather than auto-deriving a profil silently, the **profil-absent
+  signal** (`GET /profils/me` 404) drives a **blocking modal** mounted in the `(app)` layout (`OnboardingGate`):
+  present on every authenticated page, non-dismissible (ESC/outside/close disabled), re-checked each load. The
+  user picks a username (pre-filled with the derived handle, availability-checked, kept = treated as available)
+  and a birth date (≥13 age parity with register), then **`PATCH /users/me`** (rename only if it differs from the
+  derived handle — first rename never hits the cooldown, `username_changed_at` nil) **+ `POST /profils`**
+  (`display_name`=username, `birth_date`). Frontend-only, **zero backend change** (reuses existing endpoints).
+  Register users always have a profil → never gated. *Assumed limit:* it's a UX gate, not server-enforced (a
+  client could call APIs directly); a gateway-level barrier would be a separate effort.
 
 ## Data ownership
 
