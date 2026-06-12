@@ -149,6 +149,16 @@
   service from aggregation, no routing change.
 - **Each service owns its schema** (`EnsureSchema` at boot, idempotent, Mongo `collMod` resync). Single source
   of truth + autonomy (`make run` against a blank DB). Resolved a validator-drift class of bug.
+- **Legacy data normalization at boot (not just the validator).** A service owning its schema must also own the
+  *conformity of its existing data*, because Mongo (`validationLevel: strict`) re-validates the **whole document**
+  on every write: a single legacy field that violates the current `$jsonSchema` bricks *all* future edits of that
+  doc (`DocumentValidationFailure` → 500). Concrete case: profiles created before `visibility` (PR #204) had
+  `visibility: ""`, outside the `{public, private}` enum → every `PATCH /profils/me` failed in prod (clean local
+  data hid it). Fix = an idempotent migration step in `EnsureSchema` (`normalizeLegacyProfiles`: empty/absent
+  `visibility` → `public`, `bypassDocumentValidation`), same family as `dropLegacyIndexes`/`collMod` — prod
+  self-heals on deploy. Chosen over `validationLevel: moderate`, which would merely *tolerate* dirty data instead
+  of cleaning it. Companion: the handler's default 500 branch now logs the **raw** error so a future validation
+  failure is diagnosable in seconds instead of being an opaque 500.
 
 ## Social graph
 

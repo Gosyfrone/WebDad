@@ -31,7 +31,27 @@ func EnsureSchema(ctx context.Context, db *mongo.Database) error {
 	if err := ensureIndexes(ctx, db); err != nil {
 		return err
 	}
+	if err := normalizeLegacyProfiles(ctx, db); err != nil {
+		return err
+	}
 	return ensureSeed(ctx, db)
+}
+
+// normalizeLegacyProfiles remet à "public" les profils sans visibility valide.
+// bypassDocumentValidation car ces documents violent justement le schéma strict.
+func normalizeLegacyProfiles(ctx context.Context, db *mongo.Database) error {
+	filter := bson.M{"$or": bson.A{
+		bson.M{"visibility": ""},
+		bson.M{"visibility": bson.M{"$exists": false}},
+	}}
+	update := bson.M{"$set": bson.M{"visibility": "public"}}
+	_, err := db.Collection("profiles").UpdateMany(
+		ctx, filter, update, options.UpdateMany().SetBypassDocumentValidation(true),
+	)
+	if err != nil {
+		return fmt.Errorf("normalisation visibility legacy : %w", err)
+	}
+	return nil
 }
 
 // ensureCollections crée les collections manquantes avec leur validateur, et
