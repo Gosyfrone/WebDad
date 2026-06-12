@@ -13,6 +13,7 @@ import {
   type FeedPost,
 } from '@/lib/posts'
 import { useToast } from '@/hooks/use-toast'
+import { useAuthGate } from '@/components/auth-prompt-provider'
 import { useLanguage } from '@/components/language-provider'
 import {
   Dialog,
@@ -44,6 +45,7 @@ interface PostActionsProps {
 export function PostActions({ post, commentCount, commentActive = false, onComment }: PostActionsProps) {
   const { toast } = useToast()
   const { t } = useLanguage()
+  const { isVisitor, promptLogin, requireAuth } = useAuthGate()
 
   const [liked, setLiked] = useState(post.liked)
   const [likeCount, setLikeCount] = useState(post.likesCount)
@@ -115,7 +117,17 @@ export function PostActions({ post, commentCount, commentActive = false, onComme
           className="hover:text-primary hover:bg-primary/10"
           activeClassName="text-primary"
         />
-        <Popover open={repostMenuOpen} onOpenChange={setRepostMenuOpen}>
+        <Popover
+          open={repostMenuOpen}
+          onOpenChange={(o) => {
+            // Visiteur : invite à se connecter plutôt que d'ouvrir le menu repost.
+            if (o && isVisitor) {
+              promptLogin()
+              return
+            }
+            setRepostMenuOpen(o)
+          }}
+        >
           <PopoverTrigger asChild>
             <button
               aria-label={t('post.repost')}
@@ -159,7 +171,7 @@ export function PostActions({ post, commentCount, commentActive = false, onComme
           count={likeCount}
           label={t('post.like')}
           active={liked}
-          onClick={toggleLike}
+          onClick={requireAuth(toggleLike)}
           burstKey={likeBurst}
           className="hover:text-red-500 hover:bg-red-500/10"
           activeClassName="text-red-500 fill-red-500"

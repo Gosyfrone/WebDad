@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation'
 import { Search } from 'lucide-react'
 
 import { ROUTES } from '@/lib/routes'
+import { useAuthGate } from '@/components/auth-prompt-provider'
 import { useT } from '@/components/language-provider'
 import { WhoToFollow } from '@/components/layout/who-to-follow'
 import { LegalLinks } from '@/components/legal/legal-links'
@@ -21,6 +22,7 @@ const TRENDS = [
 export function SidebarRight() {
   const t = useT()
   const pathname = usePathname()
+  const { isVisitor } = useAuthGate()
 
   // La messagerie occupe toute la largeur (chat à deux volets) : pas de colonne
   // « Qui suivre » sur /messages.
@@ -56,8 +58,8 @@ export function SidebarRight() {
         ))}
       </div>
 
-      {/* Qui suivre */}
-      <WhoToFollow />
+      {/* Qui suivre (réservé aux membres : appels au graphe social authentifiés). */}
+      {!isVisitor && <WhoToFollow />}
 
       {/* Liens légaux, sous les suggestions */}
       <LegalLinks className="px-4 pb-2" />

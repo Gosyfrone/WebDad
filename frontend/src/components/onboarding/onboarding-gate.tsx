@@ -5,7 +5,7 @@ import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { CalendarDays, CircleAlert, Info, Loader2, User, UserPlus } from 'lucide-react'
 
 import { getMe, getProfilMe } from '@/lib/api'
-import { apiFetch } from '@/lib/auth-client'
+import { apiFetch, getAccessToken } from '@/lib/auth-client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useT } from '@/components/language-provider'
@@ -77,6 +77,13 @@ export function OnboardingGate() {
 
   // Détection du besoin d'onboarding : profil absent ⟺ compte OAuth non finalisé.
   React.useEffect(() => {
+    // Visiteur (pas de token) : aucun compte à finaliser. Surtout, `/profils/me`
+    // renverrait 401 → `apiFetch` tenterait un refresh → échec → redirection
+    // forcée vers /login (cassait la vue visiteur du fil public). On ne gate jamais.
+    if (!getAccessToken()) {
+      setStatus('done')
+      return
+    }
     let active = true
     void (async () => {
       try {

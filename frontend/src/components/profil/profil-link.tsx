@@ -4,6 +4,7 @@ import Link from 'next/link'
 
 import { ROUTES, profilHref } from '@/lib/routes'
 import { currentUserId } from '@/lib/posts'
+import { useAuthGate } from '@/components/auth-prompt-provider'
 import { ProfileHoverCard } from '@/components/profil/profile-hover-card'
 
 interface ProfilLinkProps {
@@ -30,11 +31,14 @@ export function ProfilLink({
   children,
   ...linkProps
 }: ProfilLinkProps & AnchorProps) {
+  const { isVisitor } = useAuthGate()
   if (!author.username) {
     return <span className={className}>{children}</span>
   }
   const href = currentUserId() === author.id ? ROUTES.profil : profilHref(author.username)
-  if (!preview) {
+  // Visiteur : pas d'aperçu au survol (la carte charge le graphe social
+  // authentifié). Le lien reste, mais le middleware le renverra vers /login.
+  if (!preview || isVisitor) {
     return (
       <Link href={href} className={className} {...linkProps}>
         {children}

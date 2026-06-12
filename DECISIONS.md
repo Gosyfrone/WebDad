@@ -156,6 +156,31 @@
   otherwise opens a chooser (`needs_choice`, files nothing — server never guesses). Window state is server-side
   (`last_bookmark_at`, per account, multi-device, no clock cheat).
 
+## Vue visiteur (fil public)
+
+- **Mode visiteur = front-only, zéro backend.** Le post-service expose déjà la lecture publique (`GET /posts` et
+  `GET /posts/:id` en `OptionalJWTAuth`, barrière de visibilité appliquée serveur → un appelant sans token ne voit
+  que les posts publics). Décision : ne RIEN ajouter côté serveur, tout le mode visiteur vit dans le front.
+- **Réutiliser le shell `(app)`, pas un groupe `(public)` séparé.** Le visiteur voit le MÊME fil avec la même
+  sidebar, seulement amputée (carte user → boutons Se connecter/S'inscrire, nav réduite à Accueil). Un groupe de
+  routes parallèle aurait dupliqué layout + feed pour un gain nul.
+- **Le vrai risque n'était pas la garde mais la redirection forcée.** `apiFetch` redirige vers `/login` sur tout
+  401 dont le refresh échoue. Or le fil enrichit chaque post via `/posts/me/{liked,reposted,bookmarked}-ids`
+  (routes `auth`), et `useFollow`/`getMyProfil`/`getMe` tapent des routes `/me`. Sans token → 401 → redirection →
+  le visiteur ne voit jamais le fil. **Parade : garder chaque appel `/me` derrière `getAccessToken()`** (early-return
+  vide), même pattern que les providers Notifications/Messages. C'est la pièce centrale, pas le retrait du middleware.
+- **`isVisitor` rendu « membre » par défaut au 1er paint.** Pas d'accès `localStorage` au SSR/hydratation → on suppose
+  connecté puis on bascule au montage (même compromis que le thème / la session) pour éviter un flash de l'UI visiteur
+  chez les membres.
+- **Actions réservées → modale « Connecte-toi » (`requireAuth`/`promptLogin`), pas redirection ni masquage.** Choix
+  produit : like/repost/citer/signet/commentaire invitent à s'inscrire sans quitter le fil. La LECTURE des commentaires
+  reste libre (GET public) ; seul l'ENVOI est gaté. L'aperçu profil au survol est désactivé pour le visiteur (il
+  chargeait le graphe social authentifié) et les profils restent gardés par le middleware.
+- **Racine `/` → `/feed`** : `/feed` étant désormais public, c'est l'entrée naturelle du mode visiteur (membre = UI
+  complète, visiteur = UI amputée).
+- **Limite assumée** : garde UX côté front (le backend protège déjà les écritures par JWT ; un client pourrait lire
+  les routes publiques directement, ce qui est précisément leur contrat).
+
 ## Translation
 
 - **Translation via Next BFF route `/api/translate`** (LibreTranslate + Google fallback), keys server-side; post-service

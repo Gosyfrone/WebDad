@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Loader2, Users } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
+import { getAccessToken } from '@/lib/auth-client'
 import {
   filterMutedPosts,
   readMutedWords,
@@ -22,6 +23,7 @@ import {
 } from '@/lib/posts'
 import { CreatePost } from '@/components/feed/create-post'
 import { PostCard } from '@/components/feed/post-card'
+import { useAuthGate } from '@/components/auth-prompt-provider'
 import { useT } from '@/components/language-provider'
 
 type FeedTab = 'for-you' | 'following'
@@ -53,6 +55,7 @@ function applyPostUpdate(current: FeedPost[], updated: FeedPost): FeedPost[] {
  */
 export function FeedView() {
   const t = useT()
+  const { isVisitor } = useAuthGate()
   const [tab, setTab] = useState<FeedTab>('for-you')
   const [posts, setPosts] = useState<FeedPost[]>([])
   const [loading, setLoading] = useState(true)
@@ -125,7 +128,9 @@ export function FeedView() {
 
     async function loadUserScopedFilters() {
       let userId = currentUserId()
-      if (!userId) {
+      // Visiteur : pas de session → pas de filtres par utilisateur (et `getMe`
+      // renverrait 401 → redirection forcée vers /login).
+      if (!userId && getAccessToken()) {
         try {
           userId = (await getMe()).id
         } catch {
@@ -184,21 +189,26 @@ export function FeedView() {
         <h1 className="brand-text hidden px-4 py-3 text-xl font-bold lg:block">
           {t('feed.title')}
         </h1>
-        {/* Onglets Pour toi / Abonnements */}
+        {/* Onglets Pour toi / Abonnements (« Abonnements » requiert une session). */}
         <div className="flex">
           <TabButton active={tab === 'for-you'} onClick={() => setTab('for-you')}>
             {t('feed.tab_for_you')}
           </TabButton>
-          <TabButton active={tab === 'following'} onClick={() => setTab('following')}>
-            {t('feed.tab_following')}
-          </TabButton>
+          {!isVisitor && (
+            <TabButton active={tab === 'following'} onClick={() => setTab('following')}>
+              {t('feed.tab_following')}
+            </TabButton>
+          )}
         </div>
       </div>
 
-      {/* Zone de création de post inline ; le FAB mobile prend le relais quand ce bloc sort de l'écran. */}
-      <div id="feed-composer">
-        <CreatePost />
-      </div>
+      {/* Zone de création de post inline (masquée pour le visiteur) ; le FAB
+          mobile prend le relais quand ce bloc sort de l'écran. */}
+      {!isVisitor && (
+        <div id="feed-composer">
+          <CreatePost />
+        </div>
+      )}
 
       {loading ? (
         <div className="flex justify-center py-12">

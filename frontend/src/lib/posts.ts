@@ -11,7 +11,7 @@
  * l'API est mappé vers le camelCase des types front.
  */
 
-import { apiFetch } from '@/lib/auth-client'
+import { apiFetch, getAccessToken } from '@/lib/auth-client'
 import { resolveMediaUrl } from '@/lib/media'
 import type { ProfilDetails } from '@/types'
 import { decodeClaims } from '@/lib/session'
@@ -286,6 +286,9 @@ async function toComment(c: ApiComment): Promise<PostComment> {
 
 /** Ids des posts likés par l'utilisateur courant (pour l'état des cœurs). */
 export async function getLikedIds(): Promise<Set<string>> {
+  // Visiteur (pas de token) : ces routes sont protégées → un 401 déclencherait
+  // une redirection forcée vers /login. On court-circuite (aucun like de toute façon).
+  if (!getAccessToken()) return new Set()
   const res = await apiFetch('/posts/me/liked-ids')
   if (!res.ok) return new Set()
   const ids = await unwrap<string[]>(res)
@@ -294,6 +297,7 @@ export async function getLikedIds(): Promise<Set<string>> {
 
 /** Ids des posts repostés par l'utilisateur courant. */
 export async function getRepostedIds(): Promise<Set<string>> {
+  if (!getAccessToken()) return new Set()
   const res = await apiFetch('/posts/me/reposted-ids')
   if (!res.ok) return new Set()
   const ids = await unwrap<string[]>(res)
@@ -302,6 +306,7 @@ export async function getRepostedIds(): Promise<Set<string>> {
 
 /** Ids des posts signés par l'utilisateur courant (état des boutons signet). */
 export async function getBookmarkedIds(): Promise<Set<string>> {
+  if (!getAccessToken()) return new Set()
   const res = await apiFetch('/posts/me/bookmarked-ids')
   if (!res.ok) return new Set()
   const ids = await unwrap<string[]>(res)

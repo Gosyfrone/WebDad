@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation'
 
 import { CreatePostDialog } from '@/components/feed/create-post-dialog'
 import { ROUTES } from '@/lib/routes'
+import { useAuthGate } from '@/components/auth-prompt-provider'
 import { useT } from '@/components/language-provider'
 
 /**
@@ -15,6 +16,7 @@ import { useT } from '@/components/language-provider'
 export function ComposeFab() {
   const t = useT()
   const pathname = usePathname()
+  const { isVisitor } = useAuthGate()
   const [show, setShow] = useState(false)
 
   useEffect(() => {
@@ -56,7 +58,8 @@ export function ComposeFab() {
     }
   }, [pathname])
 
-  if (pathname !== ROUTES.feed || !show) return null
+  // Visiteur : pas de publication → pas de bouton flottant.
+  if (isVisitor || pathname !== ROUTES.feed || !show) return null
 
   return (
     <CreatePostDialog>
