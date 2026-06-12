@@ -262,7 +262,10 @@ export function CreateAccountDialog() {
                 {t('onboarding.username_checking')}
               </p>
             ) : availability === 'taken' ? (
-              <p className="text-xs text-muted-foreground">{t('onboarding.username_hint')}</p>
+              <p className="flex items-center gap-1 text-xs text-destructive">
+                <CircleAlert className="h-3 w-3" />
+                {t('auth.register.err.username_taken')}
+              </p>
             ) : availability === 'available' ? (
               <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
                 {t('onboarding.username_available')}
