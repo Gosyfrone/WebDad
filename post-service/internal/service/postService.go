@@ -194,7 +194,7 @@ func (s *PostService) CreatePost(ctx context.Context, authorID, content, quotePo
 }
 
 // GetPosts renvoie le fil global, du plus récent au plus ancien, paginé.
-func (s *PostService) GetPosts(ctx context.Context, viewerID, hashtag, sortMode string, limit, offset int64) ([]models.Post, error) {
+func (s *PostService) GetPosts(ctx context.Context, viewerID, hashtag, sortMode string, hashtagAny bool, limit, offset int64) ([]models.Post, error) {
 	hashtag = normalizeHashtag(hashtag)
 	sortMode = normalizePostSort(sortMode)
 	fetch := s.repo.GetAll
@@ -202,6 +202,8 @@ func (s *PostService) GetPosts(ctx context.Context, viewerID, hashtag, sortMode 
 		fetch = func(ctx context.Context, pageLimit, pageOffset int64) ([]models.Post, error) {
 			return s.repo.GetAllByHashtag(ctx, hashtag, sortMode, pageLimit, pageOffset)
 		}
+	} else if hashtagAny {
+		fetch = s.repo.GetAllWithHashtags
 	}
 	return s.visibleFeedPage(ctx, viewerID, limit, offset, fetch)
 }

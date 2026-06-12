@@ -12,12 +12,16 @@ import { useToast } from '@/hooks/use-toast'
 import type { ProfilDetails } from '@/types'
 import { useMention } from '@/lib/use-mention'
 import { mentionSearchGlobal } from '@/lib/mention-search'
+import { useHashtag } from '@/lib/use-hashtag'
+import { hashtagSearchGlobal } from '@/lib/hashtag-search'
 import { useT } from '@/components/language-provider'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { EmojiPicker } from '@/components/feed/emoji-picker'
 import { MentionAutocomplete } from '@/components/mention/mention-autocomplete'
+import { HashtagAutocomplete } from '@/components/hashtag/hashtag-autocomplete'
+import { ComposerHighlight } from '@/components/hashtag/composer-highlight'
 
 const MAX_CHARS = 280
 /** Nombre maximal de médias par post (aligné sur le validateur post-service). */
@@ -66,6 +70,11 @@ export function PostComposer({
     inputRef: textareaRef,
     onChange: setContent,
     search: mentionSearchGlobal,
+  })
+  const hashtag = useHashtag({
+    inputRef: textareaRef,
+    onChange: setContent,
+    search: hashtagSearchGlobal,
   })
   const remaining = MAX_CHARS - content.length
   const isEmpty = content.trim().length === 0 && media.length === 0
@@ -173,16 +182,31 @@ export function PostComposer({
             onChange={(e) => {
               setContent(e.target.value)
               mention.sync()
+              hashtag.sync()
             }}
-            onKeyDown={mention.onKeyDown}
-            onKeyUp={mention.sync}
-            onClick={mention.sync}
+            onKeyDown={(event) => {
+              if (hashtag.onKeyDown(event)) return
+              mention.onKeyDown(event)
+            }}
+            onKeyUp={() => {
+              mention.sync()
+              hashtag.sync()
+            }}
+            onClick={() => {
+              mention.sync()
+              hashtag.sync()
+            }}
             placeholder={t('composer.placeholder')}
             rows={3}
             autoFocus={autoFocus}
-            className="w-full cursor-text resize-none bg-transparent text-xl text-foreground caret-[#5B6CFF] placeholder:text-muted-foreground focus:outline-none"
+            className={cn(
+              'relative z-10 w-full cursor-text resize-none bg-transparent text-xl caret-[#5B6CFF] placeholder:text-muted-foreground focus:outline-none',
+              content ? 'text-transparent' : 'text-foreground',
+            )}
           />
+          {content && <ComposerHighlight text={content} />}
           <MentionAutocomplete controller={mention} placement="bottom" />
+          <HashtagAutocomplete controller={hashtag} placement="bottom" className="left-24" />
         </div>
 
         {media.length > 0 && (

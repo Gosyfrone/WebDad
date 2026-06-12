@@ -406,6 +406,14 @@ export async function listHashtagTrends(limit = 5, query = ''): Promise<HashtagT
   return raw ?? []
 }
 
+/** Posts contenant au moins un hashtag, utilisés par la page Explorer. */
+export async function listHashtaggedPosts(limit = 10, offset = 0): Promise<FeedPost[]> {
+  const params = feedParams(limit, offset)
+  params.set('hashtag_any', 'true')
+  const raw = await unwrap<ApiPost[]>(await apiFetch(`/posts?${params}`))
+  return mapPosts(raw)
+}
+
 /** Crée un post (auteur dérivé du JWT côté back). */
 export async function createPost(
   content: string,

@@ -3,6 +3,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { Search } from 'lucide-react'
 
 import { currentUserId, listHashtagTrends, type HashtagTrend } from '@/lib/posts'
@@ -19,17 +20,31 @@ import { useT } from '@/components/language-provider'
 import { WhoToFollow } from '@/components/layout/who-to-follow'
 import { LegalLinks } from '@/components/legal/legal-links'
 import { SearchSuggestionsDropdown } from '@/components/search/search-suggestions-dropdown'
+import { ExplorerFilterCard } from '@/components/explorer/explorer-filter-controls'
+import { useExplorerFilters } from '@/components/explorer/explorer-filter-context'
 
 export function SidebarRight() {
   const t = useT()
   const pathname = usePathname()
   const { isVisitor } = useAuthGate()
+  const searchParams = useSearchParams()
   const router = useRouter()
   const [trends, setTrends] = useState<HashtagTrend[]>([])
   const [query, setQuery] = useState('')
   const [searchFocused, setSearchFocused] = useState(false)
   const [history, setHistory] = useState<SuggestionHistoryEntry[]>([])
   const historyOwnerId = currentUserId()
+  const {
+    showPublications,
+    showUsers,
+    submittedSearchActive,
+    togglePublications,
+    toggleUsers,
+  } = useExplorerFilters()
+  const showExplorerFilters =
+    pathname === ROUTES.explorer &&
+    submittedSearchActive &&
+    Boolean(searchParams.get('q')?.trim())
 
   useEffect(() => {
     let cancelled = false
@@ -101,6 +116,15 @@ export function SidebarRight() {
           onRemoveHistory={removeRecentSearch}
         />
       </form>
+
+      {showExplorerFilters && (
+        <ExplorerFilterCard
+          showPublications={showPublications}
+          showUsers={showUsers}
+          onTogglePublications={togglePublications}
+          onToggleUsers={toggleUsers}
+        />
+      )}
 
       {/* Tendances */}
       <div className="glass overflow-hidden rounded-[24px] border backdrop-blur-xl">

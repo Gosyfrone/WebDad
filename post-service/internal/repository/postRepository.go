@@ -57,6 +57,11 @@ func withHashtag(filter bson.M, hashtag string) bson.M {
 	return filter
 }
 
+func withAnyHashtag(filter bson.M) bson.M {
+	filter["hashtags"] = bson.M{"$exists": true, "$ne": bson.A{}}
+	return filter
+}
+
 // Create insère le post et renseigne post.ID avec l'identifiant généré.
 func (r *PostRepository) Create(ctx context.Context, post *models.Post) error {
 	res, err := r.posts.InsertOne(ctx, post)
@@ -78,6 +83,12 @@ func (r *PostRepository) GetAll(ctx context.Context, limit, skip int64) ([]model
 // GetAllByHashtag renvoie le fil global limité aux posts contenant ce hashtag.
 func (r *PostRepository) GetAllByHashtag(ctx context.Context, hashtag, sortMode string, limit, skip int64) ([]models.Post, error) {
 	return r.findSorted(ctx, withHashtag(notHidden(), hashtag), sortMode, limit, skip)
+}
+
+// GetAllWithHashtags renvoie le fil global limité aux posts contenant au moins
+// un hashtag.
+func (r *PostRepository) GetAllWithHashtags(ctx context.Context, limit, skip int64) ([]models.Post, error) {
+	return r.find(ctx, withAnyHashtag(notHidden()), limit, skip)
 }
 
 // GetByProfile renvoie les posts d'un auteur, triés du plus récent au plus ancien.

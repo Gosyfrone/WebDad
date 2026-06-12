@@ -74,6 +74,7 @@ func (h *PostHandler) CreatePost(c *gin.Context) {
 // @Param       author_id  query string false "Fil d'un auteur"
 // @Param       author_ids query string false "Fil abonnements (IDs séparés par virgule)"
 // @Param       hashtag    query string false "Filtrer par hashtag (avec ou sans #)"
+// @Param       hashtag_any query bool false "Filtrer les posts contenant au moins un hashtag"
 // @Param       sort       query string false "Tri des résultats hashtag: recent ou top (top = likes puis reposts)"
 // @Param       limit      query int    false "Nb résultats"
 // @Param       offset     query int    false "Décalage"
@@ -90,6 +91,7 @@ func (h *PostHandler) ListPosts(c *gin.Context) {
 		viewerID = claims.UserID
 	}
 	hashtag := c.Query("hashtag")
+	hashtagAny := strings.EqualFold(c.Query("hashtag_any"), "true")
 	sortMode := c.Query("sort")
 	switch {
 	case c.Query("author_ids") != "":
@@ -97,7 +99,7 @@ func (h *PostHandler) ListPosts(c *gin.Context) {
 	case c.Query("author_id") != "":
 		posts, err = h.service.GetByProfile(c.Request.Context(), c.Query("author_id"), viewerID, hashtag, pageLimit(c), pageOffset(c))
 	default:
-		posts, err = h.service.GetPosts(c.Request.Context(), viewerID, hashtag, sortMode, pageLimit(c), pageOffset(c))
+		posts, err = h.service.GetPosts(c.Request.Context(), viewerID, hashtag, sortMode, hashtagAny, pageLimit(c), pageOffset(c))
 	}
 	if err != nil {
 		respondPostError(c, err)

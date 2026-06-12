@@ -1408,6 +1408,10 @@ paths:
         description: 'Filtrer par hashtag (avec ou sans #)'
         name: hashtag
         in: query
+      - type: boolean
+        description: Filtrer les posts contenant au moins un hashtag
+        name: hashtag_any
+        in: query
       - type: string
         description: 'Tri des résultats hashtag: recent ou top (top = likes puis reposts)'
         name: sort

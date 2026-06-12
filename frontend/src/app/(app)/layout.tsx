@@ -7,6 +7,7 @@ import { NotificationsProvider } from '@/components/notifications-provider'
 import { MessagesProvider } from '@/components/messages-provider'
 import { AuthPromptProvider } from '@/components/auth-prompt-provider'
 import { OnboardingGate } from '@/components/onboarding/onboarding-gate'
+import { ExplorerFilterProvider } from '@/components/explorer/explorer-filter-context'
 
 /**
  * Layout de l'espace authentifié, responsive (mobile-first).
@@ -24,32 +25,34 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     <AuthPromptProvider>
       <NotificationsProvider>
         <MessagesProvider>
-          <div className="bg-page relative flex min-h-screen justify-center overflow-x-clip">
-            <div className="bg-page-glow-1 pointer-events-none fixed inset-0" />
-            <div className="bg-page-glow-2 pointer-events-none fixed inset-0" />
+          <ExplorerFilterProvider>
+            <div className="bg-page relative flex min-h-screen justify-center overflow-x-clip">
+              <div className="bg-page-glow-1 pointer-events-none fixed inset-0" />
+              <div className="bg-page-glow-2 pointer-events-none fixed inset-0" />
 
-            <div className="relative flex w-full max-w-[1265px]">
-              <SidebarLeft />
+              <div className="relative flex w-full max-w-[1265px]">
+                <SidebarLeft />
 
-              {/* Colonne centrale. overflow-x-clip : empêche tout défilement horizontal
-                  parasite sur mobile (sans créer de conteneur de scroll, donc sans
-                  casser les en-têtes sticky, contrairement à overflow-x-hidden). */}
-              <div className="glass-column flex min-h-screen w-full min-w-0 flex-1 flex-col overflow-x-clip backdrop-blur-2xl lg:border-x">
-                <MobileHeader />
-                {/* pb-16 : dégage la barre d'onglets fixe (masquée ≥ lg) */}
-                <main className="flex-1 pb-16 lg:pb-0">{children}</main>
+                {/* Colonne centrale. overflow-x-clip : empêche tout défilement horizontal
+                    parasite sur mobile (sans créer de conteneur de scroll, donc sans
+                    casser les en-têtes sticky, contrairement à overflow-x-hidden). */}
+                <div className="glass-column flex min-h-screen w-full min-w-0 flex-1 flex-col overflow-x-clip backdrop-blur-2xl lg:border-x">
+                  <MobileHeader />
+                  {/* pb-16 : dégage la barre d'onglets fixe (masquée ≥ lg) */}
+                  <main className="flex-1 pb-16 lg:pb-0">{children}</main>
+                </div>
+
+                <SidebarRight />
               </div>
 
-              <SidebarRight />
+              {/* Chrome mobile (masqué ≥ lg) */}
+              <MobileTabBar />
+              <ComposeFab />
+
+              {/* Onboarding bloquant pour les comptes OAuth sans profil (cf. composant). */}
+              <OnboardingGate />
             </div>
-
-            {/* Chrome mobile (masqué ≥ lg) */}
-            <MobileTabBar />
-            <ComposeFab />
-
-            {/* Onboarding bloquant pour les comptes OAuth sans profil (cf. composant). */}
-            <OnboardingGate />
-          </div>
+          </ExplorerFilterProvider>
         </MessagesProvider>
       </NotificationsProvider>
     </AuthPromptProvider>

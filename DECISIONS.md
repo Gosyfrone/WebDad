@@ -160,6 +160,10 @@
   dropdown; the same visibility filtering applies before counting, so suggestions do not leak private authors.
   The right-column search stores only clicked suggestion metadata in localStorage per user (`breezy-suggestion-history`)
   because it is cosmetic UX state, not a domain datum worth a backend service.
+  Composer hashtag autocomplete also reuses `/posts/trends?q=...` instead of adding a separate endpoint: suggestions
+  are derived from already-visible trend data, while post-service remains the single extractor/normalizer on submit.
+  Explorer's "posts with hashtags" uses `GET /posts?hashtag_any=true` rather than client-side filtering, preserving
+  the server-side visibility barrier and avoiding downloading arbitrary global-feed pages just to discard non-hashtag posts.
 - **Bookmarks = collections (many-to-many) + non-deletable default collection + burst model.** Bookmarks reference a
   post → same service as likes/reposts. Many-to-many because a post can be filed in several collections. **Burst model**
   (Instagram "save"): a short click within `BOOKMARK_SESSION_WINDOW` auto-files into the last collection (`filed`),
