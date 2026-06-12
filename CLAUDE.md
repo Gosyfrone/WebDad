@@ -8,9 +8,9 @@
 > - **[CHANGELOG.md](CHANGELOG.md)** — session work log · **[CHANGELOG_ARCHIVE.md](CHANGELOG_ARCHIVE.md)** — resolved issues / debugging history.
 > - **[PROMPTING.md](PROMPTING.md)** — token-efficient workflow + prompt templates (read on demand, NOT auto-loaded; user may say *"from PROMPTING.md, write me the prompt for: …"*).
 > - Knowledge graph in `graphify-out/` — query it before reading source (see Operating Rules).
-> - Latest session note: 12/06/2026 — Explorer search filters moved to the right sidebar on desktop and a mobile three-dots filter menu; details in `CHANGELOG.md`.
+> - Latest session note: 12/06/2026 — feed right-sidebar `Qui suivre` now shows full display names in compact mode; details in `CHANGELOG.md`.
 
-*Last Codex sync: 12/06/2026 — Explorer right-sidebar/mobile filter follow-up implemented and documented.*
+*Last Codex sync: 12/06/2026 — full display-name visibility in feed right-sidebar Who-to-follow implemented and documented.*
 
 ---
 
@@ -190,6 +190,12 @@ several well-chosen secondary features · **all 3 roles functional** · pro slid
 - 2026-06-12: pending validation for Explorer filter placement correction: desktop should render the whole Publications/Utilisateurs filter block in the right sidebar above the Top 5 trends block; mobile should hide it behind a three-dots control with a "Filtrer" menu/dialog exposing the same two checkbox filters.
 
 - 2026-06-12: Explorer right-sidebar/mobile filter correction implemented after validation. Desktop filter block moved to the right sidebar above the Top 5 trends via a shared Explorer filter context; mobile now uses a three-dots dropdown with "Filtrer" and the same Publications/Utilisateurs checkboxes. No backend/Swagger change required. Vérif: frontend `npm run build` OK. Post-build cleanup of generated `frontend/.next`, frontend restart, runtime asset checks, and `graphify update .` could not run on this pass because the approval layer rejected the escalated command due to usage limits.
+- 2026-06-12: user rule reinforced: reread `CLAUDE.md` before each response and keep it updated after responses/work. Right-sidebar feed correction implemented after validation: sidebar now uses dynamic viewport height with internal scroll and safe bottom padding; Trends Top 5 items are compact grid rows; Who-to-follow uses compact rows so 3 suggestions fit at zoom and the initial trio stays stable after clicking Follow, with the button label `Suivi`. Front-only; no backend route/handler change, so Swagger not required. Vérif: frontend `npm run build` OK. Suggested commit message: `fix(feed): stabiliser la sidebar droite au zoom`.
+- 2026-06-12: regression follow-up on the previous sidebar change: compact styling is now scoped back to the right sidebar only, restoring the default shared `UserListItem` layout outside `Qui suivre`; sidebar keeps vertical scroll and the stable `Suivi` button. Front-only; no backend route/handler change, so Swagger not required. Vérif: frontend `npm run build` OK. Suggested commit message: `fix(feed): corriger la regression CSS de la sidebar`.
+- 2026-06-12: pending validation for the next UI follow-up: make the two right-sidebar cards truly responsive in their internal layout and align Explorer trend rows with feed trend rows by moving the post count to the far right on the main hashtag line. Planned scope is frontend-only; no backend route/handler change, so no Swagger expected.
+- 2026-06-12: responsive right-sidebar cards and Explorer trend alignment implemented after validation. Feed right sidebar now uses a more adaptive width, trend rows keep the post count on the far right, and `Qui suivre` stabilizes the follow button width in compact mode. Explorer trend rows now match the feed layout with rank above, hashtag left, and post count right. Front-only; no backend route/handler change, so no Swagger required. Vérif: frontend `npm run build` OK. Suggested commit message: `fix(explorer): aligner les tendances et rendre la sidebar responsive`.
+- 2026-06-12: pending validation for the next UI follow-up: in feed right-sidebar `Qui suivre`, show the full `displayName` instead of truncating it to one line, while keeping the follow button fixed on the right and avoiding layout regressions. Planned scope is frontend-only; no backend route/handler change, so no Swagger expected.
+- 2026-06-12: full display-name visibility in feed right-sidebar `Qui suivre` implemented after validation. Compact mode no longer truncates the `displayName` to one line; it can wrap on up to 2 lines while keeping the follow button fixed on the right. Front-only; no backend route/handler change, so no Swagger required. Vérif: frontend `npm run build` OK. Suggested commit message: `fix(feed): afficher le nom complet dans qui suivre`.
 
 ---
 
