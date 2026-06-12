@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"time"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
@@ -31,7 +32,38 @@ func EnsureSchema(ctx context.Context, db *mongo.Database) error {
 	if err := ensureIndexes(ctx, db); err != nil {
 		return err
 	}
+	if err := normalizeLegacyProfiles(ctx, db); err != nil {
+		return err
+	}
 	return ensureSeed(ctx, db)
+}
+
+// normalizeLegacyProfiles répare les documents antérieurs au schéma courant.
+// Les profils créés avant l'ajout de `visibility` (cf. PR #204) portent une
+// chaîne vide (ou aucune valeur) pour ce champ, qui viole l'enum
+// {public, private} du validateur. Comme Mongo revalide le document ENTIER à
+// chaque écriture (validationLevel strict), ces profils ne peuvent plus être
+// édités du tout (toute mise à jour → DocumentValidationFailure → 500). On les
+// remet à `public` (défaut métier, cf. models.VisibilityPublic) de façon
+// idempotente au démarrage : le service possède son schéma et maintient aussi
+// la conformité de ses données (même esprit que dropLegacyIndexes / collMod).
+// bypassDocumentValidation car le filtre cible justement des docs non conformes.
+func normalizeLegacyProfiles(ctx context.Context, db *mongo.Database) error {
+	filter := bson.M{"$or": bson.A{
+		bson.M{"visibility": ""},
+		bson.M{"visibility": bson.M{"$exists": false}},
+	}}
+	update := bson.M{"$set": bson.M{"visibility": "public"}}
+	res, err := db.Collection("profiles").UpdateMany(
+		ctx, filter, update, options.UpdateMany().SetBypassDocumentValidation(true),
+	)
+	if err != nil {
+		return fmt.Errorf("normalisation visibility legacy : %w", err)
+	}
+	if res.ModifiedCount > 0 {
+		log.Printf("[profil] normalisation legacy : %d profil(s) sans visibility remis à public", res.ModifiedCount)
+	}
+	return nil
 }
 
 // ensureCollections crée les collections manquantes avec leur validateur, et

@@ -6,7 +6,10 @@ RUN apk add --no-cache git ca-certificates tzdata
 WORKDIR /app
 
 COPY go.mod go.sum ./
-RUN go mod download
+# proxy.golang.org est parfois instable en HTTP/2 (stream error / INTERNAL_ERROR
+# received from peer) : on force HTTP/1.1 et on réessaie jusqu'à 5 fois.
+ENV GODEBUG=http2client=0
+RUN n=0; until go mod download; do n=$((n+1)); [ "$n" -ge 5 ] && exit 1; echo "go mod download: retry $n"; sleep 5; done
 
 COPY . .
 
