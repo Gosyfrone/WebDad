@@ -517,6 +517,22 @@ export const messages: Record<Locale, Messages> = {
     'auth.register.err.confirm_mismatch': 'Les mots de passe ne correspondent pas.',
     'auth.register.err.failed': "L'inscription a échoué. Vérifie les informations saisies.",
 
+    // — Onboarding (finalisation des comptes OAuth sans profil) —
+    'onboarding.title': 'Bienvenue sur Breezy 👋',
+    'onboarding.subtitle':
+      "Choisis ton nom d'utilisateur et indique ta date de naissance pour finaliser ton compte.",
+    'onboarding.username_label': "Nom d'utilisateur",
+    'onboarding.username_placeholder': 'ex. felipe',
+    'onboarding.username_hint': '3 à 24 caractères : lettres, chiffres et tiret bas (_).',
+    'onboarding.username_checking': 'Vérification de la disponibilité…',
+    'onboarding.username_available': 'Disponible ✓',
+    'onboarding.birthdate_label': 'Date de naissance',
+    'onboarding.birthdate_disclaimer':
+      "En dessous de 18 ans, les contenus sensibles (NSFW) seront masqués. La date de naissance n'est pas modifiable après validation.",
+    'onboarding.submit': 'Valider et continuer',
+    'onboarding.submitting': 'Enregistrement…',
+    'onboarding.err.generic': 'Une erreur est survenue. Réessaie dans un instant.',
+
     // — Vérification d'e-mail —
     'auth.check_email.title': 'Vérifie ta boîte mail',
     'auth.check_email.subtitle':
@@ -1175,6 +1191,22 @@ export const messages: Record<Locale, Messages> = {
     'auth.register.err.confirm_max': 'The confirmation is limited to 250 characters.',
     'auth.register.err.confirm_mismatch': "Passwords don't match.",
     'auth.register.err.failed': 'Sign-up failed. Check the information entered.',
+
+    // — Onboarding (finalize OAuth accounts without a profile) —
+    'onboarding.title': 'Welcome to Breezy 👋',
+    'onboarding.subtitle':
+      'Pick your username and enter your date of birth to finish setting up your account.',
+    'onboarding.username_label': 'Username',
+    'onboarding.username_placeholder': 'e.g. felipe',
+    'onboarding.username_hint': '3 to 24 characters: letters, numbers and underscore (_).',
+    'onboarding.username_checking': 'Checking availability…',
+    'onboarding.username_available': 'Available ✓',
+    'onboarding.birthdate_label': 'Date of birth',
+    'onboarding.birthdate_disclaimer':
+      "Under 18, sensitive (NSFW) content will be hidden. Your date of birth can't be changed after confirmation.",
+    'onboarding.submit': 'Confirm and continue',
+    'onboarding.submitting': 'Saving…',
+    'onboarding.err.generic': 'Something went wrong. Try again in a moment.',
 
     // — Email verification —
     'auth.check_email.title': 'Check your inbox',

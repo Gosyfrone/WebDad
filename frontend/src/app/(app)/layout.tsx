@@ -5,6 +5,7 @@ import { MobileTabBar } from '@/components/layout/mobile-tab-bar'
 import { ComposeFab } from '@/components/layout/compose-fab'
 import { NotificationsProvider } from '@/components/notifications-provider'
 import { MessagesProvider } from '@/components/messages-provider'
+import { OnboardingGate } from '@/components/onboarding/onboarding-gate'
 
 /**
  * Layout de l'espace authentifié, responsive (mobile-first).
@@ -43,6 +44,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           {/* Chrome mobile (masqué ≥ lg) */}
           <MobileTabBar />
           <ComposeFab />
+
+          {/* Onboarding bloquant pour les comptes OAuth sans profil (cf. composant). */}
+          <OnboardingGate />
         </div>
       </MessagesProvider>
     </NotificationsProvider>
