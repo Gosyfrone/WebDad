@@ -181,17 +181,23 @@ async function toAppNotification(api: ApiNotification): Promise<AppNotification>
   return buildNotification(api, await resolveActor(api.last_actor_id))
 }
 
-/** Lien de navigation d'une notification : la conversation (mention en message)
- *  ou le post concerné. */
+/** Lien de navigation d'une notification : la conversation (mention en message),
+ *  le commentaire ciblé (réponse/commentaire) ou le post concerné. */
 export function notificationHref(n: {
   type: NotificationType
   postId: string
+  commentId: string
   conversationId: string
 }): string {
   if (n.type === 'message_mention') {
     return n.conversationId ? `/messages?conv=${encodeURIComponent(n.conversationId)}` : '/messages'
   }
-  return n.postId ? `/posts/${n.postId}` : '/feed'
+  if (!n.postId) return '/feed'
+  // Commentaire/réponse : on cible directement le commentaire dans le thread.
+  if ((n.type === 'comment' || n.type === 'reply') && n.commentId) {
+    return `/posts/${n.postId}?comment=${encodeURIComponent(n.commentId)}`
+  }
+  return `/posts/${n.postId}`
 }
 
 // --- API REST ----------------------------------------------------------------

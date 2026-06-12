@@ -3838,6 +3838,8 @@ definitions:
         type: array
         items:
           $ref: '#/definitions/models.MediaRef'
+      parent_comment:
+        $ref: '#/definitions/models.Comment'
       parent_id:
         type: string
       parent_post:

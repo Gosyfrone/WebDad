@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 
 import { ROUTES } from '@/lib/routes'
@@ -17,6 +17,8 @@ import { PostCard } from '@/components/feed/post-card'
 export function PostDetail({ id }: { id: string }) {
   const t = useT()
   const router = useRouter()
+  // Cible optionnelle d'un commentaire précis (lien depuis une notification).
+  const focusCommentId = useSearchParams().get('comment') ?? undefined
   const [post, setPost] = useState<FeedPost | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -53,7 +55,13 @@ export function PostDetail({ id }: { id: string }) {
       {loading ? (
         <p className="px-4 py-10 text-center text-muted-foreground">{t('common.loading')}</p>
       ) : post ? (
-        <PostCard post={post} onDeleted={() => router.push(ROUTES.feed)} />
+        <PostCard
+          post={post}
+          focusCommentId={focusCommentId}
+          defaultShowComments
+          noNavigate
+          onDeleted={() => router.push(ROUTES.feed)}
+        />
       ) : (
         <p className="px-4 py-10 text-center text-muted-foreground">{t('post.not_found')}</p>
       )}

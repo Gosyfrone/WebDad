@@ -57,6 +57,7 @@ interface ApiComment {
 
 interface ApiCommentWithPost extends ApiComment {
   parent_post?: ApiPost
+  parent_comment?: ApiComment
 }
 
 interface ApiUser {
@@ -132,6 +133,11 @@ export interface ReplyContext {
   parentPostId: string
   /** Auteur du post parent (pour le libellé « En réponse à @X »). */
   parentPostAuthor: PostAuthor
+  /** Post parent complet (rendu au-dessus de la réponse). `null` si supprimé/inaccessible. */
+  parentPost: FeedPost | null
+  /** Commentaire parent, uniquement si la réponse répond à un autre commentaire
+   *  (post → commentaire parent → réponse). `null` sinon. */
+  parentComment: PostComment | null
 }
 
 /** Commentaire enrichi pour l'affichage. */
@@ -575,13 +581,24 @@ export async function listCommentsByAuthor(
     avatarUrl: '',
     visibility: 'public',
   }
+  // États (liké/reposté/signé) de l'utilisateur courant, récupérés une seule
+  // fois pour enrichir tous les posts parents.
+  const [likedIds, repostedIds, bookmarkedIds] = await Promise.all([
+    getLikedIds(),
+    getRepostedIds(),
+    getBookmarkedIds(),
+  ])
   return Promise.all(
     raw.map(async (item) => {
       const comment = await toComment(item)
+      const parentPost = item.parent_post
+        ? await toFeedPost(item.parent_post, likedIds, repostedIds, bookmarkedIds)
+        : null
       const parentPostAuthor = item.parent_post
         ? await resolveAuthor(item.parent_post.author_id)
         : fallbackAuthor
-      return { comment, parentPostId: item.post_id, parentPostAuthor }
+      const parentComment = item.parent_comment ? await toComment(item.parent_comment) : null
+      return { comment, parentPostId: item.post_id, parentPostAuthor, parentPost, parentComment }
     }),
   )
 }

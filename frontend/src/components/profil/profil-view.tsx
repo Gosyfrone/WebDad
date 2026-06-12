@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { ArrowLeft, FileText, Loader2, Lock, MessageCircle, ShieldAlert } from 'lucide-react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 
 import { cn } from '@/lib/utils'
 import { ROUTES, postHref } from '@/lib/routes'
@@ -27,6 +28,7 @@ import { useToast } from '@/hooks/use-toast'
 import type { ProfilDetails, ProfilEditableFields } from '@/types'
 import { useT } from '@/components/language-provider'
 import { PostCard } from '@/components/feed/post-card'
+import { CommentRow } from '@/components/feed/comment-section'
 import { ProfilHeader } from '@/components/profil/profil-header'
 
 type ProfilTab = 'posts' | 'replies' | 'likes'
@@ -451,40 +453,60 @@ function TabButton({
   )
 }
 
+/**
+ * Onglet « Réponses » (façon Twitter) : le post parent complet et interactif en
+ * haut, puis une carte encadrée façon feed contenant — si la réponse répond à un
+ * autre commentaire — le commentaire parent, et enfin la réponse de
+ * l'utilisateur (avatar + identité + contenu via `CommentRow`). Cliquer la carte
+ * ouvre le thread et défile directement sur le commentaire.
+ */
 function ReplyCard({ reply }: { reply: ReplyContext }) {
   const t = useT()
-  const { comment, parentPostId, parentPostAuthor } = reply
+  const router = useRouter()
+  const { comment, parentPostId, parentPostAuthor, parentPost, parentComment } = reply
+  // On répond au commentaire parent s'il existe, sinon au post.
+  const replyTarget = parentComment?.author.username || parentPostAuthor.username || '…'
+  const href = `${postHref(parentPostId)}?comment=${encodeURIComponent(comment.id)}`
   return (
-    <Link
-      href={postHref(parentPostId)}
-      className="block px-4 py-3 hover:bg-accent/50 transition-colors"
-    >
-      <p className="mb-1 flex items-center gap-1 text-xs text-muted-foreground">
-        <MessageCircle className="h-3 w-3" aria-hidden />
-        {t('profil.replies_in_reply_to', { username: parentPostAuthor.username || '…' })}
-      </p>
-      <p className="text-sm">{comment.content}</p>
-      {comment.media.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-1">
-          {comment.media.map((m, i) =>
-            m.type === 'image' ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                key={i}
-                src={m.url}
-                alt=""
-                className="h-20 w-20 rounded-lg object-cover"
-              />
-            ) : (
-              <video key={i} src={m.url} className="h-20 w-20 rounded-lg object-cover" muted />
-            ),
-          )}
-        </div>
+    <div className="flex flex-col">
+      {parentPost ? (
+        <PostCard
+          post={parentPost}
+          embedded
+          onDeleted={() => {}}
+          onUpdated={() => {}}
+          onCommentClick={() => router.push(postHref(parentPostId))}
+        />
+      ) : (
+        <p className="flex items-center gap-1 px-4 pt-3 text-sm text-muted-foreground">
+          <MessageCircle className="h-3.5 w-3.5" aria-hidden />
+          {t('profil.replies_deleted_parent')}
+        </p>
       )}
-      <p className="mt-1 text-xs text-muted-foreground">
-        {new Date(comment.createdAt).toLocaleDateString()}
-      </p>
-    </Link>
+
+      {/* Carte encadrée façon feed : commentaire parent (optionnel) + réponse. */}
+      <div
+        role="link"
+        tabIndex={0}
+        onClick={() => router.push(href)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') router.push(href)
+        }}
+        className="mx-3 mb-3 cursor-pointer rounded-2xl border border-border/70 bg-card/70 p-3 shadow-sm transition-colors hover:bg-card/90"
+      >
+        <p className="mb-2 flex items-center gap-1 text-xs text-muted-foreground">
+          <MessageCircle className="h-3 w-3" aria-hidden />
+          {t('profil.replies_in_reply_to', { username: replyTarget })}
+        </p>
+
+        {parentComment && (
+          <CommentRow comment={parentComment} />
+        )}
+        <div className={parentComment ? 'ml-5 border-l border-border pl-3 pt-2' : ''}>
+          <CommentRow comment={comment} />
+        </div>
+      </div>
+    </div>
   )
 }
 

@@ -88,9 +88,13 @@ type Comment struct {
 
 // CommentWithPost enrichit un Comment du post parent visible (hydraté par la
 // couche service) pour l'onglet « Réponses » du profil. Jamais persisté.
+// `ParentComment` n'est renseigné que si le commentaire est lui-même une réponse
+// (ParentID non vide) : le front affiche alors post → commentaire parent →
+// réponse.
 type CommentWithPost struct {
 	Comment
-	ParentPost *Post `bson:"-" json:"parent_post,omitempty"`
+	ParentPost    *Post    `bson:"-" json:"parent_post,omitempty"`
+	ParentComment *Comment `bson:"-" json:"parent_comment,omitempty"`
 }
 
 // MediaRef : pièce jointe d'un post (image ou vidéo). Le post-service est

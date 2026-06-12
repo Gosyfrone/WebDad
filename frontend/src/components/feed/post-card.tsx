@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   BarChart2,
   Bookmark,
@@ -63,10 +64,23 @@ interface PostCardProps {
   post: FeedPost
   /** Affiche le badge public "Épinglé" (profil uniquement). */
   showPinBadge?: boolean
+  /** Commentaire à mettre en avant (lien depuis une notification) : ouvre la
+   *  section commentaires et y défile + surligne le commentaire ciblé. */
+  focusCommentId?: string
+  /** Rendu « intégré » (sans carte flottante : ni glass/ombre, ni marges, ni
+   *  effet de survol). Utilisé quand le post est imbriqué dans une vue
+   *  conversation (onglet Réponses). */
+  embedded?: boolean
   /** Appelé après une suppression réussie (le parent retire le post du fil). */
   onDeleted?: (id: string) => void
   /** Appelé après une mise à jour réussie (pin/unpin, etc.). */
   onUpdated?: (post: FeedPost) => void
+  /** Ouvre les commentaires par défaut sans interaction (page détail). */
+  defaultShowComments?: boolean
+  /** Remplace le toggle inline des commentaires (ex : navigate depuis la page réponses). */
+  onCommentClick?: () => void
+  /** Désactive le clic de navigation vers la page détail (page détail elle-même). */
+  noNavigate?: boolean
 }
 
 /**
@@ -76,7 +90,8 @@ interface PostCardProps {
  * Like et suppression sont câblés sur le post-service (optimistes + rollback).
  * Repost simple et citation sont câblés sur le post-service.
  */
-export function PostCard({ post, showPinBadge = false, onDeleted, onUpdated }: PostCardProps) {
+export function PostCard({ post, showPinBadge = false, focusCommentId, embedded = false, onDeleted, onUpdated, defaultShowComments = false, onCommentClick, noNavigate = false }: PostCardProps) {
+  const router = useRouter()
   const { toast } = useToast()
   const { isVisitor, promptLogin, requireAuth } = useAuthGate()
   const { t, locale } = useLanguage()
@@ -87,7 +102,7 @@ export function PostCard({ post, showPinBadge = false, onDeleted, onUpdated }: P
   const [isPinned, setIsPinned] = useState(post.isPinned)
   const [pinning, setPinning] = useState(false)
   const [likeBurst, setLikeBurst] = useState(0)
-  const [showComments, setShowComments] = useState(false)
+  const [showComments, setShowComments] = useState(Boolean(focusCommentId) || defaultShowComments)
   const [deleting, setDeleting] = useState(false)
   // Index du média ouvert en vue photo plein écran (null = fermé).
   const [photoIndex, setPhotoIndex] = useState<number | null>(null)
@@ -258,6 +273,12 @@ export function PostCard({ post, showPinBadge = false, onDeleted, onUpdated }: P
     }
   }
 
+  function handleCardClick(e: React.MouseEvent) {
+    const target = e.target as HTMLElement
+    if (target.closest('button, a, [role="button"], [data-no-nav]')) return
+    router.push(`/posts/${post.id}`)
+  }
+
   function handleBookmarkClick() {
     // Un appui long a déjà ouvert le sélecteur → on n'enchaîne pas le clic court.
     if (longPress.current) {
@@ -273,8 +294,18 @@ export function PostCard({ post, showPinBadge = false, onDeleted, onUpdated }: P
   }
 
   return (
-    <article className="glass mx-3 my-3 flex gap-3 rounded-[24px] border px-4 py-3 backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-white/85 hover:shadow-[0_20px_56px_rgba(91,108,255,0.16)] dark:hover:bg-[#1f1633]/80">
-      <ProfilLink author={post.author} className="mt-0.5 shrink-0 transition hover:opacity-90">
+    <article
+      onClick={noNavigate ? undefined : handleCardClick}
+      className={cn(
+        'flex gap-3 px-4 py-3',
+        !noNavigate && 'cursor-pointer',
+        embedded
+          ? // Intégré (vue conversation) : pas de carte flottante ni d'ombre.
+            'bg-transparent'
+          : 'glass mx-3 my-3 rounded-[24px] border backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-white/85 hover:shadow-[0_20px_56px_rgba(91,108,255,0.16)] dark:hover:bg-[#1f1633]/80',
+      )}
+    >
+      <ProfilLink author={post.author} className="mt-0.5 shrink-0 self-start transition hover:opacity-90">
         <Avatar className="h-10 w-10">
           {post.author.avatarUrl && <AvatarImage src={post.author.avatarUrl} alt="" />}
           <AvatarFallback className="bg-gradient-to-br from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] font-bold text-white">
@@ -385,7 +416,7 @@ export function PostCard({ post, showPinBadge = false, onDeleted, onUpdated }: P
             count={commentCount}
             label={t('post.comment')}
             active={showComments}
-            onClick={() => setShowComments((v) => !v)}
+            onClick={onCommentClick ?? (() => setShowComments((v) => !v))}
             className="hover:text-primary hover:bg-primary/10"
             activeClassName="text-primary"
           />
@@ -482,10 +513,13 @@ export function PostCard({ post, showPinBadge = false, onDeleted, onUpdated }: P
 
         {/* Commentaires (repliable) */}
         {showComments && (
-          <CommentSection
-            postId={post.id}
-            onCountChange={(delta) => setCommentCount((n) => Math.max(0, n + delta))}
-          />
+          <div data-no-nav>
+            <CommentSection
+              postId={post.id}
+              focusCommentId={focusCommentId}
+              onCountChange={(delta) => setCommentCount((n) => Math.max(0, n + delta))}
+            />
+          </div>
         )}
 
         <Dialog open={quoteOpen} onOpenChange={setQuoteOpen}>
@@ -613,11 +647,21 @@ function MediaGallery({
 
 function QuotedPost({ post }: { post: FeedPost }) {
   const { t } = useLanguage()
+  const router = useRouter()
   const showPrivateBadge =
     post.author.visibility === 'private' && post.author.id !== currentUserId()
 
+  function handleClick(e: React.MouseEvent) {
+    if ((e.target as HTMLElement).closest('a, button, [role="button"]')) return
+    e.stopPropagation()
+    router.push(`/posts/${post.id}`)
+  }
+
   return (
-    <div className="mt-3 rounded-xl border border-border bg-background/45 px-3 py-2">
+    <div
+      onClick={handleClick}
+      className="mt-3 cursor-pointer rounded-xl border border-border bg-background/45 px-3 py-2 transition-colors hover:bg-background/70"
+    >
       <div className="mb-1 flex min-w-0 items-center gap-1.5 text-xs">
         <ProfilLink author={post.author} className="truncate font-bold text-foreground hover:underline">
           {post.author.displayName}

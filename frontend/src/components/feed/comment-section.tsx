@@ -40,6 +40,9 @@ function mergeUnique(current: PostComment[], incoming: PostComment[]): PostComme
 
 interface CommentSectionProps {
   postId: string
+  /** Commentaire à mettre en avant (deep-link notification) : défilement +
+   *  surbrillance, et auto-dépliage du thread si c'est une réponse imbriquée. */
+  focusCommentId?: string
   /** Notifie le parent d'une variation du nombre de commentaires (+1 / -N). */
   onCountChange?: (delta: number) => void
 }
@@ -49,12 +52,14 @@ interface CommentSectionProps {
  * commentaires racine (« Voir plus de commentaires »). Chaque commentaire gère
  * ses propres réponses (threading à 2 niveaux, cf. CommentThread).
  */
-export function CommentSection({ postId, onCountChange }: CommentSectionProps) {
+export function CommentSection({ postId, focusCommentId, onCountChange }: CommentSectionProps) {
   const { toast } = useToast()
   const { t } = useLanguage()
   const { isVisitor, promptLogin } = useAuthGate()
   const [comments, setComments] = useState<PostComment[]>([])
   const [loading, setLoading] = useState(true)
+  // Id du commentaire actuellement surligné (deep-link notification).
+  const [highlightId, setHighlightId] = useState('')
   const [error, setError] = useState('')
   const [hasMore, setHasMore] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -114,6 +119,34 @@ export function CommentSection({ postId, onCountChange }: CommentSectionProps) {
     hasMore,
     loading: loading || loadingMore,
   })
+
+  // Deep-link notification : une fois les commentaires racine chargés, on tente
+  // de défiler vers le commentaire ciblé et de le surligner. On réessaie (~4s)
+  // car un thread imbriqué peut s'auto-déplier de façon asynchrone.
+  useEffect(() => {
+    if (!focusCommentId || loading) return
+    let cancelled = false
+    let attempts = 0
+    let clearTimer: ReturnType<typeof setTimeout> | undefined
+    const tryFocus = () => {
+      if (cancelled) return
+      const el = document.getElementById(`comment-${focusCommentId}`)
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        setHighlightId(focusCommentId)
+        clearTimer = setTimeout(() => {
+          if (!cancelled) setHighlightId('')
+        }, 2400)
+        return
+      }
+      if (attempts++ < 20) setTimeout(tryFocus, 200)
+    }
+    tryFocus()
+    return () => {
+      cancelled = true
+      if (clearTimer) clearTimeout(clearTimer)
+    }
+  }, [focusCommentId, loading])
 
   async function handleSubmit() {
     if (!canSubmit) return
@@ -282,6 +315,8 @@ export function CommentSection({ postId, onCountChange }: CommentSectionProps) {
                 key={c.id}
                 postId={postId}
                 comment={c}
+                focusCommentId={focusCommentId}
+                highlightId={highlightId}
                 onRemove={handleRemoveRoot}
                 onCountChange={onCountChange}
               />
@@ -304,6 +339,10 @@ export function CommentSection({ postId, onCountChange }: CommentSectionProps) {
 interface CommentThreadProps {
   postId: string
   comment: PostComment
+  /** Commentaire ciblé par un deep-link (auto-dépliage si c'est une réponse). */
+  focusCommentId?: string
+  /** Commentaire actuellement surligné. */
+  highlightId?: string
   onRemove: (id: string) => void
   onCountChange?: (delta: number) => void
 }
@@ -312,7 +351,7 @@ interface CommentThreadProps {
  * Un commentaire racine + ses réponses (repliées par défaut, indentées).
  * Réponses paginées (« Voir plus de réponses ») ; composer de réponse inline.
  */
-function CommentThread({ postId, comment, onRemove, onCountChange }: CommentThreadProps) {
+function CommentThread({ postId, comment, focusCommentId, highlightId, onRemove, onCountChange }: CommentThreadProps) {
   const { toast } = useToast()
   const { t } = useLanguage()
   const { promptLogin } = useAuthGate()
@@ -341,6 +380,26 @@ function CommentThread({ postId, comment, onRemove, onCountChange }: CommentThre
   const hasMoreReplies = replies.length < replyCount
   const remaining = MAX_CHARS - content.length
   const canSubmit = (content.trim().length > 0 || media.length > 0) && remaining >= 0 && !submitting && !uploadingMedia
+
+  // Deep-link notification : si le commentaire ciblé est une réponse de CE
+  // thread, on charge ses réponses en silence et on le déplie (le scroll +
+  // surbrillance sont gérés par le parent une fois la réponse dans le DOM).
+  useEffect(() => {
+    if (!focusCommentId || focusCommentId === comment.id || open || replyCount === 0) return
+    let cancelled = false
+    listReplies(postId, comment.id, REPLIES_PAGE, 0)
+      .then((list) => {
+        if (cancelled) return
+        if (list.some((r) => r.id === focusCommentId)) {
+          setReplies((prev) => mergeUnique(prev, list))
+          setOpen(true)
+        }
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [focusCommentId, comment.id, open, replyCount, postId])
 
   async function loadReplies(offset: number) {
     setLoading(true)
@@ -465,6 +524,7 @@ function CommentThread({ postId, comment, onRemove, onCountChange }: CommentThre
     <div className="flex flex-col">
       <CommentRow
         comment={comment}
+        highlighted={highlightId === comment.id}
         onDelete={deleteRoot}
         footer={
           <div className="mt-1 flex items-center gap-3 text-xs font-semibold text-muted-foreground">
@@ -572,6 +632,7 @@ function CommentThread({ postId, comment, onRemove, onCountChange }: CommentThre
               <CommentRow
                 key={r.id}
                 comment={r}
+                highlighted={highlightId === r.id}
                 onDelete={() => deleteReply(r)}
                 footer={
                   <div className="mt-1 text-xs font-semibold text-muted-foreground">
@@ -597,19 +658,34 @@ function CommentThread({ postId, comment, onRemove, onCountChange }: CommentThre
   )
 }
 
-function CommentRow({
+/**
+ * Ligne d'affichage d'un commentaire (avatar + identité + contenu + médias),
+ * réutilisée hors de la section commentaires (onglet « Réponses » du profil).
+ * `onDelete`/`footer` sont optionnels (rendu lecture seule sans eux). Les liens
+ * profil stoppent la propagation pour rester cliquables sous une carte cliquable.
+ */
+export function CommentRow({
   comment,
+  highlighted = false,
   onDelete,
   footer,
 }: {
   comment: PostComment
-  onDelete: () => void
+  highlighted?: boolean
+  onDelete?: () => void
   footer?: React.ReactNode
 }) {
   const { t, locale } = useLanguage()
+  const stop = (e: React.MouseEvent) => e.stopPropagation()
   return (
-    <div className="group flex gap-2">
-      <ProfilLink author={comment.author} className="shrink-0 transition hover:opacity-90">
+    <div
+      id={`comment-${comment.id}`}
+      className={cn(
+        'group flex scroll-mt-24 gap-2 rounded-xl transition-colors duration-500',
+        highlighted && 'bg-[#5B6CFF]/10 ring-2 ring-[#5B6CFF]/40 ring-offset-2 ring-offset-background',
+      )}
+    >
+      <ProfilLink onClick={stop} author={comment.author} className="shrink-0 transition hover:opacity-90">
         <Avatar className="h-8 w-8">
           {comment.author.avatarUrl && <AvatarImage src={comment.author.avatarUrl} alt="" />}
           <AvatarFallback className="bg-gradient-to-br from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] text-xs font-bold text-white">
@@ -621,6 +697,7 @@ function CommentRow({
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex items-center gap-1.5 text-xs">
           <ProfilLink
+            onClick={stop}
             author={comment.author}
             className="truncate font-bold text-foreground hover:underline"
           >
@@ -628,6 +705,7 @@ function CommentRow({
           </ProfilLink>
           {comment.author.username && (
             <ProfilLink
+              onClick={stop}
               author={comment.author}
               className="shrink-0 text-muted-foreground hover:underline"
             >
@@ -649,7 +727,7 @@ function CommentRow({
         {footer}
       </div>
 
-      {comment.canDelete && (
+      {comment.canDelete && onDelete && (
         <button
           aria-label={t('comment.delete_aria')}
           onClick={onDelete}

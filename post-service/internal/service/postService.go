@@ -879,12 +879,15 @@ func (s *PostService) CreateComment(ctx context.Context, postID, authorID, conte
 // stable entre création et suppression).
 func (s *PostService) emitCommentEvents(postAuthorID, rootID, rootAuthorID, actorID, postID, commentID, content string, retract bool) {
 	if rootID == "" {
-		// Commentaire racine → l'auteur du post.
+		// Commentaire racine → l'auteur du post. `CommentID` = ce commentaire,
+		// pour permettre le deep-link de la notification vers le commentaire
+		// (l'agrégation reste par post, cf. groupKeyFor → `comment:<post_id>`).
 		s.notif.Emit(notifier.Event{
 			Type:        notifier.TypeComment,
 			ActorID:     actorID,
 			RecipientID: postAuthorID,
 			PostID:      postID,
+			CommentID:   commentID,
 			Retract:     retract,
 		})
 	} else {
@@ -947,7 +950,8 @@ func (s *PostService) ListCommentsByAuthor(ctx context.Context, authorID, viewer
 	seenVisible := int64(0)
 	sourceOffset := int64(0)
 	allowedByAuthor := make(map[string]bool)
-	postCache := make(map[string]*models.Post) // nil = masqué ou introuvable
+	postCache := make(map[string]*models.Post)        // nil = masqué ou introuvable
+	commentCache := make(map[string]*models.Comment)  // commentaire parent (réponses), nil = introuvable
 
 	for int64(len(visible)) < limit {
 		batch, err := s.repo.ListCommentsByAuthor(ctx, authorID, MaxLimit, sourceOffset)
@@ -995,7 +999,26 @@ func (s *PostService) ListCommentsByAuthor(ctx context.Context, authorID, viewer
 				seenVisible++
 				continue
 			}
-			visible = append(visible, models.CommentWithPost{Comment: comment, ParentPost: parent})
+
+			// Réponse à un autre commentaire → hydrate le commentaire parent
+			// (post → commentaire parent → réponse). Best-effort : si introuvable
+			// (supprimé), on laisse `ParentComment` nil.
+			var parentComment *models.Comment
+			if comment.ParentID != "" {
+				cached, ok := commentCache[comment.ParentID]
+				if !ok {
+					cached = nil
+					if cid, parseErr := parseID(comment.ParentID); parseErr == nil {
+						if pc, getErr := s.repo.GetComment(ctx, cid); getErr == nil {
+							cached = pc
+						}
+					}
+					commentCache[comment.ParentID] = cached
+				}
+				parentComment = cached
+			}
+
+			visible = append(visible, models.CommentWithPost{Comment: comment, ParentPost: parent, ParentComment: parentComment})
 			if int64(len(visible)) == limit {
 				break
 			}
