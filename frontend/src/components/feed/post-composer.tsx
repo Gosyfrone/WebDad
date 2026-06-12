@@ -175,7 +175,7 @@ export function PostComposer({
       </Avatar>
 
       <div className="flex min-w-0 flex-1 flex-col gap-3">
-        <div className="relative">
+        <div className="relative isolate">
           <textarea
             ref={textareaRef}
             value={content}

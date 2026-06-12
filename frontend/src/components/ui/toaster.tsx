@@ -8,10 +8,12 @@ import {
   ToastTitle,
   ToastViewport,
 } from '@/components/ui/toast'
+import { useT } from '@/components/language-provider'
 import { useToast } from '@/hooks/use-toast'
 
 export function Toaster() {
   const { toasts } = useToast()
+  const t = useT()
 
   return (
     <ToastProvider>
@@ -23,7 +25,7 @@ export function Toaster() {
               {description && <ToastDescription>{description}</ToastDescription>}
             </div>
             {action}
-            <ToastClose />
+            <ToastClose aria-label={t('common.close')} />
           </Toast>
         )
       })}
