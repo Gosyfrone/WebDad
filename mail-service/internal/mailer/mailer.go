@@ -10,10 +10,15 @@
 package mailer
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"log"
+	"mime"
 	"net/smtp"
+	"regexp"
 	"strings"
+	"time"
 
 	"github.com/webdad/mail-service/internal/config"
 )
@@ -76,27 +81,81 @@ func (m *smtpMailer) Send(msg Message) error {
 	if fromHeader == "" {
 		fromHeader = m.smtp.User
 	}
+	// Nom d'affichage si l'adresse est nue : un From nominatif est mieux noté.
+	if !strings.Contains(fromHeader, "<") {
+		fromHeader = "Breezy <" + fromHeader + ">"
+	}
 
-	contentType := `text/plain; charset="utf-8"`
-	body := msg.Text
-	if msg.HTML != "" {
-		contentType = `text/html; charset="utf-8"`
-		body = msg.HTML
+	raw := buildMIME(fromHeader, m.smtp.User, msg)
+
+	// smtp.SendMail négocie STARTTLS automatiquement si le serveur l'annonce
+	// (cas de Gmail sur le port 587).
+	if err := smtp.SendMail(addr, auth, m.smtp.User, []string{msg.To}, raw); err != nil {
+		return fmt.Errorf("envoi SMTP : %w", err)
+	}
+	return nil
+}
+
+var htmlTagRE = regexp.MustCompile(`<[^>]*>`)
+
+// buildMIME assemble un message RFC 5322 complet :
+//   - en-têtes Date + Message-ID (leur absence est un signal anti-spam) ;
+//   - Subject encodé RFC 2047 (accents/emoji) ;
+//   - corps multipart/alternative texte + HTML (un HTML seul sans repli texte
+//     est lourdement pénalisé par les filtres anti-spam).
+//
+// Si seul le texte est fourni, le message reste un simple text/plain.
+func buildMIME(fromHeader, envelopeFrom string, msg Message) []byte {
+	domain := "breezy.local"
+	if i := strings.LastIndex(envelopeFrom, "@"); i >= 0 && i+1 < len(envelopeFrom) {
+		domain = envelopeFrom[i+1:]
+	}
+
+	text := msg.Text
+	if text == "" && msg.HTML != "" {
+		// Repli minimal : on dérive un texte lisible du HTML (tags retirés).
+		text = strings.TrimSpace(htmlTagRE.ReplaceAllString(msg.HTML, ""))
 	}
 
 	var b strings.Builder
 	fmt.Fprintf(&b, "From: %s\r\n", fromHeader)
 	fmt.Fprintf(&b, "To: %s\r\n", msg.To)
-	fmt.Fprintf(&b, "Subject: %s\r\n", msg.Subject)
+	fmt.Fprintf(&b, "Subject: %s\r\n", mime.QEncoding.Encode("utf-8", msg.Subject))
+	fmt.Fprintf(&b, "Date: %s\r\n", time.Now().Format(time.RFC1123Z))
+	fmt.Fprintf(&b, "Message-ID: <%d.%s@%s>\r\n", time.Now().UnixNano(), randHex(8), domain)
 	b.WriteString("MIME-Version: 1.0\r\n")
-	fmt.Fprintf(&b, "Content-Type: %s\r\n", contentType)
-	b.WriteString("\r\n")
-	b.WriteString(body)
 
-	// smtp.SendMail négocie STARTTLS automatiquement si le serveur l'annonce
-	// (cas de Gmail sur le port 587).
-	if err := smtp.SendMail(addr, auth, m.smtp.User, []string{msg.To}, []byte(b.String())); err != nil {
-		return fmt.Errorf("envoi SMTP : %w", err)
+	// HTML absent → simple texte.
+	if msg.HTML == "" {
+		b.WriteString("Content-Type: text/plain; charset=\"utf-8\"\r\n\r\n")
+		b.WriteString(text)
+		return []byte(b.String())
 	}
-	return nil
+
+	boundary := "breezy_" + randHex(16)
+	fmt.Fprintf(&b, "Content-Type: multipart/alternative; boundary=\"%s\"\r\n\r\n", boundary)
+
+	// Partie texte (priorité de repli pour les clients sans HTML / anti-spam).
+	fmt.Fprintf(&b, "--%s\r\n", boundary)
+	b.WriteString("Content-Type: text/plain; charset=\"utf-8\"\r\n\r\n")
+	b.WriteString(text)
+	b.WriteString("\r\n\r\n")
+
+	// Partie HTML.
+	fmt.Fprintf(&b, "--%s\r\n", boundary)
+	b.WriteString("Content-Type: text/html; charset=\"utf-8\"\r\n\r\n")
+	b.WriteString(msg.HTML)
+	b.WriteString("\r\n\r\n")
+
+	fmt.Fprintf(&b, "--%s--\r\n", boundary)
+	return []byte(b.String())
+}
+
+// randHex retourne n octets aléatoires en hexadécimal (boundary, Message-ID).
+func randHex(n int) string {
+	buf := make([]byte, n)
+	if _, err := rand.Read(buf); err != nil {
+		return fmt.Sprintf("%x", time.Now().UnixNano())
+	}
+	return hex.EncodeToString(buf)
 }

@@ -21,6 +21,9 @@ func RegisterRoutes(r *gin.Engine, serviceName string, profils *service.ProfilSe
 	{
 		// Routes authentifiées (JWT requis).
 		p.POST("/", auth, h.Create)
+		// Provisioning d'un profil pour un id donné (compte créé par un admin).
+		// Garde admin vérifiée dans le handler (comme Delete).
+		p.POST("/admin", auth, h.AdminCreate)
 		p.GET("/me", auth, h.GetMe)
 		p.PATCH("/me", auth, h.UpdateMe)
 

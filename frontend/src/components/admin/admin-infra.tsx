@@ -6,6 +6,7 @@ import { Activity, Loader2, ShieldAlert } from 'lucide-react'
 import { getMonitoring, type MonitoringSnapshot } from '@/lib/monitoring'
 import { useSession } from '@/lib/session'
 import { useLanguage } from '@/components/language-provider'
+import { CreateAccountDialog } from '@/components/admin/create-account-dialog'
 import { timeAgo } from '@/lib/utils'
 
 /** Intervalle de rafraîchissement du tableau de bord (ms). */
@@ -60,9 +61,13 @@ export function AdminInfra() {
 
   return (
     <div className="flex flex-col">
-      <header className="panel z-10 border-b px-4 py-3 lg:sticky lg:top-0">
-        <h1 className="brand-text text-xl font-bold">{t('nav.admin')}</h1>
-        <p className="text-sm text-muted-foreground">{t('admin.infra_subtitle')}</p>
+      <header className="panel z-10 flex items-start justify-between gap-3 border-b px-4 py-3 lg:sticky lg:top-0">
+        <div>
+          <h1 className="brand-text text-xl font-bold">{t('nav.admin')}</h1>
+          <p className="text-sm text-muted-foreground">{t('admin.infra_subtitle')}</p>
+        </div>
+        {/* Création de compte de force — réservée aux administrateurs. */}
+        <CreateAccountDialog />
       </header>
 
       {loading ? (

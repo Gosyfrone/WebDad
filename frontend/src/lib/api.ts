@@ -36,6 +36,7 @@ interface ApiUser {
   created_at: string
   follower_count?: number
   following_count?: number
+  username_pending?: boolean
 }
 
 interface ApiProfil {
@@ -66,6 +67,8 @@ export interface CurrentUser {
   followersCount: number
   followingCount: number
   joinedAt: string
+  /** Username provisoire (suffixé par l'admin) à remplacer par un handle libre. */
+  usernamePending: boolean
 }
 
 export async function getMe(): Promise<CurrentUser> {
@@ -76,6 +79,7 @@ export async function getMe(): Promise<CurrentUser> {
     followersCount: u.follower_count ?? 0,
     followingCount: u.following_count ?? 0,
     joinedAt: u.created_at,
+    usernamePending: u.username_pending ?? false,
   }
 }
 

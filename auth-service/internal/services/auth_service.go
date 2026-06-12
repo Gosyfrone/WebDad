@@ -42,6 +42,9 @@ var (
 	// ErrNoLocalPassword : tentative de login classique sur un compte créé via
 	// un provider externe (password NULL). Le front doit rediriger vers OAuth.
 	ErrNoLocalPassword = errors.New("ce compte se connecte via un fournisseur externe (Google) ; aucun mot de passe n'est défini")
+	// ErrInvalidCurrentPassword : changement de mot de passe refusé car le mot de
+	// passe actuel fourni ne correspond pas (ou le compte n'a pas de mot de passe local).
+	ErrInvalidCurrentPassword = errors.New("mot de passe actuel invalide")
 )
 
 // Usages des account_tokens + TTL de la vérification d'e-mail.
@@ -62,6 +65,10 @@ type Claims struct {
 	UserID string `json:"user_id"`
 	Email  string `json:"email"`
 	Role   string `json:"role"`
+	// MustChangePassword : propagé pour que le front impose un changement de mot
+	// de passe bloquant (compte créé par un admin avec un mot de passe temporaire),
+	// sans appel supplémentaire. Effacé au prochain token après le changement.
+	MustChangePassword bool `json:"must_change_password,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -79,18 +86,22 @@ type AuthService struct {
 	refreshExpiry time.Duration
 	mailer        Mailer // nil = envoi d'e-mails désactivé (no-op loggé)
 	appBaseURL    string // base URL du front (liens dans les e-mails)
+	// adminCreateAutoVerify : DEV/LOCAL — marque les comptes créés par un admin
+	// comme vérifiés d'office (court-circuit de la vérif e-mail). False en prod.
+	adminCreateAutoVerify bool
 }
 
 // New construit le service. mailer peut être nil (mail non configuré) : l'envoi
 // devient alors un no-op loggé et auth reste pleinement fonctionnel.
-func New(db *sql.DB, jwtSecret string, jwtExpiry, refreshExpiry time.Duration, mailer Mailer, appBaseURL string) *AuthService {
+func New(db *sql.DB, jwtSecret string, jwtExpiry, refreshExpiry time.Duration, mailer Mailer, appBaseURL string, adminCreateAutoVerify bool) *AuthService {
 	return &AuthService{
-		db:            db,
-		jwtSecret:     []byte(jwtSecret),
-		jwtExpiry:     jwtExpiry,
-		refreshExpiry: refreshExpiry,
-		mailer:        mailer,
-		appBaseURL:    appBaseURL,
+		db:                    db,
+		jwtSecret:             []byte(jwtSecret),
+		jwtExpiry:             jwtExpiry,
+		refreshExpiry:         refreshExpiry,
+		mailer:                mailer,
+		appBaseURL:            appBaseURL,
+		adminCreateAutoVerify: adminCreateAutoVerify,
 	}
 }
 
@@ -127,11 +138,173 @@ func (s *AuthService) Register(email, password string) (string, string, *models.
 	return s.issueTokens(u)
 }
 
+// AdminCreateUser crée un compte (role=user) au nom d'un administrateur, avec un
+// mot de passe TEMPORAIRE (must_change_password=true → changement imposé à la
+// première connexion, cf. ChangePassword).
+//
+// Vérification d'e-mail OBLIGATOIRE en prod : le compte est créé NON vérifié
+// (email_verified=false) et l'utilisateur reçoit un e-mail contenant le lien de
+// vérification + son mot de passe temporaire ; cliquer le lien vérifie l'adresse
+// ET ouvre la session (cf. VerifyEmail) → il atterrit sur le feed avec la modale
+// de changement de mot de passe. En DEV/LOCAL (adminCreateAutoVerify=true), le
+// compte est vérifié d'office (court-circuit) : connexion directe au mot de passe
+// temporaire. Best-effort sur l'e-mail (ne casse jamais la création).
+// Retourne le compte créé ; ErrEmailTaken si l'adresse est déjà utilisée.
+func (s *AuthService) AdminCreateUser(email, password, username string) (*models.User, error) {
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, fmt.Errorf("hash mot de passe : %w", err)
+	}
+
+	const q = `
+		INSERT INTO credentials (email, password, role, email_verified, must_change_password)
+		VALUES ($1, $2, $3, $4, true)
+		RETURNING id, email, role, is_active, email_verified, must_change_password, created_at`
+
+	u := &models.User{}
+	err = s.db.QueryRow(q, email, string(hash), models.RoleUser, s.adminCreateAutoVerify).
+		Scan(&u.ID, &u.Email, &u.Role, &u.IsActive, &u.EmailVerified, &u.MustChangePassword, &u.CreatedAt)
+	if err != nil {
+		if isUniqueViolation(err) {
+			return nil, ErrEmailTaken
+		}
+		return nil, fmt.Errorf("insertion utilisateur (admin) : %w", err)
+	}
+
+	s.sendAdminWelcomeMail(u, username, password)
+	return u, nil
+}
+
+// ChangePassword remplace le mot de passe d'un compte authentifié après
+// vérification du mot de passe ACTUEL, lève le drapeau must_change_password
+// (fin du flux « mot de passe temporaire »), révoque toutes les autres sessions
+// puis ré-émet une paire de tokens (le nouveau JWT ne porte plus le drapeau).
+// ErrInvalidCurrentPassword si le mot de passe actuel ne correspond pas (ou si
+// le compte n'a pas de mot de passe local, ex. compte OAuth).
+func (s *AuthService) ChangePassword(userID, currentPassword, newPassword string) (string, string, *models.User, error) {
+	const sel = `
+		SELECT id, email, password, role, is_active, email_verified, must_change_password, created_at
+		FROM credentials WHERE id = $1`
+	u := &models.User{}
+	var pwHash sql.NullString
+	err := s.db.QueryRow(sel, userID).
+		Scan(&u.ID, &u.Email, &pwHash, &u.Role, &u.IsActive, &u.EmailVerified, &u.MustChangePassword, &u.CreatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", "", nil, ErrUserNotFound
+	}
+	if err != nil {
+		return "", "", nil, fmt.Errorf("lecture utilisateur : %w", err)
+	}
+	if !pwHash.Valid || pwHash.String == "" {
+		return "", "", nil, ErrInvalidCurrentPassword // compte sans mot de passe local
+	}
+	if bcrypt.CompareHashAndPassword([]byte(pwHash.String), []byte(currentPassword)) != nil {
+		return "", "", nil, ErrInvalidCurrentPassword
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return "", "", nil, fmt.Errorf("hash du nouveau mot de passe : %w", err)
+	}
+	if _, err := s.db.Exec(
+		`UPDATE credentials SET password = $1, must_change_password = false WHERE id = $2`,
+		string(hash), userID,
+	); err != nil {
+		return "", "", nil, fmt.Errorf("mise à jour du mot de passe : %w", err)
+	}
+
+	// Révoque toutes les sessions ouvertes : un changement de mot de passe doit
+	// déconnecter partout. La nouvelle paire émise juste après rouvre la session courante.
+	if _, err := s.db.Exec(`DELETE FROM refresh_tokens WHERE user_id = $1`, userID); err != nil {
+		return "", "", nil, fmt.Errorf("révocation des sessions : %w", err)
+	}
+
+	u.MustChangePassword = false // le nouveau token ne doit plus porter le drapeau
+	return s.issueTokens(u)
+}
+
+// sendAdminWelcomeMail envoie l'e-mail de bienvenue d'un compte créé par un
+// admin : il porte TOUJOURS le mot de passe temporaire, et — quand la
+// vérification est requise (prod) — un lien de vérification d'e-mail qui ouvre la
+// session à la volée (cf. VerifyEmail). En auto-vérification (dev), le CTA pointe
+// directement vers la connexion. Best-effort : toute erreur est loggée, jamais
+// propagée. Le gabarit échappe le contenu (mot de passe arbitraire sûr en HTML).
+func (s *AuthService) sendAdminWelcomeMail(u *models.User, username, tempPassword string) {
+	if s.mailer == nil {
+		log.Printf("[auth-service] mail désactivé : bienvenue admin pour %s non envoyée", u.Email)
+		return
+	}
+
+	who := username
+	if who == "" {
+		who = u.Email
+	}
+	base := strings.TrimRight(s.appBaseURL, "/")
+
+	// Compte vérifié d'office (dev) : connexion directe, pas de lien de vérif.
+	if u.EmailVerified {
+		loginURL := base + "/login"
+		subject := "Ton compte Breezy a été créé — mot de passe temporaire"
+		text := fmt.Sprintf(
+			"Bonjour %s,\n\n"+
+				"Un administrateur vient de créer ton compte Breezy.\n\n"+
+				"Identifiants de connexion :\n"+
+				"  E-mail : %s\n"+
+				"  Mot de passe temporaire : %s\n\n"+
+				"Connecte-toi ici : %s\n\n"+
+				"Pour des raisons de sécurité, tu devras choisir un nouveau mot de "+
+				"passe dès ta première connexion.",
+			who, u.Email, tempPassword, loginURL)
+		htmlBody := brandedEmailHTML(s.appBaseURL,
+			"Ton compte Breezy est prêt 🎉",
+			fmt.Sprintf("Un administrateur a créé ton compte. Connecte-toi avec l'e-mail %s et le mot de passe temporaire ci-dessous — tu devras le changer dès ta première connexion.",
+				u.Email),
+			tempPassword,
+			"Se connecter", loginURL,
+			"Si tu n'attendais pas cet e-mail, ignore-le ou contacte l'administrateur.")
+		if err := s.mailer.Send(u.Email, subject, htmlBody, text); err != nil {
+			log.Printf("[auth-service] envoi bienvenue admin à %s : %v", u.Email, err)
+		}
+		return
+	}
+
+	// Prod : vérification d'e-mail obligatoire. Le lien vérifie l'adresse ET
+	// ouvre la session → l'utilisateur arrive sur le feed avec la modale de
+	// changement de mot de passe (drapeau porté par le token, cf. VerifyEmail).
+	raw, err := s.createAccountToken(u.ID, purposeVerify, verifyTokenTTL)
+	if err != nil {
+		log.Printf("[auth-service] création token vérif (bienvenue admin) pour %s : %v", u.Email, err)
+		return
+	}
+	link := fmt.Sprintf("%s/verify-email?token=%s", base, url.QueryEscape(raw))
+
+	subject := "Ton compte Breezy a été créé — vérifie ton adresse"
+	text := fmt.Sprintf(
+		"Bonjour %s,\n\n"+
+			"Un administrateur vient de créer ton compte Breezy.\n\n"+
+			"E-mail : %s\n"+
+			"Mot de passe temporaire : %s\n\n"+
+			"Vérifie ton adresse e-mail pour te connecter en ouvrant ce lien :\n%s\n\n"+
+			"Ce lien expire dans 24 heures. À ta première connexion, tu devras "+
+			"choisir un nouveau mot de passe.",
+		who, u.Email, tempPassword, link)
+	htmlBody := brandedEmailHTML(s.appBaseURL,
+		"Ton compte Breezy est prêt 🎉",
+		"Un administrateur a créé ton compte. Ton mot de passe temporaire est ci-dessous. Vérifie ton adresse e-mail pour te connecter — tu devras ensuite choisir un nouveau mot de passe.",
+		tempPassword,
+		"Vérifier mon adresse e-mail", link,
+		"Ce lien expire dans 24 heures. Si tu n'attendais pas cet e-mail, ignore-le ou contacte l'administrateur.")
+
+	if err := s.mailer.Send(u.Email, subject, htmlBody, text); err != nil {
+		log.Printf("[auth-service] envoi bienvenue admin (vérif) à %s : %v", u.Email, err)
+	}
+}
+
 // Login vérifie les credentials et retourne un access token + un refresh
 // token + l'utilisateur.
 func (s *AuthService) Login(email, password string) (string, string, *models.User, error) {
 	const q = `
-		SELECT id, email, password, role, is_active, email_verified, created_at
+		SELECT id, email, password, role, is_active, email_verified, must_change_password, created_at
 		FROM credentials WHERE email = $1`
 
 	return s.loginWithQuery(q, email, password)
@@ -141,7 +314,7 @@ func (s *AuthService) Login(email, password string) (string, string, *models.Use
 // BFF après résolution d'un username dans user-service.
 func (s *AuthService) LoginByUserID(userID, password string) (string, string, *models.User, error) {
 	const q = `
-		SELECT id, email, password, role, is_active, email_verified, created_at
+		SELECT id, email, password, role, is_active, email_verified, must_change_password, created_at
 		FROM credentials WHERE id = $1`
 
 	return s.loginWithQuery(q, userID, password)
@@ -151,7 +324,7 @@ func (s *AuthService) loginWithQuery(query, identifier, password string) (string
 	u := &models.User{}
 	var pwHash sql.NullString // NULL pour les comptes OAuth (sans mot de passe)
 	err := s.db.QueryRow(query, identifier).
-		Scan(&u.ID, &u.Email, &pwHash, &u.Role, &u.IsActive, &u.EmailVerified, &u.CreatedAt)
+		Scan(&u.ID, &u.Email, &pwHash, &u.Role, &u.IsActive, &u.EmailVerified, &u.MustChangePassword, &u.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", "", nil, ErrInvalidCredentials
 	}
@@ -237,7 +410,7 @@ func (s *AuthService) Refresh(rawToken string) (string, string, *models.User, er
 	tokenHash := hashToken(rawToken)
 
 	const q = `
-		SELECT c.id, c.email, c.role, c.is_active, c.created_at, rt.expires_at
+		SELECT c.id, c.email, c.role, c.is_active, c.must_change_password, c.created_at, rt.expires_at
 		FROM refresh_tokens rt
 		JOIN credentials c ON c.id = rt.user_id
 		WHERE rt.token = $1`
@@ -245,7 +418,7 @@ func (s *AuthService) Refresh(rawToken string) (string, string, *models.User, er
 	u := &models.User{}
 	var expiresAt time.Time
 	err := s.db.QueryRow(q, tokenHash).
-		Scan(&u.ID, &u.Email, &u.Role, &u.IsActive, &u.CreatedAt, &expiresAt)
+		Scan(&u.ID, &u.Email, &u.Role, &u.IsActive, &u.MustChangePassword, &u.CreatedAt, &expiresAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", "", nil, ErrInvalidRefreshToken
 	}
@@ -298,10 +471,10 @@ func (s *AuthService) VerifyEmail(rawToken string) (string, string, *models.User
 	const q = `
 		UPDATE credentials SET email_verified = true
 		WHERE id = $1
-		RETURNING id, email, role, is_active, email_verified, created_at`
+		RETURNING id, email, role, is_active, email_verified, must_change_password, created_at`
 	u := &models.User{}
 	if err := s.db.QueryRow(q, userID).
-		Scan(&u.ID, &u.Email, &u.Role, &u.IsActive, &u.EmailVerified, &u.CreatedAt); err != nil {
+		Scan(&u.ID, &u.Email, &u.Role, &u.IsActive, &u.EmailVerified, &u.MustChangePassword, &u.CreatedAt); err != nil {
 		return "", "", nil, fmt.Errorf("activation email_verified : %w", err)
 	}
 	if !u.IsActive {
@@ -365,6 +538,7 @@ func (s *AuthService) sendVerificationMail(u *models.User) {
 	htmlBody := brandedEmailHTML(s.appBaseURL,
 		"Bienvenue sur Breezy 👋",
 		"Plus qu'une étape : confirme ton adresse e-mail pour activer ton compte et rejoindre la conversation.",
+		"",
 		"Vérifier mon adresse e-mail", link,
 		"Ce lien expire dans 24 heures. Si tu n'es pas à l'origine de cette inscription, ignore simplement ce message.")
 
@@ -457,6 +631,7 @@ func (s *AuthService) sendResetMail(u *models.User) {
 	htmlBody := brandedEmailHTML(s.appBaseURL,
 		"Réinitialise ton mot de passe 🔒",
 		"Tu as demandé à changer ton mot de passe Breezy. Choisis-en un nouveau en un clic — c'est rapide et sécurisé.",
+		"",
 		"Choisir un nouveau mot de passe", link,
 		"Ce lien expire dans 1 heure. Si tu n'es pas à l'origine de cette demande, ignore ce message : ton mot de passe reste inchangé.")
 
@@ -797,9 +972,10 @@ func errIfNoRows(res sql.Result) error {
 func (s *AuthService) GenerateToken(u *models.User) (string, error) {
 	now := time.Now()
 	claims := Claims{
-		UserID: u.ID,
-		Email:  u.Email,
-		Role:   u.Role,
+		UserID:             u.ID,
+		Email:              u.Email,
+		Role:               u.Role,
+		MustChangePassword: u.MustChangePassword,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   u.ID,
 			IssuedAt:  jwt.NewNumericDate(now),

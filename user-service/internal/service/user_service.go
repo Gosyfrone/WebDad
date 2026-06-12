@@ -5,7 +5,9 @@ package service
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"regexp"
@@ -91,6 +93,48 @@ func (s *UserService) Create(id, username string) (*models.User, error) {
 		return nil, fmt.Errorf("création utilisateur : %w", err)
 	}
 	return u, nil
+}
+
+// AdminCreate crée la ligne `users` pour un id imposé (compte créé par un
+// admin). Le username demandé est validé puis utilisé tel quel s'il est libre ;
+// s'il est déjà pris, un suffixe `_<8 hex>` est ajouté et username_pending passe
+// à true (le front imposera alors le choix d'un handle disponible). Idempotent :
+// si la ligne (id) existe déjà, elle est renvoyée telle quelle.
+func (s *UserService) AdminCreate(id, username string) (*models.User, error) {
+	if err := validateUsername(username); err != nil {
+		return nil, err
+	}
+
+	// 1) Tentative directe avec le handle demandé (cas nominal : libre).
+	u, err := s.repo.CreateWithPending(id, username, false)
+	if err == nil {
+		return u, nil
+	}
+	if !isUniqueViolation(err) {
+		return nil, fmt.Errorf("création utilisateur (admin) : %w", err)
+	}
+	// La violation peut porter sur l'id (compte déjà provisionné) : si la ligne
+	// existe, on la renvoie (idempotence) plutôt que de suffixer inutilement.
+	if existing, gErr := s.repo.GetByID(id); gErr == nil {
+		return existing, nil
+	}
+
+	// 2) Handle pris : on suffixe et on marque pending. Quelques essais couvrent
+	//    une collision improbable sur le suffixe aléatoire.
+	for i := 0; i < 5; i++ {
+		u, err := s.repo.CreateWithPending(id, suffixedUsername(username), true)
+		if err == nil {
+			return u, nil
+		}
+		if !isUniqueViolation(err) {
+			return nil, fmt.Errorf("création utilisateur (admin) : %w", err)
+		}
+		if existing, gErr := s.repo.GetByID(id); gErr == nil {
+			return existing, nil
+		}
+		// Collision sur le suffixe aléatoire : nouvel essai.
+	}
+	return nil, ErrUsernameTaken
 }
 
 // GetDetailsByID retourne un utilisateur + compteurs ou ErrUserNotFound.
@@ -490,6 +534,28 @@ func defaultUsername(email string) string {
 		cleaned = cleaned[:50]
 	}
 	return cleaned
+}
+
+// suffixedUsername ajoute un suffixe `_<8 hex>` au handle demandé pour obtenir
+// un username unique de repli (ex. `felipe` → `felipe_1a2b3c4d`). La base est
+// tronquée si besoin pour rester dans la limite de 50 caractères du schéma.
+func suffixedUsername(base string) string {
+	const suffixLen = 8
+	const maxBase = 50 - 1 - suffixLen // place pour `_` + suffixe
+	if len(base) > maxBase {
+		base = base[:maxBase]
+	}
+	return base + "_" + randomHex(suffixLen)
+}
+
+// randomHex retourne n caractères hexadécimaux aléatoires (repli horodaté en cas
+// d'échec improbable de la source d'entropie).
+func randomHex(n int) string {
+	b := make([]byte, (n+1)/2)
+	if _, err := rand.Read(b); err != nil {
+		return fmt.Sprintf("%016x", time.Now().UnixNano())[:n]
+	}
+	return hex.EncodeToString(b)[:n]
 }
 
 // isUniqueViolation détecte l'erreur PostgreSQL 23505 (contrainte UNIQUE)

@@ -44,6 +44,9 @@ func New(auth *services.AuthService, oauthReg *oauth.Registry) *gin.Engine {
 		// déclenche le mail (anti-énumération) ; reset consomme le token.
 		authGroup.POST("/password/forgot", h.ForgotPassword)
 		authGroup.POST("/password/reset", h.ResetPassword)
+		// /auth/password/change : changement de mot de passe authentifié (volontaire
+		// ou imposé après création par un admin). Protégé par le JWT.
+		authGroup.POST("/password/change", middleware.JWTAuth(auth), h.ChangePassword)
 		// /auth/refresh : échange le refresh token (cookie httpOnly relayé par
 		// le BFF) contre une nouvelle paire access+refresh (rotation).
 		authGroup.POST("/refresh", h.Refresh)
@@ -62,6 +65,8 @@ func New(auth *services.AuthService, oauthReg *oauth.Registry) *gin.Engine {
 		admin := authGroup.Group("/users", middleware.JWTAuth(auth))
 		{
 			admin.GET("", middleware.ModeratorOnly(), h.ListUsers)
+			// Création forcée d'un compte (mot de passe temporaire) = GOUVERNANCE → admin.
+			admin.POST("", middleware.AdminOnly(), h.AdminCreateUser)
 			admin.PATCH("/:id/status", middleware.ModeratorOnly(), h.SetStatus)
 			admin.PATCH("/:id/role", middleware.AdminOnly(), h.SetRole)
 			// Effacement RGPD : purge définitive des identifiants (admin).

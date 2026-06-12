@@ -32,6 +32,13 @@ type Config struct {
 	MailInternalSecret string // secret partagé X-Internal-Secret (= .env racine)
 	AppBaseURL         string // base URL du front (liens dans les e-mails)
 
+	// AdminCreateAutoVerify : raccourci de DEV/LOCAL. Quand true, un compte créé
+	// par un admin est marqué vérifié d'office (email_verified=true) → la
+	// vérification d'e-mail est court-circuitée et l'utilisateur peut se connecter
+	// directement avec le mot de passe temporaire. En PROD (false), il doit
+	// vérifier son adresse via le lien reçu par e-mail avant de pouvoir entrer.
+	AdminCreateAutoVerify bool
+
 	// Effacement RGPD automatique des comptes bannis. URLs des services à purger
 	// (vide → étape ignorée). AccountPurgeAfter : ancienneté du bannissement avant
 	// purge (défaut 5 ans) ; AccountPurgeSweepInterval : période de balayage
@@ -82,6 +89,9 @@ func Load() *Config {
 	cfg.MailServiceURL = getEnv("MAIL_SERVICE_URL", "http://localhost:8089")
 	cfg.MailInternalSecret = os.Getenv("MAIL_INTERNAL_SECRET")
 	cfg.AppBaseURL = getEnv("APP_BASE_URL", "http://localhost:3000")
+	// DEV/LOCAL : court-circuite la vérification d'e-mail des comptes créés par
+	// un admin (l'envoi de mail réel se fait en ligne). À laisser false en prod.
+	cfg.AdminCreateAutoVerify = getEnv("ADMIN_CREATE_AUTO_VERIFY", "false") == "true"
 
 	cfg.SeedAdmin = getEnv("SEED_DEFAULT_ADMIN", "false") == "true"
 	cfg.SeedAdminEmail = getEnv("SEED_ADMIN_EMAIL", "admin@webdad.local")

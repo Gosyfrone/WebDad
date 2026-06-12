@@ -52,6 +52,15 @@ type CreateProfilRequest struct {
 	Gender      *string    `json:"gender"       binding:"omitempty,oneof=male female"`
 }
 
+// AdminCreateProfilRequest : payload de POST /profils/admin (admin). Crée le
+// profil d'un utilisateur donné (= credentials.id) lors du provisioning d'un
+// compte créé de force par un admin. display_name = username effectif ; pas de
+// birth_date (l'utilisateur la renseignera lui-même ensuite).
+type AdminCreateProfilRequest struct {
+	ID          string `json:"id"           binding:"required"`
+	DisplayName string `json:"display_name" binding:"required,max=100"`
+}
+
 // UpdateProfilRequest : payload de PATCH /profils/me. Champs optionnels
 // (pointeurs) : seuls les champs fournis sont modifiés (nil = inchangé).
 // birth_date est settable UNE SEULE FOIS : une fois posée, toute tentative de

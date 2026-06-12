@@ -43,6 +43,44 @@ func (h *Handler) ListUsers(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": users})
 }
 
+// AdminCreateUser : POST /auth/users — crée un compte de force (admin).
+// L'admin fournit email + mot de passe temporaire (+ username pour l'e-mail).
+// Le compte est créé vérifié (l'admin se porte garant) avec un mot de passe
+// temporaire (changement imposé à la 1re connexion). L'identité username/profil
+// est ensuite provisionnée par l'appelant (user-service + profil-service).
+// @Summary     Créer un compte avec mot de passe temporaire (admin)
+// @Tags        admin
+// @Accept      json
+// @Produce     json
+// @Security    BearerAuth
+// @Param       body body models.AdminCreateUserRequest true "Email + mot de passe temporaire (+ username pour l'e-mail)"
+// @Success     201 {object} map[string]interface{} "data: {id, email}"
+// @Failure     400 {object} map[string]string "Payload invalide"
+// @Failure     401 {object} map[string]string "Non authentifié"
+// @Failure     403 {object} map[string]string "Rôle insuffisant"
+// @Failure     409 {object} map[string]string "Email déjà utilisé"
+// @Failure     500 {object} map[string]string "Erreur interne"
+// @Router      /auth/users [post]
+func (h *Handler) AdminCreateUser(c *gin.Context) {
+	var req models.AdminCreateUserRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "payload invalide : " + err.Error()})
+		return
+	}
+
+	user, err := h.auth.AdminCreateUser(req.Email, req.Password, req.Username)
+	if err != nil {
+		if errors.Is(err, services.ErrEmailTaken) {
+			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "création du compte impossible"})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{"data": gin.H{"id": user.ID, "email": user.Email}})
+}
+
 // SetRole : PATCH /auth/users/:id/role — change le rôle d'un compte (admin).
 // Un admin ne peut pas changer son PROPRE rôle (anti-verrouillage / anti
 // auto-rétrogradation accidentelle).

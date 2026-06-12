@@ -19,10 +19,10 @@ func New(db *sql.DB) *UserRepository {
 	return &UserRepository{db: db}
 }
 
-const userColumns = `id, username, is_active, created_at, updated_at, username_changed_at`
+const userColumns = `id, username, is_active, created_at, updated_at, username_changed_at, username_pending`
 
 // userColumnsU : mêmes colonnes préfixées par l'alias `u` (jointures follows).
-const userColumnsU = `u.id, u.username, u.is_active, u.created_at, u.updated_at, u.username_changed_at`
+const userColumnsU = `u.id, u.username, u.is_active, u.created_at, u.updated_at, u.username_changed_at, u.username_pending`
 
 // detailColumns : userColumns + compteurs du graphe social (sous-requêtes
 // corrélées). Réservé aux vues « profil » (un seul utilisateur).
@@ -35,7 +35,7 @@ type scanner interface{ Scan(...any) error }
 // scanUser projette une ligne vers un *User.
 func scanUser(row scanner) (*models.User, error) {
 	u := &models.User{}
-	if err := row.Scan(&u.ID, &u.Username, &u.IsActive, &u.CreatedAt, &u.UpdatedAt, &u.UsernameChangedAt); err != nil {
+	if err := row.Scan(&u.ID, &u.Username, &u.IsActive, &u.CreatedAt, &u.UpdatedAt, &u.UsernameChangedAt, &u.UsernamePending); err != nil {
 		return nil, err
 	}
 	return u, nil
@@ -45,7 +45,7 @@ func scanUser(row scanner) (*models.User, error) {
 func scanDetails(row scanner) (*models.UserDetails, error) {
 	d := &models.UserDetails{}
 	if err := row.Scan(
-		&d.ID, &d.Username, &d.IsActive, &d.CreatedAt, &d.UpdatedAt, &d.UsernameChangedAt,
+		&d.ID, &d.Username, &d.IsActive, &d.CreatedAt, &d.UpdatedAt, &d.UsernameChangedAt, &d.UsernamePending,
 		&d.FollowerCount, &d.FollowingCount,
 	); err != nil {
 		return nil, err
@@ -60,6 +60,16 @@ func (r *UserRepository) Create(id, username string) (*models.User, error) {
 		VALUES ($1, $2)
 		RETURNING ` + userColumns
 	return scanUser(r.db.QueryRow(q, id, username))
+}
+
+// CreateWithPending insère un utilisateur en posant explicitement username_pending
+// (création par un admin : true quand le handle a dû être suffixé car déjà pris).
+func (r *UserRepository) CreateWithPending(id, username string, pending bool) (*models.User, error) {
+	const q = `
+		INSERT INTO users (id, username, username_pending)
+		VALUES ($1, $2, $3)
+		RETURNING ` + userColumns
+	return scanUser(r.db.QueryRow(q, id, username, pending))
 }
 
 // ExistsByID indique si un utilisateur existe (sans charger la ligne).
@@ -113,6 +123,12 @@ func (r *UserRepository) Update(id string, username *string) (*models.User, erro
 		    username_changed_at = CASE
 		        WHEN $2 IS NOT NULL AND $2 <> username THEN NOW()
 		        ELSE username_changed_at
+		    END,
+		    -- Un changement EFFECTIF de handle solde l'état « provisoire » : le
+		    -- username imposé par l'admin a été remplacé par un choix libre.
+		    username_pending = CASE
+		        WHEN $2 IS NOT NULL AND $2 <> username THEN false
+		        ELSE username_pending
 		    END
 		WHERE id = $1
 		RETURNING ` + userColumns

@@ -32,6 +32,10 @@ CREATE TABLE IF NOT EXISTS credentials (
 
 ALTER TABLE credentials ADD COLUMN IF NOT EXISTS email_verified BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE credentials ADD COLUMN IF NOT EXISTS deactivated_at TIMESTAMPTZ;
+-- must_change_password : compte créé par un admin avec un mot de passe temporaire.
+-- Tant qu'il est à true, le front impose un changement de mot de passe bloquant
+-- à la première connexion (cf. POST /auth/password/change qui le repasse à false).
+ALTER TABLE credentials ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN NOT NULL DEFAULT false;
 
 -- Refresh tokens (préparé pour la feature bonus).
 CREATE TABLE IF NOT EXISTS refresh_tokens (

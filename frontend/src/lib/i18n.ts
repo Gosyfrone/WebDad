@@ -563,6 +563,55 @@ export const messages: Record<Locale, Messages> = {
     'onboarding.submitting': 'Enregistrement…',
     'onboarding.err.generic': 'Une erreur est survenue. Réessaie dans un instant.',
 
+    // — Création de compte par un admin —
+    'admin.create_account': 'Créer un compte',
+    'admin.create_account_desc':
+      'Crée un compte utilisateur avec un mot de passe temporaire envoyé par e-mail.',
+    'admin.create.title': 'Créer un compte',
+    'admin.create.subtitle':
+      "Le mot de passe temporaire est envoyé par e-mail ; l'utilisateur devra le changer à sa première connexion.",
+    'admin.create.username_label': "Nom d'utilisateur",
+    'admin.create.email_label': 'Adresse e-mail',
+    'admin.create.email_placeholder': 'ex. felipe@exemple.com',
+    'admin.create.password_label': 'Mot de passe temporaire',
+    'admin.create.password_hint': 'Au moins 8 caractères.',
+    'admin.create.generate_password': 'Générer',
+    'admin.create.show_password': 'Afficher le mot de passe',
+    'admin.create.hide_password': 'Masquer le mot de passe',
+    'admin.create.submit': 'Créer le compte',
+    'admin.create.submitting': 'Création…',
+    'admin.create.success': 'Compte créé. Mot de passe temporaire envoyé à {email}.',
+    'admin.create.success_suffixed':
+      'Compte créé sous @{username} (le nom demandé était déjà pris). Mot de passe envoyé à {email}.',
+    'admin.create.err.email_taken': 'Cette adresse e-mail est déjà utilisée.',
+    'admin.create.err.email_invalid': 'Adresse e-mail invalide.',
+    'admin.create.err.generic': 'Création du compte impossible. Réessaie.',
+
+    // — Changement de mot de passe imposé (compte créé par un admin) —
+    'account.password_change.title': 'Change ton mot de passe',
+    'account.password_change.subtitle':
+      'Ton compte a été créé avec un mot de passe temporaire. Choisis-en un nouveau pour continuer.',
+    'account.password_change.current_label': 'Mot de passe temporaire',
+    'account.password_change.new_label': 'Nouveau mot de passe',
+    'account.password_change.confirm_label': 'Confirme le nouveau mot de passe',
+    'account.password_change.hint': 'Au moins 8 caractères.',
+    'account.password_change.submit': 'Mettre à jour',
+    'account.password_change.submitting': 'Mise à jour…',
+    'account.password_change.err.mismatch': 'Les mots de passe ne correspondent pas.',
+    'account.password_change.err.current': 'Mot de passe temporaire invalide.',
+    'account.password_change.err.same':
+      'Le nouveau mot de passe doit être différent du temporaire.',
+    'account.password_change.err.generic': 'Changement impossible. Réessaie.',
+
+    // — Nom d'utilisateur provisoire (attribué d'office par un admin) —
+    'account.username_pending.title': "Choisis un nom d'utilisateur",
+    'account.username_pending.subtitle':
+      "Le nom @{username} t'a été attribué temporairement car celui demandé était déjà pris. Choisis-en un autre, disponible.",
+    'account.username_pending.label': "Nom d'utilisateur",
+    'account.username_pending.submit': 'Valider',
+    'account.username_pending.submitting': 'Enregistrement…',
+    'account.username_pending.err.generic': 'Une erreur est survenue. Réessaie.',
+
     // — Vérification d'e-mail —
     'auth.check_email.title': 'Vérifie ta boîte mail',
     'auth.check_email.subtitle':
@@ -1301,6 +1350,55 @@ export const messages: Record<Locale, Messages> = {
     'onboarding.submit': 'Confirm and continue',
     'onboarding.submitting': 'Saving…',
     'onboarding.err.generic': 'Something went wrong. Try again in a moment.',
+
+    // — Admin account creation —
+    'admin.create_account': 'Create an account',
+    'admin.create_account_desc':
+      'Create a user account with a temporary password sent by email.',
+    'admin.create.title': 'Create an account',
+    'admin.create.subtitle':
+      'The temporary password is sent by email; the user will have to change it at first login.',
+    'admin.create.username_label': 'Username',
+    'admin.create.email_label': 'Email address',
+    'admin.create.email_placeholder': 'e.g. felipe@example.com',
+    'admin.create.password_label': 'Temporary password',
+    'admin.create.password_hint': 'At least 8 characters.',
+    'admin.create.generate_password': 'Generate',
+    'admin.create.show_password': 'Show password',
+    'admin.create.hide_password': 'Hide password',
+    'admin.create.submit': 'Create account',
+    'admin.create.submitting': 'Creating…',
+    'admin.create.success': 'Account created. Temporary password sent to {email}.',
+    'admin.create.success_suffixed':
+      'Account created as @{username} (the requested name was taken). Password sent to {email}.',
+    'admin.create.err.email_taken': 'This email address is already in use.',
+    'admin.create.err.email_invalid': 'Invalid email address.',
+    'admin.create.err.generic': 'Could not create the account. Try again.',
+
+    // — Forced password change (admin-created account) —
+    'account.password_change.title': 'Change your password',
+    'account.password_change.subtitle':
+      'Your account was created with a temporary password. Choose a new one to continue.',
+    'account.password_change.current_label': 'Temporary password',
+    'account.password_change.new_label': 'New password',
+    'account.password_change.confirm_label': 'Confirm the new password',
+    'account.password_change.hint': 'At least 8 characters.',
+    'account.password_change.submit': 'Update',
+    'account.password_change.submitting': 'Updating…',
+    'account.password_change.err.mismatch': 'The passwords do not match.',
+    'account.password_change.err.current': 'Invalid temporary password.',
+    'account.password_change.err.same':
+      'The new password must be different from the temporary one.',
+    'account.password_change.err.generic': 'Could not change the password. Try again.',
+
+    // — Provisional username (assigned by an admin) —
+    'account.username_pending.title': 'Choose a username',
+    'account.username_pending.subtitle':
+      'The handle @{username} was assigned to you temporarily because the requested one was taken. Pick another, available one.',
+    'account.username_pending.label': 'Username',
+    'account.username_pending.submit': 'Confirm',
+    'account.username_pending.submitting': 'Saving…',
+    'account.username_pending.err.generic': 'Something went wrong. Try again.',
 
     // — Email verification —
     'auth.check_email.title': 'Check your inbox',

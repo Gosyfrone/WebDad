@@ -13,15 +13,18 @@ const (
 // User représente une ligne de la table `credentials`.
 // PasswordHash n'est jamais sérialisé en JSON (tag `json:"-"`).
 type User struct {
-	ID            string     `json:"id"`
-	Email         string     `json:"email"`
-	PasswordHash  string     `json:"-"`        // colonne `password` (hash bcrypt, NULL si compte OAuth)
-	Provider      string     `json:"provider"` // 'local' | 'google'
-	Role          string     `json:"role"`
-	IsActive      bool       `json:"is_active"`
-	EmailVerified bool       `json:"email_verified"`
-	DeactivatedAt *time.Time `json:"deactivated_at,omitempty"` // date du bannissement (NULL si actif)
-	CreatedAt     time.Time  `json:"created_at"`
+	ID            string `json:"id"`
+	Email         string `json:"email"`
+	PasswordHash  string `json:"-"`        // colonne `password` (hash bcrypt, NULL si compte OAuth)
+	Provider      string `json:"provider"` // 'local' | 'google'
+	Role          string `json:"role"`
+	IsActive      bool   `json:"is_active"`
+	EmailVerified bool   `json:"email_verified"`
+	// MustChangePassword : mot de passe temporaire posé par un admin → le front
+	// impose un changement bloquant à la première connexion. Propagé dans le JWT.
+	MustChangePassword bool       `json:"must_change_password"`
+	DeactivatedAt      *time.Time `json:"deactivated_at,omitempty"` // date du bannissement (NULL si actif)
+	CreatedAt          time.Time  `json:"created_at"`
 }
 
 // AuthUser : vue publique d'un utilisateur renvoyée par l'API d'auth.
@@ -98,6 +101,23 @@ type OAuthExchangeRequest struct {
 // httpOnly) — pas de binding `required` pour que /logout reste best-effort.
 type RefreshRequest struct {
 	RefreshToken string `json:"refresh_token"`
+}
+
+// AdminCreateUserRequest : payload de POST /auth/users (admin). L'admin crée un
+// compte de force avec un mot de passe temporaire (le compte est marqué vérifié
+// — l'admin se porte garant — et must_change_password). `username` n'est utilisé
+// que pour personnaliser l'e-mail ; l'identité username vit dans user-service.
+type AdminCreateUserRequest struct {
+	Email    string `json:"email"    binding:"required,email"`
+	Password string `json:"password" binding:"required,min=8"`
+	Username string `json:"username" binding:"omitempty"`
+}
+
+// ChangePasswordRequest : payload de POST /auth/password/change (authentifié).
+// Sert au changement volontaire ET au changement imposé (mot de passe temporaire).
+type ChangePasswordRequest struct {
+	CurrentPassword string `json:"current_password" binding:"required"`
+	NewPassword     string `json:"new_password"     binding:"required,min=8"`
 }
 
 // UpdateRoleRequest : payload de PATCH /auth/users/:id/role (admin).

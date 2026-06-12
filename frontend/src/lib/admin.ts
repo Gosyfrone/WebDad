@@ -75,6 +75,81 @@ async function expectOk(res: Response): Promise<void> {
   }
 }
 
+/** Données de création d'un compte par un admin. */
+export interface CreateAccountInput {
+  username: string
+  email: string
+  password: string
+}
+
+/** Résultat de la création : username EFFECTIF (éventuellement suffixé) + état. */
+export interface CreatedAccount {
+  id: string
+  email: string
+  username: string
+  /** true si le username a dû être suffixé (handle demandé déjà pris). */
+  usernamePending: boolean
+}
+
+interface ApiUserRow {
+  id: string
+  username: string
+  username_pending?: boolean
+}
+
+/**
+ * Crée un compte de force (admin) en orchestrant les trois services, comme
+ * `hardDeleteUser` pour l'effacement :
+ *   1. auth-service `POST /auth/users` : credentials (vérifié + mot de passe
+ *      TEMPORAIRE), qui envoie le mot de passe par e-mail (best-effort côté back) ;
+ *   2. user-service `POST /users/admin` : ligne `users` (id imposé), username
+ *      suffixé + `username_pending` si le handle est déjà pris ;
+ *   3. profil-service `POST /profils/admin` : profil (display_name = username
+ *      effectif) pour que le gate d'onboarding ne se déclenche pas.
+ *
+ * Les étapes 1-2 sont critiques (erreur propagée) ; l'étape 3 est best-effort
+ * (le profil sera sinon créé au provisioning paresseux). Renvoie le username
+ * effectif et l'état `usernamePending`.
+ */
+export async function createAccount(input: CreateAccountInput): Promise<CreatedAccount> {
+  const created = await unwrap<{ id: string; email: string }>(
+    await apiFetch('/auth/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: input.email,
+        password: input.password,
+        username: input.username,
+      }),
+    }),
+  )
+
+  const user = await unwrap<ApiUserRow>(
+    await apiFetch('/users/admin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: created.id, username: input.username }),
+    }),
+  )
+
+  try {
+    await apiFetch('/profils/admin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: created.id, display_name: user.username }),
+    })
+  } catch {
+    /* best-effort : profil créable ensuite via provisioning paresseux */
+  }
+
+  return {
+    id: created.id,
+    email: created.email,
+    username: user.username,
+    usernamePending: user.username_pending ?? false,
+  }
+}
+
 /** Annuaire des comptes (admin). `query` filtre par email. */
 export async function listAdminUsers(
   query = '',

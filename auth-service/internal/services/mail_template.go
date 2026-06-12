@@ -16,20 +16,44 @@ import (
 //   - heading  : titre principal (gras)
 //   - intro    : phrase d'accroche — sert AUSSI de pré-en-tête masqué (aperçu
 //     dans la liste des mails) ;
+//   - code     : valeur mise en avant dans un encart monospace facon bloc de
+//     code Markdown (mot de passe temporaire) ; "" = pas d'encart ;
 //   - ctaLabel : libellé du bouton d'action ;
 //   - ctaURL   : URL du bouton (token déjà encodé), réaffichée en repli copiable ;
 //   - footnote : mention sécurité / expiration en pied de carte.
-func brandedEmailHTML(baseURL, heading, intro, ctaLabel, ctaURL, footnote string) string {
+func brandedEmailHTML(baseURL, heading, intro, code, ctaLabel, ctaURL, footnote string) string {
 	logo := strings.TrimRight(baseURL, "/") + "/logo_breezy.png"
 	return strings.NewReplacer(
 		"{{LOGO}}", html.EscapeString(logo),
 		"{{HEADING}}", html.EscapeString(heading),
 		"{{INTRO}}", html.EscapeString(intro),
+		"{{CODE_BLOCK}}", codeBlockHTML(code),
 		"{{CTA_LABEL}}", html.EscapeString(ctaLabel),
 		"{{CTA_URL}}", ctaURL,
 		"{{FOOTNOTE}}", html.EscapeString(footnote),
 		"{{YEAR}}", strconv.Itoa(time.Now().Year()),
 	).Replace(emailShell)
+}
+
+// codeBlockHTML rend une valeur (ex. mot de passe temporaire) dans un encart
+// monospace sombre facon bloc de code Markdown (```). Vide si code == "". La
+// valeur est échappée (contenu arbitraire sûr en HTML). Table + styles inline
+// pour rester lisible partout (Outlook inclus).
+func codeBlockHTML(code string) string {
+	if code == "" {
+		return ""
+	}
+	return `<tr>
+            <td style="padding:20px 44px 0 44px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td style="background-color:#0f1230; border:1px solid #2a2f5e; border-radius:12px; padding:16px 20px; font-family:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace; font-size:18px; font-weight:700; color:#9aa6ff; letter-spacing:1px; word-break:break-all; text-align:center;">` +
+		html.EscapeString(code) +
+		`</td>
+                </tr>
+              </table>
+            </td>
+          </tr>`
 }
 
 // emailShell : gabarit HTML de la coquille Breezy. Les jetons {{...}} sont
@@ -50,16 +74,20 @@ const emailShell = `<!DOCTYPE html>
       <td align="center" style="padding:32px 16px;">
         <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px; max-width:600px; background-color:#ffffff; border-radius:24px; overflow:hidden; box-shadow:0 18px 50px rgba(91,108,255,0.18);">
           <tr>
-            <td align="center" bgcolor="#5B6CFF" style="background-color:#5B6CFF; background-image:linear-gradient(120deg,#8D3DFF 0%,#5B6CFF 52%,#47D9FF 100%); padding:34px 24px;">
-              <img src="{{LOGO}}" alt="Breezy" height="38" style="height:38px; width:auto; display:block; border:0; outline:none; text-decoration:none;">
+            <td style="height:6px; line-height:6px; font-size:0; mso-line-height-rule:exactly; background-color:#5B6CFF; background-image:linear-gradient(90deg,#8D3DFF 0%,#5B6CFF 52%,#47D9FF 100%);">&nbsp;</td>
+          </tr>
+          <tr>
+            <td align="center" style="background-color:#ffffff; padding:32px 24px 6px 24px;">
+              <img src="{{LOGO}}" alt="Breezy" height="56" style="height:56px; width:auto; display:block; border:0; outline:none; text-decoration:none;">
             </td>
           </tr>
           <tr>
-            <td style="padding:42px 44px 6px 44px;">
+            <td style="padding:22px 44px 6px 44px;">
               <h1 style="margin:0; font-size:26px; line-height:1.25; color:#161a3a; font-weight:700;">{{HEADING}}</h1>
               <p style="margin:16px 0 0 0; font-size:16px; line-height:1.62; color:#4a4f6b;">{{INTRO}}</p>
             </td>
           </tr>
+          {{CODE_BLOCK}}
           <tr>
             <td align="center" style="padding:28px 44px 6px 44px;">
               <table role="presentation" cellpadding="0" cellspacing="0" border="0">

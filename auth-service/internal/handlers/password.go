@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/webdad/auth-service/internal/middleware"
 	"github.com/webdad/auth-service/internal/models"
 	"github.com/webdad/auth-service/internal/services"
 )
@@ -68,5 +69,58 @@ func (h *Handler) ResetPassword(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"data": gin.H{
 		"message": "Mot de passe réinitialisé. Tu peux te connecter avec ton nouveau mot de passe.",
+	}})
+}
+
+// ChangePassword : POST /auth/password/change — change le mot de passe de
+// l'utilisateur authentifié après vérification du mot de passe actuel. Sert au
+// changement volontaire ET au changement imposé (mot de passe temporaire posé
+// par un admin) : lève le drapeau must_change_password et ré-émet une paire de
+// tokens (le nouveau JWT ne porte plus le drapeau). Les autres sessions sont révoquées.
+// @Summary     Changer son mot de passe
+// @Tags        auth
+// @Accept      json
+// @Produce     json
+// @Security    BearerAuth
+// @Param       body body models.ChangePasswordRequest true "Mot de passe actuel + nouveau mot de passe (min 8 chars)"
+// @Success     200 {object} models.AuthUser "Mot de passe changé — data: {token, refresh_token, user}"
+// @Failure     400 {object} map[string]string "Payload invalide ou mot de passe actuel invalide (code: invalid_current_password)"
+// @Failure     401 {object} map[string]string "Non authentifié"
+// @Failure     404 {object} map[string]string "Compte introuvable"
+// @Failure     500 {object} map[string]string "Erreur interne"
+// @Router      /auth/password/change [post]
+func (h *Handler) ChangePassword(c *gin.Context) {
+	claims, ok := middleware.ClaimsFrom(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "claims absents"})
+		return
+	}
+
+	var req models.ChangePasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "payload invalide : " + err.Error()})
+		return
+	}
+
+	token, refresh, user, err := h.auth.ChangePassword(claims.UserID, req.CurrentPassword, req.NewPassword)
+	if err != nil {
+		switch {
+		case errors.Is(err, services.ErrInvalidCurrentPassword):
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": err.Error(),
+				"code":  "invalid_current_password",
+			})
+		case errors.Is(err, services.ErrUserNotFound):
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "changement de mot de passe impossible"})
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"data": gin.H{
+		"token":         token,
+		"refresh_token": refresh,
+		"user":          models.NewAuthUser(user),
 	}})
 }

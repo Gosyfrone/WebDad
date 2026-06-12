@@ -21,6 +21,21 @@
 - **Access (15m) localStorage + refresh (24h) httpOnly cookie via BFF.** Assumed trade-off:
   access is XSS-exposed but short-lived; refresh is non-stealable. BFF-managed cookie (same-origin)
   avoids cross-origin CORS/SameSite complexity. Refresh is **single-flight** to avoid refresh storms on simultaneous 401s.
+- **Admin-created accounts = temporary password + provisional username (forced fixups via JWT/`/users/me`).**
+  An admin creates an account from `/admin` (auth `POST /auth/users`, AdminOnly): credentials are written
+  `must_change_password=true` (a temporary password, emailed best-effort) and **email verification is
+  mandatory** (`email_verified=false`): the welcome email carries the verify link + the temp password, and
+  clicking it verifies the address **and** opens the session (`VerifyEmail` now propagates the flag) → the
+  user lands on the feed with the change-password modal. A **dev/local shortcut** `ADMIN_CREATE_AUTO_VERIFY=true`
+  marks the account verified up-front (real mail goes online) so login works directly with the temp password.
+  The flag rides in the **JWT claims** (and is re-read on
+  `/refresh`) so the front shows a blocking change-password modal on any page **without an extra call**;
+  `POST /auth/password/change` verifies the current password, clears the flag, revokes other sessions and
+  re-issues a flagless token (modal disappears, no reload). The requested **username** is provisioned in
+  user-service (`POST /users/admin`); if taken it is suffixed `_<8 hex>` with `username_pending=true`
+  (exposed by `/users/me`, cleared on an effective `PATCH /users/me`), driving a second blocking modal.
+  Orchestration lives client-side in `lib/admin.createAccount` (admin bearer, same pattern as the RGPD
+  eraser) — one datum, one service; steps 1-2 critical, profil creation best-effort.
 - **Refresh token = opaque random, stored SHA-256 hashed, rotated on `/refresh`, revoked on `/logout`.**
   Opaque + DB-stored = revocable (unlike self-contained JWT); hashing means a DB leak yields no usable token;
   rotation is the basis for future reuse-detection. The **back never auto-renews** — it signs `exp` and

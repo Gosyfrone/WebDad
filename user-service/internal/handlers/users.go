@@ -55,6 +55,38 @@ func (h *Handler) Create(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"data": user})
 }
 
+// AdminCreate : POST /users/admin — crée la ligne `users` pour un id donné (admin).
+// Réservé aux admins (middleware) : sert au provisioning d'un compte créé de
+// force via auth-service. Si le username demandé est pris, il est suffixé et
+// username_pending passe à true.
+// @Summary     Créer un utilisateur pour un id donné (admin)
+// @Tags        users
+// @Accept      json
+// @Produce     json
+// @Security    BearerAuth
+// @Param       body body models.AdminCreateUserRequest true "ID (= credentials.id) + username souhaité"
+// @Success     201 {object} models.User "Utilisateur créé (username éventuellement suffixé)"
+// @Failure     400 {object} map[string]string "Payload invalide"
+// @Failure     401 {object} map[string]string "Non authentifié"
+// @Failure     403 {object} map[string]string "Réservé admin"
+// @Failure     409 {object} map[string]string "Username pris"
+// @Router      /users/admin [post]
+func (h *Handler) AdminCreate(c *gin.Context) {
+	var req models.AdminCreateUserRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "payload invalide : " + err.Error()})
+		return
+	}
+
+	user, err := h.users.AdminCreate(req.ID, req.Username)
+	if err != nil {
+		respondUserError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{"data": user})
+}
+
 // List : GET /users — liste paginée (?limit=&offset=).
 // @Summary     Lister les utilisateurs (paginé)
 // @Tags        users
