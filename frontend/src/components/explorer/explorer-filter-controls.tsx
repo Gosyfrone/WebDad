@@ -6,7 +6,6 @@ import { cn } from '@/lib/utils'
 import { useT } from '@/components/language-provider'
 import {
   DropdownMenu,
-  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -54,14 +53,15 @@ export function FilterControls({
 }) {
   const t = useT()
   return (
-    <div className="flex flex-wrap gap-2" aria-label={t('explorer.filters_hint')}>
-      <FilterCheck
+    <div className="flex flex-col" aria-label={t('explorer.filters_hint')}>
+      <FilterRow
         label={t('explorer.filter_publications')}
         checked={showPublications}
         disabled={showPublications && !showUsers}
         onChange={onTogglePublications}
       />
-      <FilterCheck
+      <div className="border-t border-border/50" />
+      <FilterRow
         label={t('explorer.filter_users')}
         checked={showUsers}
         disabled={showUsers && !showPublications}
@@ -88,23 +88,24 @@ export function MobileFilterMenu({
       <DropdownMenuTrigger asChild>
         <ButtonLikeDots label={t('explorer.filter_title')} />
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56 rounded-2xl">
-        <DropdownMenuLabel>{t('explorer.filter_title')}</DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuCheckboxItem
+      <DropdownMenuContent align="end" className="w-64 overflow-hidden rounded-2xl p-0">
+        <DropdownMenuLabel className="px-4 py-3 text-base font-bold">
+          {t('explorer.filter_title')}
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator className="m-0" />
+        <MobileFilterRow
+          label={t('explorer.filter_publications')}
           checked={showPublications}
           disabled={showPublications && !showUsers}
-          onCheckedChange={onTogglePublications}
-        >
-          {t('explorer.filter_publications')}
-        </DropdownMenuCheckboxItem>
-        <DropdownMenuCheckboxItem
+          onChange={onTogglePublications}
+        />
+        <DropdownMenuSeparator className="m-0" />
+        <MobileFilterRow
+          label={t('explorer.filter_users')}
           checked={showUsers}
           disabled={showUsers && !showPublications}
-          onCheckedChange={onToggleUsers}
-        >
-          {t('explorer.filter_users')}
-        </DropdownMenuCheckboxItem>
+          onChange={onToggleUsers}
+        />
       </DropdownMenuContent>
     </DropdownMenu>
   )
@@ -123,7 +124,7 @@ function ButtonLikeDots({ label }: { label: string }) {
   )
 }
 
-function FilterCheck({
+function FilterRow({
   label,
   checked,
   disabled,
@@ -137,21 +138,55 @@ function FilterCheck({
   return (
     <label
       className={cn(
-        'flex cursor-pointer items-center gap-2 rounded-full border px-3 py-2 text-xs font-bold transition-colors',
-        checked
-          ? 'border-[#5B6CFF] bg-[#5B6CFF]/10 text-[#5B6CFF] dark:border-[#9aa6ff] dark:bg-[#9aa6ff]/15 dark:text-[#c7ceff]'
-          : 'border-border text-muted-foreground hover:bg-accent',
-        disabled && 'cursor-not-allowed opacity-70',
+        'flex cursor-pointer items-center justify-between px-4 py-3 transition-colors hover:bg-accent',
+        disabled && 'cursor-not-allowed opacity-60',
       )}
     >
-      <input
-        type="checkbox"
-        checked={checked}
-        disabled={disabled}
-        onChange={onChange}
-        className="h-3.5 w-3.5 accent-[#5B6CFF]"
-      />
-      {label}
+      <span className="text-sm font-medium text-foreground">{label}</span>
+      <input type="checkbox" checked={checked} disabled={disabled} onChange={onChange} className="sr-only" />
+      <CircleIndicator checked={checked} />
     </label>
+  )
+}
+
+function MobileFilterRow({
+  label,
+  checked,
+  disabled,
+  onChange,
+}: {
+  label: string
+  checked: boolean
+  disabled: boolean
+  onChange: () => void
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onChange}
+      className={cn(
+        'flex w-full items-center justify-between px-4 py-3 text-sm font-medium transition-colors hover:bg-accent',
+        disabled && 'cursor-not-allowed opacity-60',
+      )}
+    >
+      {label}
+      <CircleIndicator checked={checked} />
+    </button>
+  )
+}
+
+function CircleIndicator({ checked }: { checked: boolean }) {
+  return (
+    <span
+      className={cn(
+        'flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors',
+        checked
+          ? 'border-[#5B6CFF] bg-[#5B6CFF] dark:border-[#9aa6ff] dark:bg-[#9aa6ff]'
+          : 'border-muted-foreground/50 bg-transparent',
+      )}
+    >
+      {checked && <span className="h-2 w-2 rounded-full bg-white" />}
+    </span>
   )
 }
