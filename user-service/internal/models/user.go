@@ -25,6 +25,12 @@ type User struct {
 	// (nil = jamais changé). Sert de base au cooldown de changement de
 	// username (cf. service). Symétrique de display_name_changed_at (profil).
 	UsernameChangedAt *time.Time `json:"username_changed_at,omitempty"`
+
+	// UsernamePending : true si le username a été attribué d'office avec un
+	// suffixe (compte créé par un admin, handle demandé déjà pris). Le front
+	// impose alors un changement de username (repassé à false dès qu'un handle
+	// libre est choisi via PATCH /users/me).
+	UsernamePending bool `json:"username_pending"`
 }
 
 // UserDetails enrichit User des compteurs du graphe social, pour les vues
@@ -40,6 +46,15 @@ type UserDetails struct {
 // L'id n'est pas dans le corps : il provient du JWT (claims) ou est généré.
 // Le nom affiché n'est plus ici (→ profil-service).
 type CreateUserRequest struct {
+	Username string `json:"username" binding:"required,min=3,max=50"`
+}
+
+// AdminCreateUserRequest : payload de POST /users/admin (admin). Crée la ligne
+// `users` pour un id donné (= credentials.id retourné par auth-service). Si le
+// username demandé est déjà pris, un suffixe `_<hex>` est ajouté et
+// username_pending passe à true.
+type AdminCreateUserRequest struct {
+	ID       string `json:"id"       binding:"required"`
 	Username string `json:"username" binding:"required,min=3,max=50"`
 }
 

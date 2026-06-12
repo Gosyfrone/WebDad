@@ -7,6 +7,8 @@ import { NotificationsProvider } from '@/components/notifications-provider'
 import { MessagesProvider } from '@/components/messages-provider'
 import { AuthPromptProvider } from '@/components/auth-prompt-provider'
 import { OnboardingGate } from '@/components/onboarding/onboarding-gate'
+import { PasswordChangeGate } from '@/components/account/password-change-gate'
+import { UsernamePendingGate } from '@/components/account/username-pending-gate'
 import { ExplorerFilterProvider } from '@/components/explorer/explorer-filter-context'
 
 /**
@@ -51,6 +53,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
               {/* Onboarding bloquant pour les comptes OAuth sans profil (cf. composant). */}
               <OnboardingGate />
+              {/* Comptes créés par un admin : changement du mot de passe temporaire
+                  (prioritaire), puis du username provisoire si suffixé. */}
+              <PasswordChangeGate />
+              <UsernamePendingGate />
             </div>
           </ExplorerFilterProvider>
         </MessagesProvider>

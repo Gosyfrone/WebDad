@@ -166,6 +166,46 @@ func (h *ProfilHandler) Create(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"data": profil})
 }
 
+// AdminCreate : POST /profils/admin — crée le profil d'un utilisateur donné (admin).
+// Sert au provisioning d'un compte créé de force via auth-service : l'id vient du
+// corps (pas du JWT). display_name = username effectif. Réservé aux admins.
+// @Summary     Créer le profil d'un utilisateur (admin)
+// @Tags        profils
+// @Accept      json
+// @Produce     json
+// @Security    BearerAuth
+// @Param       body body models.AdminCreateProfilRequest true "ID (= credentials.id) + display_name"
+// @Success     201 {object} models.Profil
+// @Failure     400 {object} map[string]string
+// @Failure     401 {object} map[string]string
+// @Failure     403 {object} map[string]string "Réservé admin"
+// @Failure     409 {object} map[string]string "Profil déjà existant"
+// @Router      /profils/admin [post]
+func (h *ProfilHandler) AdminCreate(c *gin.Context) {
+	claims, ok := middleware.ClaimsFrom(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "claims absents"})
+		return
+	}
+	if claims.Role != models.RoleAdmin {
+		c.JSON(http.StatusForbidden, gin.H{"error": "réservé aux administrateurs"})
+		return
+	}
+	var req models.AdminCreateProfilRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "payload invalide : " + err.Error()})
+		return
+	}
+	profil, err := h.profils.Create(c.Request.Context(), req.ID, models.CreateProfilRequest{
+		DisplayName: req.DisplayName,
+	})
+	if err != nil {
+		respondProfilError(c, err)
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"data": profil})
+}
+
 // Delete : DELETE /profils/:userId — supprime un profil (protégé, admin).
 // @Summary     Supprimer un profil (admin)
 // @Tags        profils

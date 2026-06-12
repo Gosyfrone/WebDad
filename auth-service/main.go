@@ -41,7 +41,7 @@ func main() {
 		log.Printf("[%s] WARNING: MAIL_INTERNAL_SECRET absent — envoi d'e-mails désactivé (no-op)", serviceName)
 	}
 
-	auth := services.New(conn, cfg.JWTSecret, cfg.JWTExpiry, cfg.RefreshExpiry, mailer, cfg.AppBaseURL)
+	auth := services.New(conn, cfg.JWTSecret, cfg.JWTExpiry, cfg.RefreshExpiry, mailer, cfg.AppBaseURL, cfg.AdminCreateAutoVerify)
 
 	if cfg.SeedAdmin {
 		if err := auth.EnsureDefaultAdmin(cfg.SeedAdminEmail, cfg.SeedAdminPassword); err != nil {

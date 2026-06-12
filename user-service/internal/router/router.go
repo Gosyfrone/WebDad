@@ -47,6 +47,8 @@ func New(users *service.UserService, jwtSecret string) *gin.Engine {
 
 		// Routes authentifiées (JWT requis).
 		u.POST("", auth, h.Create)
+		// Provisioning d'un compte créé par un admin (id imposé, suffixe si pris) → admin.
+		u.POST("/admin", auth, middleware.AdminOnly(), h.AdminCreate)
 		u.GET("/me", auth, h.GetMe)
 		u.PATCH("/me", auth, h.UpdateMe)
 		u.GET("/me/follow-requests/outgoing", auth, h.PendingFollowRequests)

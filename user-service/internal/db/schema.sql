@@ -29,6 +29,12 @@ CREATE TABLE IF NOT EXISTS users (
 -- migration) : CREATE TABLE IF NOT EXISTS ne modifie pas une table existante.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS username_changed_at TIMESTAMPTZ;
 
+-- username_pending : le username a été attribué d'office (compte créé par un
+-- admin) avec un suffixe `_<hex>` car le handle demandé était déjà pris. Tant
+-- qu'il est à true, le front impose à l'utilisateur de choisir un username
+-- disponible (repassé à false dès qu'il en choisit un libre via PATCH /users/me).
+ALTER TABLE users ADD COLUMN IF NOT EXISTS username_pending BOOLEAN NOT NULL DEFAULT false;
+
 -- Graphe de follows (relations entre utilisateurs).
 CREATE TABLE IF NOT EXISTS follows (
     follower_id  UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,

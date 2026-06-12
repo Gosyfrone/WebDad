@@ -267,6 +267,80 @@
         }
       }
     },
+    "/auth/password/change": {
+      "post": {
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "auth"
+        ],
+        "summary": "Changer son mot de passe",
+        "parameters": [
+          {
+            "description": "Mot de passe actuel + nouveau mot de passe (min 8 chars)",
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/models.ChangePasswordRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Mot de passe changé — data: {token, refresh_token, user}",
+            "schema": {
+              "$ref": "#/definitions/models.AuthUser"
+            }
+          },
+          "400": {
+            "description": "Payload invalide ou mot de passe actuel invalide (code: invalid_current_password)",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "401": {
+            "description": "Non authentifié",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "404": {
+            "description": "Compte introuvable",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "500": {
+            "description": "Erreur interne",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
     "/auth/password/forgot": {
       "post": {
         "consumes": [
@@ -539,6 +613,88 @@
           },
           "403": {
             "description": "Rôle insuffisant",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "500": {
+            "description": "Erreur interne",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "admin"
+        ],
+        "summary": "Créer un compte avec mot de passe temporaire (admin)",
+        "parameters": [
+          {
+            "description": "Email + mot de passe temporaire (+ username pour l'e-mail)",
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/models.AdminCreateUserRequest"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "data: {id, email}",
+            "schema": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "400": {
+            "description": "Payload invalide",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "401": {
+            "description": "Non authentifié",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "403": {
+            "description": "Rôle insuffisant",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "409": {
+            "description": "Email déjà utilisé",
             "schema": {
               "type": "object",
               "additionalProperties": {
@@ -1054,6 +1210,80 @@
           },
           "401": {
             "description": "Non authentifié",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "409": {
+            "description": "Username pris",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/admin": {
+      "post": {
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "users"
+        ],
+        "summary": "Créer un utilisateur pour un id donné (admin)",
+        "parameters": [
+          {
+            "description": "ID (= credentials.id) + username souhaité",
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/models.AdminCreateUserRequest"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Utilisateur créé (username éventuellement suffixé)",
+            "schema": {
+              "$ref": "#/definitions/models.User"
+            }
+          },
+          "400": {
+            "description": "Payload invalide",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "401": {
+            "description": "Non authentifié",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "403": {
+            "description": "Réservé admin",
             "schema": {
               "type": "object",
               "additionalProperties": {
@@ -1846,6 +2076,80 @@
           },
           "401": {
             "description": "Unauthorized",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "409": {
+            "description": "Profil déjà existant",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/profils/admin": {
+      "post": {
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "profils"
+        ],
+        "summary": "Créer le profil d'un utilisateur (admin)",
+        "parameters": [
+          {
+            "description": "ID (= credentials.id) + display_name",
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/models.AdminCreateProfilRequest"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Created",
+            "schema": {
+              "$ref": "#/definitions/models.Profil"
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "403": {
+            "description": "Réservé admin",
             "schema": {
               "type": "object",
               "additionalProperties": {
@@ -4965,6 +5269,23 @@
     }
   },
   "definitions": {
+    "models.AdminCreateUserRequest": {
+      "type": "object",
+      "required": [
+        "id",
+        "username"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string",
+          "maxLength": 50,
+          "minLength": 3
+        }
+      }
+    },
     "models.AuthUser": {
       "type": "object",
       "properties": {
@@ -4976,6 +5297,22 @@
         },
         "role": {
           "type": "string"
+        }
+      }
+    },
+    "models.ChangePasswordRequest": {
+      "type": "object",
+      "required": [
+        "current_password",
+        "new_password"
+      ],
+      "properties": {
+        "current_password": {
+          "type": "string"
+        },
+        "new_password": {
+          "type": "string",
+          "minLength": 8
         }
       }
     },
@@ -5162,6 +5499,10 @@
         "username_changed_at": {
           "description": "UsernameChangedAt : date du dernier changement effectif du handle\n(nil = jamais changé). Sert de base au cooldown de changement de\nusername (cf. service). Symétrique de display_name_changed_at (profil).",
           "type": "string"
+        },
+        "username_pending": {
+          "description": "UsernamePending : true si le username a été attribué d'office avec un\nsuffixe (compte créé par un admin, handle demandé déjà pris). Le front\nimpose alors un changement de username (repassé à false dès qu'un handle\nlibre est choisi via PATCH /users/me).",
+          "type": "boolean"
         }
       }
     },
@@ -5191,6 +5532,26 @@
         },
         "username_changed_at": {
           "description": "UsernameChangedAt : date du dernier changement effectif du handle\n(nil = jamais changé). Sert de base au cooldown de changement de\nusername (cf. service). Symétrique de display_name_changed_at (profil).",
+          "type": "string"
+        },
+        "username_pending": {
+          "description": "UsernamePending : true si le username a été attribué d'office avec un\nsuffixe (compte créé par un admin, handle demandé déjà pris). Le front\nimpose alors un changement de username (repassé à false dès qu'un handle\nlibre est choisi via PATCH /users/me).",
+          "type": "boolean"
+        }
+      }
+    },
+    "models.AdminCreateProfilRequest": {
+      "type": "object",
+      "required": [
+        "display_name",
+        "id"
+      ],
+      "properties": {
+        "display_name": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "id": {
           "type": "string"
         }
       }
