@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LogOut, Settings } from 'lucide-react'
+import { LogOut, Palette, Settings } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import { logout } from '@/lib/auth-client'
@@ -14,6 +14,7 @@ import { ROUTES, navItemsForRole } from '@/lib/routes'
 import type { ProfilDetails } from '@/types'
 import { useT } from '@/components/language-provider'
 import { ThemeToggle } from '@/components/theme-toggle'
+import { CustomThemeDialog } from '@/components/custom-theme-dialog'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
   Sheet,
@@ -47,6 +48,7 @@ export function MobileHeader() {
   const session = useSession()
   const hidden = pathname?.startsWith(ROUTES.profil) ?? false
   const [open, setOpen] = useState(false)
+  const [themeDialogOpen, setThemeDialogOpen] = useState(false)
   const [account, setAccount] = useState({
     displayName: '',
     username: '',
@@ -190,6 +192,19 @@ export function MobileHeader() {
             <div className="mb-1 rounded-2xl px-2 py-2">
               <ThemeToggle />
             </div>
+            <button
+              type="button"
+              onClick={() => {
+                // Ferme le tiroir, puis ouvre la popup au tick suivant
+                // (évite la course de focus Sheet ↔ Dialog).
+                setOpen(false)
+                setTimeout(() => setThemeDialogOpen(true), 0)
+              }}
+              className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-base transition-colors hover:bg-accent"
+            >
+              <Palette className="h-5 w-5" />
+              {t('theme.customize')}
+            </button>
             <SheetClose asChild>
               <Link
                 href={ROUTES.parametres}
@@ -229,6 +244,10 @@ export function MobileHeader() {
 
       {/* Contrepoids pour équilibrer le logo centré */}
       <span className="ml-auto h-8 w-8" aria-hidden />
+
+      {/* Popup de thème personnalisé (frère du tiroir : ne se démonte pas
+          quand le Sheet se ferme). */}
+      <CustomThemeDialog open={themeDialogOpen} onOpenChange={setThemeDialogOpen} />
     </header>
   )
 }

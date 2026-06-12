@@ -55,7 +55,7 @@ export function MentionAutocomplete({
         >
           <Avatar className="h-8 w-8 shrink-0">
             {c.avatarUrl && <AvatarImage src={c.avatarUrl} alt="" />}
-            <AvatarFallback className="bg-gradient-to-br from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] text-xs font-bold text-white">
+            <AvatarFallback className="bg-gradient-to-br from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] text-xs font-bold text-white">
               {(c.displayName || c.username || 'U').charAt(0).toUpperCase()}
             </AvatarFallback>
           </Avatar>

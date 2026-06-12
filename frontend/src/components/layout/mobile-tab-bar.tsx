@@ -73,7 +73,7 @@ export function MobileTabBar() {
                 {showBadge && (
                   <span
                     aria-label={badgeAria}
-                    className="absolute -right-2 -top-1.5 flex h-[16px] min-w-[16px] items-center justify-center rounded-full bg-gradient-to-r from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] px-1 text-[10px] font-bold leading-none text-white shadow"
+                    className="absolute -right-2 -top-1.5 flex h-[16px] min-w-[16px] items-center justify-center rounded-full bg-gradient-to-r from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] px-1 text-[10px] font-bold leading-none text-white shadow"
                   >
                     {badgeCount > 99 ? '99+' : badgeCount}
                   </span>

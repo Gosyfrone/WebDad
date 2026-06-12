@@ -156,7 +156,7 @@ export function PostComposer({
     <div className={cn('flex gap-3', className)}>
       <Avatar className="mt-1 h-10 w-10 shrink-0 shadow-[0_12px_30px_rgba(91,108,255,0.22)]">
         {avatarUrl && <AvatarImage src={avatarUrl} alt="" />}
-        <AvatarFallback className="bg-gradient-to-br from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] font-bold text-white">
+        <AvatarFallback className="bg-gradient-to-br from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] font-bold text-white">
           {initial}
         </AvatarFallback>
       </Avatar>
@@ -257,7 +257,7 @@ export function PostComposer({
 
             <Button
               size="sm"
-              className="rounded-full bg-gradient-to-r from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] font-bold text-white shadow-[0_12px_30px_rgba(91,108,255,0.28)]"
+              className="rounded-full bg-gradient-to-r from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] font-bold text-white shadow-[0_12px_30px_rgba(91,108,255,0.28)]"
               disabled={isEmpty || isOver || submitting}
               onClick={handleSubmit}
             >

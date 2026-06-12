@@ -163,7 +163,7 @@ export function BookmarkDialog({ postId, open, onOpenChange, onMembershipChange 
                         className={cn(
                           'grid h-5 w-5 shrink-0 place-items-center rounded-md border transition-colors',
                           checked
-                            ? 'border-transparent bg-gradient-to-br from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] text-white'
+                            ? 'border-transparent bg-gradient-to-br from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] text-white'
                             : 'border-border',
                         )}
                       >
@@ -205,7 +205,7 @@ export function BookmarkDialog({ postId, open, onOpenChange, onMembershipChange 
             size="sm"
             onClick={() => void handleCreate()}
             disabled={!newName.trim() || creating}
-            className="shrink-0 gap-1 bg-gradient-to-r from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] text-white"
+            className="shrink-0 gap-1 bg-gradient-to-r from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] text-white"
           >
             {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
             {t('bookmarks.create')}

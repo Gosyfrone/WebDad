@@ -94,7 +94,7 @@ export function ConversationList({
             <Button
               size="icon"
               aria-label={t('messages.new')}
-              className="h-9 w-9 rounded-full bg-gradient-to-r from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] text-white"
+              className="h-9 w-9 rounded-full bg-gradient-to-r from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] text-white"
             >
               <Plus className="h-5 w-5" />
             </Button>

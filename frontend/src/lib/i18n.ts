@@ -128,6 +128,20 @@ export const messages: Record<Locale, Messages> = {
     'theme.system': 'Mode système',
     'theme.on': 'Activé',
     'theme.off': 'Désactivé',
+    // — Thème personnalisé —
+    'theme.customize': 'Personnaliser le thème',
+    'theme.customize_hint': 'Choisissez les couleurs de votre Breezy.',
+    'theme.target_background': "Fond d'écran",
+    'theme.target_background_hint': "Couleur de fond de l'application",
+    'theme.target_text': 'Couleur du texte',
+    'theme.target_text_hint': '« Pour toi », « Abonnements »…',
+    'theme.target_primary': "Boutons d'action",
+    'theme.target_primary_hint': '« Breezer », « Suivre »…',
+    'theme.reset': 'Réinitialiser',
+    'theme.back': 'Retour',
+    'theme.hex': 'Code hexadécimal',
+    'theme.brightness': 'Luminosité',
+    'theme.color_wheel_aria': 'Roue de sélection de couleur',
 
     // — Sélecteur de langue —
     'lang.title': 'Langue',
@@ -777,6 +791,20 @@ export const messages: Record<Locale, Messages> = {
     'theme.system': 'System mode',
     'theme.on': 'On',
     'theme.off': 'Off',
+    // — Custom theme —
+    'theme.customize': 'Customize theme',
+    'theme.customize_hint': 'Pick your Breezy colors.',
+    'theme.target_background': 'Background',
+    'theme.target_background_hint': 'App background color',
+    'theme.target_text': 'Text color',
+    'theme.target_text_hint': '“For you”, “Following”…',
+    'theme.target_primary': 'Action buttons',
+    'theme.target_primary_hint': '“Breeze”, “Follow”…',
+    'theme.reset': 'Reset',
+    'theme.back': 'Back',
+    'theme.hex': 'Hex code',
+    'theme.brightness': 'Brightness',
+    'theme.color_wheel_aria': 'Color selection wheel',
 
     // — Language switch —
     'lang.title': 'Language',

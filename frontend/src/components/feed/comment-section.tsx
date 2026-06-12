@@ -241,7 +241,7 @@ export function CommentSection({ postId, onCountChange }: CommentSectionProps) {
           </EmojiPicker>
           <Button
             size="sm"
-            className="shrink-0 rounded-full bg-gradient-to-r from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] font-bold text-white"
+            className="shrink-0 rounded-full bg-gradient-to-r from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] font-bold text-white"
             disabled={!canSubmit}
             onClick={handleSubmit}
           >
@@ -538,7 +538,7 @@ function CommentThread({ postId, comment, onRemove, onCountChange }: CommentThre
                 </EmojiPicker>
                 <Button
                   size="sm"
-                  className="shrink-0 rounded-full bg-gradient-to-r from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] font-bold text-white"
+                  className="shrink-0 rounded-full bg-gradient-to-r from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] font-bold text-white"
                   disabled={!canSubmit}
                   onClick={submitReply}
                 >
@@ -593,7 +593,7 @@ function CommentRow({
       <ProfilLink author={comment.author} className="shrink-0 transition hover:opacity-90">
         <Avatar className="h-8 w-8">
           {comment.author.avatarUrl && <AvatarImage src={comment.author.avatarUrl} alt="" />}
-          <AvatarFallback className="bg-gradient-to-br from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] text-xs font-bold text-white">
+          <AvatarFallback className="bg-gradient-to-br from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] text-xs font-bold text-white">
             {initialOf(comment.author.displayName)}
           </AvatarFallback>
         </Avatar>

@@ -65,6 +65,15 @@
     --brand-blue: 223 85% 60%;
     --brand-cyan: 199 89% 48%;
 
+    /* Arrêts du dégradé de marque des BOUTONS D'ACTION (Breezer, Suivre, FAB,
+     * badges…). Référencés en arbitrary value Tailwind :
+     *   from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)]
+     * Le thème personnalisé (cible « boutons d'action ») surcharge ces 3
+     * variables avec une couleur unie → les boutons deviennent cette couleur. */
+    --brand-from: #8d3dff;
+    --brand-via: #5b6cff;
+    --brand-to: #47d9ff;
+
     /* =====================================================================
      * SURFACES DE LA REFONTE GRAPHIQUE (glassmorphism)
      * ---------------------------------------------------------------------

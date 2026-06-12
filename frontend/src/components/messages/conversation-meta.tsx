@@ -52,7 +52,7 @@ export function ConversationAvatar({
   return (
     <div
       className={cn(
-        'flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] text-white',
+        'flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] text-white',
         className,
       )}
     >

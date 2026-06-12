@@ -133,7 +133,7 @@ function NonMemberMention({
           >
             <Avatar className="h-11 w-11 shrink-0">
               {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt="" />}
-              <AvatarFallback className="bg-gradient-to-br from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] font-bold text-white">
+              <AvatarFallback className="bg-gradient-to-br from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] font-bold text-white">
                 {(user.displayName || user.username || 'U').charAt(0).toUpperCase()}
               </AvatarFallback>
             </Avatar>

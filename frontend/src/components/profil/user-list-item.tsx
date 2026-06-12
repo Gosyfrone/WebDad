@@ -133,7 +133,7 @@ export function UserListItem({
             'group/btn relative z-10 mt-0.5 shrink-0 rounded-full font-bold',
             isFollowing
               ? 'border-white/70 bg-white/80 backdrop-blur hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive dark:border-white/15 dark:bg-white/10 dark:hover:bg-destructive/20'
-              : 'bg-gradient-to-r from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] text-white',
+              : 'bg-gradient-to-r from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] text-white',
           )}
         >
           {isFollowing ? (
