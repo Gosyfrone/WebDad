@@ -629,6 +629,27 @@ func (r *PostRepository) DeleteRepliesByParent(ctx context.Context, parentID str
 	return res.DeletedCount, nil
 }
 
+// ListCommentsByAuthor renvoie tous les commentaires d'un auteur, du plus
+// récent au plus ancien, paginés. Utilisé pour l'onglet « Réponses » du profil.
+func (r *PostRepository) ListCommentsByAuthor(ctx context.Context, authorID string, limit, skip int64) ([]models.Comment, error) {
+	opts := options.Find().
+		SetSort(bson.D{{Key: "created_at", Value: -1}}).
+		SetLimit(limit).
+		SetSkip(skip)
+
+	cursor, err := r.comments.Find(ctx, bson.M{"author_id": authorID}, opts)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = cursor.Close(ctx) }()
+
+	comments := []models.Comment{}
+	if err := cursor.All(ctx, &comments); err != nil {
+		return nil, err
+	}
+	return comments, nil
+}
+
 // GetComment renvoie un commentaire par son ObjectID (mongo.ErrNoDocuments si absent).
 func (r *PostRepository) GetComment(ctx context.Context, id bson.ObjectID) (*models.Comment, error) {
 	var comment models.Comment

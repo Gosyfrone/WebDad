@@ -1881,6 +1881,40 @@ paths:
             type: object
             additionalProperties:
               type: string
+  /posts/comments:
+    get:
+      produces:
+      - application/json
+      tags:
+      - comments
+      summary: Réponses écrites par un utilisateur (onglet profil)
+      parameters:
+      - type: string
+        description: ID de l'auteur des commentaires
+        name: author_id
+        in: query
+        required: true
+      - type: integer
+        description: Nb résultats
+        name: limit
+        in: query
+      - type: integer
+        description: Décalage
+        name: offset
+        in: query
+      responses:
+        '200':
+          description: OK
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/models.CommentWithPost'
+        '400':
+          description: Bad Request
+          schema:
+            type: object
+            additionalProperties:
+              type: string
   /posts/me/bookmarked-ids:
     get:
       security:
@@ -3710,6 +3744,31 @@ definitions:
           $ref: '#/definitions/models.MediaRef'
       parent_id:
         type: string
+      post_id:
+        type: string
+      reply_count:
+        type: integer
+      updated_at:
+        type: string
+  models.CommentWithPost:
+    type: object
+    properties:
+      author_id:
+        type: string
+      content:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      media:
+        type: array
+        items:
+          $ref: '#/definitions/models.MediaRef'
+      parent_id:
+        type: string
+      parent_post:
+        $ref: '#/definitions/models.Post'
       post_id:
         type: string
       reply_count:

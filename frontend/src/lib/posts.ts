@@ -55,6 +55,10 @@ interface ApiComment {
   created_at: string
 }
 
+interface ApiCommentWithPost extends ApiComment {
+  parent_post?: ApiPost
+}
+
 interface ApiUser {
   id: string
   username: string
@@ -120,6 +124,15 @@ export interface HashtagTrend {
 }
 
 export type HashtagPostSort = 'top' | 'recent'
+
+/** Commentaire de profil enrichi du post parent (onglet « Réponses »). */
+export interface ReplyContext {
+  comment: PostComment
+  /** ID du post sur lequel porte le commentaire (pour la navigation). */
+  parentPostId: string
+  /** Auteur du post parent (pour le libellé « En réponse à @X »). */
+  parentPostAuthor: PostAuthor
+}
 
 /** Commentaire enrichi pour l'affichage. */
 export interface PostComment {
@@ -525,6 +538,36 @@ export async function listReplies(
     await apiFetch(`/posts/${postId}/comments/${commentId}/replies?limit=${limit}&offset=${offset}`),
   )
   return Promise.all((raw ?? []).map(toComment))
+}
+
+/** Commentaires écrits par un utilisateur, enrichis du post parent (onglet « Réponses »). */
+export async function listCommentsByAuthor(
+  authorId: string,
+  limit = 20,
+  offset = 0,
+): Promise<ReplyContext[]> {
+  const raw = await unwrap<ApiCommentWithPost[]>(
+    await apiFetch(
+      `/posts/comments?author_id=${encodeURIComponent(authorId)}&limit=${limit}&offset=${offset}`,
+    ),
+  )
+  if (!raw) return []
+  const fallbackAuthor: PostAuthor = {
+    id: '',
+    username: '',
+    displayName: '...',
+    avatarUrl: '',
+    visibility: 'public',
+  }
+  return Promise.all(
+    raw.map(async (item) => {
+      const comment = await toComment(item)
+      const parentPostAuthor = item.parent_post
+        ? await resolveAuthor(item.parent_post.author_id)
+        : fallbackAuthor
+      return { comment, parentPostId: item.post_id, parentPostAuthor }
+    }),
+  )
 }
 
 /**

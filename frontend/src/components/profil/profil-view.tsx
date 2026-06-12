@@ -1,11 +1,11 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { ArrowLeft, FileText, Loader2, Lock, ShieldAlert } from 'lucide-react'
+import { ArrowLeft, FileText, Loader2, Lock, MessageCircle, ShieldAlert } from 'lucide-react'
 import Link from 'next/link'
 
 import { cn } from '@/lib/utils'
-import { ROUTES } from '@/lib/routes'
+import { ROUTES, postHref } from '@/lib/routes'
 import { useFollow } from '@/lib/use-follow'
 import {
   getMyProfil,
@@ -16,8 +16,10 @@ import {
 import {
   applyProfilUpdateToPosts,
   listByAuthor,
+  listCommentsByAuthor,
   subscribePostCreated,
   type FeedPost,
+  type ReplyContext,
 } from '@/lib/posts'
 import { FOLLOW_CHANGE_EVENT, type FollowChangeDetail } from '@/lib/use-follow'
 import { useToast } from '@/hooks/use-toast'
@@ -68,6 +70,7 @@ export function ProfilView({ username }: ProfilViewProps) {
   const t = useT()
   const [profil, setProfil] = useState<ProfilDetails | null>(null)
   const [posts, setPosts] = useState<FeedPost[]>([])
+  const [replies, setReplies] = useState<ReplyContext[]>([])
   const [tab, setTab] = useState<ProfilTab>('posts')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -152,6 +155,29 @@ export function ProfilView({ username }: ProfilViewProps) {
       cancelled = true
     }
   }, [accessPending, privateContentLocked, profil?.userId])
+
+  // Réponses de l'auteur (onglet « Réponses »), chargées au premier clic.
+  useEffect(() => {
+    if (tab !== 'replies') return
+    if (!profil?.userId) return
+    if (accessPending) return
+    if (privateContentLocked) {
+      setReplies([])
+      return
+    }
+    let cancelled = false
+    listCommentsByAuthor(profil.userId).then(
+      (list) => {
+        if (!cancelled) setReplies(list)
+      },
+      () => {
+        if (!cancelled) setReplies([])
+      },
+    )
+    return () => {
+      cancelled = true
+    }
+  }, [tab, accessPending, privateContentLocked, profil?.userId])
 
   useEffect(() => {
     function handleFollowChange(event: Event) {
@@ -345,10 +371,18 @@ export function ProfilView({ username }: ProfilViewProps) {
         ) : (
           <EmptyTab message={t('profil.empty_posts')} />
         )
+      ) : tab === 'replies' ? (
+        replies.length > 0 ? (
+          <div className="divide-y divide-border">
+            {replies.map((reply) => (
+              <ReplyCard key={reply.comment.id} reply={reply} />
+            ))}
+          </div>
+        ) : (
+          <EmptyTab message={t('profil.empty_replies')} />
+        )
       ) : (
-        <EmptyTab
-          message={tab === 'replies' ? t('profil.empty_replies') : t('profil.empty_likes')}
-        />
+        <EmptyTab message={t('profil.empty_likes')} />
       )}
     </div>
   )
@@ -375,6 +409,43 @@ function TabButton({
     >
       {children}
     </button>
+  )
+}
+
+function ReplyCard({ reply }: { reply: ReplyContext }) {
+  const t = useT()
+  const { comment, parentPostId, parentPostAuthor } = reply
+  return (
+    <Link
+      href={postHref(parentPostId)}
+      className="block px-4 py-3 hover:bg-accent/50 transition-colors"
+    >
+      <p className="mb-1 flex items-center gap-1 text-xs text-muted-foreground">
+        <MessageCircle className="h-3 w-3" aria-hidden />
+        {t('profil.replies_in_reply_to', { username: parentPostAuthor.username || '…' })}
+      </p>
+      <p className="text-sm">{comment.content}</p>
+      {comment.media.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1">
+          {comment.media.map((m, i) =>
+            m.type === 'image' ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                key={i}
+                src={m.url}
+                alt=""
+                className="h-20 w-20 rounded-lg object-cover"
+              />
+            ) : (
+              <video key={i} src={m.url} className="h-20 w-20 rounded-lg object-cover" muted />
+            ),
+          )}
+        </div>
+      )}
+      <p className="mt-1 text-xs text-muted-foreground">
+        {new Date(comment.createdAt).toLocaleDateString()}
+      </p>
+    </Link>
   )
 }
 

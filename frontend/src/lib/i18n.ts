@@ -747,6 +747,7 @@ export const messages: Record<Locale, Messages> = {
     'profil.tab_likes': "J'aime",
     'profil.empty_posts': 'Aucun post publié pour le moment.',
     'profil.empty_replies': 'Les réponses apparaîtront ici.',
+    'profil.replies_in_reply_to': 'En réponse à @{username}',
     'profil.empty_likes': 'Les posts que vous aimez apparaîtront ici.',
     'profil.private_title': 'Ce compte est privé',
     'profil.private_message':
@@ -1535,6 +1536,7 @@ export const messages: Record<Locale, Messages> = {
     'profil.tab_likes': 'Likes',
     'profil.empty_posts': 'No posts yet.',
     'profil.empty_replies': 'Replies will show up here.',
+    'profil.replies_in_reply_to': 'In reply to @{username}',
     'profil.empty_likes': 'Posts you like will show up here.',
     'profil.private_title': 'This account is private',
     'profil.private_message':

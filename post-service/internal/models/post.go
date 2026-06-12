@@ -86,6 +86,13 @@ type Comment struct {
 	UpdatedAt  time.Time     `bson:"updated_at" json:"updated_at"`
 }
 
+// CommentWithPost enrichit un Comment du post parent visible (hydraté par la
+// couche service) pour l'onglet « Réponses » du profil. Jamais persisté.
+type CommentWithPost struct {
+	Comment
+	ParentPost *Post `bson:"-" json:"parent_post,omitempty"`
+}
+
 // MediaRef : pièce jointe d'un post (image ou vidéo). Le post-service est
 // agnostique du contenu : il ne stocke que l'URL (chemin relatif `/media/<id>`
 // servi par le media-service via la gateway) et la nature (image/vidéo, pour

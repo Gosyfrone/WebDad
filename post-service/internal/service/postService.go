@@ -918,6 +918,80 @@ func (s *PostService) postAuthor(ctx context.Context, id string) string {
 	return p.AuthorID
 }
 
+// ListCommentsByAuthor renvoie les commentaires écrits par authorID, enrichis
+// de leur post parent, filtrés par la barrière de visibilité : les réponses
+// dont le post parent est masqué ou n'est pas lisible par viewerID sont exclues.
+func (s *PostService) ListCommentsByAuthor(ctx context.Context, authorID, viewerID string, limit, offset int64) ([]models.CommentWithPost, error) {
+	limit = clampLimit(limit)
+	offset = clampOffset(offset)
+
+	visible := make([]models.CommentWithPost, 0, limit)
+	seenVisible := int64(0)
+	sourceOffset := int64(0)
+	allowedByAuthor := make(map[string]bool)
+	postCache := make(map[string]*models.Post) // nil = masqué ou introuvable
+
+	for int64(len(visible)) < limit {
+		batch, err := s.repo.ListCommentsByAuthor(ctx, authorID, MaxLimit, sourceOffset)
+		if err != nil {
+			return nil, err
+		}
+		if len(batch) == 0 {
+			break
+		}
+
+		for _, comment := range batch {
+			parent, fetched := postCache[comment.PostID]
+			if !fetched {
+				oid, parseErr := parseID(comment.PostID)
+				if parseErr == nil {
+					p, getErr := s.repo.Get(ctx, oid)
+					if getErr == nil && !p.IsHidden {
+						postCache[comment.PostID] = p
+						parent = p
+					} else {
+						postCache[comment.PostID] = nil
+					}
+				} else {
+					postCache[comment.PostID] = nil
+				}
+			}
+			if parent == nil {
+				continue
+			}
+
+			allowed, ok := allowedByAuthor[parent.AuthorID]
+			if !ok {
+				var chkErr error
+				allowed, chkErr = s.canReadAuthor(ctx, viewerID, parent.AuthorID)
+				if chkErr != nil {
+					return nil, chkErr
+				}
+				allowedByAuthor[parent.AuthorID] = allowed
+			}
+			if !allowed {
+				continue
+			}
+
+			if seenVisible < offset {
+				seenVisible++
+				continue
+			}
+			visible = append(visible, models.CommentWithPost{Comment: comment, ParentPost: parent})
+			if int64(len(visible)) == limit {
+				break
+			}
+		}
+
+		if int64(len(batch)) < MaxLimit {
+			break
+		}
+		sourceOffset += MaxLimit
+	}
+
+	return visible, nil
+}
+
 // ListComments renvoie les commentaires RACINE d'un post (chronologiques, paginés).
 func (s *PostService) ListComments(ctx context.Context, postID string, limit, offset int64) ([]models.Comment, error) {
 	if _, err := parseID(postID); err != nil {
