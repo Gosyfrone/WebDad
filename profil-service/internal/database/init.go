@@ -150,8 +150,9 @@ func ensureSeed(ctx context.Context, db *mongo.Database) error {
 			"banner_url":   "",
 			"website":      "",
 			"location":     "",
-			"visibility":   "public",
-			"created_at":   now,
+			"visibility":       "public",
+			"likes_visibility": "public",
+			"created_at":       now,
 			"updated_at":   now,
 		},
 	}
@@ -179,7 +180,8 @@ var validators = map[string]bson.M{
 				"banner_url":   bson.M{"bsonType": "string"},
 				"website":      bson.M{"bsonType": "string"},
 				"location":     bson.M{"bsonType": "string"},
-				"visibility":   bson.M{"bsonType": "string", "enum": bson.A{"public", "private"}},
+				"visibility":       bson.M{"bsonType": "string", "enum": bson.A{"public", "private"}},
+				"likes_visibility": bson.M{"bsonType": "string", "enum": bson.A{"public", "private"}},
 				// Champs optionnels (validés uniquement s'ils sont présents).
 				"birth_date":              bson.M{"bsonType": "date"},
 				"gender":                  bson.M{"bsonType": "string", "enum": bson.A{"male", "female"}},

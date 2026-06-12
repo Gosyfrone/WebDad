@@ -17,6 +17,7 @@ import {
   applyProfilUpdateToPosts,
   listByAuthor,
   listCommentsByAuthor,
+  listLikedByUser,
   subscribePostCreated,
   type FeedPost,
   type ReplyContext,
@@ -71,6 +72,8 @@ export function ProfilView({ username }: ProfilViewProps) {
   const [profil, setProfil] = useState<ProfilDetails | null>(null)
   const [posts, setPosts] = useState<FeedPost[]>([])
   const [replies, setReplies] = useState<ReplyContext[]>([])
+  const [likedPosts, setLikedPosts] = useState<FeedPost[]>([])
+  const [likesPrivateLocked, setLikesPrivateLocked] = useState(false)
   const [tab, setTab] = useState<ProfilTab>('posts')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -172,6 +175,34 @@ export function ProfilView({ username }: ProfilViewProps) {
       },
       () => {
         if (!cancelled) setReplies([])
+      },
+    )
+    return () => {
+      cancelled = true
+    }
+  }, [tab, accessPending, privateContentLocked, profil?.userId])
+
+  // Likes de l'auteur (onglet « J'aime »), chargés au premier clic.
+  useEffect(() => {
+    if (tab !== 'likes') return
+    if (!profil?.userId) return
+    if (accessPending) return
+    if (privateContentLocked) {
+      setLikedPosts([])
+      return
+    }
+    let cancelled = false
+    setLikesPrivateLocked(false)
+    listLikedByUser(profil.userId).then(
+      (list) => {
+        if (!cancelled) setLikedPosts(list)
+      },
+      (err: unknown) => {
+        if (cancelled) return
+        if (err instanceof Error && err.message === 'likes_private') {
+          setLikesPrivateLocked(true)
+        }
+        setLikedPosts([])
       },
     )
     return () => {
@@ -381,6 +412,14 @@ export function ProfilView({ username }: ProfilViewProps) {
         ) : (
           <EmptyTab message={t('profil.empty_replies')} />
         )
+      ) : likesPrivateLocked ? (
+        <LikesPrivateTab username={profil.username} />
+      ) : likedPosts.length > 0 ? (
+        <div className="divide-y divide-border">
+          {likedPosts.map((post) => (
+            <PostCard key={post.id} post={post} onDeleted={() => {}} onUpdated={() => {}} />
+          ))}
+        </div>
       ) : (
         <EmptyTab message={t('profil.empty_likes')} />
       )}
@@ -466,6 +505,21 @@ function PrivateTab() {
       <div className="max-w-sm space-y-1">
         <p className="text-sm font-semibold text-foreground">{t('profil.private_title')}</p>
         <p className="text-sm text-muted-foreground">{t('profil.private_message')}</p>
+      </div>
+    </CenteredTab>
+  )
+}
+
+function LikesPrivateTab({ username }: { username: string }) {
+  const t = useT()
+  return (
+    <CenteredTab>
+      <Lock className="h-10 w-10 text-[#5B6CFF] dark:text-[#9aa6ff]" aria-hidden />
+      <div className="max-w-sm space-y-1">
+        <p className="text-sm font-semibold text-foreground">
+          {t('profil.likes_private_title', { username })}
+        </p>
+        <p className="text-sm text-muted-foreground">{t('profil.likes_private_message')}</p>
       </div>
     </CenteredTab>
   )

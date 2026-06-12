@@ -254,6 +254,28 @@ func (h *ProfilHandler) GetVisibility(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"visibility": profil.Visibility})
 }
 
+// GetLikesVisibility : GET /profils/:userId/likes-visibility — préférence de
+// confidentialité des J'aime d'un utilisateur (public/private).
+// @Summary     Visibilité des J'aime d'un profil
+// @Tags        profils
+// @Produce     json
+// @Param       userId path string true "User ID"
+// @Success     200 {object} map[string]string "likes_visibility: public|private"
+// @Failure     404 {object} map[string]string
+// @Router      /profils/{userId}/likes-visibility [get]
+func (h *ProfilHandler) GetLikesVisibility(c *gin.Context) {
+	profil, err := h.profils.GetByUserID(c.Request.Context(), c.Param("userId"))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "profil introuvable"})
+		return
+	}
+	v := profil.LikesVisibility
+	if v == "" {
+		v = models.VisibilityPublic
+	}
+	c.JSON(http.StatusOK, gin.H{"likes_visibility": v})
+}
+
 // respondProfilError mappe les erreurs métier vers des codes HTTP.
 func respondProfilError(c *gin.Context, err error) {
 	switch {

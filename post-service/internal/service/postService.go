@@ -81,6 +81,7 @@ type PostService struct {
 
 type profilVisibilityClient interface {
 	Visibility(ctx context.Context, userID string) (string, error)
+	LikesVisibility(ctx context.Context, userID string) (string, error)
 }
 
 type followStatusClient interface {
@@ -714,6 +715,23 @@ func (s *PostService) PostLikers(ctx context.Context, id string) ([]string, erro
 		return nil, err
 	}
 	return s.repo.LikersByPost(ctx, id)
+}
+
+// ListLikedByUser retourne les posts likés par authorID, triés du like le plus
+// récent au plus ancien, paginés. callerID peut être vide (visiteur).
+// Retourne ErrForbidden si les likes de authorID sont privés et que callerID
+// n'est pas authorID.
+func (s *PostService) ListLikedByUser(ctx context.Context, authorID, callerID string, limit, offset int64) ([]*models.Post, error) {
+	if s.profilClient != nil && callerID != authorID {
+		lv, err := s.profilClient.LikesVisibility(ctx, authorID)
+		if err != nil {
+			return nil, fmt.Errorf("%w: vérification likes-visibility: %v", ErrDependencyUnavailable, err)
+		}
+		if lv == client.VisibilityPrivate {
+			return nil, ErrForbidden
+		}
+	}
+	return s.repo.LikedPostsByUser(ctx, authorID, clampLimit(limit), clampOffset(offset))
 }
 
 // RepostPost enregistre un repost simple de actorID sur un post et renvoie le

@@ -376,3 +376,10 @@
 - **`.env` layering:** root = cross-cutting vars (`JWT_SECRET`, `INTERNAL_EVENT_SECRET`, `NEXT_PUBLIC_API_URL`, only the root
   `.env` is interpolable by compose); `<service>/.env` = own config via `env_file:`; `environment:` only for Docker overrides.
 - **Containerization = Docker + docker-compose** (grading requirement).
+
+## Visibilité des likes (`likes_visibility`)
+
+- **`likes_visibility` vit dans profil-service** aux côtés de `visibility`, sur le même modèle (`public|private`, défaut `public`). Posé sur le `Profil` Mongo, exposé via `GET /profils/:id/likes-visibility` et modifiable par `PATCH /profils/me`.
+- **Application côté serveur dans post-service** : `GET /posts/liked?author_id=<id>` vérifie `LikesVisibility` avant de renvoyer la liste ; si privé et caller ≠ owner → 403. Le front affiche un état vide explicite (`LikesPrivateTab`) sur 403.
+- **Barrière de visibilité secondaire** : les posts hiddens (`is_hidden=true`) sont exclus directement en base (`$ne: true` dans la query Mongo). La visibilité par auteur (profil privé + non-abonné) n'est pas recheckée post par post pour éviter N appels à profil-service (acceptable à l'échelle du projet).
+- **Pas de changement sur les routes existantes** (`/posts/me/liked-ids`, `POST /like`, etc.) — la préférence ne change que la visibilité de la liste publique de likes.

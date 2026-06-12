@@ -32,7 +32,8 @@ type Profil struct {
 	Gender      string     `json:"gender,omitempty"      bson:"gender,omitempty"` // "male" | "female"
 	CreatedAt   time.Time  `json:"created_at"            bson:"created_at"`
 	UpdatedAt   time.Time  `json:"updated_at"            bson:"updated_at"`
-	Visibility  string     `json:"visibility" bson:"visibility"`
+	Visibility      string `json:"visibility"       bson:"visibility"`
+	LikesVisibility string `json:"likes_visibility"  bson:"likes_visibility"`
 	// DisplayNameChangedAt : date du dernier changement EFFECTIF de display_name
 	// (nil = jamais changé depuis le provisioning). Enregistrée dès aujourd'hui
 	// pour servir de base à un cooldown « X jours entre deux changements de nom »
@@ -74,5 +75,6 @@ type UpdateProfilRequest struct {
 	Location    *string    `json:"location"     binding:"omitempty"`
 	BirthDate   *time.Time `json:"birth_date"   binding:"omitempty"`
 	Gender      *string    `json:"gender"       binding:"omitempty,oneof=male female"`
-	Visibility  *string    `json:"visibility"   binding:"omitempty,oneof=public private"`
+	Visibility      *string `json:"visibility"        binding:"omitempty,oneof=public private"`
+	LikesVisibility *string `json:"likes_visibility"   binding:"omitempty,oneof=public private"`
 }

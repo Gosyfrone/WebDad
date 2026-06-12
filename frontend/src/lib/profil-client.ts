@@ -31,6 +31,7 @@ type ApiProfil = {
   updated_at?: string
   display_name_changed_at?: string
   visibility?: 'public' | 'private'
+  likes_visibility?: 'public' | 'private'
 }
 
 const PROFIL_UPDATED_EVENT = 'breezy:profil-updated'
@@ -72,6 +73,20 @@ export async function saveMyProfil(
     method: 'PATCH',
     headers: jsonHeaders(),
     body: JSON.stringify(toUpdatePayload(fields)),
+  })
+
+  const updated = await getMyProfil()
+  notifyProfilUpdated(updated)
+  return updated
+}
+
+export async function saveMyLikesVisibility(
+  likesVisibility: ProfilDetails['likesVisibility']
+): Promise<ProfilDetails> {
+  await fetchApiData<ApiProfil>('/profils/me', {
+    method: 'PATCH',
+    headers: jsonHeaders(),
+    body: JSON.stringify({ likes_visibility: likesVisibility }),
   })
 
   const updated = await getMyProfil()
@@ -135,6 +150,7 @@ function mergeProfil(
     updatedAt: profil?.updated_at ?? user.updated_at ?? user.created_at,
     displayNameChangedAt: profil?.display_name_changed_at ?? '',
     visibility: profil?.visibility === 'private' ? 'private' : 'public',
+    likesVisibility: profil?.likes_visibility === 'private' ? 'private' : 'public',
     followersCount: user.follower_count ?? 0,
     followingCount: user.following_count ?? 0,
     postsCount: 0,

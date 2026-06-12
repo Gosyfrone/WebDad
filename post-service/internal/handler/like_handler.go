@@ -86,6 +86,37 @@ func (h *LikeHandler) ListPostLikes(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": ids})
 }
 
+// ListLikedByUser : GET /posts/liked?author_id=<id> — posts likés par un
+// utilisateur, antéchronologiques. Retourne 403 si les likes sont privés et
+// l'appelant n'est pas le propriétaire.
+// @Summary     Posts likés par un utilisateur
+// @Tags        likes
+// @Produce     json
+// @Param       author_id query string true  "User ID"
+// @Param       limit     query int    false "Nb résultats"
+// @Param       offset    query int    false "Décalage"
+// @Success     200 {array} models.Post
+// @Failure     400 {object} map[string]string
+// @Failure     403 {object} map[string]string "Likes privés"
+// @Router      /posts/liked [get]
+func (h *LikeHandler) ListLikedByUser(c *gin.Context) {
+	authorID := c.Query("author_id")
+	if authorID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "author_id requis"})
+		return
+	}
+	callerID := ""
+	if claims, ok := middleware.ClaimsFrom(c); ok {
+		callerID = claims.UserID
+	}
+	posts, err := h.service.ListLikedByUser(c.Request.Context(), authorID, callerID, pageLimit(c), pageOffset(c))
+	if err != nil {
+		respondPostError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": posts})
+}
+
 // LikedByMe : GET /posts/me/liked-ids — ids des posts likés par l'utilisateur
 // courant (initialise l'état des cœurs côté front, façon getFollowingIds).
 // @Summary     IDs des posts que j'ai likés

@@ -53,6 +53,7 @@ export interface ProfilDetails {
   updatedAt: string
   displayNameChangedAt: string
   visibility: 'public' | 'private'
+  likesVisibility: 'public' | 'private'
   followersCount: number
   followingCount: number
   postsCount: number

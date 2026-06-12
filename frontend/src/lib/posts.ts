@@ -412,6 +412,22 @@ export async function listByAuthor(authorId: string, limit = 20, offset = 0): Pr
   return mapPosts(raw)
 }
 
+/** Posts likés par un utilisateur (403 si likes privés et non-propriétaire). */
+export async function listLikedByUser(
+  authorId: string,
+  limit = 20,
+  offset = 0,
+): Promise<FeedPost[]> {
+  const params = new URLSearchParams()
+  params.set('author_id', authorId)
+  params.set('limit', String(limit))
+  params.set('offset', String(offset))
+  const res = await apiFetch(`/posts/liked?${params}`)
+  if (res.status === 403) throw Object.assign(new Error('likes_private'), { status: 403 })
+  const raw = await unwrap<ApiPost[]>(res)
+  return mapPosts(raw ?? [])
+}
+
 export async function listHashtagTrends(limit = 5, query = ''): Promise<HashtagTrend[]> {
   const params = new URLSearchParams()
   params.set('limit', String(limit))
