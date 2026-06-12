@@ -710,7 +710,7 @@ export const messages: Record<Locale, Messages> = {
 
     // — Bouton de suivi —
     'follow.follow': 'Suivre',
-    'follow.followed': 'Abonné',
+    'follow.followed': 'Suivi',
     'follow.requested': 'En attente',
     'follow.unfollow': 'Ne plus suivre',
     'follow.private_unfollow_title': 'Ne plus suivre ce compte privé ?',

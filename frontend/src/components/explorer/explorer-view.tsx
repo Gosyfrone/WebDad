@@ -583,11 +583,13 @@ function TrendsSection({
                 <span className="block text-xs text-muted-foreground">
                   {t('explorer.trend_rank', { rank: String(index + 1) })}
                 </span>
-                <span className="block truncate font-bold text-foreground">#{trend.tag}</span>
-                <span className="block text-xs text-muted-foreground">
-                  {t(trend.count > 1 ? 'trends.posts_other' : 'trends.posts_one', {
-                    count: formatTrendCount(trend.count),
-                  })}
+                <span className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-3">
+                  <span className="min-w-0 truncate font-bold text-foreground">#{trend.tag}</span>
+                  <span className="justify-self-end whitespace-nowrap text-xs text-muted-foreground">
+                    {t(trend.count > 1 ? 'trends.posts_other' : 'trends.posts_one', {
+                      count: formatTrendCount(trend.count),
+                    })}
+                  </span>
                 </span>
               </span>
             </Link>

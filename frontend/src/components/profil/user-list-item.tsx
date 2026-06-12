@@ -17,6 +17,8 @@ interface UserListItemProps {
   pending?: boolean
   /** Affiche la bio sous le @handle (défaut : oui). Compact en sidebar. */
   showBio?: boolean
+  /** Resserre la ligne pour les cartes latérales tout en gardant une marge basse. */
+  compact?: boolean
   /** Déclenché quand la ligne ouvre le profil. */
   onProfileOpen?: (user: RelationUser) => void
   /** Action compacte affichée à droite de la ligne (ex. retirer d'un historique). */
@@ -48,6 +50,7 @@ export function UserListItem({
   isSelf = false,
   pending = false,
   showBio = true,
+  compact = false,
   onProfileOpen,
   trailingAction,
   onToggleFollow,
@@ -58,7 +61,12 @@ export function UserListItem({
   const initials = (user.displayName.charAt(0) || user.username.charAt(0) || '?').toUpperCase()
 
   return (
-    <div className="relative flex items-start gap-3 px-4 py-3 transition-colors hover:bg-accent">
+    <div
+      className={cn(
+        'relative flex gap-3 rounded-[18px] transition-colors hover:bg-accent',
+        compact ? 'items-start px-3 py-1.5' : 'items-start px-4 py-3',
+      )}
+    >
       {/* Lien « étiré » : rend toute la ligne cliquable vers le profil. */}
       <ProfilLink
         author={{ id: user.id, username: user.username }}
@@ -75,23 +83,29 @@ export function UserListItem({
         className="relative z-10 shrink-0"
         onClick={() => onProfileOpen?.(user)}
       >
-        <Avatar className="h-10 w-10">
+        <Avatar className={cn(compact ? 'h-9 w-9' : 'h-10 w-10')}>
           {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user.displayName} />}
           <AvatarFallback>{initials}</AvatarFallback>
         </Avatar>
       </ProfilLink>
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className={cn('flex min-w-0 flex-1 flex-col', compact && 'pr-1')}>
         <ProfilLink
           author={{ id: user.id, username: user.username }}
-          className="relative z-10 truncate text-sm font-bold text-foreground hover:underline"
+          className={cn(
+            'relative z-10 font-bold text-foreground hover:underline',
+            compact ? 'line-clamp-2 break-words text-[13px] leading-4' : 'truncate text-sm',
+          )}
           onClick={() => onProfileOpen?.(user)}
         >
           {user.displayName}
         </ProfilLink>
         <ProfilLink
           author={{ id: user.id, username: user.username }}
-          className="relative z-10 truncate text-sm text-muted-foreground hover:underline"
+          className={cn(
+            'relative z-10 truncate text-muted-foreground hover:underline',
+            compact ? 'text-[13px] leading-4' : 'text-sm',
+          )}
           onClick={() => onProfileOpen?.(user)}
         >
           @{user.username}
@@ -114,7 +128,10 @@ export function UserListItem({
             e.stopPropagation()
             onRemoveFollower(user)
           }}
-          className="relative z-10 mt-0.5 shrink-0 rounded-full border-white/70 bg-white/80 font-bold backdrop-blur hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive dark:border-white/15 dark:bg-white/10 dark:hover:bg-destructive/20"
+          className={cn(
+            'relative z-10 mt-0.5 shrink-0 rounded-full border-white/70 bg-white/80 font-bold backdrop-blur hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive dark:border-white/15 dark:bg-white/10 dark:hover:bg-destructive/20',
+            compact && 'mt-0',
+          )}
         >
           {t('follow.remove_follower')}
         </Button>
@@ -130,17 +147,21 @@ export function UserListItem({
             onToggleFollow(user, !isFollowing)
           }}
           className={cn(
-            'group/btn relative z-10 mt-0.5 shrink-0 rounded-full font-bold',
+            'group/btn relative z-10 shrink-0 rounded-full font-bold',
+            compact ? 'mt-0' : 'mt-0.5',
+            compact && 'h-8 min-w-[76px] px-3 text-xs',
             isFollowing
               ? 'border-white/70 bg-white/80 backdrop-blur hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive dark:border-white/15 dark:bg-white/10 dark:hover:bg-destructive/20'
               : 'bg-gradient-to-r from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] text-white',
           )}
         >
-          {isFollowing ? (
+          {isFollowing && !compact ? (
             <>
               <span className="group-hover/btn:hidden">{t('follow.followed')}</span>
               <span className="hidden group-hover/btn:inline">{t('follow.unfollow')}</span>
             </>
+          ) : isFollowing ? (
+            t('follow.followed')
           ) : (
             t('follow.follow')
           )}

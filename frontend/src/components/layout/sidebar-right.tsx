@@ -94,7 +94,7 @@ export function SidebarRight() {
   }
 
   return (
-    <aside className="sticky top-0 hidden h-screen w-[350px] flex-col gap-3 overflow-y-auto px-4 py-3 xl:flex">
+    <aside className="sticky top-0 hidden h-screen w-[min(350px,30vw)] min-w-[290px] flex-col gap-2 overflow-y-auto px-3 py-2 pb-8 xl:flex 2xl:px-4">
       {/* Search */}
       <form onSubmit={submitSearch} className="relative">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
@@ -128,23 +128,25 @@ export function SidebarRight() {
 
       {/* Tendances */}
       <div className="glass overflow-hidden rounded-[24px] border backdrop-blur-xl">
-        <h2 className="brand-text px-4 py-2.5 text-lg font-bold">{t('trends.title')}</h2>
+        <h2 className="brand-text px-4 pb-1.5 pt-2.5 text-lg font-bold leading-tight">{t('trends.title')}</h2>
         {trends.length > 0 ? (
-          trends.map((trend) => (
-            <Link
-              key={trend.tag}
-              href={hashtagHref(trend.tag, 'top')}
-              className="flex flex-col gap-0.5 px-4 py-2 transition-colors hover:bg-accent"
-            >
-              <span className="text-[11px] leading-4 text-muted-foreground">{t('trends.trending')}</span>
-              <span className="font-bold text-foreground">#{trend.tag}</span>
-              <span className="text-[11px] leading-4 text-muted-foreground">
-                {t(trend.count > 1 ? 'trends.posts_other' : 'trends.posts_one', {
-                  count: formatTrendCount(trend.count),
-                })}
-              </span>
-            </Link>
-          ))
+          <div className="px-2 pb-2">
+            {trends.map((trend) => (
+              <Link
+                key={trend.tag}
+                href={hashtagHref(trend.tag, 'top')}
+                className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-2 rounded-[18px] px-3 py-2 transition-colors hover:bg-accent"
+              >
+                <span className="col-span-2 text-[11px] leading-3 text-muted-foreground">{t('trends.trending')}</span>
+                <span className="min-w-0 truncate text-sm font-bold leading-5 text-foreground">#{trend.tag}</span>
+                <span className="justify-self-end whitespace-nowrap pl-2 text-[11px] leading-5 text-muted-foreground">
+                  {t(trend.count > 1 ? 'trends.posts_other' : 'trends.posts_one', {
+                    count: formatTrendCount(trend.count),
+                  })}
+                </span>
+              </Link>
+            ))}
+          </div>
         ) : (
           <p className="px-4 pb-4 text-sm text-muted-foreground">{t('trends.empty')}</p>
         )}
