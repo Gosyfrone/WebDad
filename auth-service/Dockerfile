@@ -7,8 +7,6 @@ WORKDIR /app
 
 # Copier les fichiers de dépendances en premier (cache Docker optimal)
 COPY go.mod go.sum ./
-# proxy.golang.org est parfois instable en HTTP/2 (stream error / INTERNAL_ERROR
-# received from peer) : on force HTTP/1.1 et on réessaie jusqu'à 5 fois.
 RUN go mod download
 
 # Copier le code source
