@@ -93,6 +93,10 @@ var validators = map[string]bson.M{
 			"properties": bson.M{
 				"author_id": bson.M{"bsonType": "string"},
 				"content":   bson.M{"bsonType": "string", "maxLength": 280},
+				"hashtags": bson.M{
+					"bsonType": "array",
+					"items":    bson.M{"bsonType": "string"},
+				},
 				"media": bson.M{
 					"bsonType": "array",
 					"maxItems": 4,
@@ -232,6 +236,7 @@ var indexes = map[string][]mongo.IndexModel{
 		{Keys: bson.D{{Key: "created_at", Value: -1}}}, // tri fil d'actu
 		{Keys: bson.D{{Key: "author_id", Value: 1}, {Key: "pinned_at", Value: -1}, {Key: "created_at", Value: -1}}},
 		{Keys: bson.D{{Key: "is_hidden", Value: 1}}},
+		{Keys: bson.D{{Key: "hashtags", Value: 1}, {Key: "created_at", Value: -1}}},
 	},
 	"comments": {
 		{Keys: bson.D{{Key: "author_id", Value: 1}}},

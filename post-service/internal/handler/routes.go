@@ -37,6 +37,8 @@ func RegisterRoutes(r *gin.Engine, serviceName string, postService *service.Post
 		posts.GET("/me/liked-ids", auth, LikeHandler.LikedByMe)
 		posts.GET("/me/reposted-ids", auth, PostHandler.RepostedByMe)
 		posts.GET("/me/bookmarked-ids", auth, BookmarkHandler.BookmarkedByMe)
+		// Tendances hashtags — route STATIQUE avant `/:id`.
+		posts.GET("/trends", optionalAuth, PostHandler.ListHashtagTrends)
 
 		// Modération — routes STATIQUES (`/posts/moderation/…`) placées avant le
 		// groupe `/:id`. Corbeille partagée mod/admin (tweets retirés en

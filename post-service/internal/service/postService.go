@@ -8,7 +8,11 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"regexp"
+	"sort"
+	"strings"
 	"time"
+	"unicode"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
@@ -53,6 +57,8 @@ const (
 	DefaultLimit = 20
 	MaxLimit     = 100
 )
+
+var hashtagPattern = regexp.MustCompile(`(^|[^\p{L}\p{N}_])#([\p{L}\p{N}_]{1,64})`)
 
 type PostService struct {
 	repo *repository.PostRepository
@@ -152,6 +158,7 @@ func (s *PostService) CreatePost(ctx context.Context, authorID, content, quotePo
 	post := &models.Post{
 		AuthorID:      authorID,
 		Content:       content,
+		Hashtags:      ExtractHashtags(content),
 		Media:         media,
 		QuotePostID:   quotePostID,
 		LikesCount:    0,
@@ -187,8 +194,18 @@ func (s *PostService) CreatePost(ctx context.Context, authorID, content, quotePo
 }
 
 // GetPosts renvoie le fil global, du plus récent au plus ancien, paginé.
-func (s *PostService) GetPosts(ctx context.Context, viewerID string, limit, offset int64) ([]models.Post, error) {
-	return s.visibleFeedPage(ctx, viewerID, limit, offset, s.repo.GetAll)
+func (s *PostService) GetPosts(ctx context.Context, viewerID, hashtag, sortMode string, hashtagAny bool, limit, offset int64) ([]models.Post, error) {
+	hashtag = normalizeHashtag(hashtag)
+	sortMode = normalizePostSort(sortMode)
+	fetch := s.repo.GetAll
+	if hashtag != "" {
+		fetch = func(ctx context.Context, pageLimit, pageOffset int64) ([]models.Post, error) {
+			return s.repo.GetAllByHashtag(ctx, hashtag, sortMode, pageLimit, pageOffset)
+		}
+	} else if hashtagAny {
+		fetch = s.repo.GetAllWithHashtags
+	}
+	return s.visibleFeedPage(ctx, viewerID, limit, offset, fetch)
 }
 
 // GetPost renvoie un post par son id si le profil de l'auteur est lisible par
@@ -230,7 +247,7 @@ func (s *PostService) UpdatePost(ctx context.Context, id, content, actorID, acto
 	if !canModify(post, actorID, actorRole) {
 		return nil, ErrForbidden
 	}
-	updated, err := s.repo.Update(ctx, oid, content)
+	updated, err := s.repo.Update(ctx, oid, content, ExtractHashtags(content))
 	return updated, translateNotFound(err)
 }
 
@@ -452,7 +469,7 @@ func (s *PostService) PurgePost(ctx context.Context, id, actorID, actorRole stri
 }
 
 // GetByProfile renvoie les posts d'un auteur, du plus récent au plus ancien.
-func (s *PostService) GetByProfile(ctx context.Context, authorID, viewerID string, limit, offset int64) ([]models.Post, error) {
+func (s *PostService) GetByProfile(ctx context.Context, authorID, viewerID, hashtag string, limit, offset int64) ([]models.Post, error) {
 	allowed, err := s.canReadAuthor(ctx, viewerID, authorID)
 	if err != nil {
 		return nil, err
@@ -460,20 +477,80 @@ func (s *PostService) GetByProfile(ctx context.Context, authorID, viewerID strin
 	if !allowed {
 		return []models.Post{}, nil
 	}
-	return s.repo.GetByProfile(ctx, authorID, clampLimit(limit), clampOffset(offset))
+	return s.repo.GetByProfileHashtag(ctx, authorID, normalizeHashtag(hashtag), clampLimit(limit), clampOffset(offset))
 }
 
 // GetFeed renvoie les posts d'un ensemble d'auteurs (fil « Abonnements »). Le
 // front fournit les ids suivis (seul le user-service connaît le graphe) ; la
 // sélection + le tri + la pagination sont faits côté DB ($in indexé). Liste
 // vide → aucun post (pas de requête inutile).
-func (s *PostService) GetFeed(ctx context.Context, authorIDs []string, viewerID string, limit, offset int64) ([]models.Post, error) {
+func (s *PostService) GetFeed(ctx context.Context, authorIDs []string, viewerID, hashtag, sortMode string, limit, offset int64) ([]models.Post, error) {
 	if len(authorIDs) == 0 {
 		return []models.Post{}, nil
 	}
+	hashtag = normalizeHashtag(hashtag)
+	sortMode = normalizePostSort(sortMode)
 	return s.visibleFeedPage(ctx, viewerID, limit, offset, func(ctx context.Context, pageLimit, pageOffset int64) ([]models.Post, error) {
-		return s.repo.GetByAuthors(ctx, authorIDs, pageLimit, pageOffset)
+		return s.repo.GetByAuthorsHashtag(ctx, authorIDs, hashtag, sortMode, pageLimit, pageOffset)
 	})
+}
+
+// TrendingHashtags compte les hashtags des posts lisibles par le visiteur courant.
+// query filtre optionnellement sur un préfixe normalisé, utile pour les suggestions.
+func (s *PostService) TrendingHashtags(ctx context.Context, viewerID, query string, limit int64) ([]models.HashtagTrend, error) {
+	limit = clampLimit(limit)
+	query = normalizeTrendQuery(query)
+	counts := make(map[string]int64)
+	allowedByAuthor := make(map[string]bool)
+	sourceOffset := int64(0)
+
+	for {
+		batch, err := s.repo.GetAll(ctx, MaxLimit, sourceOffset)
+		if err != nil {
+			return nil, err
+		}
+		if len(batch) == 0 {
+			break
+		}
+		for _, post := range batch {
+			allowed, ok := allowedByAuthor[post.AuthorID]
+			if !ok {
+				allowed, err = s.canReadAuthor(ctx, viewerID, post.AuthorID)
+				if err != nil {
+					return nil, err
+				}
+				allowedByAuthor[post.AuthorID] = allowed
+			}
+			if !allowed {
+				continue
+			}
+			for _, tag := range post.Hashtags {
+				if !matchesTrendQuery(tag, query) {
+					continue
+				}
+				counts[tag]++
+			}
+		}
+		if int64(len(batch)) < MaxLimit {
+			break
+		}
+		sourceOffset += MaxLimit
+	}
+
+	trends := make([]models.HashtagTrend, 0, len(counts))
+	for tag, count := range counts {
+		trends = append(trends, models.HashtagTrend{Tag: tag, Count: count})
+	}
+	sort.Slice(trends, func(i, j int) bool {
+		if trends[i].Count == trends[j].Count {
+			return trends[i].Tag < trends[j].Tag
+		}
+		return trends[i].Count > trends[j].Count
+	})
+	if int64(len(trends)) > limit {
+		trends = trends[:limit]
+	}
+	return trends, nil
 }
 
 type postFetcher func(ctx context.Context, limit, offset int64) ([]models.Post, error)
@@ -964,6 +1041,61 @@ func withoutProfilePins(posts []models.Post) []models.Post {
 		cleaned[i].PinnedAt = nil
 	}
 	return cleaned
+}
+
+// ExtractHashtags normalise les hashtags d'un texte : minuscules, sans #, uniques.
+func ExtractHashtags(content string) []string {
+	matches := hashtagPattern.FindAllStringSubmatch(content, -1)
+	if len(matches) == 0 {
+		return nil
+	}
+	seen := make(map[string]bool, len(matches))
+	tags := make([]string, 0, len(matches))
+	for _, match := range matches {
+		if len(match) < 3 {
+			continue
+		}
+		tag := normalizeHashtag(match[2])
+		if tag == "" || seen[tag] {
+			continue
+		}
+		seen[tag] = true
+		tags = append(tags, tag)
+	}
+	return tags
+}
+
+func normalizeHashtag(raw string) string {
+	tag := strings.TrimSpace(strings.TrimPrefix(raw, "#"))
+	tag = strings.ToLower(tag)
+	if tag == "" || !hasLetter(tag) {
+		return ""
+	}
+	return tag
+}
+
+func normalizeTrendQuery(raw string) string {
+	return strings.ToLower(strings.TrimPrefix(strings.TrimSpace(raw), "#"))
+}
+
+func matchesTrendQuery(tag, query string) bool {
+	return query == "" || strings.HasPrefix(tag, query)
+}
+
+func normalizePostSort(raw string) string {
+	if strings.ToLower(strings.TrimSpace(raw)) == "top" {
+		return "top"
+	}
+	return "recent"
+}
+
+func hasLetter(value string) bool {
+	for _, r := range value {
+		if unicode.IsLetter(r) {
+			return true
+		}
+	}
+	return false
 }
 
 // parseID valide qu'un id est bien un ObjectID hexadécimal.

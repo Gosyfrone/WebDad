@@ -50,6 +50,18 @@ func NewPostRepository(db *mongo.Database) *PostRepository {
 // sans être effacés. Une nouvelle map à chaque appel (pas d'aliasing).
 func notHidden() bson.M { return bson.M{"is_hidden": bson.M{"$ne": true}} }
 
+func withHashtag(filter bson.M, hashtag string) bson.M {
+	if hashtag != "" {
+		filter["hashtags"] = hashtag
+	}
+	return filter
+}
+
+func withAnyHashtag(filter bson.M) bson.M {
+	filter["hashtags"] = bson.M{"$exists": true, "$ne": bson.A{}}
+	return filter
+}
+
 // Create insère le post et renseigne post.ID avec l'identifiant généré.
 func (r *PostRepository) Create(ctx context.Context, post *models.Post) error {
 	res, err := r.posts.InsertOne(ctx, post)
@@ -68,13 +80,29 @@ func (r *PostRepository) GetAll(ctx context.Context, limit, skip int64) ([]model
 	return r.find(ctx, notHidden(), limit, skip)
 }
 
+// GetAllByHashtag renvoie le fil global limité aux posts contenant ce hashtag.
+func (r *PostRepository) GetAllByHashtag(ctx context.Context, hashtag, sortMode string, limit, skip int64) ([]models.Post, error) {
+	return r.findSorted(ctx, withHashtag(notHidden(), hashtag), sortMode, limit, skip)
+}
+
+// GetAllWithHashtags renvoie le fil global limité aux posts contenant au moins
+// un hashtag.
+func (r *PostRepository) GetAllWithHashtags(ctx context.Context, limit, skip int64) ([]models.Post, error) {
+	return r.find(ctx, withAnyHashtag(notHidden()), limit, skip)
+}
+
 // GetByProfile renvoie les posts d'un auteur, triés du plus récent au plus ancien.
 func (r *PostRepository) GetByProfile(ctx context.Context, authorID string, limit, skip int64) ([]models.Post, error) {
+	return r.GetByProfileHashtag(ctx, authorID, "", limit, skip)
+}
+
+// GetByProfileHashtag renvoie les posts d'un auteur, éventuellement filtrés par hashtag.
+func (r *PostRepository) GetByProfileHashtag(ctx context.Context, authorID, hashtag string, limit, skip int64) ([]models.Post, error) {
 	opts := options.Find().
 		SetSort(bson.D{{Key: "pinned_at", Value: -1}, {Key: "created_at", Value: -1}}).
 		SetLimit(limit + skip)
 
-	filter := notHidden()
+	filter := withHashtag(notHidden(), hashtag)
 	filter["author_id"] = authorID
 	cursor, err := r.posts.Find(ctx, filter, opts)
 	if err != nil {
@@ -105,6 +133,9 @@ func (r *PostRepository) GetByProfile(ctx context.Context, authorID string, limi
 		if post.IsHidden {
 			continue
 		}
+		if hashtag != "" && !postHasHashtag(post, hashtag) {
+			continue
+		}
 		post.RepostedByID = repost.UserID
 		post.RepostedAt = &repost.CreatedAt
 		posts = append(posts, *post)
@@ -125,15 +156,57 @@ func (r *PostRepository) GetByProfile(ctx context.Context, authorID string, limi
 // triés du plus récent au plus ancien. Une seule requête indexée (`$in` sur
 // author_id) : la sélection est faite côté DB, pas côté client.
 func (r *PostRepository) GetByAuthors(ctx context.Context, authorIDs []string, limit, skip int64) ([]models.Post, error) {
-	filter := notHidden()
+	return r.GetByAuthorsHashtag(ctx, authorIDs, "", "", limit, skip)
+}
+
+// GetByAuthorsHashtag renvoie les posts d'auteurs donnés, éventuellement filtrés par hashtag.
+func (r *PostRepository) GetByAuthorsHashtag(ctx context.Context, authorIDs []string, hashtag, sortMode string, limit, skip int64) ([]models.Post, error) {
+	filter := withHashtag(notHidden(), hashtag)
 	filter["author_id"] = bson.M{"$in": authorIDs}
-	return r.find(ctx, filter, limit, skip)
+	return r.findSorted(ctx, filter, sortMode, limit, skip)
+}
+
+// ListTopHashtags agrège les hashtags les plus présents dans les posts non masqués.
+func (r *PostRepository) ListTopHashtags(ctx context.Context, limit int64) ([]models.HashtagTrend, error) {
+	pipeline := mongo.Pipeline{
+		{{Key: "$match", Value: bson.M{
+			"is_hidden": bson.M{"$ne": true},
+			"hashtags":  bson.M{"$exists": true, "$ne": bson.A{}},
+		}}},
+		{{Key: "$unwind", Value: "$hashtags"}},
+		{{Key: "$group", Value: bson.M{"_id": "$hashtags", "count": bson.M{"$sum": 1}}}},
+		{{Key: "$sort", Value: bson.D{{Key: "count", Value: -1}, {Key: "_id", Value: 1}}}},
+		{{Key: "$limit", Value: limit}},
+	}
+
+	cursor, err := r.posts.Aggregate(ctx, pipeline)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = cursor.Close(ctx) }()
+
+	var rows []struct {
+		Tag   string `bson:"_id"`
+		Count int64  `bson:"count"`
+	}
+	if err := cursor.All(ctx, &rows); err != nil {
+		return nil, err
+	}
+	trends := make([]models.HashtagTrend, 0, len(rows))
+	for _, row := range rows {
+		trends = append(trends, models.HashtagTrend{Tag: row.Tag, Count: row.Count})
+	}
+	return trends, nil
 }
 
 // find factorise la lecture paginée + triée des posts.
 func (r *PostRepository) find(ctx context.Context, filter bson.M, limit, skip int64) ([]models.Post, error) {
+	return r.findSorted(ctx, filter, "", limit, skip)
+}
+
+func (r *PostRepository) findSorted(ctx context.Context, filter bson.M, sortMode string, limit, skip int64) ([]models.Post, error) {
 	opts := options.Find().
-		SetSort(bson.D{{Key: "created_at", Value: -1}}).
+		SetSort(postSort(sortMode)).
 		SetLimit(limit).
 		SetSkip(skip)
 
@@ -148,6 +221,18 @@ func (r *PostRepository) find(ctx context.Context, filter bson.M, limit, skip in
 		return nil, err
 	}
 	return posts, nil
+}
+
+func postSort(sortMode string) bson.D {
+	if sortMode == "top" {
+		return bson.D{
+			{Key: "likes_count", Value: -1},
+			{Key: "reposts_count", Value: -1},
+			{Key: "comments_count", Value: -1},
+			{Key: "created_at", Value: -1},
+		}
+	}
+	return bson.D{{Key: "created_at", Value: -1}}
 }
 
 // Get renvoie un post par son ObjectID (mongo.ErrNoDocuments si absent).
@@ -296,10 +381,11 @@ func (r *PostRepository) PurgeByAuthor(ctx context.Context, userID string) (int6
 
 // Update modifie le contenu et renvoie le document à jour (ReturnDocument
 // After). mongo.ErrNoDocuments si le post n'existe pas.
-func (r *PostRepository) Update(ctx context.Context, id bson.ObjectID, content string) (*models.Post, error) {
+func (r *PostRepository) Update(ctx context.Context, id bson.ObjectID, content string, hashtags []string) (*models.Post, error) {
 	update := bson.M{
 		"$set": bson.M{
 			"content":    content,
+			"hashtags":   hashtags,
 			"updated_at": time.Now(),
 		},
 	}
@@ -608,4 +694,16 @@ func profileSortTime(post models.Post) time.Time {
 		return *post.RepostedAt
 	}
 	return post.CreatedAt
+}
+
+func postHasHashtag(post *models.Post, hashtag string) bool {
+	if post == nil {
+		return false
+	}
+	for _, tag := range post.Hashtags {
+		if tag == hashtag {
+			return true
+		}
+	}
+	return false
 }

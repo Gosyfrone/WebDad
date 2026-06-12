@@ -24,6 +24,7 @@ type Post struct {
 	ID            bson.ObjectID `bson:"_id,omitempty" json:"id"`
 	AuthorID      string        `bson:"author_id" json:"author_id"`
 	Content       string        `bson:"content" json:"content"`
+	Hashtags      []string      `bson:"hashtags,omitempty" json:"hashtags,omitempty"`
 	Media         []MediaRef    `bson:"media,omitempty" json:"media,omitempty"`
 	QuotePostID   string        `bson:"quote_post_id,omitempty" json:"quote_post_id,omitempty"`
 	LikesCount    int32         `bson:"likes_count" json:"likes_count"`
@@ -57,6 +58,12 @@ type Repost struct {
 	PostID    string        `bson:"post_id" json:"post_id"`
 	UserID    string        `bson:"user_id" json:"user_id"`
 	CreatedAt time.Time     `bson:"created_at" json:"created_at"`
+}
+
+// HashtagTrend — compteur agrégé d'un hashtag dans les posts visibles.
+type HashtagTrend struct {
+	Tag   string `json:"tag"`
+	Count int64  `json:"count"`
 }
 
 // Comment — document de la collection `comments`. Un commentaire référence son

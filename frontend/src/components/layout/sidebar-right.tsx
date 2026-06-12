@@ -1,61 +1,153 @@
 'use client'
 
-import { usePathname } from 'next/navigation'
+import { useEffect, useState, type FormEvent } from 'react'
+import Link from 'next/link'
+import { usePathname, useRouter } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { Search } from 'lucide-react'
 
-import { ROUTES } from '@/lib/routes'
+import { currentUserId, listHashtagTrends, type HashtagTrend } from '@/lib/posts'
+import { ROUTES, hashtagHref, searchHref } from '@/lib/routes'
 import { useAuthGate } from '@/components/auth-prompt-provider'
+import {
+  addSuggestionHistoryEntry,
+  clearSuggestionHistory,
+  readSuggestionHistory,
+  removeSuggestionHistoryEntry,
+  type SuggestionHistoryEntry,
+} from '@/lib/search-suggestion-history'
 import { useT } from '@/components/language-provider'
 import { WhoToFollow } from '@/components/layout/who-to-follow'
 import { LegalLinks } from '@/components/legal/legal-links'
-
-/**
- * Tendances décoratives (placeholder, pas de back). Les libellés viennent du
- * dictionnaire i18n ; les hashtags restent tels quels (identifiants de marque).
- */
-const TRENDS = [
-  { categoryKey: 'trends.t1.category', topic: '#Microservices', postsKey: 'trends.t1.posts' },
-  { categoryKey: 'trends.t2.category', topic: '#NextJS', postsKey: 'trends.t2.posts' },
-  { categoryKey: 'trends.t3.category', topic: '#Docker', postsKey: 'trends.t3.posts' },
-]
+import { SearchSuggestionsDropdown } from '@/components/search/search-suggestions-dropdown'
+import { ExplorerFilterCard } from '@/components/explorer/explorer-filter-controls'
+import { useExplorerFilters } from '@/components/explorer/explorer-filter-context'
 
 export function SidebarRight() {
   const t = useT()
   const pathname = usePathname()
   const { isVisitor } = useAuthGate()
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const [trends, setTrends] = useState<HashtagTrend[]>([])
+  const [query, setQuery] = useState('')
+  const [searchFocused, setSearchFocused] = useState(false)
+  const [history, setHistory] = useState<SuggestionHistoryEntry[]>([])
+  const historyOwnerId = currentUserId()
+  const {
+    showPublications,
+    showUsers,
+    submittedSearchActive,
+    togglePublications,
+    toggleUsers,
+  } = useExplorerFilters()
+  const showExplorerFilters =
+    pathname === ROUTES.explorer &&
+    submittedSearchActive &&
+    Boolean(searchParams.get('q')?.trim())
+
+  useEffect(() => {
+    let cancelled = false
+    listHashtagTrends(5)
+      .then((list) => {
+        if (!cancelled) setTrends(list)
+      })
+      .catch(() => {
+        if (!cancelled) setTrends([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [pathname])
+
+  useEffect(() => {
+    setHistory(readSuggestionHistory(historyOwnerId))
+  }, [historyOwnerId])
 
   // La messagerie occupe toute la largeur (chat à deux volets) : pas de colonne
   // « Qui suivre » sur /messages.
   if (pathname?.startsWith(ROUTES.messages)) return null
 
+  function submitSearch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const href = searchHref(query)
+    if (href !== ROUTES.explorer) router.push(href)
+  }
+
+  function pickSearchSuggestion(
+    href: string,
+    entry?: Omit<SuggestionHistoryEntry, 'visitedAt'>,
+  ) {
+    if (entry) setHistory(addSuggestionHistoryEntry(historyOwnerId, entry))
+    setSearchFocused(false)
+    setQuery('')
+    router.push(href)
+  }
+
+  function clearRecentSearches() {
+    clearSuggestionHistory(historyOwnerId)
+    setHistory([])
+  }
+
+  function removeRecentSearch(entryId: string) {
+    setHistory(removeSuggestionHistoryEntry(historyOwnerId, entryId))
+  }
+
   return (
-    <aside className="sticky top-0 hidden h-screen w-[350px] flex-col gap-4 overflow-y-auto px-4 py-4 xl:flex">
+    <aside className="sticky top-0 hidden h-screen w-[350px] flex-col gap-3 overflow-y-auto px-4 py-3 xl:flex">
       {/* Search */}
-      <div className="relative">
+      <form onSubmit={submitSearch} className="relative">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
         <input
           type="search"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          onFocus={() => setSearchFocused(true)}
+          onBlur={() => setSearchFocused(false)}
           placeholder={t('search.placeholder')}
-          disabled
-          className="glass w-full rounded-full border py-2.5 pl-10 pr-4 text-sm backdrop-blur placeholder:text-muted-foreground focus:border-[#5B6CFF] focus:bg-white focus:outline-none disabled:cursor-not-allowed dark:focus:bg-white/10"
+          className="glass w-full rounded-full border py-2.5 pl-10 pr-4 text-sm backdrop-blur placeholder:text-muted-foreground focus:border-[#5B6CFF] focus:bg-white focus:outline-none dark:focus:bg-white/10"
         />
-      </div>
+        <SearchSuggestionsDropdown
+          query={query}
+          open={searchFocused}
+          history={history}
+          onPick={pickSearchSuggestion}
+          onClearHistory={clearRecentSearches}
+          onRemoveHistory={removeRecentSearch}
+        />
+      </form>
+
+      {showExplorerFilters && (
+        <ExplorerFilterCard
+          showPublications={showPublications}
+          showUsers={showUsers}
+          onTogglePublications={togglePublications}
+          onToggleUsers={toggleUsers}
+        />
+      )}
 
       {/* Tendances */}
       <div className="glass overflow-hidden rounded-[24px] border backdrop-blur-xl">
-        <h2 className="brand-text px-4 py-3 text-xl font-bold">{t('trends.title')}</h2>
-        {TRENDS.map((trend) => (
-          <div
-            key={trend.topic}
-            className="flex cursor-not-allowed flex-col gap-0.5 px-4 py-3 transition-colors hover:bg-accent"
-          >
-            <span className="text-xs text-muted-foreground">
-              {t(trend.categoryKey)} · {t('trends.trending')}
-            </span>
-            <span className="font-bold text-foreground">{trend.topic}</span>
-            <span className="text-xs text-muted-foreground">{t(trend.postsKey)}</span>
-          </div>
-        ))}
+        <h2 className="brand-text px-4 py-2.5 text-lg font-bold">{t('trends.title')}</h2>
+        {trends.length > 0 ? (
+          trends.map((trend) => (
+            <Link
+              key={trend.tag}
+              href={hashtagHref(trend.tag, 'top')}
+              className="flex flex-col gap-0.5 px-4 py-2 transition-colors hover:bg-accent"
+            >
+              <span className="text-[11px] leading-4 text-muted-foreground">{t('trends.trending')}</span>
+              <span className="font-bold text-foreground">#{trend.tag}</span>
+              <span className="text-[11px] leading-4 text-muted-foreground">
+                {t(trend.count > 1 ? 'trends.posts_other' : 'trends.posts_one', {
+                  count: formatTrendCount(trend.count),
+                })}
+              </span>
+            </Link>
+          ))
+        ) : (
+          <p className="px-4 pb-4 text-sm text-muted-foreground">{t('trends.empty')}</p>
+        )}
       </div>
 
       {/* Qui suivre (réservé aux membres : appels au graphe social authentifiés). */}
@@ -65,4 +157,10 @@ export function SidebarRight() {
       <LegalLinks className="px-4 pb-2" />
     </aside>
   )
+}
+
+function formatTrendCount(count: number): string {
+  if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M`
+  if (count >= 1_000) return `${(count / 1_000).toFixed(1)}K`
+  return String(count)
 }

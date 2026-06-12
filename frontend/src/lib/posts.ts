@@ -32,6 +32,7 @@ export interface ApiPost {
   id: string
   author_id: string
   content: string
+  hashtags?: string[]
   media?: { url: string; type: 'image' | 'video' }[]
   quote_post_id?: string
   likes_count: number
@@ -87,6 +88,7 @@ export interface FeedPost {
   id: string
   author: PostAuthor
   content: string
+  hashtags: string[]
   media: PostMedia[]
   quotePostId: string
   quotedPost: FeedPost | null
@@ -109,6 +111,13 @@ export interface FeedPost {
   /** L'utilisateur courant peut-il épingler/désépingler ce post ? */
   canPin: boolean
 }
+
+export interface HashtagTrend {
+  tag: string
+  count: number
+}
+
+export type HashtagPostSort = 'top' | 'recent'
 
 /** Commentaire enrichi pour l'affichage. */
 export interface PostComment {
@@ -249,6 +258,7 @@ async function toFeedPost(
     id: p.id,
     author: await resolveAuthor(p.author_id),
     content: p.content,
+    hashtags: p.hashtags ?? [],
     media: (p.media ?? []).map((m) => ({ url: resolveMediaUrl(m.url), type: m.type })),
     quotePostId: p.quote_post_id ?? '',
     quotedPost,
@@ -351,30 +361,56 @@ export async function mapPosts(raw: ApiPost[]): Promise<FeedPost[]> {
 }
 
 /** Fil global (« Pour toi »), paginé. */
-export async function listFeed(limit = 20, offset = 0): Promise<FeedPost[]> {
-  const raw = await unwrap<ApiPost[]>(
-    await apiFetch(`/posts?limit=${limit}&offset=${offset}`),
-  )
+export async function listFeed(
+  limit = 20,
+  offset = 0,
+  hashtag = '',
+  sort: HashtagPostSort = 'recent',
+): Promise<FeedPost[]> {
+  const params = feedParams(limit, offset, hashtag, sort)
+  const raw = await unwrap<ApiPost[]>(await apiFetch(`/posts?${params}`))
   return mapPosts(raw)
 }
 
 /** Fil « Abonnements » : posts des comptes suivis (ids fournis par user-service). */
-export async function listFollowingFeed(limit = 20, offset = 0): Promise<FeedPost[]> {
+export async function listFollowingFeed(
+  limit = 20,
+  offset = 0,
+  hashtag = '',
+  sort: HashtagPostSort = 'recent',
+): Promise<FeedPost[]> {
   const ids = await followingIds()
   if (ids.length === 0) return []
-  const raw = await unwrap<ApiPost[]>(
-    await apiFetch(
-      `/posts?author_ids=${ids.map(encodeURIComponent).join(',')}&limit=${limit}&offset=${offset}`,
-    ),
-  )
+  const params = feedParams(limit, offset, hashtag, sort)
+  params.set('author_ids', ids.join(','))
+  const raw = await unwrap<ApiPost[]>(await apiFetch(`/posts?${params}`))
   return mapPosts(raw)
 }
 
 /** Posts d'un auteur (onglet « Posts » d'un profil). */
 export async function listByAuthor(authorId: string, limit = 20, offset = 0): Promise<FeedPost[]> {
-  const raw = await unwrap<ApiPost[]>(
-    await apiFetch(`/posts?author_id=${encodeURIComponent(authorId)}&limit=${limit}&offset=${offset}`),
+  const params = feedParams(limit, offset)
+  params.set('author_id', authorId)
+  const raw = await unwrap<ApiPost[]>(await apiFetch(`/posts?${params}`))
+  return mapPosts(raw)
+}
+
+export async function listHashtagTrends(limit = 5, query = ''): Promise<HashtagTrend[]> {
+  const params = new URLSearchParams()
+  params.set('limit', String(limit))
+  const q = query.trim().replace(/^#/, '')
+  if (q) params.set('q', q)
+  const raw = await unwrap<HashtagTrend[]>(
+    await apiFetch(`/posts/trends?${params}`),
   )
+  return raw ?? []
+}
+
+/** Posts contenant au moins un hashtag, utilisés par la page Explorer. */
+export async function listHashtaggedPosts(limit = 10, offset = 0): Promise<FeedPost[]> {
+  const params = feedParams(limit, offset)
+  params.set('hashtag_any', 'true')
+  const raw = await unwrap<ApiPost[]>(await apiFetch(`/posts?${params}`))
   return mapPosts(raw)
 }
 
@@ -528,6 +564,23 @@ async function followingIds(): Promise<string[]> {
   if (!res.ok) return []
   const users = await unwrap<{ id: string }[]>(res)
   return (users ?? []).map((u) => u.id)
+}
+
+function feedParams(
+  limit: number,
+  offset: number,
+  hashtag = '',
+  sort: HashtagPostSort = 'recent',
+): URLSearchParams {
+  const params = new URLSearchParams()
+  params.set('limit', String(limit))
+  params.set('offset', String(offset))
+  const tag = hashtag.trim().replace(/^#/, '')
+  if (tag) {
+    params.set('hashtag', tag)
+    params.set('sort', sort)
+  }
+  return params
 }
 
 // --- Broadcast « post créé » (le fil prépend sans refetch) -------------------

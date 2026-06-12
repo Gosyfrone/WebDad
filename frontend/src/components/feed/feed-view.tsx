@@ -1,7 +1,8 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { Loader2, Users } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { ArrowLeft, ImageIcon, Loader2, Search, Users } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import { getAccessToken } from '@/lib/auth-client'
@@ -20,13 +21,18 @@ import {
   currentUserId,
   subscribePostCreated,
   type FeedPost,
+  type HashtagPostSort,
+  type PostMedia,
 } from '@/lib/posts'
+import { ROUTES, hashtagHref, postHref, searchHref } from '@/lib/routes'
 import { CreatePost } from '@/components/feed/create-post'
 import { PostCard } from '@/components/feed/post-card'
 import { useAuthGate } from '@/components/auth-prompt-provider'
 import { useT } from '@/components/language-provider'
+import { SearchSuggestionsDropdown } from '@/components/search/search-suggestions-dropdown'
 
 type FeedTab = 'for-you' | 'following'
+type HashtagTab = 'top' | 'recent' | 'media'
 
 const FEED_PAGE = 10
 
@@ -56,6 +62,11 @@ function applyPostUpdate(current: FeedPost[], updated: FeedPost): FeedPost[] {
 export function FeedView() {
   const t = useT()
   const { isVisitor } = useAuthGate()
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const selectedHashtag = (searchParams.get('hashtag') ?? '').trim().replace(/^#/, '')
+  const hashtagTab = normalizeHashtagTab(searchParams.get('tab'))
+  const [hashtagInput, setHashtagInput] = useState(selectedHashtag ? `#${selectedHashtag}` : '')
   const [tab, setTab] = useState<FeedTab>('for-you')
   const [posts, setPosts] = useState<FeedPost[]>([])
   const [loading, setLoading] = useState(true)
@@ -64,16 +75,26 @@ export function FeedView() {
   const [error, setError] = useState('')
   const [mutedWords, setMutedWords] = useState<string[]>([])
   const [viewerUserId, setViewerUserId] = useState('')
+  const [searchFocused, setSearchFocused] = useState(false)
   // Nombre d'éléments réellement chargés depuis le serveur (offset de pagination,
   // indépendant des insertions/suppressions locales).
   const offsetRef = useRef(0)
 
   const fetchPage = useCallback(
-    (activeTab: FeedTab, offset: number) =>
-      activeTab === 'for-you'
-        ? listFeed(FEED_PAGE, offset)
-        : listFollowingFeed(FEED_PAGE, offset),
-    [],
+    (activeTab: FeedTab, offset: number) => {
+      if (selectedHashtag) {
+        return listFeed(
+          FEED_PAGE,
+          offset,
+          selectedHashtag,
+          hashtagTab === 'top' ? 'top' : 'recent',
+        )
+      }
+      return activeTab === 'for-you'
+        ? listFeed(FEED_PAGE, offset, selectedHashtag)
+        : listFollowingFeed(FEED_PAGE, offset, selectedHashtag)
+    },
+    [hashtagTab, selectedHashtag],
   )
 
   // Chargement initial / changement d'onglet.
@@ -102,6 +123,14 @@ export function FeedView() {
       cancelled = true
     }
   }, [tab, fetchPage, t])
+
+  const clearHashtagFilter = useCallback(() => {
+    router.push(ROUTES.feed)
+  }, [router])
+
+  useEffect(() => {
+    setHashtagInput(selectedHashtag ? `#${selectedHashtag}` : '')
+  }, [selectedHashtag])
 
   const loadMore = useCallback(async () => {
     setLoadingMore(true)
@@ -181,30 +210,100 @@ export function FeedView() {
   }, [])
 
   const visiblePosts = filterMutedPosts(posts, mutedWords, viewerUserId)
+  const visibleMedia = hashtagTab === 'media' ? mediaFromPosts(visiblePosts) : []
+
+  function submitHashtagSearch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const query = hashtagInput.trim()
+    if (!query) {
+      clearHashtagFilter()
+      return
+    }
+    router.push(searchHref(query))
+  }
+
+  function pickSearchSuggestion(href: string) {
+    setSearchFocused(false)
+    router.push(href)
+  }
+
+  function setHashtagTab(next: HashtagTab) {
+    if (!selectedHashtag) return
+    router.push(hashtagHref(selectedHashtag, next))
+  }
 
   return (
     <div className="flex flex-col">
       {/* En-tête : sticky sur desktop ; sur mobile l'en-tête global (logo) prend le relais */}
       <div className="panel z-10 border-b lg:sticky lg:top-0">
-        <h1 className="brand-text hidden px-4 py-3 text-xl font-bold lg:block">
-          {t('feed.title')}
-        </h1>
-        {/* Onglets Pour toi / Abonnements (« Abonnements » requiert une session). */}
-        <div className="flex">
-          <TabButton active={tab === 'for-you'} onClick={() => setTab('for-you')}>
-            {t('feed.tab_for_you')}
-          </TabButton>
-          {!isVisitor && (
-            <TabButton active={tab === 'following'} onClick={() => setTab('following')}>
-              {t('feed.tab_following')}
-            </TabButton>
-          )}
-        </div>
+        {selectedHashtag ? (
+          <>
+            <form onSubmit={submitHashtagSearch} className="flex items-center gap-2 px-4 py-3">
+              <button
+                type="button"
+                onClick={clearHashtagFilter}
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                aria-label={t('feed.hashtag_back')}
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </button>
+              <div className="relative min-w-0 flex-1">
+                <Search
+                  className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                  aria-hidden
+                />
+                <input
+                  type="search"
+                  value={hashtagInput}
+                  onChange={(event) => setHashtagInput(event.target.value)}
+                  onFocus={() => setSearchFocused(true)}
+                  onBlur={() => setSearchFocused(false)}
+                  aria-label={t('feed.hashtag_search_aria')}
+                  placeholder={t('feed.hashtag_search_placeholder')}
+                  className="glass w-full rounded-full border py-2.5 pl-10 pr-4 text-sm font-semibold outline-none transition focus:border-[#5B6CFF] focus:bg-white dark:focus:bg-white/10"
+                />
+                <SearchSuggestionsDropdown
+                  query={hashtagInput}
+                  open={searchFocused}
+                  onPick={pickSearchSuggestion}
+                />
+              </div>
+            </form>
+            <div className="flex">
+              <TabButton active={hashtagTab === 'top'} onClick={() => setHashtagTab('top')}>
+                {t('feed.hashtag_tab_top')}
+              </TabButton>
+              <TabButton active={hashtagTab === 'recent'} onClick={() => setHashtagTab('recent')}>
+                {t('feed.hashtag_tab_recent')}
+              </TabButton>
+              <TabButton active={hashtagTab === 'media'} onClick={() => setHashtagTab('media')}>
+                {t('feed.hashtag_tab_media')}
+              </TabButton>
+            </div>
+          </>
+        ) : (
+          <>
+            <h1 className="brand-text hidden px-4 py-3 text-xl font-bold lg:block">
+              {t('feed.title')}
+            </h1>
+            {/* Onglets Pour toi / Abonnements (« Abonnements » requiert une session). */}
+            <div className="flex">
+              <TabButton active={tab === 'for-you'} onClick={() => setTab('for-you')}>
+                {t('feed.tab_for_you')}
+              </TabButton>
+              {!isVisitor && (
+                <TabButton active={tab === 'following'} onClick={() => setTab('following')}>
+                  {t('feed.tab_following')}
+                </TabButton>
+              )}
+            </div>
+          </>
+        )}
       </div>
 
       {/* Zone de création de post inline (masquée pour le visiteur) ; le FAB
           mobile prend le relais quand ce bloc sort de l'écran. */}
-      {!isVisitor && (
+      {!isVisitor && !selectedHashtag && (
         <div id="feed-composer">
           <CreatePost />
         </div>
@@ -233,6 +332,21 @@ export function FeedView() {
           title={t('feed.filtered_empty_title')}
           message={t('feed.filtered_empty_msg')}
         />
+      ) : selectedHashtag && hashtagTab === 'media' ? (
+        <>
+          {visibleMedia.length === 0 ? (
+            <EmptyState title={t('feed.hashtag_no_media_title')} message={t('feed.hashtag_no_media_msg')} />
+          ) : (
+            <HashtagMediaGrid media={visibleMedia} openLabel={t('feed.hashtag_media_open')} />
+          )}
+          {hasMore && (
+            <div ref={sentinelRef} className="flex justify-center py-6">
+              {loadingMore && (
+                <Loader2 className="h-5 w-5 animate-spin text-[#5B6CFF]" aria-hidden />
+              )}
+            </div>
+          )}
+        </>
       ) : (
         <>
           <div className="divide-y divide-border">
@@ -257,6 +371,10 @@ export function FeedView() {
       )}
     </div>
   )
+}
+
+function normalizeHashtagTab(value: string | null): HashtagTab {
+  return value === 'recent' || value === 'media' ? value : 'top'
 }
 
 function TabButton({
@@ -289,6 +407,49 @@ function EmptyState({ title, message }: { title: string; message: string }) {
       <Users className="h-10 w-10 text-[#5B6CFF] dark:text-[#9aa6ff]" aria-hidden />
       <h2 className="text-lg font-bold">{title}</h2>
       <p className="max-w-sm text-sm text-muted-foreground">{message}</p>
+    </div>
+  )
+}
+
+function mediaFromPosts(posts: FeedPost[]): Array<PostMedia & { postId: string }> {
+  return posts.flatMap((post) => post.media.map((media) => ({ ...media, postId: post.id })))
+}
+
+function HashtagMediaGrid({
+  media,
+  openLabel,
+}: {
+  media: Array<PostMedia & { postId: string }>
+  openLabel: string
+}) {
+  return (
+    <div className="grid grid-cols-3 gap-1 p-1 sm:gap-1.5 sm:p-2">
+      {media.map((item, index) => (
+        <a
+          key={`${item.postId}-${item.url}-${index}`}
+          href={postHref(item.postId)}
+          className="group relative aspect-square overflow-hidden bg-muted"
+          aria-label={openLabel}
+        >
+          {item.type === 'video' ? (
+            <>
+              <video src={item.url} muted playsInline className="h-full w-full object-cover" />
+              <ImageIcon
+                className="absolute right-2 top-2 h-4 w-4 rounded-full bg-background/70 p-0.5 text-foreground"
+                aria-hidden
+              />
+            </>
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={item.url}
+              alt=""
+              loading="lazy"
+              className="h-full w-full object-cover transition group-hover:scale-[1.02]"
+            />
+          )}
+        </a>
+      ))}
     </div>
   )
 }

@@ -2180,6 +2180,24 @@
             "in": "query"
           },
           {
+            "type": "string",
+            "description": "Filtrer par hashtag (avec ou sans #)",
+            "name": "hashtag",
+            "in": "query"
+          },
+          {
+            "type": "boolean",
+            "description": "Filtrer les posts contenant au moins un hashtag",
+            "name": "hashtag_any",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "description": "Tri des résultats hashtag: recent ou top (top = likes puis reposts)",
+            "name": "sort",
+            "in": "query"
+          },
+          {
             "type": "integer",
             "description": "Nb résultats",
             "name": "limit",
@@ -2708,6 +2726,51 @@
           },
           "401": {
             "description": "Unauthorized",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/posts/trends": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "posts"
+        ],
+        "summary": "Tendances hashtags",
+        "parameters": [
+          {
+            "type": "integer",
+            "description": "Nb de tendances",
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "description": "Préfixe de hashtag à suggérer",
+            "name": "q",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/models.HashtagTrend"
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
             "schema": {
               "type": "object",
               "additionalProperties": {
@@ -5355,6 +5418,17 @@
         }
       }
     },
+    "models.HashtagTrend": {
+      "type": "object",
+      "properties": {
+        "count": {
+          "type": "integer"
+        },
+        "tag": {
+          "type": "string"
+        }
+      }
+    },
     "models.MediaRef": {
       "type": "object",
       "required": [
@@ -5387,6 +5461,12 @@
         },
         "created_at": {
           "type": "string"
+        },
+        "hashtags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         },
         "hidden_at": {
           "type": "string"
