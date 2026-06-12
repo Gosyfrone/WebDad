@@ -127,6 +127,9 @@
 - **profil-service owns decorative/editable fields incl. `visibility`; user-service owns identity +
   social graph; `role` lives in the JWT.** One source of truth per datum; any profil write = one `PATCH /profils/me`,
   no inter-DB transaction.
+- **Profile visibility defaults to public, then is user-configurable in settings.** `POST /profils` always stores
+  `visibility=public`; `/parametres` calls `PATCH /profils/me` with `public|private`. This keeps signup friction low
+  and leaves the privacy barrier enforceable server-side by post-service.
 - **`ProfilDetails` aggregation (read) is composed by the caller** (front/BFF), not the service — decouples
   service from aggregation, no routing change.
 - **Each service owns its schema** (`EnsureSchema` at boot, idempotent, Mongo `collMod` resync). Single source

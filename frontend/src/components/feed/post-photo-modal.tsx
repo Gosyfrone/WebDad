@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronLeft, ChevronRight, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, LockOpen, X } from 'lucide-react'
 
 import { cn, timeAgo } from '@/lib/utils'
-import type { FeedPost } from '@/lib/posts'
+import { currentUserId, type FeedPost } from '@/lib/posts'
 import { useLanguage } from '@/components/language-provider'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { CommentSection } from '@/components/feed/comment-section'
@@ -38,6 +38,8 @@ export function PostPhotoModal({ post, index, onClose }: PostPhotoModalProps) {
   const media = post.media
   const item = media[current]
   const hasMany = media.length > 1
+  const showPrivateBadge =
+    post.author.visibility === 'private' && post.author.id !== currentUserId()
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -128,6 +130,9 @@ export function PostPhotoModal({ post, index, onClose }: PostPhotoModalProps) {
                   @{post.author.username}
                 </ProfilLink>
               )}
+              {showPrivateBadge && (
+                <PrivateAuthorBadge label={t('post.private_account_tooltip')} />
+              )}
               <span className="shrink-0 text-muted-foreground">·</span>
               <span className="shrink-0 text-muted-foreground">{timeAgo(post.createdAt, locale)}</span>
             </div>
@@ -151,6 +156,21 @@ export function PostPhotoModal({ post, index, onClose }: PostPhotoModalProps) {
       </div>
     </div>,
     document.body,
+  )
+}
+
+function PrivateAuthorBadge({ label }: { label: string }) {
+  return (
+    <span className="group relative inline-flex shrink-0 items-center">
+      <LockOpen
+        tabIndex={0}
+        className="h-3.5 w-3.5 text-primary outline-none"
+        aria-label={label}
+      />
+      <span className="pointer-events-none absolute left-1/2 top-5 z-20 w-max max-w-[12rem] -translate-x-1/2 rounded-md border bg-popover px-2 py-1 text-xs font-medium text-popover-foreground opacity-0 shadow-md transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+        {label}
+      </span>
+    </span>
   )
 }
 

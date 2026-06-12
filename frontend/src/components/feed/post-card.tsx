@@ -6,6 +6,7 @@ import {
   Bookmark,
   Heart,
   Loader2,
+  LockOpen,
   MessageCircle,
   MoreHorizontal,
   Pin,
@@ -102,6 +103,8 @@ export function PostCard({ post, showPinBadge = false, onDeleted, onUpdated }: P
   const [bookmarking, setBookmarking] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
   const displayPinBadge = isPinned && (showPinBadge || post.canPin)
+  const showPrivateBadge =
+    post.author.visibility === 'private' && post.author.id !== currentUserId()
   // Détection de l'appui long (ouvre le sélecteur sans auto-classer).
   const longPress = useRef(false)
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -297,6 +300,9 @@ export function PostCard({ post, showPinBadge = false, onDeleted, onUpdated }: P
               >
                 @{post.author.username}
               </ProfilLink>
+            )}
+            {showPrivateBadge && (
+              <PrivateAuthorBadge label={t('post.private_account_tooltip')} />
             )}
             <span className="shrink-0 text-muted-foreground">·</span>
             <span className="shrink-0 text-muted-foreground">{timeAgo(post.createdAt, locale)}</span>
@@ -513,6 +519,21 @@ export function PostCard({ post, showPinBadge = false, onDeleted, onUpdated }: P
   )
 }
 
+function PrivateAuthorBadge({ label }: { label: string }) {
+  return (
+    <span className="group relative inline-flex shrink-0 items-center">
+      <LockOpen
+        tabIndex={0}
+        className="h-3.5 w-3.5 text-primary outline-none"
+        aria-label={label}
+      />
+      <span className="pointer-events-none absolute left-1/2 top-5 z-20 w-max max-w-[12rem] -translate-x-1/2 rounded-md border bg-popover px-2 py-1 text-xs font-medium text-popover-foreground opacity-0 shadow-md transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+        {label}
+      </span>
+    </span>
+  )
+}
+
 /**
  * Galerie des médias d'un post (images + vidéos). Disposition façon X :
  * 1 média = pleine largeur ; 2-4 = grille 2 colonnes. Les URLs sont déjà
@@ -591,6 +612,10 @@ function MediaGallery({
 }
 
 function QuotedPost({ post }: { post: FeedPost }) {
+  const { t } = useLanguage()
+  const showPrivateBadge =
+    post.author.visibility === 'private' && post.author.id !== currentUserId()
+
   return (
     <div className="mt-3 rounded-xl border border-border bg-background/45 px-3 py-2">
       <div className="mb-1 flex min-w-0 items-center gap-1.5 text-xs">
@@ -601,6 +626,9 @@ function QuotedPost({ post }: { post: FeedPost }) {
           <ProfilLink author={post.author} className="shrink-0 text-muted-foreground hover:underline">
             @{post.author.username}
           </ProfilLink>
+        )}
+        {showPrivateBadge && (
+          <PrivateAuthorBadge label={t('post.private_account_tooltip')} />
         )}
       </div>
       <MentionText

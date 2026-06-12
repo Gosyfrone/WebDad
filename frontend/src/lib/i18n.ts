@@ -161,6 +161,19 @@ export const messages: Record<Locale, Messages> = {
     'settings.account_title': 'Paramètres du compte',
     'settings.account_desc':
       'Personnalisez votre expérience Breezy.',
+    'visibility.title': 'Visibilité du compte',
+    'visibility.desc': 'Choisissez qui peut voir vos publications, réponses et mentions J’aime.',
+    'visibility.public_title': 'Public',
+    'visibility.public_desc': 'Tout le monde peut voir votre profil.',
+    'visibility.private_title': 'Privé',
+    'visibility.private_desc': 'Seuls vos abonnés acceptés voient votre contenu.',
+    'visibility.private_account': 'Compte privé',
+    'visibility.private_toggle_desc': 'Activez pour limiter votre contenu aux abonnés acceptés.',
+    'visibility.toggle_aria': 'Changer la visibilité du compte',
+    'visibility.saving': 'Enregistrement...',
+    'visibility.saved': 'Visibilité mise à jour.',
+    'visibility.load_failed': 'Impossible de charger la visibilité.',
+    'visibility.save_failed': 'Impossible de modifier la visibilité.',
     'filters.title': 'Mots filtrés',
     'filters.desc':
       "Masquez les posts du fil qui contiennent un mot ou une expression que vous ne voulez pas voir.",
@@ -652,6 +665,7 @@ export const messages: Record<Locale, Messages> = {
     'post.views': 'Vues',
     'post.share': 'Partager',
     'post.deleted': 'Post supprimé',
+    'post.private_account_tooltip': 'Ce compte est privé',
 
     // — Commentaires —
     'comment.reply': 'Répondre',
@@ -890,6 +904,19 @@ export const messages: Record<Locale, Messages> = {
     'settings.account_title': 'Account settings',
     'settings.account_desc':
       'Customize your Breezy experience.',
+    'visibility.title': 'Account visibility',
+    'visibility.desc': 'Choose who can see your posts, replies, and likes.',
+    'visibility.public_title': 'Public',
+    'visibility.public_desc': 'Everyone can see your profile.',
+    'visibility.private_title': 'Private',
+    'visibility.private_desc': 'Only accepted followers can see your content.',
+    'visibility.private_account': 'Private account',
+    'visibility.private_toggle_desc': 'Turn on to limit your content to accepted followers.',
+    'visibility.toggle_aria': 'Change account visibility',
+    'visibility.saving': 'Saving...',
+    'visibility.saved': 'Visibility updated.',
+    'visibility.load_failed': 'Could not load visibility.',
+    'visibility.save_failed': 'Could not update visibility.',
     'filters.title': 'Muted words',
     'filters.desc':
       "Hide feed posts containing a word or phrase you don't want to see.",
@@ -1377,6 +1404,7 @@ export const messages: Record<Locale, Messages> = {
     'post.views': 'Views',
     'post.share': 'Share',
     'post.deleted': 'Post deleted',
+    'post.private_account_tooltip': 'This account is private',
 
     // — Comments —
     'comment.reply': 'Reply',

@@ -74,6 +74,7 @@ func (s *ProfilService) Create(ctx context.Context, userID string, req models.Cr
 		BirthDate:   req.BirthDate,
 		CreatedAt:   now,
 		UpdatedAt:   now,
+		Visibility:  models.VisibilityPublic,
 	}
 	if req.Gender != nil {
 		p.Gender = *req.Gender
@@ -165,6 +166,9 @@ func planUpdate(current *models.Profil, req models.UpdateProfilRequest, now time
 	}
 	if req.Gender != nil {
 		set["gender"] = *req.Gender
+	}
+	if req.Visibility != nil && *req.Visibility != current.Visibility {
+		set["visibility"] = *req.Visibility
 	}
 
 	return set, nil

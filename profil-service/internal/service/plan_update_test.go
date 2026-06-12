@@ -100,3 +100,24 @@ func TestPlanUpdate_BirthDateSetOnce(t *testing.T) {
 		t.Fatalf("attendu ErrBirthDateLocked, obtenu %v", err)
 	}
 }
+
+func TestPlanUpdate_Visibility(t *testing.T) {
+	now := time.Now().UTC()
+	current := &models.Profil{Visibility: models.VisibilityPublic}
+
+	set, err := planUpdate(current, models.UpdateProfilRequest{Visibility: ptr(models.VisibilityPrivate)}, now, 0)
+	if err != nil {
+		t.Fatalf("err inattendue : %v", err)
+	}
+	if set["visibility"] != models.VisibilityPrivate {
+		t.Fatalf("visibility = %v, attendu %s", set["visibility"], models.VisibilityPrivate)
+	}
+
+	set, err = planUpdate(current, models.UpdateProfilRequest{Visibility: ptr(models.VisibilityPublic)}, now, 0)
+	if err != nil {
+		t.Fatalf("err inattendue : %v", err)
+	}
+	if _, ok := set["visibility"]; ok {
+		t.Fatal("visibility ne devrait pas être réécrite (valeur identique)")
+	}
+}

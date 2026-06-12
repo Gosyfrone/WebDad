@@ -1,11 +1,12 @@
 'use client'
 
-import { EyeOff, Languages, Scale, Settings } from 'lucide-react'
+import { EyeOff, Languages, Lock, Scale, Settings } from 'lucide-react'
 
 import { useT } from '@/components/language-provider'
 import { LanguageSelector } from '@/components/language-selector'
 import { LegalLinks } from '@/components/legal/legal-links'
 import { MutedWordsSettings } from '@/components/settings/muted-words-settings'
+import { VisibilitySettings } from '@/components/settings/visibility-settings'
 
 export default function ParametresPage() {
   const t = useT()
@@ -49,6 +50,22 @@ export default function ParametresPage() {
               <div className="panel rounded-xl border px-2 py-2 shadow-sm">
                 <LanguageSelector />
               </div>
+            </div>
+
+            <div className="grid gap-4 px-4 py-4 md:grid-cols-[minmax(0,1fr)_minmax(260px,340px)] md:items-start">
+              <div className="flex items-start gap-3">
+                <span className="mt-1 text-primary">
+                  <Lock className="h-5 w-5" aria-hidden />
+                </span>
+                <div className="min-w-0">
+                  <h3 className="font-semibold text-foreground">{t('visibility.title')}</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {t('visibility.desc')}
+                  </p>
+                </div>
+              </div>
+
+              <VisibilitySettings />
             </div>
 
             <div className="grid gap-4 px-4 py-4 md:grid-cols-[minmax(0,1fr)_minmax(260px,340px)] md:items-start">

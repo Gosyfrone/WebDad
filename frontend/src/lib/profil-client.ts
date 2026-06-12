@@ -79,6 +79,20 @@ export async function saveMyProfil(
   return updated
 }
 
+export async function saveMyVisibility(
+  visibility: ProfilDetails['visibility']
+): Promise<ProfilDetails> {
+  await fetchApiData<ApiProfil>('/profils/me', {
+    method: 'PATCH',
+    headers: jsonHeaders(),
+    body: JSON.stringify({ visibility }),
+  })
+
+  const updated = await getMyProfil()
+  notifyProfilUpdated(updated)
+  return updated
+}
+
 export function subscribeProfilUpdated(
   onUpdate: (profil: ProfilDetails) => void
 ): () => void {
