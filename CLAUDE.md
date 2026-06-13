@@ -34,6 +34,15 @@ These govern *how* Claude works on this repo. They override default behavior.
    - `ARCHITECTURE.md` (only if boundaries/flows change),
    - `CHANGELOG.md` (one session entry; push older entries to `CHANGELOG_ARCHIVE.md`).
 5. **Never hardcode secrets** — use `.env` variables.
+5b. **⚠️ BASE DE DONNÉES EN PROD — migrations rétrocompatibles obligatoires.** Une base de
+    données peuplée existe. Toute feature qui ajoute un champ contraint (enum `$jsonSchema`,
+    `required`, index unique) DOIT fournir une **migration idempotente au boot** (dans
+    `EnsureSchema`) qui backfill les documents existants vers une valeur valide. Sinon les vieux
+    docs violent le nouveau schéma et **toute mise à jour est rejetée** (Mongo `strict` revalide le
+    doc complet) — cas vécu 2× : `visibility` puis `likes_visibility` (un `""` persisté ne respecte
+    pas l'enum). Corollaire : tag bson d'un champ à enum/défaut → jamais de valeur « vide »
+    persistée (poser un défaut explicite à la création **et** `omitempty`). Réf : `backfillVisibility`
+    dans `profil-service/internal/database/init.go`.
 6. **Each service is independent**: its own Dockerfile, its own DB, its own embedded schema.
 7. When implementing a feature, **update its status** in `PROJECT_STATUS.md`.
 8. Before any architectural decision, **check the evaluation criteria** (Reference section below).
