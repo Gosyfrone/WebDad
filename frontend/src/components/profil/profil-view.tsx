@@ -406,7 +406,7 @@ export function ProfilView({ username }: ProfilViewProps) {
         )
       ) : tab === 'replies' ? (
         replies.length > 0 ? (
-          <div className="divide-y divide-border">
+          <div className="flex flex-col gap-3 py-3">
             {replies.map((reply) => (
               <ReplyCard key={reply.comment.id} reply={reply} />
             ))}
@@ -468,7 +468,7 @@ function ReplyCard({ reply }: { reply: ReplyContext }) {
   const replyTarget = parentComment?.author.username || parentPostAuthor.username || '…'
   const href = `${postHref(parentPostId)}?comment=${encodeURIComponent(comment.id)}`
   return (
-    <div className="flex flex-col">
+    <div className="glass group mx-3 flex flex-col rounded-[24px] border backdrop-blur-xl transition hover:bg-white/85 hover:shadow-[0_20px_56px_rgba(91,108,255,0.16)] dark:hover:bg-[#1f1633]/80">
       {parentPost ? (
         <PostCard
           post={parentPost}
