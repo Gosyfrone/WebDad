@@ -51,6 +51,7 @@ func JWTAuth(secret string) gin.HandlerFunc {
 		}
 
 		c.Set(contextKey, claims)
+		c.Set("user_id", claims.UserID)
 		c.Next()
 	}
 }
@@ -76,6 +77,7 @@ func OptionalJWTAuth(secret string) gin.HandlerFunc {
 		claims, err := parseToken(parts[1], key)
 		if err == nil {
 			c.Set(contextKey, claims)
+			c.Set("user_id", claims.UserID)
 		}
 		c.Next()
 	}

@@ -21,7 +21,8 @@ var startedAt = time.Now()
 
 // New construit le routeur Gin avec toutes les routes du service.
 func New(auth *services.AuthService, oauthReg *oauth.Registry) *gin.Engine {
-	r := gin.Default()
+	r := gin.New()
+	r.Use(middleware.RequestID(), middleware.Recovery(), middleware.RequestLogger())
 	h := handlers.New(auth, oauthReg)
 
 	r.GET("/health", func(c *gin.Context) {

@@ -1,18 +1,23 @@
 package main
 
 import (
-	"log"
+	"log/slog"
+	"os"
 
 	"github.com/gin-gonic/gin"
 
 	"github.com/webdad/mail-service/internal/config"
 	"github.com/webdad/mail-service/internal/handler"
+	"github.com/webdad/mail-service/internal/logging"
 	"github.com/webdad/mail-service/internal/mailer"
+	"github.com/webdad/mail-service/internal/middleware"
 )
 
 const serviceName = "mail-service"
 
 func main() {
+	logging.Setup(serviceName)
+
 	cfg := config.Load()
 	gin.SetMode(ginMode(cfg.GinMode))
 
@@ -20,12 +25,14 @@ func main() {
 	// sinon repli console (les e-mails sont loggés, pratique en dev).
 	m := mailer.New(cfg)
 
-	r := gin.Default()
+	r := gin.New()
+	r.Use(middleware.RequestID(), middleware.Recovery(), middleware.RequestLogger())
 	handler.RegisterRoutes(r, serviceName, m, cfg.InternalSecret)
 
-	log.Printf("[%s] en écoute sur le port %s", serviceName, cfg.Port)
+	slog.Info("en écoute", "port", cfg.Port)
 	if err := r.Run(":" + cfg.Port); err != nil {
-		log.Fatalf("[%s] échec du démarrage : %v", serviceName, err)
+		slog.Error("échec du démarrage", "error", err)
+		os.Exit(1)
 	}
 }
 

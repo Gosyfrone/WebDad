@@ -58,6 +58,7 @@
 - [x] CI/CD: 3 GitHub Actions workflows (`ci-go` build+test -race + golangci-lint + govulncheck;
       `ci-frontend` lint+build; `ci-integration` docker stack + healthchecks). govulncheck = 0 vuln.
 - [x] **API documentation:** Swagger/OpenAPI spec — `make swagger` génère `doc/openapi.{json,yaml}` (58 routes, 7 services annotés swaggo/swag code-first). Spec agrégé commité. Per-service `docs/` gitignorés.
+- [x] **Logging structuré slog** : tous les services (api-gateway + 7 services métier) ont `internal/logging` + `RequestID`/`RequestLogger`/`Recovery`, JSON release / texte debug, `LOG_LEVEL`, attribut `service`, `user_id` corrélé par le JWT middleware.
 - [x] **CI swagger job** (`ci-go.yml` job `swagger`) : drift check (`git diff --exit-code doc/`) + validation Swagger 2.0 (`go-swagger validate`). Bloquant sur PR.
 - [x] **API docs GitHub Pages** (`pages.yml`) : Redoc UI déployée sur `https://gosyfrone.github.io/WebDad/` à chaque push develop. Source = `doc/` (openapi.json + index.html). Local : `make swagger-site` (port 8088).
 - [ ] **Perspective:** gitleaks, Dependabot, CD (push images to GHCR).

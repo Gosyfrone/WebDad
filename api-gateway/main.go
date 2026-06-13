@@ -1,28 +1,34 @@
 package main
 
 import (
-	"log"
+	"log/slog"
+	"os"
 
 	"github.com/gin-gonic/gin"
 
 	"github.com/webdad/api-gateway/internal/config"
+	"github.com/webdad/api-gateway/internal/logging"
 	"github.com/webdad/api-gateway/internal/router"
 )
 
 const serviceName = "api-gateway"
 
 func main() {
+	logging.Setup(serviceName)
+
 	cfg := config.Load()
 	gin.SetMode(ginMode(cfg.GinMode))
 
 	r, err := router.New(cfg)
 	if err != nil {
-		log.Fatalf("[%s] configuration du routeur : %v", serviceName, err)
+		slog.Error("configuration du routeur", "error", err)
+		os.Exit(1)
 	}
 
-	log.Printf("[%s] en écoute sur le port %s", serviceName, cfg.Port)
+	slog.Info("en écoute", "port", cfg.Port)
 	if err := r.Run(":" + cfg.Port); err != nil {
-		log.Fatalf("[%s] échec du démarrage : %v", serviceName, err)
+		slog.Error("échec du démarrage", "error", err)
+		os.Exit(1)
 	}
 }
 

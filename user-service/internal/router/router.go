@@ -22,7 +22,8 @@ var startedAt = time.Now()
 // jwtSecret protège les routes mutables / personnelles (validation locale
 // du token émis par auth-service, même secret partagé).
 func New(users *service.UserService, jwtSecret string) *gin.Engine {
-	r := gin.Default()
+	r := gin.New()
+	r.Use(middleware.RequestID(), middleware.Recovery(), middleware.RequestLogger())
 	h := handlers.New(users)
 	auth := middleware.JWTAuth(jwtSecret)
 
