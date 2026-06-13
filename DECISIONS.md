@@ -366,6 +366,8 @@
 
 ## CI/CD
 
+- **Smoke-test externe post-déploiement (`deploy.yml`, job `smoke-test`).** Tourne sur un runner GitHub (vue externe, pas depuis le VPS) après le job `deploy`. Vérifie que `API_PUBLIC_URL/health` et `FRONT_PUBLIC_URL` répondent 200 en HTTPS — ce qui aurait attrapé le bug Cloudflare (handshake TLS KO côté edge alors que les conteneurs étaient sains). 3 tentatives espacées de 10 s pour absorber le redémarrage des conteneurs ; URLs dans des variables GitHub Actions (`vars.API_PUBLIC_URL` / `vars.FRONT_PUBLIC_URL`, non-sensibles → `vars.*` et non `secrets.*`).
+
 - **3 GitHub Actions workflows by domain:** `ci-go` (per-service matrix: gofmt + vet + build + `test -race` + tidy +
   golangci-lint v2 + govulncheck report-only), `ci-frontend` (lint + build/typecheck), `ci-integration` (docker compose up the
   stack minus the frontend, wait for all healthchecks). Separate files = independent triggers/path-filters; matrix = parallelism +

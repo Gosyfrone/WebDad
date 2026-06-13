@@ -114,3 +114,43 @@ jobs:
               docker compose -f docker-compose.prod.yml pull
             IMAGE_TAG=${{ needs.prepare.outputs.tag }} \
               docker compose -f docker-compose.prod.yml up -d --remove-orphans
+
+  # ── 4. Smoke-test externe post-déploiement ───────────────────────
+  # Tourne sur un runner GitHub (vue externe, pas depuis le VPS) pour valider
+  # que l'edge public (Cloudflare + TLS + reverse-proxy) répond bien.
+  # Variables GitHub Actions requises (Settings → Variables, non-sensibles) :
+  #   API_PUBLIC_URL   ex. https://api.breezy.philippeluu.fr
+  #   FRONT_PUBLIC_URL ex. https://breezy.philippeluu.fr
+  # Distinguer vars.* (publiques) des secrets.* (OVH_HOST, GITHUB_TOKEN…).
+  smoke-test:
+    name: Smoke-test → edge public
+    needs: [deploy]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Attendre le redémarrage des conteneurs
+        run: sleep 15
+
+      - name: API /health (HTTPS edge)
+        run: |
+          for i in 1 2 3; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 \
+              "${{ vars.API_PUBLIC_URL }}/health")
+            echo "Tentative $i : HTTP $code"
+            [ "$code" = "200" ] && exit 0
+            [ "$i" -lt 3 ] && sleep 10
+          done
+          echo "::error::API edge KO (TLS/Cloudflare/gateway ?) — dernier code HTTP : $code"
+          exit 1
+
+      - name: Frontend (HTTPS edge)
+        run: |
+          for i in 1 2 3; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 \
+              "${{ vars.FRONT_PUBLIC_URL }}")
+            echo "Tentative $i : HTTP $code"
+            [ "$code" = "200" ] && exit 0
+            [ "$i" -lt 3 ] && sleep 10
+          done
+          echo "::error::Frontend edge KO (TLS/Cloudflare ?) — dernier code HTTP : $code"
+          exit 1
