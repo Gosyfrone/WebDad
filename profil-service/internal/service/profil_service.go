@@ -69,11 +69,11 @@ func (s *ProfilService) Search(ctx context.Context, term string, limit int64) ([
 func (s *ProfilService) Create(ctx context.Context, userID string, req models.CreateProfilRequest) (*models.Profil, error) {
 	now := time.Now().UTC()
 	p := &models.Profil{
-		UserID:      userID,
-		DisplayName: strings.TrimSpace(req.DisplayName),
-		BirthDate:   req.BirthDate,
-		CreatedAt:   now,
-		UpdatedAt:   now,
+		UserID:          userID,
+		DisplayName:     strings.TrimSpace(req.DisplayName),
+		BirthDate:       req.BirthDate,
+		CreatedAt:       now,
+		UpdatedAt:       now,
 		Visibility:      models.VisibilityPublic,
 		LikesVisibility: models.VisibilityPublic,
 	}

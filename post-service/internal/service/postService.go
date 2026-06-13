@@ -950,8 +950,8 @@ func (s *PostService) ListCommentsByAuthor(ctx context.Context, authorID, viewer
 	seenVisible := int64(0)
 	sourceOffset := int64(0)
 	allowedByAuthor := make(map[string]bool)
-	postCache := make(map[string]*models.Post)        // nil = masqué ou introuvable
-	commentCache := make(map[string]*models.Comment)  // commentaire parent (réponses), nil = introuvable
+	postCache := make(map[string]*models.Post)       // nil = masqué ou introuvable
+	commentCache := make(map[string]*models.Comment) // commentaire parent (réponses), nil = introuvable
 
 	for int64(len(visible)) < limit {
 		batch, err := s.repo.ListCommentsByAuthor(ctx, authorID, MaxLimit, sourceOffset)

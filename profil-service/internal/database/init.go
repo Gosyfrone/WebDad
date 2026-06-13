@@ -151,17 +151,17 @@ func ensureSeed(ctx context.Context, db *mongo.Database) error {
 	filter := bson.M{"user_id": adminUserID}
 	update := bson.M{
 		"$setOnInsert": bson.M{
-			"user_id":      adminUserID,
-			"display_name": "Administrateur Breezy",
-			"bio":          "Administrateur de Breezy",
-			"avatar_url":   "",
-			"banner_url":   "",
-			"website":      "",
-			"location":     "",
+			"user_id":          adminUserID,
+			"display_name":     "Administrateur Breezy",
+			"bio":              "Administrateur de Breezy",
+			"avatar_url":       "",
+			"banner_url":       "",
+			"website":          "",
+			"location":         "",
 			"visibility":       "public",
 			"likes_visibility": "public",
 			"created_at":       now,
-			"updated_at":   now,
+			"updated_at":       now,
 		},
 	}
 	_, err := db.Collection("profiles").UpdateOne(ctx, filter, update, options.UpdateOne().SetUpsert(true))
@@ -181,13 +181,13 @@ var validators = map[string]bson.M{
 			"bsonType": "object",
 			"required": bson.A{"user_id", "created_at"},
 			"properties": bson.M{
-				"user_id":      bson.M{"bsonType": "string"},
-				"display_name": bson.M{"bsonType": "string", "maxLength": 100},
-				"bio":          bson.M{"bsonType": "string", "maxLength": 160},
-				"avatar_url":   bson.M{"bsonType": "string"},
-				"banner_url":   bson.M{"bsonType": "string"},
-				"website":      bson.M{"bsonType": "string"},
-				"location":     bson.M{"bsonType": "string"},
+				"user_id":          bson.M{"bsonType": "string"},
+				"display_name":     bson.M{"bsonType": "string", "maxLength": 100},
+				"bio":              bson.M{"bsonType": "string", "maxLength": 160},
+				"avatar_url":       bson.M{"bsonType": "string"},
+				"banner_url":       bson.M{"bsonType": "string"},
+				"website":          bson.M{"bsonType": "string"},
+				"location":         bson.M{"bsonType": "string"},
 				"visibility":       bson.M{"bsonType": "string", "enum": bson.A{"public", "private"}},
 				"likes_visibility": bson.M{"bsonType": "string", "enum": bson.A{"public", "private"}},
 				// Champs optionnels (validés uniquement s'ils sont présents).
