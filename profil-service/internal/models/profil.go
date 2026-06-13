@@ -21,18 +21,19 @@ const (
 // source de vérité par donnée). La vue agrégée d'un profil (identité +
 // compteurs + décoratif) est composée à la lecture par l'appelant.
 type Profil struct {
-	UserID      string     `json:"user_id"               bson:"user_id"`
-	DisplayName string     `json:"display_name"          bson:"display_name"`
-	Bio         string     `json:"bio"                   bson:"bio"`
-	AvatarURL   string     `json:"avatar_url"            bson:"avatar_url"`
-	BannerURL   string     `json:"banner_url"            bson:"banner_url"`
-	Website     string     `json:"website"               bson:"website"`
-	Location    string     `json:"location"              bson:"location"`
-	BirthDate   *time.Time `json:"birth_date,omitempty"  bson:"birth_date,omitempty"`
-	Gender      string     `json:"gender,omitempty"      bson:"gender,omitempty"` // "male" | "female"
-	CreatedAt   time.Time  `json:"created_at"            bson:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at"            bson:"updated_at"`
-	Visibility  string     `json:"visibility" bson:"visibility"`
+	UserID          string     `json:"user_id"               bson:"user_id"`
+	DisplayName     string     `json:"display_name"          bson:"display_name"`
+	Bio             string     `json:"bio"                   bson:"bio"`
+	AvatarURL       string     `json:"avatar_url"            bson:"avatar_url"`
+	BannerURL       string     `json:"banner_url"            bson:"banner_url"`
+	Website         string     `json:"website"               bson:"website"`
+	Location        string     `json:"location"              bson:"location"`
+	BirthDate       *time.Time `json:"birth_date,omitempty"  bson:"birth_date,omitempty"`
+	Gender          string     `json:"gender,omitempty"      bson:"gender,omitempty"` // "male" | "female"
+	CreatedAt       time.Time  `json:"created_at"            bson:"created_at"`
+	UpdatedAt       time.Time  `json:"updated_at"            bson:"updated_at"`
+	Visibility      string     `json:"visibility"       bson:"visibility,omitempty"`
+	LikesVisibility string     `json:"likes_visibility"  bson:"likes_visibility,omitempty"`
 	// DisplayNameChangedAt : date du dernier changement EFFECTIF de display_name
 	// (nil = jamais changé depuis le provisioning). Enregistrée dès aujourd'hui
 	// pour servir de base à un cooldown « X jours entre deux changements de nom »
@@ -66,13 +67,14 @@ type AdminCreateProfilRequest struct {
 // birth_date est settable UNE SEULE FOIS : une fois posée, toute tentative de
 // la changer est refusée (cf. service).
 type UpdateProfilRequest struct {
-	DisplayName *string    `json:"display_name" binding:"omitempty,max=100"`
-	Bio         *string    `json:"bio"          binding:"omitempty,max=160"`
-	AvatarURL   *string    `json:"avatar_url"   binding:"omitempty"`
-	BannerURL   *string    `json:"banner_url"   binding:"omitempty"`
-	Website     *string    `json:"website"      binding:"omitempty"`
-	Location    *string    `json:"location"     binding:"omitempty"`
-	BirthDate   *time.Time `json:"birth_date"   binding:"omitempty"`
-	Gender      *string    `json:"gender"       binding:"omitempty,oneof=male female"`
-	Visibility  *string    `json:"visibility"   binding:"omitempty,oneof=public private"`
+	DisplayName     *string    `json:"display_name" binding:"omitempty,max=100"`
+	Bio             *string    `json:"bio"          binding:"omitempty,max=160"`
+	AvatarURL       *string    `json:"avatar_url"   binding:"omitempty"`
+	BannerURL       *string    `json:"banner_url"   binding:"omitempty"`
+	Website         *string    `json:"website"      binding:"omitempty"`
+	Location        *string    `json:"location"     binding:"omitempty"`
+	BirthDate       *time.Time `json:"birth_date"   binding:"omitempty"`
+	Gender          *string    `json:"gender"       binding:"omitempty,oneof=male female"`
+	Visibility      *string    `json:"visibility"        binding:"omitempty,oneof=public private"`
+	LikesVisibility *string    `json:"likes_visibility"   binding:"omitempty,oneof=public private"`
 }

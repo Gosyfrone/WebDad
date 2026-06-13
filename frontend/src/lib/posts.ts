@@ -55,6 +55,11 @@ interface ApiComment {
   created_at: string
 }
 
+interface ApiCommentWithPost extends ApiComment {
+  parent_post?: ApiPost
+  parent_comment?: ApiComment
+}
+
 interface ApiUser {
   id: string
   username: string
@@ -120,6 +125,20 @@ export interface HashtagTrend {
 }
 
 export type HashtagPostSort = 'top' | 'recent'
+
+/** Commentaire de profil enrichi du post parent (onglet « Réponses »). */
+export interface ReplyContext {
+  comment: PostComment
+  /** ID du post sur lequel porte le commentaire (pour la navigation). */
+  parentPostId: string
+  /** Auteur du post parent (pour le libellé « En réponse à @X »). */
+  parentPostAuthor: PostAuthor
+  /** Post parent complet (rendu au-dessus de la réponse). `null` si supprimé/inaccessible. */
+  parentPost: FeedPost | null
+  /** Commentaire parent, uniquement si la réponse répond à un autre commentaire
+   *  (post → commentaire parent → réponse). `null` sinon. */
+  parentComment: PostComment | null
+}
 
 /** Commentaire enrichi pour l'affichage. */
 export interface PostComment {
@@ -399,6 +418,22 @@ export async function listByAuthor(authorId: string, limit = 20, offset = 0): Pr
   return mapPosts(raw)
 }
 
+/** Posts likés par un utilisateur (403 si likes privés et non-propriétaire). */
+export async function listLikedByUser(
+  authorId: string,
+  limit = 20,
+  offset = 0,
+): Promise<FeedPost[]> {
+  const params = new URLSearchParams()
+  params.set('author_id', authorId)
+  params.set('limit', String(limit))
+  params.set('offset', String(offset))
+  const res = await apiFetch(`/posts/liked?${params}`)
+  if (res.status === 403) throw Object.assign(new Error('likes_private'), { status: 403 })
+  const raw = await unwrap<ApiPost[]>(res)
+  return mapPosts(raw ?? [])
+}
+
 export async function listHashtagTrends(limit = 5, query = ''): Promise<HashtagTrend[]> {
   const params = new URLSearchParams()
   params.set('limit', String(limit))
@@ -525,6 +560,47 @@ export async function listReplies(
     await apiFetch(`/posts/${postId}/comments/${commentId}/replies?limit=${limit}&offset=${offset}`),
   )
   return Promise.all((raw ?? []).map(toComment))
+}
+
+/** Commentaires écrits par un utilisateur, enrichis du post parent (onglet « Réponses »). */
+export async function listCommentsByAuthor(
+  authorId: string,
+  limit = 20,
+  offset = 0,
+): Promise<ReplyContext[]> {
+  const raw = await unwrap<ApiCommentWithPost[]>(
+    await apiFetch(
+      `/posts/comments?author_id=${encodeURIComponent(authorId)}&limit=${limit}&offset=${offset}`,
+    ),
+  )
+  if (!raw) return []
+  const fallbackAuthor: PostAuthor = {
+    id: '',
+    username: '',
+    displayName: '...',
+    avatarUrl: '',
+    visibility: 'public',
+  }
+  // États (liké/reposté/signé) de l'utilisateur courant, récupérés une seule
+  // fois pour enrichir tous les posts parents.
+  const [likedIds, repostedIds, bookmarkedIds] = await Promise.all([
+    getLikedIds(),
+    getRepostedIds(),
+    getBookmarkedIds(),
+  ])
+  return Promise.all(
+    raw.map(async (item) => {
+      const comment = await toComment(item)
+      const parentPost = item.parent_post
+        ? await toFeedPost(item.parent_post, likedIds, repostedIds, bookmarkedIds)
+        : null
+      const parentPostAuthor = item.parent_post
+        ? await resolveAuthor(item.parent_post.author_id)
+        : fallbackAuthor
+      const parentComment = item.parent_comment ? await toComment(item.parent_comment) : null
+      return { comment, parentPostId: item.post_id, parentPostAuthor, parentPost, parentComment }
+    }),
+  )
 }
 
 /**

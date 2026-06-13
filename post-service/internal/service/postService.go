@@ -81,6 +81,7 @@ type PostService struct {
 
 type profilVisibilityClient interface {
 	Visibility(ctx context.Context, userID string) (string, error)
+	LikesVisibility(ctx context.Context, userID string) (string, error)
 }
 
 type followStatusClient interface {
@@ -716,6 +717,23 @@ func (s *PostService) PostLikers(ctx context.Context, id string) ([]string, erro
 	return s.repo.LikersByPost(ctx, id)
 }
 
+// ListLikedByUser retourne les posts likés par authorID, triés du like le plus
+// récent au plus ancien, paginés. callerID peut être vide (visiteur).
+// Retourne ErrForbidden si les likes de authorID sont privés et que callerID
+// n'est pas authorID.
+func (s *PostService) ListLikedByUser(ctx context.Context, authorID, callerID string, limit, offset int64) ([]*models.Post, error) {
+	if s.profilClient != nil && callerID != authorID {
+		lv, err := s.profilClient.LikesVisibility(ctx, authorID)
+		if err != nil {
+			return nil, fmt.Errorf("%w: vérification likes-visibility: %v", ErrDependencyUnavailable, err)
+		}
+		if lv == client.VisibilityPrivate {
+			return nil, ErrForbidden
+		}
+	}
+	return s.repo.LikedPostsByUser(ctx, authorID, clampLimit(limit), clampOffset(offset))
+}
+
 // RepostPost enregistre un repost simple de actorID sur un post et renvoie le
 // post original annoté (`reposted_by_id`, `reposted_at`) pour l'affichage profil.
 func (s *PostService) RepostPost(ctx context.Context, id, actorID string) (*models.Post, error) {
@@ -861,12 +879,15 @@ func (s *PostService) CreateComment(ctx context.Context, postID, authorID, conte
 // stable entre création et suppression).
 func (s *PostService) emitCommentEvents(postAuthorID, rootID, rootAuthorID, actorID, postID, commentID, content string, retract bool) {
 	if rootID == "" {
-		// Commentaire racine → l'auteur du post.
+		// Commentaire racine → l'auteur du post. `CommentID` = ce commentaire,
+		// pour permettre le deep-link de la notification vers le commentaire
+		// (l'agrégation reste par post, cf. groupKeyFor → `comment:<post_id>`).
 		s.notif.Emit(notifier.Event{
 			Type:        notifier.TypeComment,
 			ActorID:     actorID,
 			RecipientID: postAuthorID,
 			PostID:      postID,
+			CommentID:   commentID,
 			Retract:     retract,
 		})
 	} else {
@@ -916,6 +937,100 @@ func (s *PostService) postAuthor(ctx context.Context, id string) string {
 		return ""
 	}
 	return p.AuthorID
+}
+
+// ListCommentsByAuthor renvoie les commentaires écrits par authorID, enrichis
+// de leur post parent, filtrés par la barrière de visibilité : les réponses
+// dont le post parent est masqué ou n'est pas lisible par viewerID sont exclues.
+func (s *PostService) ListCommentsByAuthor(ctx context.Context, authorID, viewerID string, limit, offset int64) ([]models.CommentWithPost, error) {
+	limit = clampLimit(limit)
+	offset = clampOffset(offset)
+
+	visible := make([]models.CommentWithPost, 0, limit)
+	seenVisible := int64(0)
+	sourceOffset := int64(0)
+	allowedByAuthor := make(map[string]bool)
+	postCache := make(map[string]*models.Post)       // nil = masqué ou introuvable
+	commentCache := make(map[string]*models.Comment) // commentaire parent (réponses), nil = introuvable
+
+	for int64(len(visible)) < limit {
+		batch, err := s.repo.ListCommentsByAuthor(ctx, authorID, MaxLimit, sourceOffset)
+		if err != nil {
+			return nil, err
+		}
+		if len(batch) == 0 {
+			break
+		}
+
+		for _, comment := range batch {
+			parent, fetched := postCache[comment.PostID]
+			if !fetched {
+				oid, parseErr := parseID(comment.PostID)
+				if parseErr == nil {
+					p, getErr := s.repo.Get(ctx, oid)
+					if getErr == nil && !p.IsHidden {
+						postCache[comment.PostID] = p
+						parent = p
+					} else {
+						postCache[comment.PostID] = nil
+					}
+				} else {
+					postCache[comment.PostID] = nil
+				}
+			}
+			if parent == nil {
+				continue
+			}
+
+			allowed, ok := allowedByAuthor[parent.AuthorID]
+			if !ok {
+				var chkErr error
+				allowed, chkErr = s.canReadAuthor(ctx, viewerID, parent.AuthorID)
+				if chkErr != nil {
+					return nil, chkErr
+				}
+				allowedByAuthor[parent.AuthorID] = allowed
+			}
+			if !allowed {
+				continue
+			}
+
+			if seenVisible < offset {
+				seenVisible++
+				continue
+			}
+
+			// Réponse à un autre commentaire → hydrate le commentaire parent
+			// (post → commentaire parent → réponse). Best-effort : si introuvable
+			// (supprimé), on laisse `ParentComment` nil.
+			var parentComment *models.Comment
+			if comment.ParentID != "" {
+				cached, ok := commentCache[comment.ParentID]
+				if !ok {
+					cached = nil
+					if cid, parseErr := parseID(comment.ParentID); parseErr == nil {
+						if pc, getErr := s.repo.GetComment(ctx, cid); getErr == nil {
+							cached = pc
+						}
+					}
+					commentCache[comment.ParentID] = cached
+				}
+				parentComment = cached
+			}
+
+			visible = append(visible, models.CommentWithPost{Comment: comment, ParentPost: parent, ParentComment: parentComment})
+			if int64(len(visible)) == limit {
+				break
+			}
+		}
+
+		if int64(len(batch)) < MaxLimit {
+			break
+		}
+		sourceOffset += MaxLimit
+	}
+
+	return visible, nil
 }
 
 // ListComments renvoie les commentaires RACINE d'un post (chronologiques, paginés).

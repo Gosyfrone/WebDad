@@ -174,6 +174,12 @@ export const messages: Record<Locale, Messages> = {
     'visibility.saved': 'Visibilité mise à jour.',
     'visibility.load_failed': 'Impossible de charger la visibilité.',
     'visibility.save_failed': 'Impossible de modifier la visibilité.',
+    'visibility.likes_private_account': "J'aime privés",
+    'visibility.likes_private_toggle_desc':
+      "Activez pour masquer vos mentions J'aime aux autres utilisateurs.",
+    'visibility.likes_toggle_aria': "Changer la visibilité des J'aime",
+    'visibility.likes_saved': "Visibilité des J'aime mise à jour.",
+    'visibility.likes_save_failed': "Impossible de modifier la visibilité des J'aime.",
     'filters.title': 'Mots filtrés',
     'filters.desc':
       "Masquez les posts du fil qui contiennent un mot ou une expression que vous ne voulez pas voir.",
@@ -747,7 +753,11 @@ export const messages: Record<Locale, Messages> = {
     'profil.tab_likes': "J'aime",
     'profil.empty_posts': 'Aucun post publié pour le moment.',
     'profil.empty_replies': 'Les réponses apparaîtront ici.',
+    'profil.replies_in_reply_to': 'En réponse à @{username}',
+    'profil.replies_deleted_parent': 'Publication d’origine indisponible.',
     'profil.empty_likes': 'Les posts que vous aimez apparaîtront ici.',
+    'profil.likes_private_title': "Les J'aime de @{username} sont privés",
+    'profil.likes_private_message': "Cet utilisateur a choisi de garder ses mentions J'aime privées.",
     'profil.private_title': 'Ce compte est privé',
     'profil.private_message':
       'Suivez ce profil pour voir ses posts, ses réponses et ses mentions J’aime.',
@@ -966,6 +976,11 @@ export const messages: Record<Locale, Messages> = {
     'visibility.saved': 'Visibility updated.',
     'visibility.load_failed': 'Could not load visibility.',
     'visibility.save_failed': 'Could not update visibility.',
+    'visibility.likes_private_account': 'Private likes',
+    'visibility.likes_private_toggle_desc': 'Turn on to hide your likes from other users.',
+    'visibility.likes_toggle_aria': 'Change likes visibility',
+    'visibility.likes_saved': 'Likes visibility updated.',
+    'visibility.likes_save_failed': 'Could not update likes visibility.',
     'filters.title': 'Muted words',
     'filters.desc':
       "Hide feed posts containing a word or phrase you don't want to see.",
@@ -1535,7 +1550,11 @@ export const messages: Record<Locale, Messages> = {
     'profil.tab_likes': 'Likes',
     'profil.empty_posts': 'No posts yet.',
     'profil.empty_replies': 'Replies will show up here.',
+    'profil.replies_in_reply_to': 'In reply to @{username}',
+    'profil.replies_deleted_parent': 'Original post unavailable.',
     'profil.empty_likes': 'Posts you like will show up here.',
+    'profil.likes_private_title': "@{username}'s likes are private",
+    'profil.likes_private_message': 'This user has chosen to keep their likes private.',
     'profil.private_title': 'This account is private',
     'profil.private_message':
       'Follow this profile to see their posts, replies, and likes.',

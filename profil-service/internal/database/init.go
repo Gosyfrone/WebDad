@@ -31,25 +31,33 @@ func EnsureSchema(ctx context.Context, db *mongo.Database) error {
 	if err := ensureIndexes(ctx, db); err != nil {
 		return err
 	}
-	if err := normalizeLegacyProfiles(ctx, db); err != nil {
+	if err := backfillVisibility(ctx, db); err != nil {
 		return err
 	}
 	return ensureSeed(ctx, db)
 }
 
-// normalizeLegacyProfiles remet à "public" les profils sans visibility valide.
-// bypassDocumentValidation car ces documents violent justement le schéma strict.
-func normalizeLegacyProfiles(ctx context.Context, db *mongo.Database) error {
-	filter := bson.M{"$or": bson.A{
-		bson.M{"visibility": ""},
-		bson.M{"visibility": bson.M{"$exists": false}},
-	}}
-	update := bson.M{"$set": bson.M{"visibility": "public"}}
-	_, err := db.Collection("profiles").UpdateMany(
-		ctx, filter, update, options.UpdateMany().SetBypassDocumentValidation(true),
-	)
-	if err != nil {
-		return fmt.Errorf("normalisation visibility legacy : %w", err)
+// backfillVisibility remet à une valeur valide les champs `visibility` et
+// `likes_visibility` des documents écrits avant l'introduction de ces champs
+// (ou avant leur valeur par défaut). Sans omitempty historique, la valeur zéro
+// a pu être persistée comme chaîne vide : `""` ne respecte pas l'enum
+// {public, private} du $jsonSchema, et la validation `strict` de Mongo rejette
+// alors TOUTE mise à jour ultérieure du document (le doc complet est revalidé).
+//
+// ⚠️ Base de PROD : toute feature ajoutant un champ contraint (enum, required,
+// index unique) doit fournir ce type de migration idempotente au boot, sinon les
+// vieux documents bloquent leurs propres écritures. Idempotent : no-op une fois
+// les documents corrigés (filtre sur champ absent OU chaîne vide).
+func backfillVisibility(ctx context.Context, db *mongo.Database) error {
+	coll := db.Collection("profiles")
+	for _, field := range []string{"visibility", "likes_visibility"} {
+		filter := bson.M{"$or": bson.A{
+			bson.M{field: bson.M{"$exists": false}},
+			bson.M{field: ""},
+		}}
+		if _, err := coll.UpdateMany(ctx, filter, bson.M{"$set": bson.M{field: "public"}}); err != nil {
+			return fmt.Errorf("backfill %q : %w", field, err)
+		}
 	}
 	return nil
 }
@@ -143,16 +151,17 @@ func ensureSeed(ctx context.Context, db *mongo.Database) error {
 	filter := bson.M{"user_id": adminUserID}
 	update := bson.M{
 		"$setOnInsert": bson.M{
-			"user_id":      adminUserID,
-			"display_name": "Administrateur Breezy",
-			"bio":          "Administrateur de Breezy",
-			"avatar_url":   "",
-			"banner_url":   "",
-			"website":      "",
-			"location":     "",
-			"visibility":   "public",
-			"created_at":   now,
-			"updated_at":   now,
+			"user_id":          adminUserID,
+			"display_name":     "Administrateur Breezy",
+			"bio":              "Administrateur de Breezy",
+			"avatar_url":       "",
+			"banner_url":       "",
+			"website":          "",
+			"location":         "",
+			"visibility":       "public",
+			"likes_visibility": "public",
+			"created_at":       now,
+			"updated_at":       now,
 		},
 	}
 	_, err := db.Collection("profiles").UpdateOne(ctx, filter, update, options.UpdateOne().SetUpsert(true))
@@ -172,14 +181,15 @@ var validators = map[string]bson.M{
 			"bsonType": "object",
 			"required": bson.A{"user_id", "created_at"},
 			"properties": bson.M{
-				"user_id":      bson.M{"bsonType": "string"},
-				"display_name": bson.M{"bsonType": "string", "maxLength": 100},
-				"bio":          bson.M{"bsonType": "string", "maxLength": 160},
-				"avatar_url":   bson.M{"bsonType": "string"},
-				"banner_url":   bson.M{"bsonType": "string"},
-				"website":      bson.M{"bsonType": "string"},
-				"location":     bson.M{"bsonType": "string"},
-				"visibility":   bson.M{"bsonType": "string", "enum": bson.A{"public", "private"}},
+				"user_id":          bson.M{"bsonType": "string"},
+				"display_name":     bson.M{"bsonType": "string", "maxLength": 100},
+				"bio":              bson.M{"bsonType": "string", "maxLength": 160},
+				"avatar_url":       bson.M{"bsonType": "string"},
+				"banner_url":       bson.M{"bsonType": "string"},
+				"website":          bson.M{"bsonType": "string"},
+				"location":         bson.M{"bsonType": "string"},
+				"visibility":       bson.M{"bsonType": "string", "enum": bson.A{"public", "private"}},
+				"likes_visibility": bson.M{"bsonType": "string", "enum": bson.A{"public", "private"}},
 				// Champs optionnels (validés uniquement s'ils sont présents).
 				"birth_date":              bson.M{"bsonType": "date"},
 				"gender":                  bson.M{"bsonType": "string", "enum": bson.A{"male", "female"}},

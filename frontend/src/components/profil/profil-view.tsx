@@ -1,11 +1,12 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { ArrowLeft, FileText, Loader2, Lock, ShieldAlert } from 'lucide-react'
+import { ArrowLeft, FileText, Loader2, Lock, MessageCircle, ShieldAlert } from 'lucide-react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 
 import { cn } from '@/lib/utils'
-import { ROUTES } from '@/lib/routes'
+import { ROUTES, postHref } from '@/lib/routes'
 import { useFollow } from '@/lib/use-follow'
 import {
   getMyProfil,
@@ -16,14 +17,18 @@ import {
 import {
   applyProfilUpdateToPosts,
   listByAuthor,
+  listCommentsByAuthor,
+  listLikedByUser,
   subscribePostCreated,
   type FeedPost,
+  type ReplyContext,
 } from '@/lib/posts'
 import { FOLLOW_CHANGE_EVENT, type FollowChangeDetail } from '@/lib/use-follow'
 import { useToast } from '@/hooks/use-toast'
 import type { ProfilDetails, ProfilEditableFields } from '@/types'
 import { useT } from '@/components/language-provider'
 import { PostCard } from '@/components/feed/post-card'
+import { CommentRow } from '@/components/feed/comment-section'
 import { ProfilHeader } from '@/components/profil/profil-header'
 
 type ProfilTab = 'posts' | 'replies' | 'likes'
@@ -68,6 +73,9 @@ export function ProfilView({ username }: ProfilViewProps) {
   const t = useT()
   const [profil, setProfil] = useState<ProfilDetails | null>(null)
   const [posts, setPosts] = useState<FeedPost[]>([])
+  const [replies, setReplies] = useState<ReplyContext[]>([])
+  const [likedPosts, setLikedPosts] = useState<FeedPost[]>([])
+  const [likesPrivateLocked, setLikesPrivateLocked] = useState(false)
   const [tab, setTab] = useState<ProfilTab>('posts')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -152,6 +160,57 @@ export function ProfilView({ username }: ProfilViewProps) {
       cancelled = true
     }
   }, [accessPending, privateContentLocked, profil?.userId])
+
+  // Réponses de l'auteur (onglet « Réponses »), chargées au premier clic.
+  useEffect(() => {
+    if (tab !== 'replies') return
+    if (!profil?.userId) return
+    if (accessPending) return
+    if (privateContentLocked) {
+      setReplies([])
+      return
+    }
+    let cancelled = false
+    listCommentsByAuthor(profil.userId).then(
+      (list) => {
+        if (!cancelled) setReplies(list)
+      },
+      () => {
+        if (!cancelled) setReplies([])
+      },
+    )
+    return () => {
+      cancelled = true
+    }
+  }, [tab, accessPending, privateContentLocked, profil?.userId])
+
+  // Likes de l'auteur (onglet « J'aime »), chargés au premier clic.
+  useEffect(() => {
+    if (tab !== 'likes') return
+    if (!profil?.userId) return
+    if (accessPending) return
+    if (privateContentLocked) {
+      setLikedPosts([])
+      return
+    }
+    let cancelled = false
+    setLikesPrivateLocked(false)
+    listLikedByUser(profil.userId).then(
+      (list) => {
+        if (!cancelled) setLikedPosts(list)
+      },
+      (err: unknown) => {
+        if (cancelled) return
+        if (err instanceof Error && err.message === 'likes_private') {
+          setLikesPrivateLocked(true)
+        }
+        setLikedPosts([])
+      },
+    )
+    return () => {
+      cancelled = true
+    }
+  }, [tab, accessPending, privateContentLocked, profil?.userId])
 
   useEffect(() => {
     function handleFollowChange(event: Event) {
@@ -345,10 +404,26 @@ export function ProfilView({ username }: ProfilViewProps) {
         ) : (
           <EmptyTab message={t('profil.empty_posts')} />
         )
+      ) : tab === 'replies' ? (
+        replies.length > 0 ? (
+          <div className="flex flex-col gap-3 py-3">
+            {replies.map((reply) => (
+              <ReplyCard key={reply.comment.id} reply={reply} />
+            ))}
+          </div>
+        ) : (
+          <EmptyTab message={t('profil.empty_replies')} />
+        )
+      ) : likesPrivateLocked ? (
+        <LikesPrivateTab username={profil.username} />
+      ) : likedPosts.length > 0 ? (
+        <div className="divide-y divide-border">
+          {likedPosts.map((post) => (
+            <PostCard key={post.id} post={post} onDeleted={() => {}} onUpdated={() => {}} />
+          ))}
+        </div>
       ) : (
-        <EmptyTab
-          message={tab === 'replies' ? t('profil.empty_replies') : t('profil.empty_likes')}
-        />
+        <EmptyTab message={t('profil.empty_likes')} />
       )}
     </div>
   )
@@ -378,6 +453,63 @@ function TabButton({
   )
 }
 
+/**
+ * Onglet « Réponses » (façon Twitter) : le post parent complet et interactif en
+ * haut, puis une carte encadrée façon feed contenant — si la réponse répond à un
+ * autre commentaire — le commentaire parent, et enfin la réponse de
+ * l'utilisateur (avatar + identité + contenu via `CommentRow`). Cliquer la carte
+ * ouvre le thread et défile directement sur le commentaire.
+ */
+function ReplyCard({ reply }: { reply: ReplyContext }) {
+  const t = useT()
+  const router = useRouter()
+  const { comment, parentPostId, parentPostAuthor, parentPost, parentComment } = reply
+  // On répond au commentaire parent s'il existe, sinon au post.
+  const replyTarget = parentComment?.author.username || parentPostAuthor.username || '…'
+  const href = `${postHref(parentPostId)}?comment=${encodeURIComponent(comment.id)}`
+  return (
+    <div className="glass group mx-3 flex flex-col rounded-[24px] border backdrop-blur-xl transition hover:bg-white/85 hover:shadow-[0_20px_56px_rgba(91,108,255,0.16)] dark:hover:bg-[#1f1633]/80">
+      {parentPost ? (
+        <PostCard
+          post={parentPost}
+          embedded
+          onDeleted={() => {}}
+          onUpdated={() => {}}
+          onCommentClick={() => router.push(postHref(parentPostId))}
+        />
+      ) : (
+        <p className="flex items-center gap-1 px-4 pt-3 text-sm text-muted-foreground">
+          <MessageCircle className="h-3.5 w-3.5" aria-hidden />
+          {t('profil.replies_deleted_parent')}
+        </p>
+      )}
+
+      {/* Carte encadrée façon feed : commentaire parent (optionnel) + réponse. */}
+      <div
+        role="link"
+        tabIndex={0}
+        onClick={() => router.push(href)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') router.push(href)
+        }}
+        className="mx-3 mb-3 cursor-pointer rounded-2xl border border-border/70 bg-card/70 p-3 shadow-sm transition-colors hover:bg-card/90"
+      >
+        <p className="mb-2 flex items-center gap-1 text-xs text-muted-foreground">
+          <MessageCircle className="h-3 w-3" aria-hidden />
+          {t('profil.replies_in_reply_to', { username: replyTarget })}
+        </p>
+
+        {parentComment && (
+          <CommentRow comment={parentComment} />
+        )}
+        <div className={parentComment ? 'ml-5 border-l border-border pl-3 pt-2' : ''}>
+          <CommentRow comment={comment} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function EmptyTab({ message }: { message: string }) {
   return (
     <div className="glass mx-4 mt-6 flex flex-col items-center gap-2 rounded-[26px] border px-8 py-16 text-center backdrop-blur-xl">
@@ -395,6 +527,21 @@ function PrivateTab() {
       <div className="max-w-sm space-y-1">
         <p className="text-sm font-semibold text-foreground">{t('profil.private_title')}</p>
         <p className="text-sm text-muted-foreground">{t('profil.private_message')}</p>
+      </div>
+    </CenteredTab>
+  )
+}
+
+function LikesPrivateTab({ username }: { username: string }) {
+  const t = useT()
+  return (
+    <CenteredTab>
+      <Lock className="h-10 w-10 text-[#5B6CFF] dark:text-[#9aa6ff]" aria-hidden />
+      <div className="max-w-sm space-y-1">
+        <p className="text-sm font-semibold text-foreground">
+          {t('profil.likes_private_title', { username })}
+        </p>
+        <p className="text-sm text-muted-foreground">{t('profil.likes_private_message')}</p>
       </div>
     </CenteredTab>
   )

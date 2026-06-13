@@ -2421,6 +2421,46 @@
         }
       }
     },
+    "/profils/{userId}/likes-visibility": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "profils"
+        ],
+        "summary": "Visibilité des J'aime d'un profil",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "User ID",
+            "name": "userId",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "likes_visibility: public|private",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
     "/profils/{userId}/visibility": {
       "get": {
         "produces": [
@@ -2922,6 +2962,119 @@
           },
           "404": {
             "description": "Not Found",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/posts/comments": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "comments"
+        ],
+        "summary": "Réponses écrites par un utilisateur (onglet profil)",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "ID de l'auteur des commentaires",
+            "name": "author_id",
+            "in": "query",
+            "required": true
+          },
+          {
+            "type": "integer",
+            "description": "Nb résultats",
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "type": "integer",
+            "description": "Décalage",
+            "name": "offset",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/models.CommentWithPost"
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/posts/liked": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "likes"
+        ],
+        "summary": "Posts likés par un utilisateur",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "User ID",
+            "name": "author_id",
+            "in": "query",
+            "required": true
+          },
+          {
+            "type": "integer",
+            "description": "Nb résultats",
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "type": "integer",
+            "description": "Décalage",
+            "name": "offset",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/models.Post"
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "403": {
+            "description": "Likes privés",
             "schema": {
               "type": "object",
               "additionalProperties": {
@@ -5607,6 +5760,9 @@
           "description": "\"male\" | \"female\"",
           "type": "string"
         },
+        "likes_visibility": {
+          "type": "string"
+        },
         "location": {
           "type": "string"
         },
@@ -5649,6 +5805,13 @@
           "enum": [
             "male",
             "female"
+          ]
+        },
+        "likes_visibility": {
+          "type": "string",
+          "enum": [
+            "public",
+            "private"
           ]
         },
         "location": {
@@ -5724,6 +5887,47 @@
         },
         "parent_id": {
           "type": "string"
+        },
+        "post_id": {
+          "type": "string"
+        },
+        "reply_count": {
+          "type": "integer"
+        },
+        "updated_at": {
+          "type": "string"
+        }
+      }
+    },
+    "models.CommentWithPost": {
+      "type": "object",
+      "properties": {
+        "author_id": {
+          "type": "string"
+        },
+        "content": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "media": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/models.MediaRef"
+          }
+        },
+        "parent_comment": {
+          "$ref": "#/definitions/models.Comment"
+        },
+        "parent_id": {
+          "type": "string"
+        },
+        "parent_post": {
+          "$ref": "#/definitions/models.Post"
         },
         "post_id": {
           "type": "string"

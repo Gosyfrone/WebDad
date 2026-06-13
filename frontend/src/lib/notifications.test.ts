@@ -57,17 +57,36 @@ describe('buildNotification (agrégation → affichage)', () => {
 
 describe('notificationHref', () => {
   it('pointe vers le post quand postId présent', () => {
-    expect(notificationHref({ type: 'like', postId: 'abc', conversationId: '' })).toBe('/posts/abc')
+    expect(notificationHref({ type: 'like', postId: 'abc', commentId: '', conversationId: '' })).toBe(
+      '/posts/abc',
+    )
   })
 
   it('repli sur le fil sans postId', () => {
-    expect(notificationHref({ type: 'like', postId: '', conversationId: '' })).toBe('/feed')
+    expect(notificationHref({ type: 'like', postId: '', commentId: '', conversationId: '' })).toBe(
+      '/feed',
+    )
   })
 
   it('pointe vers la conversation pour une mention en message', () => {
-    expect(notificationHref({ type: 'message_mention', postId: '', conversationId: 'cv1' })).toBe(
-      '/messages?conv=cv1',
-    )
+    expect(
+      notificationHref({ type: 'message_mention', postId: '', commentId: '', conversationId: 'cv1' }),
+    ).toBe('/messages?conv=cv1')
+  })
+
+  it('cible le commentaire pour un commentaire/réponse', () => {
+    expect(
+      notificationHref({ type: 'comment', postId: 'abc', commentId: 'c1', conversationId: '' }),
+    ).toBe('/posts/abc?comment=c1')
+    expect(
+      notificationHref({ type: 'reply', postId: 'abc', commentId: 'c2', conversationId: '' }),
+    ).toBe('/posts/abc?comment=c2')
+  })
+
+  it('repli sur le post seul si le commentaire est absent', () => {
+    expect(
+      notificationHref({ type: 'comment', postId: 'abc', commentId: '', conversationId: '' }),
+    ).toBe('/posts/abc')
   })
 })
 

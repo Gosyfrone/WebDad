@@ -30,6 +30,7 @@ func RegisterRoutes(r *gin.Engine, serviceName string, profils *service.ProfilSe
 		// Lecture publique.
 		p.GET("/search", h.Search) // ?q= : recherche par display_name
 		p.GET("/:userId/visibility", h.GetVisibility)
+		p.GET("/:userId/likes-visibility", h.GetLikesVisibility)
 		p.GET("/:userId", h.GetByUserID)
 		p.DELETE("/:userId", auth, h.Delete) // admin (vérifié dans le handler)
 	}

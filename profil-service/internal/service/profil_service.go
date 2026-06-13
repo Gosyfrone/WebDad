@@ -69,12 +69,13 @@ func (s *ProfilService) Search(ctx context.Context, term string, limit int64) ([
 func (s *ProfilService) Create(ctx context.Context, userID string, req models.CreateProfilRequest) (*models.Profil, error) {
 	now := time.Now().UTC()
 	p := &models.Profil{
-		UserID:      userID,
-		DisplayName: strings.TrimSpace(req.DisplayName),
-		BirthDate:   req.BirthDate,
-		CreatedAt:   now,
-		UpdatedAt:   now,
-		Visibility:  models.VisibilityPublic,
+		UserID:          userID,
+		DisplayName:     strings.TrimSpace(req.DisplayName),
+		BirthDate:       req.BirthDate,
+		CreatedAt:       now,
+		UpdatedAt:       now,
+		Visibility:      models.VisibilityPublic,
+		LikesVisibility: models.VisibilityPublic,
 	}
 	if req.Gender != nil {
 		p.Gender = *req.Gender
@@ -169,6 +170,9 @@ func planUpdate(current *models.Profil, req models.UpdateProfilRequest, now time
 	}
 	if req.Visibility != nil && *req.Visibility != current.Visibility {
 		set["visibility"] = *req.Visibility
+	}
+	if req.LikesVisibility != nil && *req.LikesVisibility != current.LikesVisibility {
+		set["likes_visibility"] = *req.LikesVisibility
 	}
 
 	return set, nil

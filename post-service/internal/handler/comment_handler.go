@@ -23,6 +23,36 @@ func NewCommentHandler(svc *service.PostService, serviceName string) *CommentHan
 	}
 }
 
+// ListCommentsByAuthor : GET /posts/comments?author_id=<id> — commentaires écrits
+// par un utilisateur, enrichis du post parent visible (onglet « Réponses » du profil).
+// JWT optionnel : utilisé pour la barrière de visibilité sur le post parent.
+// @Summary     Réponses écrites par un utilisateur (onglet profil)
+// @Tags        comments
+// @Produce     json
+// @Param       author_id query string true  "ID de l'auteur des commentaires"
+// @Param       limit     query int    false "Nb résultats"
+// @Param       offset    query int    false "Décalage"
+// @Success     200 {array} models.CommentWithPost
+// @Failure     400 {object} map[string]string
+// @Router      /posts/comments [get]
+func (h *CommentHandler) ListCommentsByAuthor(c *gin.Context) {
+	authorID := c.Query("author_id")
+	if authorID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "author_id requis"})
+		return
+	}
+	viewerID := ""
+	if claims, ok := middleware.ClaimsFrom(c); ok {
+		viewerID = claims.UserID
+	}
+	results, err := h.service.ListCommentsByAuthor(c.Request.Context(), authorID, viewerID, pageLimit(c), pageOffset(c))
+	if err != nil {
+		respondPostError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": results})
+}
+
 // ListPostComments : GET /posts/:id/comments (public) — commentaires RACINE,
 // chronologiques, paginés (les réponses sont chargées via ListCommentReplies).
 // @Summary     Commentaires d'un post

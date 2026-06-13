@@ -496,6 +496,67 @@ func (r *PostRepository) LikersByPost(ctx context.Context, postID string) ([]str
 	return r.distinctStrings(ctx, r.likes, bson.M{"post_id": postID}, "user_id")
 }
 
+// LikedPostsByUser retourne les posts likés par userID, dans l'ordre du like le
+// plus récent en premier, paginés (limit/offset). Les posts masqués (is_hidden)
+// sont exclus. L'ordre de like est préservé.
+func (r *PostRepository) LikedPostsByUser(ctx context.Context, userID string, limit, offset int64) ([]*models.Post, error) {
+	type likeDoc struct {
+		PostID string `bson:"post_id"`
+	}
+
+	cur, err := r.likes.Find(ctx, bson.M{"user_id": userID},
+		options.Find().
+			SetSort(bson.D{{Key: "created_at", Value: -1}}).
+			SetLimit(limit).
+			SetSkip(offset),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = cur.Close(ctx) }()
+
+	var docs []likeDoc
+	if err := cur.All(ctx, &docs); err != nil {
+		return nil, err
+	}
+	if len(docs) == 0 {
+		return []*models.Post{}, nil
+	}
+
+	oids := make([]bson.ObjectID, 0, len(docs))
+	orderByHex := make(map[string]int, len(docs))
+	for i, d := range docs {
+		oid, err := bson.ObjectIDFromHex(d.PostID)
+		if err != nil {
+			continue
+		}
+		oids = append(oids, oid)
+		orderByHex[d.PostID] = i
+	}
+	if len(oids) == 0 {
+		return []*models.Post{}, nil
+	}
+
+	postCur, err := r.posts.Find(ctx, bson.M{
+		"_id":       bson.M{"$in": oids},
+		"is_hidden": bson.M{"$ne": true},
+	})
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = postCur.Close(ctx) }()
+
+	var posts []*models.Post
+	if err := postCur.All(ctx, &posts); err != nil {
+		return nil, err
+	}
+
+	sort.Slice(posts, func(i, j int) bool {
+		return orderByHex[posts[i].ID.Hex()] < orderByHex[posts[j].ID.Hex()]
+	})
+	return posts, nil
+}
+
 // DeleteLikesByPost purge les likes d'un post (nettoyage à la suppression).
 func (r *PostRepository) DeleteLikesByPost(ctx context.Context, postID string) error {
 	_, err := r.likes.DeleteMany(ctx, bson.M{"post_id": postID})
@@ -627,6 +688,27 @@ func (r *PostRepository) DeleteRepliesByParent(ctx context.Context, parentID str
 		return 0, err
 	}
 	return res.DeletedCount, nil
+}
+
+// ListCommentsByAuthor renvoie tous les commentaires d'un auteur, du plus
+// récent au plus ancien, paginés. Utilisé pour l'onglet « Réponses » du profil.
+func (r *PostRepository) ListCommentsByAuthor(ctx context.Context, authorID string, limit, skip int64) ([]models.Comment, error) {
+	opts := options.Find().
+		SetSort(bson.D{{Key: "created_at", Value: -1}}).
+		SetLimit(limit).
+		SetSkip(skip)
+
+	cursor, err := r.comments.Find(ctx, bson.M{"author_id": authorID}, opts)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = cursor.Close(ctx) }()
+
+	comments := []models.Comment{}
+	if err := cursor.All(ctx, &comments); err != nil {
+		return nil, err
+	}
+	return comments, nil
 }
 
 // GetComment renvoie un commentaire par son ObjectID (mongo.ErrNoDocuments si absent).
