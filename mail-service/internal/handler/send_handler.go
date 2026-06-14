@@ -1,7 +1,7 @@
 package handler
 
 import (
-	"log"
+	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -48,9 +48,10 @@ func (h *SendHandler) Send(c *gin.Context) {
 		HTML:    req.HTML,
 		Text:    req.Text,
 	}); err != nil {
-		log.Printf("[mail-service] envoi à %s échoué : %v", req.To, err)
+		slog.Error("envoi e-mail échoué", "subject", req.Subject, "error", err)
 		c.JSON(http.StatusBadGateway, gin.H{"error": "envoi impossible"})
 		return
 	}
+	slog.Info("e-mail envoyé", "subject", req.Subject)
 	c.Status(http.StatusAccepted)
 }

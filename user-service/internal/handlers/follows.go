@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/webdad/user-service/internal/logging"
 	"github.com/webdad/user-service/internal/middleware"
 )
 
@@ -31,6 +32,7 @@ func (h *Handler) Follow(c *gin.Context) {
 		respondUserError(c, err)
 		return
 	}
+	logging.FromGin(c).Info("follow", "target_id", c.Param("id"), "status", status)
 	c.JSON(http.StatusOK, gin.H{"data": gin.H{"status": status}})
 }
 
@@ -54,6 +56,7 @@ func (h *Handler) Unfollow(c *gin.Context) {
 		respondUserError(c, err)
 		return
 	}
+	logging.FromGin(c).Info("unfollow", "target_id", c.Param("id"))
 	c.Status(http.StatusNoContent)
 }
 
@@ -148,6 +151,7 @@ func (h *Handler) AcceptFollowRequest(c *gin.Context) {
 		respondUserError(c, err)
 		return
 	}
+	logging.FromGin(c).Info("demande de suivi acceptée", "follower_id", c.Param("followerId"))
 	c.JSON(http.StatusOK, gin.H{"data": gin.H{"status": "accepted"}})
 }
 
@@ -171,6 +175,7 @@ func (h *Handler) RejectFollowRequest(c *gin.Context) {
 		respondUserError(c, err)
 		return
 	}
+	logging.FromGin(c).Info("demande de suivi rejetée", "follower_id", c.Param("followerId"))
 	c.JSON(http.StatusOK, gin.H{"data": gin.H{"status": "rejected"}})
 }
 

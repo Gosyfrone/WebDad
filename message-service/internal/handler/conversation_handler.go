@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/webdad/message-service/internal/logging"
 	"github.com/webdad/message-service/internal/middleware"
 	"github.com/webdad/message-service/internal/models"
 	"github.com/webdad/message-service/internal/realtime"
@@ -64,6 +65,7 @@ func (h *ConversationHandler) CreateConversation(c *gin.Context) {
 		respondError(c, err)
 		return
 	}
+	logging.FromGin(c).Info("conversation créée", "conv_id", view.ID, "type", req.Type)
 	c.JSON(http.StatusCreated, gin.H{"data": view})
 }
 
@@ -150,6 +152,7 @@ func (h *ConversationHandler) SetMemberRole(c *gin.Context) {
 	h.hub.Publish(notify, gin.H{"type": "member_role_changed", "data": gin.H{
 		"conversation_id": c.Param("id"), "user_id": c.Param("userId"), "role": req.Role,
 	}})
+	logging.FromGin(c).Info("rôle membre modifié", "conv_id", c.Param("id"), "target_id", c.Param("userId"), "role", req.Role)
 	c.JSON(http.StatusOK, gin.H{"data": gin.H{"user_id": c.Param("userId"), "role": req.Role}})
 }
 
@@ -193,6 +196,7 @@ func (h *ConversationHandler) DeleteConversation(c *gin.Context) {
 		return
 	}
 	h.hub.Publish(notify, gin.H{"type": "conversation_deleted", "data": gin.H{"id": convID}})
+	logging.FromGin(c).Info("groupe supprimé", "conv_id", convID)
 	c.Status(http.StatusNoContent)
 }
 
@@ -326,6 +330,7 @@ func (h *ConversationHandler) PurgeUser(c *gin.Context) {
 		respondError(c, err)
 		return
 	}
+	logging.FromGin(c).Info("données messagerie purgées RGPD (admin)", "target_id", c.Param("id"))
 	c.Status(http.StatusNoContent)
 }
 
@@ -368,6 +373,7 @@ func (h *ConversationHandler) AddMember(c *gin.Context) {
 	h.hub.Publish(notify, gin.H{"type": "member_added", "data": gin.H{
 		"conversation_id": c.Param("id"), "user_id": req.UserID,
 	}})
+	logging.FromGin(c).Info("membre ajouté", "conv_id", c.Param("id"), "target_id", req.UserID)
 	c.JSON(http.StatusCreated, gin.H{"data": gin.H{"user_id": req.UserID, "role": models.MemberTalker}})
 }
 
@@ -393,6 +399,7 @@ func (h *ConversationHandler) RemoveMember(c *gin.Context) {
 	h.hub.Publish(notify, gin.H{"type": "member_removed", "data": gin.H{
 		"conversation_id": c.Param("id"), "user_id": targetID,
 	}})
+	logging.FromGin(c).Info("membre retiré/parti", "conv_id", c.Param("id"), "target_id", targetID)
 	c.Status(http.StatusNoContent)
 }
 

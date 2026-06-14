@@ -4,6 +4,8 @@ package logging
 import (
 	"log/slog"
 	"os"
+
+	"github.com/gin-gonic/gin"
 )
 
 // Setup initialise slog.SetDefault avec un handler JSON (release) ou texte
@@ -18,6 +20,16 @@ func Setup(service string) {
 		handler = slog.NewTextHandler(os.Stdout, opts)
 	}
 	slog.SetDefault(slog.New(handler).With(slog.String("service", service)))
+}
+
+// FromGin retourne un logger enrichi avec request_id et user_id (si présent)
+// pour corrélation automatique dans les handlers.
+func FromGin(c *gin.Context) *slog.Logger {
+	l := slog.Default().With("request_id", c.GetString("request_id"))
+	if uid := c.GetString("user_id"); uid != "" {
+		l = l.With("user_id", uid)
+	}
+	return l
 }
 
 func parseLevel(s string) slog.Level {

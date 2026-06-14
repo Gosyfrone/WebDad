@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/webdad/auth-service/internal/logging"
 	"github.com/webdad/auth-service/internal/models"
 	"github.com/webdad/auth-service/internal/services"
 )
@@ -31,13 +32,16 @@ func (h *Handler) Register(c *gin.Context) {
 	token, refresh, user, err := h.auth.Register(req.Email, req.Password)
 	if err != nil {
 		if errors.Is(err, services.ErrEmailTaken) {
+			logging.FromGin(c).Warn("inscription refusée", "reason", "email_taken")
 			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
 			return
 		}
+		logging.FromGin(c).Error("inscription : erreur inattendue", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "création du compte impossible"})
 		return
 	}
 
+	logging.FromGin(c).Info("inscription réussie", "user_id", user.ID)
 	c.JSON(http.StatusCreated, gin.H{"data": gin.H{
 		"token":         token,
 		"refresh_token": refresh,

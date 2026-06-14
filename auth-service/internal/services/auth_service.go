@@ -12,7 +12,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/url"
 	"strings"
 	"time"
@@ -231,7 +231,7 @@ func (s *AuthService) ChangePassword(userID, currentPassword, newPassword string
 // propagée. Le gabarit échappe le contenu (mot de passe arbitraire sûr en HTML).
 func (s *AuthService) sendAdminWelcomeMail(u *models.User, username, tempPassword string) {
 	if s.mailer == nil {
-		log.Printf("[auth-service] mail désactivé : bienvenue admin pour %s non envoyée", u.Email)
+		slog.Debug("mail désactivé : e-mail bienvenue admin non envoyé", "user_id", u.ID)
 		return
 	}
 
@@ -263,7 +263,7 @@ func (s *AuthService) sendAdminWelcomeMail(u *models.User, username, tempPasswor
 			"Se connecter", loginURL,
 			"Si tu n'attendais pas cet e-mail, ignore-le ou contacte l'administrateur.")
 		if err := s.mailer.Send(u.Email, subject, htmlBody, text); err != nil {
-			log.Printf("[auth-service] envoi bienvenue admin à %s : %v", u.Email, err)
+			slog.Warn("envoi e-mail bienvenue admin échoué (best-effort)", "user_id", u.ID, "error", err)
 		}
 		return
 	}
@@ -273,7 +273,7 @@ func (s *AuthService) sendAdminWelcomeMail(u *models.User, username, tempPasswor
 	// changement de mot de passe (drapeau porté par le token, cf. VerifyEmail).
 	raw, err := s.createAccountToken(u.ID, purposeVerify, verifyTokenTTL)
 	if err != nil {
-		log.Printf("[auth-service] création token vérif (bienvenue admin) pour %s : %v", u.Email, err)
+		slog.Error("création token vérification (bienvenue admin) échouée", "user_id", u.ID, "error", err)
 		return
 	}
 	link := fmt.Sprintf("%s/verify-email?token=%s", base, url.QueryEscape(raw))
@@ -296,7 +296,7 @@ func (s *AuthService) sendAdminWelcomeMail(u *models.User, username, tempPasswor
 		"Ce lien expire dans 24 heures. Si tu n'attendais pas cet e-mail, ignore-le ou contacte l'administrateur.")
 
 	if err := s.mailer.Send(u.Email, subject, htmlBody, text); err != nil {
-		log.Printf("[auth-service] envoi bienvenue admin (vérif) à %s : %v", u.Email, err)
+		slog.Warn("envoi e-mail bienvenue admin (vérif) échoué (best-effort)", "user_id", u.ID, "error", err)
 	}
 }
 
@@ -499,7 +499,7 @@ func (s *AuthService) ResendVerification(email string) error {
 		return nil // compte inexistant : no-op silencieux (anti-énumération).
 	}
 	if err != nil {
-		log.Printf("[auth-service] resend vérif (lecture) pour %s : %v", email, err)
+		slog.Error("resend vérification : lecture DB échouée", "error", err)
 		return nil
 	}
 	if u.EmailVerified {
@@ -515,13 +515,13 @@ func (s *AuthService) ResendVerification(email string) error {
 // casse ni le register ni le resend).
 func (s *AuthService) sendVerificationMail(u *models.User) {
 	if s.mailer == nil {
-		log.Printf("[auth-service] mail désactivé : vérif pour %s non envoyée", u.Email)
+		slog.Debug("mail désactivé : e-mail de vérification non envoyé", "user_id", u.ID)
 		return
 	}
 
 	raw, err := s.createAccountToken(u.ID, purposeVerify, verifyTokenTTL)
 	if err != nil {
-		log.Printf("[auth-service] création token vérif pour %s : %v", u.Email, err)
+		slog.Error("création token vérification échouée", "user_id", u.ID, "error", err)
 		return
 	}
 
@@ -543,7 +543,7 @@ func (s *AuthService) sendVerificationMail(u *models.User) {
 		"Ce lien expire dans 24 heures. Si tu n'es pas à l'origine de cette inscription, ignore simplement ce message.")
 
 	if err := s.mailer.Send(u.Email, subject, htmlBody, text); err != nil {
-		log.Printf("[auth-service] envoi mail vérif à %s : %v", u.Email, err)
+		slog.Warn("envoi e-mail vérification échoué (best-effort)", "user_id", u.ID, "error", err)
 	}
 }
 
@@ -562,7 +562,7 @@ func (s *AuthService) ForgotPassword(email string) error {
 		return nil // compte inexistant : no-op silencieux (anti-énumération).
 	}
 	if err != nil {
-		log.Printf("[auth-service] forgot password (lecture) pour %s : %v", email, err)
+		slog.Error("forgot password : lecture DB échouée", "error", err)
 		return nil
 	}
 	if !u.IsActive {
@@ -608,13 +608,13 @@ func (s *AuthService) ResetPassword(rawToken, newPassword string) error {
 // forgot, qui reste anti-énumération).
 func (s *AuthService) sendResetMail(u *models.User) {
 	if s.mailer == nil {
-		log.Printf("[auth-service] mail désactivé : reset pour %s non envoyé", u.Email)
+		slog.Debug("mail désactivé : e-mail reset non envoyé", "user_id", u.ID)
 		return
 	}
 
 	raw, err := s.createAccountToken(u.ID, purposeReset, resetTokenTTL)
 	if err != nil {
-		log.Printf("[auth-service] création token reset pour %s : %v", u.Email, err)
+		slog.Error("création token reset échouée", "user_id", u.ID, "error", err)
 		return
 	}
 
@@ -636,7 +636,7 @@ func (s *AuthService) sendResetMail(u *models.User) {
 		"Ce lien expire dans 1 heure. Si tu n'es pas à l'origine de cette demande, ignore ce message : ton mot de passe reste inchangé.")
 
 	if err := s.mailer.Send(u.Email, subject, htmlBody, text); err != nil {
-		log.Printf("[auth-service] envoi mail reset à %s : %v", u.Email, err)
+		slog.Warn("envoi e-mail reset échoué (best-effort)", "user_id", u.ID, "error", err)
 	}
 }
 
@@ -912,10 +912,10 @@ func (s *AuthService) SweepBannedAccounts(ctx context.Context, e *eraser.Eraser,
 	purged := 0
 	for _, u := range banned {
 		if failed := e.Erase(ctx, bearer, u.ID); len(failed) > 0 {
-			log.Printf("[account-purge] %s : échec partiel %v", u.ID, failed)
+			slog.Warn("purge RGPD : services non effacés", "user_id", u.ID, "failed_services", failed)
 		}
 		if err := s.DeleteAccount(u.ID); err != nil {
-			log.Printf("[account-purge] suppression credentials %s : %v", u.ID, err)
+			slog.Error("purge RGPD : suppression credentials échouée", "user_id", u.ID, "error", err)
 			continue
 		}
 		purged++
@@ -934,9 +934,9 @@ func (s *AuthService) RunAccountPurgeSweeper(ctx context.Context, e *eraser.Eras
 	defer ticker.Stop()
 	for {
 		if n, err := s.SweepBannedAccounts(ctx, e, after); err != nil {
-			log.Printf("[account-purge] balayage : %v", err)
+			slog.Error("purge RGPD : balayage échoué", "error", err)
 		} else if n > 0 {
-			log.Printf("[account-purge] %d comptes bannis effacés (RGPD)", n)
+			slog.Info("purge RGPD : comptes bannis effacés", "count", n)
 		}
 		select {
 		case <-ctx.Done():

@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/webdad/auth-service/internal/logging"
 	"github.com/webdad/auth-service/internal/models"
 )
 
@@ -25,6 +26,7 @@ func (h *Handler) Logout(c *gin.Context) {
 	_ = c.ShouldBindJSON(&req) // corps absent toléré (déconnexion best-effort)
 
 	if err := h.auth.Logout(req.RefreshToken); err != nil {
+		logging.FromGin(c).Error("logout : révocation refresh token", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "déconnexion impossible"})
 		return
 	}

@@ -8,6 +8,7 @@ package realtime
 
 import (
 	"encoding/json"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -54,6 +55,7 @@ func (h *Hub) Register(userID string, ws *websocket.Conn) {
 	h.conns[userID][c] = struct{}{}
 	h.mu.Unlock()
 
+	slog.Debug("hub ws enregistré", "user_id", userID)
 	go c.writePump()
 	c.readPump() // bloque jusqu'à fermeture de la socket
 }
@@ -66,6 +68,7 @@ func (h *Hub) remove(c *Conn) {
 		if _, exists := set[c]; exists {
 			delete(set, c)
 			close(c.send)
+			slog.Debug("hub ws déconnecté", "user_id", c.userID)
 		}
 		if len(set) == 0 {
 			delete(h.conns, c.userID)

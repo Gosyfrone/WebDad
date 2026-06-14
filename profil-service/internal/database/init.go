@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
@@ -55,8 +56,12 @@ func backfillVisibility(ctx context.Context, db *mongo.Database) error {
 			bson.M{field: bson.M{"$exists": false}},
 			bson.M{field: ""},
 		}}
-		if _, err := coll.UpdateMany(ctx, filter, bson.M{"$set": bson.M{field: "public"}}); err != nil {
+		res, err := coll.UpdateMany(ctx, filter, bson.M{"$set": bson.M{field: "public"}})
+		if err != nil {
 			return fmt.Errorf("backfill %q : %w", field, err)
+		}
+		if res.ModifiedCount > 0 {
+			slog.Info("migration: profils legacy normalisés", "field", field, "count", res.ModifiedCount)
 		}
 	}
 	return nil

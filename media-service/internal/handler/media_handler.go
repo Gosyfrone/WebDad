@@ -11,6 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/webdad/media-service/internal/config"
+	"github.com/webdad/media-service/internal/logging"
 	"github.com/webdad/media-service/internal/middleware"
 	"github.com/webdad/media-service/internal/storage"
 	"github.com/webdad/media-service/internal/validate"
@@ -104,10 +105,12 @@ func (h *MediaHandler) Upload(c *gin.Context) {
 
 	mime, kind, err := validate.Detect(head)
 	if err != nil {
+		logging.FromGin(c).Warn("upload refusé : type MIME non supporté", "error", err)
 		c.JSON(http.StatusUnsupportedMediaType, gin.H{"error": err.Error()})
 		return
 	}
 	if err := validate.CheckSize(kind, fileHeader.Size, h.maxImageBytes, h.maxVideoBytes); err != nil {
+		logging.FromGin(c).Warn("upload refusé : fichier trop volumineux", "kind", string(kind), "size", fileHeader.Size)
 		c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": err.Error()})
 		return
 	}
@@ -120,10 +123,12 @@ func (h *MediaHandler) Upload(c *gin.Context) {
 
 	reader := io.MultiReader(bytes.NewReader(head), f)
 	if err := h.store.Put(c.Request.Context(), id, reader, fileHeader.Size, mime, claims.UserID); err != nil {
+		logging.FromGin(c).Error("échec stockage MinIO (upload)", "error", err)
 		c.JSON(http.StatusBadGateway, gin.H{"error": "échec du stockage"})
 		return
 	}
 
+	logging.FromGin(c).Info("média uploadé", "media_id", id, "mime", mime, "size", fileHeader.Size)
 	c.JSON(http.StatusCreated, gin.H{"data": uploadResponse{
 		ID:   id,
 		URL:  "/media/" + id,
@@ -162,6 +167,7 @@ func (h *MediaHandler) UploadEncrypted(c *gin.Context) {
 		return
 	}
 	if fileHeader.Size > h.maxVideoBytes {
+		logging.FromGin(c).Warn("upload chiffré refusé : blob trop volumineux", "size", fileHeader.Size)
 		c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": validate.ErrTooLarge.Error()})
 		return
 	}
@@ -180,10 +186,12 @@ func (h *MediaHandler) UploadEncrypted(c *gin.Context) {
 	}
 
 	if err := h.store.Put(c.Request.Context(), id, f, fileHeader.Size, "application/octet-stream", claims.UserID); err != nil {
+		logging.FromGin(c).Error("échec stockage MinIO (upload chiffré)", "error", err)
 		c.JSON(http.StatusBadGateway, gin.H{"error": "échec du stockage"})
 		return
 	}
 
+	logging.FromGin(c).Info("blob chiffré E2EE uploadé", "media_id", id, "size", fileHeader.Size)
 	c.JSON(http.StatusCreated, gin.H{"data": uploadResponse{
 		ID:   id,
 		URL:  "/media/" + id,
@@ -213,6 +221,7 @@ func (h *MediaHandler) Download(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "média introuvable"})
 			return
 		}
+		logging.FromGin(c).Error("erreur lecture MinIO (download)", "media_id", id, "error", err)
 		c.JSON(http.StatusBadGateway, gin.H{"error": "lecture impossible"})
 		return
 	}
@@ -260,11 +269,13 @@ func (h *MediaHandler) Delete(c *gin.Context) {
 	}
 
 	if storage.OwnerOf(info) != claims.UserID && claims.Role != roleAdmin {
+		logging.FromGin(c).Warn("suppression média refusée : non propriétaire", "media_id", id)
 		c.JSON(http.StatusForbidden, gin.H{"error": "média non détenu"})
 		return
 	}
 
 	if err := h.store.Remove(c.Request.Context(), id); err != nil {
+		logging.FromGin(c).Error("erreur suppression MinIO", "media_id", id, "error", err)
 		c.JSON(http.StatusBadGateway, gin.H{"error": "suppression impossible"})
 		return
 	}
@@ -277,9 +288,11 @@ func (h *MediaHandler) Delete(c *gin.Context) {
 func (h *MediaHandler) PurgeByOwner(c *gin.Context) {
 	n, err := h.store.RemoveByOwner(c.Request.Context(), c.Param("id"))
 	if err != nil {
+		logging.FromGin(c).Error("erreur purge MinIO (RGPD)", "target_id", c.Param("id"), "error", err)
 		c.JSON(http.StatusBadGateway, gin.H{"error": "purge impossible"})
 		return
 	}
+	logging.FromGin(c).Info("médias purgés RGPD (admin)", "target_id", c.Param("id"), "objects_deleted", n)
 	c.JSON(http.StatusOK, gin.H{"data": gin.H{"objects_deleted": n}})
 }
 

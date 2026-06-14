@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -37,8 +38,10 @@ func (h *InternalHandler) Events(c *gin.Context) {
 	}
 
 	if err := h.service.HandleEvent(c.Request.Context(), ev); err != nil {
+		slog.Error("traitement événement échoué", "event_type", ev.Type, "actor_id", ev.ActorID, "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "traitement impossible"})
 		return
 	}
+	slog.Debug("événement traité", "event_type", ev.Type, "actor_id", ev.ActorID, "recipient_id", ev.RecipientID)
 	c.Status(http.StatusAccepted)
 }

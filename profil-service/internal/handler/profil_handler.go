@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/webdad/profil-service/internal/logging"
 	"github.com/webdad/profil-service/internal/middleware"
 	"github.com/webdad/profil-service/internal/models"
 	"github.com/webdad/profil-service/internal/service"
@@ -129,6 +130,7 @@ func (h *ProfilHandler) UpdateMe(c *gin.Context) {
 		respondProfilError(c, err)
 		return
 	}
+	logging.FromGin(c).Info("profil modifié")
 	c.JSON(http.StatusOK, gin.H{"data": profil})
 }
 
@@ -163,6 +165,7 @@ func (h *ProfilHandler) Create(c *gin.Context) {
 		respondProfilError(c, err)
 		return
 	}
+	logging.FromGin(c).Info("profil créé")
 	c.JSON(http.StatusCreated, gin.H{"data": profil})
 }
 
@@ -203,6 +206,7 @@ func (h *ProfilHandler) AdminCreate(c *gin.Context) {
 		respondProfilError(c, err)
 		return
 	}
+	logging.FromGin(c).Info("profil créé (admin)", "new_user_id", req.ID)
 	c.JSON(http.StatusCreated, gin.H{"data": profil})
 }
 
@@ -231,6 +235,7 @@ func (h *ProfilHandler) Delete(c *gin.Context) {
 		respondProfilError(c, err)
 		return
 	}
+	logging.FromGin(c).Info("profil supprimé (admin)", "target_id", c.Param("userId"))
 	c.Status(http.StatusNoContent)
 }
 
@@ -284,8 +289,10 @@ func respondProfilError(c *gin.Context, err error) {
 	case errors.Is(err, service.ErrProfilExists), errors.Is(err, service.ErrBirthDateLocked):
 		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
 	case errors.Is(err, service.ErrDisplayNameCooldown):
+		logging.FromGin(c).Warn("changement de display_name refusé", "reason", "cooldown")
 		c.JSON(http.StatusTooManyRequests, gin.H{"error": err.Error()})
 	default:
+		logging.FromGin(c).Error("erreur profil inattendue", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "erreur interne"})
 	}
 }
