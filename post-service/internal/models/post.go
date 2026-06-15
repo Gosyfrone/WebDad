@@ -26,6 +26,7 @@ type Post struct {
 	Content       string        `bson:"content" json:"content"`
 	Hashtags      []string      `bson:"hashtags,omitempty" json:"hashtags,omitempty"`
 	Media         []MediaRef    `bson:"media,omitempty" json:"media,omitempty"`
+	Poll          *Poll         `bson:"poll,omitempty" json:"poll,omitempty"`
 	QuotePostID   string        `bson:"quote_post_id,omitempty" json:"quote_post_id,omitempty"`
 	LikesCount    int32         `bson:"likes_count" json:"likes_count"`
 	CommentsCount int32         `bson:"comments_count" json:"comments_count"`
@@ -48,6 +49,40 @@ type Post struct {
 	RepostedAt   *time.Time `bson:"-" json:"reposted_at,omitempty"`
 	CreatedAt    time.Time  `bson:"created_at" json:"created_at"`
 	UpdatedAt    time.Time  `bson:"updated_at" json:"updated_at"`
+}
+
+const (
+	PollAudienceEveryone  = "everyone"
+	PollAudienceFollowers = "followers"
+)
+
+// Poll — sondage embarqué dans un post. Les votes sont stockés à part dans
+// `poll_votes` pour garantir "un vote par utilisateur", tandis que les
+// compteurs dénormalisés vivent ici pour afficher le résultat rapidement.
+type Poll struct {
+	Choices         []PollChoice `bson:"choices" json:"choices"`
+	EndsAt          time.Time    `bson:"ends_at" json:"ends_at"`
+	ClosedAt        *time.Time   `bson:"closed_at,omitempty" json:"closed_at,omitempty"`
+	Audience        string       `bson:"audience" json:"audience"`
+	TotalVotes      int32        `bson:"total_votes" json:"total_votes"`
+	VotedChoiceID   string       `bson:"-" json:"voted_choice_id,omitempty"`
+	WinnerChoiceIDs []string     `bson:"-" json:"winner_choice_ids,omitempty"`
+	CanViewResults  bool         `bson:"-" json:"can_view_results"`
+	CanClose        bool         `bson:"-" json:"can_close"`
+}
+
+type PollChoice struct {
+	ID         string `bson:"id" json:"id"`
+	Label      string `bson:"label" json:"label"`
+	VotesCount int32  `bson:"votes_count" json:"votes_count"`
+}
+
+type PollVote struct {
+	ID        bson.ObjectID `bson:"_id,omitempty" json:"id"`
+	PostID    string        `bson:"post_id" json:"post_id"`
+	UserID    string        `bson:"user_id" json:"user_id"`
+	ChoiceID  string        `bson:"choice_id" json:"choice_id"`
+	CreatedAt time.Time     `bson:"created_at" json:"created_at"`
 }
 
 // Repost — document de la collection `reposts`. Index unique `post_id+user_id`
@@ -112,9 +147,20 @@ type MediaRef struct {
 // est optionnel SI au moins un média est joint (vérifié dans le handler) ;
 // jusqu'à 4 médias.
 type CreatePostRequest struct {
-	Content     string     `json:"content" binding:"max=280"`
-	Media       []MediaRef `json:"media" binding:"max=4,dive"`
-	QuotePostID string     `json:"quote_post_id"`
+	Content     string             `json:"content" binding:"max=280"`
+	Media       []MediaRef         `json:"media" binding:"max=4,dive"`
+	Poll        *CreatePollRequest `json:"poll"`
+	QuotePostID string             `json:"quote_post_id"`
+}
+
+type CreatePollRequest struct {
+	Choices         []string `json:"choices" binding:"min=2,max=4,dive,min=1,max=80"`
+	DurationMinutes int64    `json:"duration_minutes" binding:"required,min=1,max=10080"`
+	Audience        string   `json:"audience" binding:"omitempty,oneof=everyone followers"`
+}
+
+type VotePollRequest struct {
+	ChoiceID string `json:"choice_id" binding:"required"`
 }
 
 // UpdatePostRequest : corps de PATCH /posts/:id.

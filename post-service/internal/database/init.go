@@ -10,7 +10,7 @@ import (
 )
 
 // collectionOrder fige l'ordre de création (déterministe pour les logs/tests).
-var collectionOrder = []string{"posts", "comments", "likes", "reposts", "reports", "bookmark_collections", "bookmarks", "bookmark_prefs"}
+var collectionOrder = []string{"posts", "comments", "likes", "reposts", "poll_votes", "reports", "bookmark_collections", "bookmarks", "bookmark_prefs"}
 
 // EnsureSchema crée les collections (avec validateurs $jsonSchema) et les
 // index du post-service, de façon idempotente. Le service possède ainsi son
@@ -109,6 +109,30 @@ var validators = map[string]bson.M{
 						},
 					},
 				},
+				"poll": bson.M{
+					"bsonType": "object",
+					"required": bson.A{"choices", "ends_at", "audience", "total_votes"},
+					"properties": bson.M{
+						"choices": bson.M{
+							"bsonType": "array",
+							"minItems": 2,
+							"maxItems": 4,
+							"items": bson.M{
+								"bsonType": "object",
+								"required": bson.A{"id", "label", "votes_count"},
+								"properties": bson.M{
+									"id":          bson.M{"bsonType": "string"},
+									"label":       bson.M{"bsonType": "string", "maxLength": 80},
+									"votes_count": bson.M{"bsonType": "int", "minimum": 0},
+								},
+							},
+						},
+						"ends_at":     bson.M{"bsonType": "date"},
+						"closed_at":   bson.M{"bsonType": bson.A{"date", "null"}},
+						"audience":    bson.M{"enum": bson.A{"everyone", "followers"}},
+						"total_votes": bson.M{"bsonType": "int", "minimum": 0},
+					},
+				},
 				"is_hidden":       bson.M{"bsonType": "bool"},
 				"hidden_by":       bson.M{"bsonType": bson.A{"string", "null"}},
 				"hidden_at":       bson.M{"bsonType": bson.A{"date", "null"}},
@@ -170,6 +194,18 @@ var validators = map[string]bson.M{
 			"properties": bson.M{
 				"post_id":    bson.M{"bsonType": "string"},
 				"user_id":    bson.M{"bsonType": "string"},
+				"created_at": bson.M{"bsonType": "date"},
+			},
+		},
+	},
+	"poll_votes": {
+		"$jsonSchema": bson.M{
+			"bsonType": "object",
+			"required": bson.A{"post_id", "user_id", "choice_id", "created_at"},
+			"properties": bson.M{
+				"post_id":    bson.M{"bsonType": "string"},
+				"user_id":    bson.M{"bsonType": "string"},
+				"choice_id":  bson.M{"bsonType": "string"},
 				"created_at": bson.M{"bsonType": "date"},
 			},
 		},
@@ -252,6 +288,10 @@ var indexes = map[string][]mongo.IndexModel{
 	"reposts": {
 		{Keys: bson.D{{Key: "post_id", Value: 1}, {Key: "user_id", Value: 1}}, Options: options.Index().SetUnique(true)},
 		{Keys: bson.D{{Key: "user_id", Value: 1}, {Key: "created_at", Value: -1}}},
+	},
+	"poll_votes": {
+		{Keys: bson.D{{Key: "post_id", Value: 1}, {Key: "user_id", Value: 1}}, Options: options.Index().SetUnique(true)},
+		{Keys: bson.D{{Key: "post_id", Value: 1}}},
 	},
 	"reports": {
 		{Keys: bson.D{{Key: "post_id", Value: 1}}},

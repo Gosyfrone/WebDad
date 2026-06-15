@@ -19,8 +19,10 @@ import {
 
 import { cn, initialOf, timeAgo } from '@/lib/utils'
 import {
+  closePoll,
   currentUserId,
   deletePost,
+  getPostById,
   likePost,
   notifyPostCreated,
   pinPost,
@@ -28,8 +30,10 @@ import {
   unlikePost,
   unrepostPost,
   unpinPost,
+  votePoll,
   type FeedPost,
   type PostMedia,
+  type PostPoll,
 } from '@/lib/posts'
 import { quickBookmark, removeBookmarkEverywhere } from '@/lib/bookmarks'
 import { BookmarkDialog } from '@/components/feed/bookmark-dialog'
@@ -106,6 +110,8 @@ export function PostCard({ post, showPinBadge = false, focusCommentId, embedded 
   const [deleting, setDeleting] = useState(false)
   // Index du média ouvert en vue photo plein écran (null = fermé).
   const [photoIndex, setPhotoIndex] = useState<number | null>(null)
+  const [poll, setPoll] = useState(post.poll)
+  const pollClosed = poll ? isPollClosed(poll) : false
 
   const [reposted, setReposted] = useState(post.reposted)
   const [repostedById, setRepostedById] = useState(post.repostedById)
@@ -131,6 +137,20 @@ export function PostCard({ post, showPinBadge = false, focusCommentId, embedded 
   useEffect(() => {
     setIsPinned(post.isPinned)
   }, [post.isPinned])
+
+  useEffect(() => {
+    setPoll(post.poll)
+  }, [post.poll])
+
+  useEffect(() => {
+    if (!poll || !poll.canViewResults || pollClosed) return
+    const timer = setInterval(() => {
+      void refreshPoll()
+    }, 5000)
+    return () => clearInterval(timer)
+    // `refreshPoll` intentionally stays outside deps; it reads the stable post id.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [poll?.canViewResults, pollClosed, post.id])
 
   useEffect(() => {
     setReposted(post.reposted)
@@ -213,6 +233,33 @@ export function PostCard({ post, showPinBadge = false, focusCommentId, embedded 
     } finally {
       setPinning(false)
     }
+  }
+
+  async function handlePollVote(choiceId: string) {
+    try {
+      const updated = await votePoll(post.id, choiceId)
+      setPoll(updated.poll)
+      onUpdated?.(updated)
+    } catch {
+      toast({ title: t('post.poll_failed'), variant: 'destructive' })
+    }
+  }
+
+  async function handleClosePoll() {
+    try {
+      const updated = await closePoll(post.id)
+      setPoll(updated.poll)
+      onUpdated?.(updated)
+    } catch {
+      toast({ title: t('post.poll_close_failed'), variant: 'destructive' })
+    }
+  }
+
+  async function refreshPoll() {
+    const updated = await getPostById(post.id)
+    if (!updated) return
+    setPoll(updated.poll)
+    onUpdated?.(updated)
   }
 
   /** Clic court : dé-signe si déjà signé, sinon laisse la rafale serveur décider. */
@@ -403,6 +450,15 @@ export function PostCard({ post, showPinBadge = false, focusCommentId, embedded 
 
         {post.media.length > 0 && (
           <MediaGallery media={post.media} onOpen={(i) => setPhotoIndex(i)} />
+        )}
+
+        {poll && (
+          <PostPollCard
+            poll={poll}
+            onVote={requireAuth(handlePollVote)}
+            onClose={poll.canClose ? handleClosePoll : undefined}
+            onRefresh={refreshPoll}
+          />
         )}
 
         {post.quotedPost && (
@@ -680,8 +736,160 @@ function QuotedPost({ post }: { post: FeedPost }) {
         className="line-clamp-5 whitespace-pre-wrap break-words text-sm text-foreground/75"
       />
       {post.media.length > 0 && <MediaGallery media={post.media} compact />}
+      {post.poll && <PostPollCard poll={post.poll} compact />}
     </div>
   )
+}
+
+function PostPollCard({
+  poll,
+  onVote,
+  onClose,
+  onRefresh,
+  compact = false,
+}: {
+  poll: PostPoll
+  onVote?: (choiceId: string) => Promise<void> | void
+  onClose?: () => Promise<void> | void
+  onRefresh?: () => Promise<void> | void
+  compact?: boolean
+}) {
+  const { t } = useLanguage()
+  const [voting, setVoting] = useState('')
+  const [closing, setClosing] = useState(false)
+  const [now, setNow] = useState(() => Date.now())
+  const closed = isPollClosedAt(poll, now)
+  const showResults = poll.canViewResults
+  const total = Math.max(0, poll.totalVotes)
+
+  useEffect(() => {
+    if (closed) return
+    const timer = setInterval(() => {
+      const next = Date.now()
+      setNow(next)
+      if (isPollClosedAt(poll, next)) {
+        void onRefresh?.()
+      }
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [closed, onRefresh, poll])
+
+  async function vote(choiceId: string) {
+    if (!onVote || voting || closed || poll.votedChoiceId) return
+    setVoting(choiceId)
+    try {
+      await onVote(choiceId)
+    } finally {
+      setVoting('')
+    }
+  }
+
+  async function closeNow() {
+    if (!onClose || closing) return
+    setClosing(true)
+    try {
+      await onClose()
+    } finally {
+      setClosing(false)
+    }
+  }
+
+  return (
+    <div className={cn('mt-3 rounded-2xl border border-border bg-background/45 p-3', compact && 'rounded-xl p-2')}>
+      {onClose && !closed && !compact && (
+        <div className="mb-2 flex justify-end">
+          <button
+            type="button"
+            onClick={() => void closeNow()}
+            disabled={closing}
+            className="rounded-full px-3 py-1 text-xs font-semibold text-primary transition hover:bg-primary/10 disabled:opacity-60"
+          >
+            {closing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : t('post.poll_close')}
+          </button>
+        </div>
+      )}
+      <div className="space-y-2">
+        {poll.choices.map((choice) => {
+          const percent = total > 0 ? Math.round((choice.votesCount / total) * 100) : 0
+          const selected = poll.votedChoiceId === choice.id
+          const winner = poll.winnerChoiceIds.includes(choice.id)
+          return (
+            <button
+              key={choice.id}
+              type="button"
+              disabled={!onVote || closed || Boolean(poll.votedChoiceId) || Boolean(voting)}
+              onClick={() => void vote(choice.id)}
+              className={cn(
+                'relative flex min-h-10 w-full items-center justify-between overflow-hidden rounded-lg border border-border px-3 py-2 text-left text-sm transition',
+                onVote && !closed && !poll.votedChoiceId && 'hover:border-primary hover:bg-primary/5',
+                selected && 'border-primary text-primary',
+                winner && closed && 'border-emerald-500 bg-emerald-500/10 ring-1 ring-emerald-500/35',
+              )}
+            >
+              {showResults && (
+                <span
+                  aria-hidden
+                  className={cn(
+                    'absolute inset-y-0 left-0 transition-all',
+                    winner && closed ? 'bg-emerald-500/16' : 'bg-primary/12',
+                  )}
+                  style={{ width: `${percent}%` }}
+                />
+              )}
+              <span className="relative z-10 min-w-0 truncate font-medium">{choice.label}</span>
+              <span className="relative z-10 ml-3 flex shrink-0 items-center gap-2 font-semibold">
+                {winner && <span className="text-xs text-primary">{t('post.poll_winner')}</span>}
+                {voting === choice.id ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : selected ? (
+                  t('post.poll_voted')
+                ) : showResults ? (
+                  `${percent}%`
+                ) : (
+                  t('post.poll_vote')
+                )}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+        {showResults && (
+          <>
+            <span>{t('post.poll_votes', { count: total })}</span>
+            <span>·</span>
+          </>
+        )}
+        <span>{closed ? t('post.poll_closed') : t('post.poll_ends_in', { time: formatPollRemaining(poll.endsAt, now) })}</span>
+        {poll.audience === 'followers' && (
+          <>
+            <span>·</span>
+            <span>{t('post.poll_followers_only')}</span>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function isPollClosed(poll: PostPoll): boolean {
+  return isPollClosedAt(poll, Date.now())
+}
+
+function isPollClosedAt(poll: PostPoll, now: number): boolean {
+  return Boolean(poll.closedAt) || Date.parse(poll.endsAt) <= now
+}
+
+function formatPollRemaining(endsAt: string, now: number): string {
+  const remainingSeconds = Math.max(0, Math.ceil((Date.parse(endsAt) - now) / 1000))
+  const days = Math.floor(remainingSeconds / 86400)
+  const hours = Math.floor((remainingSeconds % 86400) / 3600)
+  const minutes = Math.floor((remainingSeconds % 3600) / 60)
+  const seconds = remainingSeconds % 60
+  if (days > 0) return `${days} j ${hours} h`
+  if (hours > 0) return `${hours} h ${minutes} min`
+  if (minutes > 0) return `${minutes} min ${seconds} s`
+  return `${seconds} s`
 }
 
 interface ActionButtonProps {

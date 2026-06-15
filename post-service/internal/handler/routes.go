@@ -93,6 +93,8 @@ func RegisterRoutes(r *gin.Engine, serviceName string, postService *service.Post
 			post.DELETE("/like", auth, LikeHandler.UnlikePost)
 			post.POST("/repost", auth, PostHandler.RepostPost)
 			post.DELETE("/repost", auth, PostHandler.UnrepostPost)
+			post.POST("/poll/close", auth, PostHandler.ClosePoll)
+			post.POST("/poll/vote", auth, PostHandler.VotePoll)
 
 			post.POST("/bookmark", auth, BookmarkHandler.Bookmark)
 			post.DELETE("/bookmark", auth, BookmarkHandler.Unbookmark)

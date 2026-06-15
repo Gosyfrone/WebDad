@@ -20,10 +20,11 @@ import (
 // hexadécimal (`post_id`, string) ; les compteurs dénormalisés vivent sur le
 // document `posts` et sont maintenus par `$inc`.
 type PostRepository struct {
-	posts    *mongo.Collection
-	likes    *mongo.Collection
-	comments *mongo.Collection
-	reposts  *mongo.Collection
+	posts     *mongo.Collection
+	likes     *mongo.Collection
+	comments  *mongo.Collection
+	reposts   *mongo.Collection
+	pollVotes *mongo.Collection
 	// Signets : collections + appartenances + préférences de rafale.
 	bookmarkCollections *mongo.Collection
 	bookmarks           *mongo.Collection
@@ -36,6 +37,7 @@ func NewPostRepository(db *mongo.Database) *PostRepository {
 		likes:               db.Collection("likes"),
 		comments:            db.Collection("comments"),
 		reposts:             db.Collection("reposts"),
+		pollVotes:           db.Collection("poll_votes"),
 		bookmarkCollections: db.Collection("bookmark_collections"),
 		bookmarks:           db.Collection("bookmarks"),
 		bookmarkPrefs:       db.Collection("bookmark_prefs"),
@@ -455,6 +457,63 @@ func (r *PostRepository) IncCounter(ctx context.Context, id bson.ObjectID, field
 	return &post, nil
 }
 
+func (r *PostRepository) AddPollVote(ctx context.Context, postID, userID, choiceID string) (bool, error) {
+	_, err := r.pollVotes.InsertOne(ctx, &models.PollVote{
+		PostID:    postID,
+		UserID:    userID,
+		ChoiceID:  choiceID,
+		CreatedAt: time.Now(),
+	})
+	if err != nil {
+		if mongo.IsDuplicateKeyError(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+
+func (r *PostRepository) PollVoteChoice(ctx context.Context, postID, userID string) (string, error) {
+	var vote models.PollVote
+	if err := r.pollVotes.FindOne(ctx, bson.M{"post_id": postID, "user_id": userID}).Decode(&vote); err != nil {
+		return "", err
+	}
+	return vote.ChoiceID, nil
+}
+
+func (r *PostRepository) IncPollChoice(ctx context.Context, id bson.ObjectID, choiceID string) (*models.Post, error) {
+	update := bson.M{
+		"$inc": bson.M{
+			"poll.total_votes":           1,
+			"poll.choices.$.votes_count": 1,
+		},
+		"$set": bson.M{"updated_at": time.Now()},
+	}
+	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
+
+	var post models.Post
+	if err := r.posts.FindOneAndUpdate(ctx, bson.M{"_id": id, "poll.choices.id": choiceID}, update, opts).Decode(&post); err != nil {
+		return nil, err
+	}
+	return &post, nil
+}
+
+func (r *PostRepository) ClosePoll(ctx context.Context, id bson.ObjectID, at time.Time) (*models.Post, error) {
+	update := bson.M{
+		"$set": bson.M{
+			"poll.closed_at": at,
+			"updated_at":     at,
+		},
+	}
+	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
+
+	var post models.Post
+	if err := r.posts.FindOneAndUpdate(ctx, bson.M{"_id": id, "poll": bson.M{"$exists": true}}, update, opts).Decode(&post); err != nil {
+		return nil, err
+	}
+	return &post, nil
+}
+
 // --- Likes -------------------------------------------------------------------
 
 // AddLike enregistre un like (idempotent grâce à l'index unique
@@ -625,6 +684,11 @@ func (r *PostRepository) ListRepostsByUser(ctx context.Context, userID string, l
 
 func (r *PostRepository) DeleteRepostsByPost(ctx context.Context, postID string) error {
 	_, err := r.reposts.DeleteMany(ctx, bson.M{"post_id": postID})
+	return err
+}
+
+func (r *PostRepository) DeletePollVotesByPost(ctx context.Context, postID string) error {
+	_, err := r.pollVotes.DeleteMany(ctx, bson.M{"post_id": postID})
 	return err
 }
 

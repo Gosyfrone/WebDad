@@ -38,7 +38,7 @@ social network built for the FISA INFO A3 "Distributed App Dev" project.
 | auth-service | 8081 | PostgreSQL | Credentials, JWT (HS256), refresh tokens (opaque, SHA-256 hashed, rotated) |
 | user-service | 8082 | PostgreSQL | Identity: `username` (immutable handle), `is_active`, social graph (follows + follow_requests + counts) |
 | profil-service | 8083 | MongoDB | Decorative/editable fields: `display_name`, `bio`, avatar/banner, website, location, birth_date, gender, nationality (ISO alpha-2), **`visibility`** |
-| post-service | 8084 | MongoDB | Posts, hashtags/trends, comments (threaded 2 levels), likes, reposts/quotes, pins, bookmarks (collections), post media refs |
+| post-service | 8084 | MongoDB | Posts, hashtags/trends, comments (threaded 2 levels), likes, reposts/quotes, pins, polls/votes, bookmarks (collections), post media refs |
 | message-service | 8085 | MongoDB | E2EE messaging (DM/groups/communities), conversations, members, encrypted messages, WS |
 | notification-service | 8086 | MongoDB | Aggregated notifications (Instagram-style), ingest `/internal/events`, WS |
 | media-service | 8087 | MinIO | Opaque byte storage (avatar/banner, post media, encrypted attachments) |

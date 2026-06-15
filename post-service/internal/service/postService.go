@@ -35,6 +35,9 @@ var (
 	ErrPrivateProfil = errors.New("profil privé")
 	// ErrDependencyUnavailable : profil-service / user-service indisponible → 503.
 	ErrDependencyUnavailable = errors.New("service dépendant indisponible")
+	ErrInvalidPoll           = errors.New("sondage invalide")
+	ErrPollClosed            = errors.New("sondage terminé")
+	ErrPollAlreadyVoted      = errors.New("vote déjà enregistré")
 	// ErrCollectionNotFound : collection de signets absente ou n'appartenant pas à
 	// l'utilisateur (on ne distingue pas pour ne pas divulguer l'existence) → 404.
 	ErrCollectionNotFound = errors.New("collection de signets introuvable")
@@ -142,7 +145,7 @@ func (s *PostService) SetNotifier(n notifier.Notifier) {
 
 // CreatePost crée un post pour authorID (dérivé du JWT) et renvoie le document
 // créé (avec son id généré). Les compteurs sont posés à 0 explicitement.
-func (s *PostService) CreatePost(ctx context.Context, authorID, content, quotePostID string, media []models.MediaRef) (*models.Post, error) {
+func (s *PostService) CreatePost(ctx context.Context, authorID, content, quotePostID string, media []models.MediaRef, pollReq *models.CreatePollRequest) (*models.Post, error) {
 	quotedAuthorID := "" // auteur du post cité (destinataire de la notif « citation »)
 	if quotePostID != "" {
 		quoteOID, err := parseID(quotePostID)
@@ -156,11 +159,16 @@ func (s *PostService) CreatePost(ctx context.Context, authorID, content, quotePo
 		quotedAuthorID = quoted.AuthorID
 	}
 	now := time.Now()
+	poll, err := buildPoll(pollReq, now)
+	if err != nil {
+		return nil, err
+	}
 	post := &models.Post{
 		AuthorID:      authorID,
 		Content:       content,
 		Hashtags:      ExtractHashtags(content),
 		Media:         media,
+		Poll:          poll,
 		QuotePostID:   quotePostID,
 		LikesCount:    0,
 		CommentsCount: 0,
@@ -171,6 +179,7 @@ func (s *PostService) CreatePost(ctx context.Context, authorID, content, quotePo
 	if err := s.repo.Create(ctx, post); err != nil {
 		return nil, err
 	}
+	hydratePoll(post, authorID, "")
 	// Citation = tag implicite de l'auteur cité → notif (navigation vers le post
 	// citant). Une notif par citation (façon mention, pas d'agrégation). La
 	// suppression du post citant la purge via la cascade post_deleted.
@@ -206,7 +215,12 @@ func (s *PostService) GetPosts(ctx context.Context, viewerID, hashtag, sortMode 
 	} else if hashtagAny {
 		fetch = s.repo.GetAllWithHashtags
 	}
-	return s.visibleFeedPage(ctx, viewerID, limit, offset, fetch)
+	posts, err := s.visibleFeedPage(ctx, viewerID, limit, offset, fetch)
+	if err != nil {
+		return nil, err
+	}
+	s.hydratePolls(ctx, posts, viewerID)
+	return posts, nil
 }
 
 // GetPost renvoie un post par son id si le profil de l'auteur est lisible par
@@ -231,6 +245,7 @@ func (s *PostService) GetPost(ctx context.Context, id, viewerID, viewerRole stri
 	if !allowed {
 		return nil, ErrPrivateProfil
 	}
+	s.hydratePoll(ctx, post, viewerID)
 	return post, nil
 }
 
@@ -329,6 +344,7 @@ func (s *PostService) hardDeletePost(ctx context.Context, oid bson.ObjectID, id,
 	_ = s.repo.DeleteLikesByPost(ctx, id)
 	_ = s.repo.DeleteCommentsByPost(ctx, id)
 	_ = s.repo.DeleteRepostsByPost(ctx, id)
+	_ = s.repo.DeletePollVotesByPost(ctx, id)
 	_ = s.repo.DeleteBookmarksByPost(ctx, id)
 	// Purge en cascade les notifications pointant vers ce post (likes,
 	// commentaires, mentions) — plus de notification orpheline vers un post mort.
@@ -478,7 +494,12 @@ func (s *PostService) GetByProfile(ctx context.Context, authorID, viewerID, hash
 	if !allowed {
 		return []models.Post{}, nil
 	}
-	return s.repo.GetByProfileHashtag(ctx, authorID, normalizeHashtag(hashtag), clampLimit(limit), clampOffset(offset))
+	posts, err := s.repo.GetByProfileHashtag(ctx, authorID, normalizeHashtag(hashtag), clampLimit(limit), clampOffset(offset))
+	if err != nil {
+		return nil, err
+	}
+	s.hydratePolls(ctx, posts, viewerID)
+	return posts, nil
 }
 
 // GetFeed renvoie les posts d'un ensemble d'auteurs (fil « Abonnements »). Le
@@ -491,9 +512,94 @@ func (s *PostService) GetFeed(ctx context.Context, authorIDs []string, viewerID,
 	}
 	hashtag = normalizeHashtag(hashtag)
 	sortMode = normalizePostSort(sortMode)
-	return s.visibleFeedPage(ctx, viewerID, limit, offset, func(ctx context.Context, pageLimit, pageOffset int64) ([]models.Post, error) {
+	posts, err := s.visibleFeedPage(ctx, viewerID, limit, offset, func(ctx context.Context, pageLimit, pageOffset int64) ([]models.Post, error) {
 		return s.repo.GetByAuthorsHashtag(ctx, authorIDs, hashtag, sortMode, pageLimit, pageOffset)
 	})
+	if err != nil {
+		return nil, err
+	}
+	s.hydratePolls(ctx, posts, viewerID)
+	return posts, nil
+}
+
+func (s *PostService) VotePoll(ctx context.Context, postID, actorID, choiceID string) (*models.Post, error) {
+	oid, err := parseID(postID)
+	if err != nil {
+		return nil, err
+	}
+	post, err := s.repo.Get(ctx, oid)
+	if err != nil {
+		return nil, translateNotFound(err)
+	}
+	if post.Poll == nil {
+		return nil, ErrInvalidPoll
+	}
+	if pollIsClosed(post.Poll, time.Now()) {
+		return nil, ErrPollClosed
+	}
+	allowed, err := s.canReadAuthor(ctx, actorID, post.AuthorID)
+	if err != nil {
+		return nil, err
+	}
+	if !allowed {
+		return nil, ErrPrivateProfil
+	}
+	if post.Poll.Audience == models.PollAudienceFollowers && actorID != post.AuthorID {
+		if s.followClient == nil {
+			return nil, ErrForbidden
+		}
+		follows, err := s.followClient.IsFollowing(ctx, actorID, post.AuthorID)
+		if err != nil {
+			return nil, fmt.Errorf("%w: vérification abonnement: %v", ErrDependencyUnavailable, err)
+		}
+		if !follows {
+			return nil, ErrForbidden
+		}
+	}
+	if !pollHasChoice(post.Poll, choiceID) {
+		return nil, ErrInvalidPoll
+	}
+	created, err := s.repo.AddPollVote(ctx, postID, actorID, choiceID)
+	if err != nil {
+		return nil, err
+	}
+	if !created {
+		s.hydratePoll(ctx, post, actorID)
+		return post, ErrPollAlreadyVoted
+	}
+	updated, err := s.repo.IncPollChoice(ctx, oid, choiceID)
+	if err != nil {
+		return nil, translateNotFound(err)
+	}
+	hydratePoll(updated, actorID, choiceID)
+	return updated, nil
+}
+
+func (s *PostService) ClosePoll(ctx context.Context, postID, actorID string) (*models.Post, error) {
+	oid, err := parseID(postID)
+	if err != nil {
+		return nil, err
+	}
+	post, err := s.repo.Get(ctx, oid)
+	if err != nil {
+		return nil, translateNotFound(err)
+	}
+	if post.Poll == nil {
+		return nil, ErrInvalidPoll
+	}
+	if post.AuthorID != actorID {
+		return nil, ErrForbidden
+	}
+	if pollIsClosed(post.Poll, time.Now()) {
+		s.hydratePoll(ctx, post, actorID)
+		return post, nil
+	}
+	closed, err := s.repo.ClosePoll(ctx, oid, time.Now())
+	if err != nil {
+		return nil, translateNotFound(err)
+	}
+	hydratePoll(closed, actorID, "")
+	return closed, nil
 }
 
 // TrendingHashtags compte les hashtags des posts lisibles par le visiteur courant.
@@ -1156,6 +1262,119 @@ func withoutProfilePins(posts []models.Post) []models.Post {
 		cleaned[i].PinnedAt = nil
 	}
 	return cleaned
+}
+
+func buildPoll(req *models.CreatePollRequest, now time.Time) (*models.Poll, error) {
+	if req == nil {
+		return nil, nil
+	}
+	if req.DurationMinutes < 1 || req.DurationMinutes > 7*24*60 {
+		return nil, ErrInvalidPoll
+	}
+	audience := req.Audience
+	if audience == "" {
+		audience = models.PollAudienceEveryone
+	}
+	if audience != models.PollAudienceEveryone && audience != models.PollAudienceFollowers {
+		return nil, ErrInvalidPoll
+	}
+	seen := make(map[string]bool, len(req.Choices))
+	choices := make([]models.PollChoice, 0, len(req.Choices))
+	for _, raw := range req.Choices {
+		label := strings.TrimSpace(raw)
+		if label == "" || len([]rune(label)) > 80 {
+			return nil, ErrInvalidPoll
+		}
+		key := strings.ToLower(label)
+		if seen[key] {
+			return nil, ErrInvalidPoll
+		}
+		seen[key] = true
+		choices = append(choices, models.PollChoice{
+			ID:         bson.NewObjectID().Hex(),
+			Label:      label,
+			VotesCount: 0,
+		})
+	}
+	if len(choices) < 2 || len(choices) > 4 {
+		return nil, ErrInvalidPoll
+	}
+	return &models.Poll{
+		Choices:    choices,
+		EndsAt:     now.Add(time.Duration(req.DurationMinutes) * time.Minute),
+		Audience:   audience,
+		TotalVotes: 0,
+	}, nil
+}
+
+func pollHasChoice(poll *models.Poll, choiceID string) bool {
+	if poll == nil {
+		return false
+	}
+	for _, choice := range poll.Choices {
+		if choice.ID == choiceID {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *PostService) hydratePolls(ctx context.Context, posts []models.Post, viewerID string) {
+	for i := range posts {
+		s.hydratePoll(ctx, &posts[i], viewerID)
+	}
+}
+
+func (s *PostService) hydratePoll(ctx context.Context, post *models.Post, viewerID string) {
+	if post == nil || post.Poll == nil {
+		return
+	}
+	voted := ""
+	if viewerID != "" {
+		if choiceID, err := s.repo.PollVoteChoice(ctx, post.ID.Hex(), viewerID); err == nil {
+			voted = choiceID
+		}
+	}
+	hydratePoll(post, viewerID, voted)
+}
+
+func hydratePoll(post *models.Post, viewerID, votedChoiceID string) {
+	if post == nil || post.Poll == nil {
+		return
+	}
+	now := time.Now()
+	closed := pollIsClosed(post.Poll, now)
+	isAuthor := viewerID != "" && viewerID == post.AuthorID
+	canViewResults := closed || isAuthor || votedChoiceID != ""
+	post.Poll.VotedChoiceID = votedChoiceID
+	post.Poll.CanViewResults = canViewResults
+	post.Poll.CanClose = isAuthor && !closed
+	maxVotes := int32(-1)
+	winners := make([]string, 0, len(post.Poll.Choices))
+	for _, choice := range post.Poll.Choices {
+		if choice.VotesCount > maxVotes {
+			maxVotes = choice.VotesCount
+			winners = []string{choice.ID}
+			continue
+		}
+		if choice.VotesCount == maxVotes {
+			winners = append(winners, choice.ID)
+		}
+	}
+	if canViewResults && closed && maxVotes > 0 {
+		post.Poll.WinnerChoiceIDs = winners
+	}
+	if !canViewResults {
+		post.Poll.TotalVotes = 0
+		post.Poll.WinnerChoiceIDs = nil
+		for i := range post.Poll.Choices {
+			post.Poll.Choices[i].VotesCount = 0
+		}
+	}
+}
+
+func pollIsClosed(poll *models.Poll, now time.Time) bool {
+	return poll != nil && (poll.ClosedAt != nil || !now.Before(poll.EndsAt))
 }
 
 // ExtractHashtags normalise les hashtags d'un texte : minuscules, sans #, uniques.
