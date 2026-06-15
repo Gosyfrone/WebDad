@@ -4,6 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/webdad/post-service/internal/middleware"
+	"github.com/webdad/post-service/internal/realtime"
 	"github.com/webdad/post-service/internal/service"
 )
 
@@ -13,7 +14,7 @@ import (
 // pour être atteignable par le front. jwtSecret protège les routes mutables
 // (validation locale du token émis par auth-service, secret partagé) ; la
 // lecture reste publique.
-func RegisterRoutes(r *gin.Engine, serviceName string, postService *service.PostService, jwtSecret string) {
+func RegisterRoutes(r *gin.Engine, serviceName string, postService *service.PostService, jwtSecret string, hub *realtime.Hub, allowedOrigins []string) {
 	auth := middleware.JWTAuth(jwtSecret)
 	optionalAuth := middleware.OptionalJWTAuth(jwtSecret)
 
@@ -22,9 +23,14 @@ func RegisterRoutes(r *gin.Engine, serviceName string, postService *service.Post
 	LikeHandler := NewLikeHandler(postService, serviceName)
 	CommentHandler := NewCommentHandler(postService, serviceName)
 	BookmarkHandler := NewBookmarkHandler(postService, serviceName)
+	WSHandler := NewWSHandler(hub, jwtSecret, allowedOrigins)
 
 	posts := r.Group("/posts")
 	{
+		// Fil temps réel : ping WebSocket à chaque nouveau post public racine.
+		// Route STATIQUE placée avant le groupe `/:id` (sinon « ws » serait
+		// capturé comme un id). Auth via query param (handshake WS).
+		posts.GET("/ws", WSHandler.Connect)
 		// Lecture publique. Le fil par auteur est un filtre de la liste :
 		// GET /posts?author_id=<id> (cf. ListPosts) — pas de préfixe séparé,
 		// pour rester sous `/posts` (le seul routé par la gateway).

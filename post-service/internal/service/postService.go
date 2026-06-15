@@ -74,6 +74,9 @@ type PostService struct {
 	// Par défaut un no-op : le post-service reste autonome si le
 	// notification-service n'est pas configuré. Câblé via SetNotifier au boot.
 	notif notifier.Notifier
+	// feed diffuse en temps réel les nouveaux posts (ping WebSocket). Par défaut
+	// un no-op : le post-service fonctionne sans le hub temps réel.
+	feed feedBroadcaster
 	// bookmarkWindow : durée de la fenêtre glissante de rafale. Un clic court qui
 	// suit le précédent signet de moins de bookmarkWindow range automatiquement
 	// dans la dernière collection ; au-delà, le serveur redemande la collection.
@@ -96,7 +99,27 @@ type followStatusClient interface {
 	IsFollowing(ctx context.Context, followerID, followingID string) (bool, error)
 }
 
+// feedBroadcaster diffuse en temps réel la création d'un post (ping WebSocket).
+// Implémenté par realtime.Hub ; no-op par défaut (service testable sans hub).
+type feedBroadcaster interface {
+	PostCreated(postID, authorID string)
+}
+
+// noopBroadcaster : diffusion désactivée (pas de hub temps réel câblé).
+type noopBroadcaster struct{}
+
+func (noopBroadcaster) PostCreated(string, string) {}
+
 type Option func(*PostService)
+
+// WithFeedBroadcaster branche le hub temps réel du fil (best-effort).
+func WithFeedBroadcaster(b feedBroadcaster) Option {
+	return func(s *PostService) {
+		if b != nil {
+			s.feed = b
+		}
+	}
+}
 
 func WithProfilClient(c profilVisibilityClient) Option {
 	return func(s *PostService) {
@@ -134,7 +157,7 @@ func WithPurgeRetention(after, warnBefore time.Duration) Option {
 }
 
 func NewPostService(r *repository.PostRepository, opts ...Option) *PostService {
-	s := &PostService{repo: r, notif: notifier.Noop{}}
+	s := &PostService{repo: r, notif: notifier.Noop{}, feed: noopBroadcaster{}}
 	for _, opt := range opts {
 		opt(s)
 	}
@@ -214,7 +237,31 @@ func (s *PostService) CreatePost(ctx context.Context, authorID, content, quotePo
 			MentionHandles: handles,
 		})
 	}
+	// Diffuse le nouveau post en temps réel (ping WebSocket) — best-effort,
+	// uniquement pour les comptes publics (voir broadcastNewPost). N'impacte
+	// jamais la création.
+	s.broadcastNewPost(authorID, post.ID.Hex())
 	return post, nil
+}
+
+// broadcastNewPost notifie en temps réel (best-effort, fire-and-forget) que
+// authorID vient de publier postID. On ne diffuse qu'aux comptes PUBLICS : un
+// post de compte privé ne concerne que les abonnés approuvés et ne doit pas
+// révéler l'activité de l'auteur aux autres (la sécurité ne dépend jamais du
+// front). Le ping ne porte que des ids — le contenu reste protégé par la
+// barrière de visibilité du fil normal côté lecture.
+func (s *PostService) broadcastNewPost(authorID, postID string) {
+	go func() {
+		if s.profilClient != nil {
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
+			vis, err := s.profilClient.Visibility(ctx, authorID)
+			if err != nil || vis != client.VisibilityPublic {
+				return
+			}
+		}
+		s.feed.PostCreated(postID, authorID)
+	}()
 }
 
 // GetPosts renvoie le fil global, du plus récent au plus ancien, paginé.

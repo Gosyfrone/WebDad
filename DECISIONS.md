@@ -356,6 +356,29 @@
 - **Front badge:** app-wide unread counter held in memory (dedup by id), single WS, seeded by `unread-count`. Avoids a
   server request per event during spikes; self-corrects on page open / `notification_refresh`.
 
+## Fil temps réel (WebSocket) — bandeau « a posté » (15/06/2026)
+
+- **Goal:** X-style live feed — when someone else posts while you're reading, a floating banner (avatar + "a posté")
+  appears at the top; clicking it reveals the new posts and scrolls up. (Validated scope: banner only, no live counter
+  updates.)
+- **Broadcast hub, not per-user.** post-service gets its own `realtime.Hub`, but unlike notification/message hubs
+  (one connection indexed per recipient) the feed is public → the hub keeps a flat set of connections and broadcasts to
+  all. Endpoint `GET /posts/ws?access_token=<jwt>` (token in query param: browsers can't set Authorization on a WS
+  handshake). The gateway already proxies the WS upgrade under `/posts` (httputil reverse proxy) — no gateway change.
+- **Ping, not content ("firehose + refetch").** The WS event carries only `{type, post_id, author_id}`. The front
+  resolves the author (avatar/name) from its existing `resolveAuthor` cache and fetches the actual content through the
+  normal authenticated feed endpoint. **Rationale:** keeps the WS lightweight AND keeps the visibility barrier
+  server-side (security never depends on the front) — no need to duplicate author-enrichment / visibility logic in the
+  hub. A click in the "Following" tab on a non-followed author simply returns nothing on refetch.
+- **Public-account gating at emission.** `broadcastNewPost` only pings when the author's account is public
+  (`profilClient.Visibility`); a private account's post must not signal activity to non-followers. Fire-and-forget in a
+  goroutine, never blocks/fails post creation (same contract as the notifier). Hub injected via `WithFeedBroadcaster`
+  (no-op default → service stays unit-testable without a hub).
+- **Client relevance filter.** `FeedView` drops self-authored pings (already prepended locally), pings while a hashtag
+  filter is active, and posts already shown; the "Following" tab additionally filters by the cached `getFollowingIds`
+  set. Banner = latest pinged author's avatar; reveal refetches page 0 of the active tab and prepends the dedup'd new
+  ones.
+
 ## Mentions (@handle)
 
 - **Shared pure bricks** (`lib/mentions.ts`, regex aligned with the back) reused across posts/comments/messages = one

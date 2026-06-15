@@ -12,6 +12,7 @@
  */
 
 import { apiFetch, getAccessToken } from '@/lib/auth-client'
+import { API_URL } from '@/lib/config'
 import { resolveMediaUrl } from '@/lib/media'
 import type { ProfilDetails } from '@/types'
 import { decodeClaims } from '@/lib/session'
@@ -795,4 +796,76 @@ export function subscribePostCreated(onCreate: (post: FeedPost) => void): () => 
   }
   window.addEventListener(POST_CREATED_EVENT, handle)
   return () => window.removeEventListener(POST_CREATED_EVENT, handle)
+}
+
+/** Résout (et cache) l'auteur d'un post par son id — sert à l'aperçu temps réel
+ * (avatar/nom du bandeau « a posté ») sans avoir à charger le post complet. */
+export function getPostAuthor(userId: string): Promise<PostAuthor> {
+  return resolveAuthor(userId)
+}
+
+// --- Fil temps réel (WebSocket) ---------------------------------------------
+// Le post-service diffuse un « ping » léger à chaque nouveau post PUBLIC racine
+// (id du post + id de l'auteur). On ne charge PAS le contenu via le WS : le fil
+// authentifié normal reste la source (barrière de visibilité server-side). Le
+// ping sert seulement à afficher le bandeau « X a posté » en haut du fil.
+
+/** Ping minimal reçu du serveur à la création d'un post. */
+export interface NewPostPing {
+  postId: string
+  authorId: string
+}
+
+/** Poignée de connexion temps réel du fil (fermeture propre). */
+export interface FeedRealtimeHandle {
+  close(): void
+}
+
+/**
+ * Ouvre la connexion temps réel du fil (`/posts/ws`). Reconnexion automatique
+ * avec backoff linéaire (calquée sur connectNotifications). Le token transite en
+ * query param (le navigateur n'autorise pas d'en-tête sur un upgrade WS).
+ */
+export function connectFeedRealtime(onNewPost: (ping: NewPostPing) => void): FeedRealtimeHandle {
+  let socket: WebSocket | null = null
+  let closedByUs = false
+  let retry = 0
+
+  const connect = () => {
+    const token = getAccessToken()
+    if (!token) return
+    const wsBase = API_URL.replace(/^http/, 'ws').replace(/\/+$/, '')
+    socket = new WebSocket(`${wsBase}/posts/ws?access_token=${encodeURIComponent(token)}`)
+
+    socket.onmessage = (event) => {
+      let payload: { type?: string; post_id?: string; author_id?: string }
+      try {
+        payload = JSON.parse(event.data as string)
+      } catch {
+        return
+      }
+      if (payload.type === 'post_created' && payload.post_id && payload.author_id) {
+        onNewPost({ postId: payload.post_id, authorId: payload.author_id })
+      }
+    }
+
+    socket.onopen = () => {
+      retry = 0
+    }
+
+    socket.onclose = () => {
+      if (closedByUs) return
+      retry = Math.min(retry + 1, 10)
+      setTimeout(connect, retry * 1000)
+    }
+  }
+
+  connect()
+
+  return {
+    close() {
+      closedByUs = true
+      socket?.close()
+    },
+  }
 }

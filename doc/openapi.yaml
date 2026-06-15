@@ -2076,6 +2076,22 @@ paths:
             type: object
             additionalProperties:
               type: string
+  /posts/ws:
+    get:
+      tags:
+      - posts
+      summary: Connexion WebSocket temps réel (fil)
+      parameters:
+      - type: string
+        description: JWT access token
+        name: access_token
+        in: query
+        required: true
+      responses:
+        '101':
+          description: Upgrade WebSocket
+          schema:
+            type: string
   /posts/{id}:
     get:
       produces:

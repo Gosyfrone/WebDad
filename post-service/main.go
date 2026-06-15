@@ -15,6 +15,7 @@ import (
 	"github.com/webdad/post-service/internal/logging"
 	"github.com/webdad/post-service/internal/middleware"
 	"github.com/webdad/post-service/internal/notifier"
+	"github.com/webdad/post-service/internal/realtime"
 	"github.com/webdad/post-service/internal/repository"
 	"github.com/webdad/post-service/internal/service"
 )
@@ -50,12 +51,17 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Hub temps réel du fil : diffuse un ping WebSocket à chaque nouveau post
+	// public racine (cf. realtime.Hub).
+	hub := realtime.NewHub()
+
 	postRepo := repository.NewPostRepository(db)
 	opts := []service.Option{
 		service.WithBookmarkWindow(cfg.BookmarkWindow),
 		service.WithProfilClient(client.NewProfilClient(cfg.ProfilServiceURL)),
 		service.WithFollowClient(client.NewFollowClient(cfg.UserServiceURL, cfg.InternalSecret)),
 		service.WithPurgeRetention(cfg.PurgeAfter, cfg.PurgeWarnBefore),
+		service.WithFeedBroadcaster(hub),
 	}
 	if cfg.NotificationURL != "" {
 		opts = append(opts, service.WithNotifier(notifier.New(cfg.NotificationURL, cfg.InternalSecret)))
@@ -69,7 +75,7 @@ func main() {
 
 	r := gin.New()
 	r.Use(middleware.RequestID(), middleware.Recovery(), middleware.RequestLogger())
-	handler.RegisterRoutes(r, serviceName, postService, cfg.JWTSecret)
+	handler.RegisterRoutes(r, serviceName, postService, cfg.JWTSecret, hub, cfg.AllowedOrigins)
 
 	slog.Info("en écoute", "port", cfg.Port)
 	if err := r.Run(":" + cfg.Port); err != nil {

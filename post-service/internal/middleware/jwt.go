@@ -129,6 +129,14 @@ func ClaimsFrom(c *gin.Context) (*Claims, bool) {
 	return claims, ok
 }
 
+// ParseToken valide la signature (HS256) et l'expiration d'un token passé en
+// clair (sans en-tête « Bearer »). Utilisé par la poignée de main WebSocket, où
+// le navigateur ne peut pas poser d'en-tête Authorization : le token transite en
+// query param (`?access_token=`).
+func ParseToken(tokenStr, secret string) (*Claims, error) {
+	return parseToken(tokenStr, []byte(secret))
+}
+
 // parseToken valide la signature (HS256) et l'expiration, puis retourne les claims.
 func parseToken(tokenStr string, key []byte) (*Claims, error) {
 	claims := &Claims{}
