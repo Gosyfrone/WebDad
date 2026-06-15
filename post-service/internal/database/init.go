@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
@@ -20,7 +21,34 @@ func EnsureSchema(ctx context.Context, db *mongo.Database) error {
 	if err := ensureCollections(ctx, db); err != nil {
 		return err
 	}
+	if err := backfillReplyAudience(ctx, db); err != nil {
+		return err
+	}
 	return ensureIndexes(ctx, db)
+}
+
+// backfillReplyAudience pose `reply_audience: "everyone"` sur les posts écrits
+// avant l'introduction du champ (audience des réponses absente). Bien qu'un champ
+// absent reste valide vis-à-vis de l'enum optionnelle du $jsonSchema (donc pas de
+// crash en l'état), on matérialise la valeur par défaut sur les vieux documents
+// pour rester explicite et homogène — et conforme à la règle 5b (toute feature à
+// champ contraint fournit une migration idempotente au boot, vu les cas vécus
+// `visibility`/`likes_visibility`). Idempotent : no-op une fois les docs corrigés
+// (filtre sur champ absent OU chaîne vide).
+func backfillReplyAudience(ctx context.Context, db *mongo.Database) error {
+	coll := db.Collection("posts")
+	filter := bson.M{"$or": bson.A{
+		bson.M{"reply_audience": bson.M{"$exists": false}},
+		bson.M{"reply_audience": ""},
+	}}
+	res, err := coll.UpdateMany(ctx, filter, bson.M{"$set": bson.M{"reply_audience": "everyone"}})
+	if err != nil {
+		return fmt.Errorf("backfill reply_audience : %w", err)
+	}
+	if res.ModifiedCount > 0 {
+		slog.Info("migration: posts legacy normalisés", "field", "reply_audience", "count", res.ModifiedCount)
+	}
+	return nil
 }
 
 // ensureCollections crée les collections manquantes avec leur validateur, et

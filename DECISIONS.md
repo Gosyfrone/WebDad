@@ -220,8 +220,11 @@
   per-post choice (`reply_audience` ∈ `everyone|followers`) made at creation and **not editable afterwards** (parity with
   `Poll.Audience`; `UpdatePostRequest` only carries `content`). The field is stored on the post document with
   `omitempty`, so an empty/absent value is never persisted and old posts (created before the field) read back as
-  `everyone` via `ReplyAudienceOf` — the validator declares it as an **optional** enum property, so **no backfill
-  migration** is required (règle 5b). The barrier is enforced in the single comment entry point `CreateComment` (covers
+  `everyone` via `ReplyAudienceOf` — the validator declares it as an **optional** enum property, so an absent value is
+  already schema-valid and never crashes a legacy write. Even so, an **idempotent boot migration** `backfillReplyAudience`
+  (in `EnsureSchema`) materializes `reply_audience="everyone"` on pre-field posts, by precaution on the prod DB and to
+  honour règle 5b (the `visibility`/`likes_visibility` scars showed how a constrained field can lock legacy writes); it
+  is a no-op once normalized (filter on absent/empty). The barrier is enforced in the single comment entry point `CreateComment` (covers
   both root comments and replies) by `canReplyTo`: a `followers` post lets the author, the author's followers, and
   moderators/admins reply, everyone else gets `ErrReplyNotAllowed` (403). Follower status reuses the existing follow
   client, exactly like followers-only polls, so the rule cannot be bypassed by a custom front. **Mods/admins bypass** the
