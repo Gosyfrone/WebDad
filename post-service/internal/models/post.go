@@ -126,6 +126,17 @@ type HashtagTrend struct {
 	Count int64  `json:"count"`
 }
 
+// PostStat — compteurs dénormalisés d'un post (likes/commentaires/reposts) sans
+// son contenu. Charge utile légère de GET /posts/stats : le front rafraîchit
+// périodiquement les compteurs des posts affichés (façon X) sans recharger les
+// posts ni toucher l'état « moi » (liked/reposted local).
+type PostStat struct {
+	ID            string `json:"id"`
+	LikesCount    int32  `json:"likes_count"`
+	CommentsCount int32  `json:"comments_count"`
+	RepostsCount  int32  `json:"reposts_count"`
+}
+
 // Comment — document de la collection `comments`. Un commentaire référence son
 // post par l'identifiant hexadécimal (`post_id`, string) ; l'auteur est dérivé
 // du JWT, jamais du corps.

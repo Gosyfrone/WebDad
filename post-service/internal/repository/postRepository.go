@@ -201,6 +201,35 @@ func (r *PostRepository) ListTopHashtags(ctx context.Context, limit int64) ([]mo
 	return trends, nil
 }
 
+// StatsByIDs renvoie les posts non masqués dont l'_id figure dans oids, en
+// projection LÉGÈRE : auteur (pour la barrière de visibilité côté service) +
+// compteurs dénormalisés, sans contenu ni médias. Sert au rafraîchissement
+// périodique des compteurs côté front. L'ordre n'est pas garanti (le front
+// indexe par id).
+func (r *PostRepository) StatsByIDs(ctx context.Context, oids []bson.ObjectID) ([]models.Post, error) {
+	if len(oids) == 0 {
+		return []models.Post{}, nil
+	}
+	filter := bson.M{"_id": bson.M{"$in": oids}, "is_hidden": bson.M{"$ne": true}}
+	opts := options.Find().SetProjection(bson.M{
+		"author_id":      1,
+		"likes_count":    1,
+		"comments_count": 1,
+		"reposts_count":  1,
+	})
+	cursor, err := r.posts.Find(ctx, filter, opts)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = cursor.Close(ctx) }()
+
+	posts := []models.Post{}
+	if err := cursor.All(ctx, &posts); err != nil {
+		return nil, err
+	}
+	return posts, nil
+}
+
 // find factorise la lecture paginée + triée des posts.
 func (r *PostRepository) find(ctx context.Context, filter bson.M, limit, skip int64) ([]models.Post, error) {
 	return r.findSorted(ctx, filter, "", limit, skip)

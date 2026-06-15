@@ -62,7 +62,9 @@ composed by the **caller** (front/BFF).
 - **Notifications (server→server):** post/message/user-service POST best-effort fire-and-forget
   events to notification-service `/internal/events` (secret `INTERNAL_EVENT_SECRET`, off the gateway).
 - **Realtime:** WebSocket hubs per user for messages (`/messages/ws`) and notifications
-  (`/notifications/ws`), proxied natively by the gateway (101 upgrade).
+  (`/notifications/ws`), plus a **broadcast** hub on post-service (`/posts/ws`) that pings all
+  connected clients on each new public root post (id + author only → "X a posté" banner, content
+  refetched via the normal feed). All proxied natively by the gateway (101 upgrade).
 - **Media download:** streamed through the gateway (`http.ServeContent`, Range/seek); MinIO never exposed.
 
 ## 4. Critical components (god nodes — most connected)

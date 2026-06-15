@@ -16,6 +16,8 @@ import {
 } from '@/lib/profil-client'
 import {
   applyProfilUpdateToPosts,
+  applyStatsToPost,
+  applyStatsToPosts,
   listByAuthor,
   listCommentsByAuthor,
   listLikedByUser,
@@ -23,6 +25,7 @@ import {
   type FeedPost,
   type ReplyContext,
 } from '@/lib/posts'
+import { usePostStatsPolling } from '@/lib/use-post-stats-polling'
 import { FOLLOW_CHANGE_EVENT, type FollowChangeDetail } from '@/lib/use-follow'
 import { useToast } from '@/hooks/use-toast'
 import type { ProfilDetails, ProfilEditableFields } from '@/types'
@@ -262,6 +265,32 @@ export function ProfilView({ username }: ProfilViewProps) {
     [],
   )
 
+  // Compteurs dynamiques : refetch périodique des likes/commentaires/reposts des
+  // posts affichés (onglets Posts / J'aime / Réponses), façon X, sans toucher
+  // l'état « moi ». Un lot couvre l'union des trois listes.
+  usePostStatsPolling(
+    () => [
+      ...posts.map((p) => p.id),
+      ...likedPosts.map((p) => p.id),
+      ...replies.flatMap((r) => (r.parentPost ? [r.parentPost.id] : [])),
+    ],
+    (stats) => {
+      setPosts((prev) => applyStatsToPosts(prev, stats))
+      setLikedPosts((prev) => applyStatsToPosts(prev, stats))
+      setReplies((prev) => {
+        let changed = false
+        const next = prev.map((r) => {
+          if (!r.parentPost) return r
+          const updated = applyStatsToPost(r.parentPost, stats)
+          if (updated === r.parentPost) return r
+          changed = true
+          return { ...r, parentPost: updated }
+        })
+        return changed ? next : prev
+      })
+    },
+  )
+
   function handleDeleted(id: string) {
     setPosts((prev) => prev.filter((p) => p.id !== id))
   }
@@ -323,6 +352,7 @@ export function ProfilView({ username }: ProfilViewProps) {
         <div className="panel sticky top-0 z-10 flex items-center gap-6 border-b px-4 py-2">
           <Link
             href={ROUTES.feed}
+            scroll={false}
             aria-label={t('profil.back_aria')}
             className="rounded-full p-2 transition-colors hover:bg-accent hover:text-[#5B6CFF] dark:hover:text-[#9aa6ff]"
           >
@@ -345,6 +375,7 @@ export function ProfilView({ username }: ProfilViewProps) {
       <div className="panel sticky top-0 z-10 flex items-center gap-6 border-b px-4 py-2">
         <Link
           href={ROUTES.feed}
+          scroll={false}
           aria-label={t('profil.back_aria')}
           className="rounded-full p-2 transition-colors hover:bg-accent hover:text-[#5B6CFF] dark:hover:text-[#9aa6ff]"
         >

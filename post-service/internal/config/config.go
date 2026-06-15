@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -39,6 +40,9 @@ type Config struct {
 	PurgeAfter         time.Duration
 	PurgeWarnBefore    time.Duration
 	PurgeSweepInterval time.Duration
+	// AllowedOrigins : origines acceptées pour l'upgrade WebSocket du fil temps
+	// réel (`/posts/ws`). Mêmes valeurs que la CORS du front. Défaut localhost:3000.
+	AllowedOrigins []string
 }
 
 // Load construit la config. Charge les .env best-effort (ignorés s'ils
@@ -67,6 +71,7 @@ func Load() *Config {
 		PurgeAfter:         getDuration("PURGE_AFTER", 43800*time.Hour),
 		PurgeWarnBefore:    getDuration("PURGE_WARN_BEFORE", 720*time.Hour),
 		PurgeSweepInterval: getDuration("PURGE_SWEEP_INTERVAL", 6*time.Hour),
+		AllowedOrigins:     splitCSV(getEnv("CORS_ALLOWED_ORIGINS", "http://localhost:3000")),
 	}
 
 	if cfg.JWTSecret == "" {
@@ -118,4 +123,17 @@ func defaultServiceURL(serviceName, port string) string {
 		return fmt.Sprintf("http://%s:%s", serviceName, port)
 	}
 	return fmt.Sprintf("http://localhost:%s", port)
+}
+
+// splitCSV découpe une liste séparée par des virgules en éliminant les blancs et
+// les entrées vides (ex. « http://a, http://b » → ["http://a","http://b"]).
+func splitCSV(s string) []string {
+	parts := strings.Split(s, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if t := strings.TrimSpace(p); t != "" {
+			out = append(out, t)
+		}
+	}
+	return out
 }

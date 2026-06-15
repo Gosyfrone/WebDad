@@ -4,29 +4,36 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeft, ImageIcon, Loader2, Search, Users } from 'lucide-react'
 
-import { cn } from '@/lib/utils'
+import { cn, initialOf } from '@/lib/utils'
 import { getAccessToken } from '@/lib/auth-client'
 import {
   filterMutedPosts,
   readMutedWords,
   subscribeMutedWords,
 } from '@/lib/content-filters'
-import { getMe } from '@/lib/api'
+import { getFollowingIds, getMe } from '@/lib/api'
 import { subscribeProfilUpdated } from '@/lib/profil-client'
 import { useInfiniteScroll } from '@/lib/use-infinite-scroll'
 import {
   applyProfilUpdateToPosts,
+  applyStatsToPosts,
+  connectFeedRealtime,
+  getPostAuthor,
   listFeed,
   listFollowingFeed,
   currentUserId,
   subscribePostCreated,
   type FeedPost,
   type HashtagPostSort,
+  type NewPostPing,
+  type PostAuthor,
   type PostMedia,
 } from '@/lib/posts'
+import { usePostStatsPolling } from '@/lib/use-post-stats-polling'
 import { ROUTES, hashtagHref, postHref, searchHref } from '@/lib/routes'
 import { CreatePost } from '@/components/feed/create-post'
 import { PostCard } from '@/components/feed/post-card'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { useAuthGate } from '@/components/auth-prompt-provider'
 import { useT } from '@/components/language-provider'
 import { SearchSuggestionsDropdown } from '@/components/search/search-suggestions-dropdown'
@@ -80,6 +87,26 @@ export function FeedView() {
   // indépendant des insertions/suppressions locales).
   const offsetRef = useRef(0)
 
+  // Temps réel : posts publiés par d'AUTRES pendant qu'on consulte le fil. On
+  // n'affiche pas leur contenu tout de suite (façon X) ; on accumule un « ping »
+  // par post et on présente un bandeau « a posté » cliquable qui révèle les
+  // nouveautés et remonte en haut.
+  const [pendingPings, setPendingPings] = useState<NewPostPing[]>([])
+  const [bannerAuthor, setBannerAuthor] = useState<PostAuthor | null>(null)
+  // Ensemble des comptes suivis (filtre du bandeau pour l'onglet « Abonnements »).
+  const followingIdsRef = useRef<Set<string>>(new Set())
+  // Miroirs des valeurs courantes pour le callback WS (monté une seule fois).
+  const tabRef = useRef(tab)
+  const selectedHashtagRef = useRef(selectedHashtag)
+  const viewerRef = useRef(viewerUserId)
+  const postsRef = useRef(posts)
+  const pendingRef = useRef(pendingPings)
+  tabRef.current = tab
+  selectedHashtagRef.current = selectedHashtag
+  viewerRef.current = viewerUserId
+  postsRef.current = posts
+  pendingRef.current = pendingPings
+
   const fetchPage = useCallback(
     (activeTab: FeedTab, offset: number) => {
       if (selectedHashtag) {
@@ -104,6 +131,9 @@ export function FeedView() {
     setError('')
     setPosts([])
     offsetRef.current = 0
+    // Nouveau contexte de fil → on repart d'un bandeau vide.
+    setPendingPings([])
+    setBannerAuthor(null)
 
     fetchPage(tab, 0)
       .then((list) => {
@@ -150,6 +180,64 @@ export function FeedView() {
     hasMore,
     loading: loading || loadingMore,
   })
+
+  // Révèle les posts en attente : refetch la 1re page de l'onglet courant,
+  // prépend les nouveautés (dédup) et remonte en haut. Le contenu vient du fil
+  // authentifié normal (visibilité server-side), pas du ping WebSocket.
+  const revealPending = useCallback(async () => {
+    setPendingPings([])
+    setBannerAuthor(null)
+    try {
+      const fresh = await fetchPage(tab, 0)
+      setPosts((prev) => {
+        const seen = new Set(prev.map((p) => p.id))
+        const fresher = fresh.filter((p) => !seen.has(p.id))
+        offsetRef.current += fresher.length
+        return [...fresher, ...prev]
+      })
+    } catch {
+      // best-effort : on garde le fil courant
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [fetchPage, tab])
+
+  // Charge l'ensemble des comptes suivis (filtre du bandeau en onglet
+  // « Abonnements » : on n'annonce que les posts d'auteurs suivis).
+  useEffect(() => {
+    if (!viewerUserId) return
+    let cancelled = false
+    void getFollowingIds(viewerUserId)
+      .then((set) => {
+        if (!cancelled) followingIdsRef.current = set
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [viewerUserId])
+
+  // Connexion WebSocket du fil (montée une seule fois ; visiteur exclu). À chaque
+  // « ping », on filtre via les refs (pas mes posts, pas de filtre hashtag actif,
+  // pas déjà présent/en attente, et auteur suivi en onglet « Abonnements »), puis
+  // on empile le ping et on résout l'auteur du bandeau.
+  useEffect(() => {
+    if (isVisitor || !getAccessToken()) return
+    const handle = connectFeedRealtime((ping: NewPostPing) => {
+      if (selectedHashtagRef.current) return
+      if (ping.authorId === viewerRef.current) return
+      if (postsRef.current.some((p) => p.id === ping.postId)) return
+      if (pendingRef.current.some((p) => p.postId === ping.postId)) return
+      if (tabRef.current === 'following' && !followingIdsRef.current.has(ping.authorId)) return
+
+      setPendingPings((prev) =>
+        prev.some((p) => p.postId === ping.postId) ? prev : [ping, ...prev],
+      )
+      void getPostAuthor(ping.authorId)
+        .then(setBannerAuthor)
+        .catch(() => {})
+    })
+    return () => handle.close()
+  }, [isVisitor])
 
   useEffect(() => {
     let cancelled = false
@@ -199,6 +287,13 @@ export function FeedView() {
         setPosts((prev) => applyProfilUpdateToPosts(prev, profil))
       }),
     [],
+  )
+
+  // Compteurs dynamiques : refetch périodique des likes/commentaires/reposts des
+  // posts affichés (façon X), sans toucher l'état « moi » (liked/reposted local).
+  usePostStatsPolling(
+    () => postsRef.current.map((p) => p.id),
+    (stats) => setPosts((prev) => applyStatsToPosts(prev, stats)),
   )
 
   const handleDeleted = useCallback((id: string) => {
@@ -300,6 +395,27 @@ export function FeedView() {
           </>
         )}
       </div>
+
+      {/* Bandeau temps réel « a posté » : flotte sous l'en-tête dès qu'un autre
+          utilisateur a publié. Clic → révèle les nouveautés et remonte en haut.
+          (wrapper transparent aux clics, seul le bouton les capte). */}
+      {!selectedHashtag && bannerAuthor && pendingPings.length > 0 && (
+        <div className="pointer-events-none sticky top-2 z-20 flex justify-center lg:top-[60px]">
+          <button
+            type="button"
+            onClick={revealPending}
+            className="pointer-events-auto flex items-center gap-2 rounded-full border border-white/20 bg-[#5B6CFF] px-4 py-1.5 text-sm font-semibold text-white shadow-lg transition hover:brightness-110"
+          >
+            <Avatar className="h-6 w-6">
+              {bannerAuthor.avatarUrl && <AvatarImage src={bannerAuthor.avatarUrl} alt="" />}
+              <AvatarFallback className="bg-gradient-to-br from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] text-[10px] font-bold text-white">
+                {initialOf(bannerAuthor.displayName)}
+              </AvatarFallback>
+            </Avatar>
+            <span>{t('feed.new_posts')}</span>
+          </button>
+        </div>
+      )}
 
       {/* Zone de création de post inline (masquée pour le visiteur) ; le FAB
           mobile prend le relais quand ce bloc sort de l'écran. */}

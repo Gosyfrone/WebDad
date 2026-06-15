@@ -5,7 +5,13 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 
 import { ROUTES } from '@/lib/routes'
-import { getPostById, type FeedPost } from '@/lib/posts'
+import {
+  applyStatsToPost,
+  getPostById,
+  STATS_POLL_INTERVAL_DETAIL_MS,
+  type FeedPost,
+} from '@/lib/posts'
+import { usePostStatsPolling } from '@/lib/use-post-stats-polling'
 import { useT } from '@/components/language-provider'
 import { PostCard } from '@/components/feed/post-card'
 
@@ -37,6 +43,14 @@ export function PostDetail({ id }: { id: string }) {
       cancelled = true
     }
   }, [id])
+
+  // Compteurs dynamiques : refetch périodique des likes/commentaires/reposts du
+  // post affiché (façon X), sans toucher l'état « moi » (liked/reposted local).
+  usePostStatsPolling(
+    () => (post ? [post.id] : []),
+    (stats) => setPost((prev) => (prev ? applyStatsToPost(prev, stats) : prev)),
+    STATS_POLL_INTERVAL_DETAIL_MS,
+  )
 
   return (
     <div className="flex flex-col">

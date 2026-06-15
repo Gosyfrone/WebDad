@@ -12,6 +12,7 @@
  */
 
 import { apiFetch, getAccessToken } from '@/lib/auth-client'
+import { API_URL } from '@/lib/config'
 import { resolveMediaUrl } from '@/lib/media'
 import type { ProfilDetails } from '@/types'
 import { decodeClaims } from '@/lib/session'
@@ -795,4 +796,165 @@ export function subscribePostCreated(onCreate: (post: FeedPost) => void): () => 
   }
   window.addEventListener(POST_CREATED_EVENT, handle)
   return () => window.removeEventListener(POST_CREATED_EVENT, handle)
+}
+
+/** Résout (et cache) l'auteur d'un post par son id — sert à l'aperçu temps réel
+ * (avatar/nom du bandeau « a posté ») sans avoir à charger le post complet. */
+export function getPostAuthor(userId: string): Promise<PostAuthor> {
+  return resolveAuthor(userId)
+}
+
+// --- Compteurs dynamiques (polling périodique) ------------------------------
+// Façon X : les compteurs (likes/commentaires/reposts) des posts AFFICHÉS sont
+// rafraîchis par lots toutes les quelques secondes, sans recharger les posts ni
+// toucher l'état « moi » (liked/reposted/bookmarked, piloté par les actions
+// locales). Lecture seule via le fil authentifié normal → barrière de visibilité
+// server-side (les posts invisibles sont simplement absents de la réponse).
+
+/** Intervalle de rafraîchissement des compteurs (ms) — fil/profil (plusieurs posts). */
+export const STATS_POLL_INTERVAL_MS = 7000
+
+/** Intervalle plus court sur la vue détail (un seul post → coût négligeable, plus vif). */
+export const STATS_POLL_INTERVAL_DETAIL_MS = 3500
+
+/** Borne du lot d'ids par requête (alignée sur la borne serveur). */
+const STATS_BATCH_MAX = 100
+
+/** Compteurs dénormalisés d'un post (réponse de GET /posts/stats). */
+export interface PostStats {
+  likesCount: number
+  commentsCount: number
+  repostsCount: number
+}
+
+interface ApiPostStat {
+  id: string
+  likes_count: number
+  comments_count: number
+  reposts_count: number
+}
+
+/**
+ * Récupère les compteurs des posts demandés en un seul lot. Renvoie une map
+ * `id → compteurs` ; les posts invisibles/supprimés en sont absents. Le lot est
+ * borné à `STATS_BATCH_MAX` ids.
+ */
+export async function getPostsStats(ids: string[]): Promise<Map<string, PostStats>> {
+  const out = new Map<string, PostStats>()
+  const wanted = Array.from(new Set(ids.filter(Boolean))).slice(0, STATS_BATCH_MAX)
+  if (wanted.length === 0) return out
+  const params = new URLSearchParams({ ids: wanted.join(',') })
+  const stats = await unwrap<ApiPostStat[]>(await apiFetch(`/posts/stats?${params}`))
+  for (const s of stats ?? []) {
+    out.set(s.id, {
+      likesCount: s.likes_count ?? 0,
+      commentsCount: s.comments_count ?? 0,
+      repostsCount: s.reposts_count ?? 0,
+    })
+  }
+  return out
+}
+
+/**
+ * Applique des compteurs frais à un post SANS toucher son état « moi »
+ * (liked/reposted/bookmarked). Renvoie le post inchangé (même référence) si
+ * aucun compteur n'a bougé — évite les re-rendus inutiles.
+ */
+export function applyStatsToPost(post: FeedPost, stats: Map<string, PostStats>): FeedPost {
+  const s = stats.get(post.id)
+  if (!s) return post
+  if (
+    post.likesCount === s.likesCount &&
+    post.commentsCount === s.commentsCount &&
+    post.repostsCount === s.repostsCount
+  ) {
+    return post
+  }
+  return {
+    ...post,
+    likesCount: s.likesCount,
+    commentsCount: s.commentsCount,
+    repostsCount: s.repostsCount,
+  }
+}
+
+/**
+ * Applique des compteurs frais à une liste de posts. Renvoie la MÊME liste
+ * (même référence) si aucun post n'a changé — un cycle de polling sans nouveauté
+ * ne provoque alors aucun re-rendu.
+ */
+export function applyStatsToPosts(posts: FeedPost[], stats: Map<string, PostStats>): FeedPost[] {
+  let changed = false
+  const next = posts.map((p) => {
+    const updated = applyStatsToPost(p, stats)
+    if (updated !== p) changed = true
+    return updated
+  })
+  return changed ? next : posts
+}
+
+// --- Fil temps réel (WebSocket) ---------------------------------------------
+// Le post-service diffuse un « ping » léger à chaque nouveau post PUBLIC racine
+// (id du post + id de l'auteur). On ne charge PAS le contenu via le WS : le fil
+// authentifié normal reste la source (barrière de visibilité server-side). Le
+// ping sert seulement à afficher le bandeau « X a posté » en haut du fil.
+
+/** Ping minimal reçu du serveur à la création d'un post. */
+export interface NewPostPing {
+  postId: string
+  authorId: string
+}
+
+/** Poignée de connexion temps réel du fil (fermeture propre). */
+export interface FeedRealtimeHandle {
+  close(): void
+}
+
+/**
+ * Ouvre la connexion temps réel du fil (`/posts/ws`). Reconnexion automatique
+ * avec backoff linéaire (calquée sur connectNotifications). Le token transite en
+ * query param (le navigateur n'autorise pas d'en-tête sur un upgrade WS).
+ */
+export function connectFeedRealtime(onNewPost: (ping: NewPostPing) => void): FeedRealtimeHandle {
+  let socket: WebSocket | null = null
+  let closedByUs = false
+  let retry = 0
+
+  const connect = () => {
+    const token = getAccessToken()
+    if (!token) return
+    const wsBase = API_URL.replace(/^http/, 'ws').replace(/\/+$/, '')
+    socket = new WebSocket(`${wsBase}/posts/ws?access_token=${encodeURIComponent(token)}`)
+
+    socket.onmessage = (event) => {
+      let payload: { type?: string; post_id?: string; author_id?: string }
+      try {
+        payload = JSON.parse(event.data as string)
+      } catch {
+        return
+      }
+      if (payload.type === 'post_created' && payload.post_id && payload.author_id) {
+        onNewPost({ postId: payload.post_id, authorId: payload.author_id })
+      }
+    }
+
+    socket.onopen = () => {
+      retry = 0
+    }
+
+    socket.onclose = () => {
+      if (closedByUs) return
+      retry = Math.min(retry + 1, 10)
+      setTimeout(connect, retry * 1000)
+    }
+  }
+
+  connect()
+
+  return {
+    close() {
+      closedByUs = true
+      socket?.close()
+    },
+  }
 }

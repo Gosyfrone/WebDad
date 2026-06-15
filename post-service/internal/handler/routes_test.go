@@ -10,6 +10,7 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
+	"github.com/webdad/post-service/internal/realtime"
 	"github.com/webdad/post-service/internal/repository"
 	"github.com/webdad/post-service/internal/service"
 )
@@ -32,7 +33,7 @@ func newTestRouter(t *testing.T) *gin.Engine {
 		repository.NewPostRepository(db),
 		service.WithBookmarkWindow(5*time.Minute),
 	)
-	RegisterRoutes(r, "post-service", svc, "test-secret")
+	RegisterRoutes(r, "post-service", svc, "test-secret", realtime.NewHub(), nil)
 	return r
 }
 

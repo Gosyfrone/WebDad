@@ -66,6 +66,11 @@ const (
 	MaxLimit     = 100
 )
 
+// MaxStatsIDs borne le nombre d'ids acceptés par une requête de compteurs
+// (GET /posts/stats) — au-delà, on n'honore que les premiers. Couvre largement
+// une page de fil affichée côté front.
+const MaxStatsIDs = 100
+
 var hashtagPattern = regexp.MustCompile(`(^|[^\p{L}\p{N}_])#([\p{L}\p{N}_]{1,64})`)
 
 type PostService struct {
@@ -74,6 +79,9 @@ type PostService struct {
 	// Par défaut un no-op : le post-service reste autonome si le
 	// notification-service n'est pas configuré. Câblé via SetNotifier au boot.
 	notif notifier.Notifier
+	// feed diffuse en temps réel les nouveaux posts (ping WebSocket). Par défaut
+	// un no-op : le post-service fonctionne sans le hub temps réel.
+	feed feedBroadcaster
 	// bookmarkWindow : durée de la fenêtre glissante de rafale. Un clic court qui
 	// suit le précédent signet de moins de bookmarkWindow range automatiquement
 	// dans la dernière collection ; au-delà, le serveur redemande la collection.
@@ -96,7 +104,27 @@ type followStatusClient interface {
 	IsFollowing(ctx context.Context, followerID, followingID string) (bool, error)
 }
 
+// feedBroadcaster diffuse en temps réel la création d'un post (ping WebSocket).
+// Implémenté par realtime.Hub ; no-op par défaut (service testable sans hub).
+type feedBroadcaster interface {
+	PostCreated(postID, authorID string)
+}
+
+// noopBroadcaster : diffusion désactivée (pas de hub temps réel câblé).
+type noopBroadcaster struct{}
+
+func (noopBroadcaster) PostCreated(string, string) {}
+
 type Option func(*PostService)
+
+// WithFeedBroadcaster branche le hub temps réel du fil (best-effort).
+func WithFeedBroadcaster(b feedBroadcaster) Option {
+	return func(s *PostService) {
+		if b != nil {
+			s.feed = b
+		}
+	}
+}
 
 func WithProfilClient(c profilVisibilityClient) Option {
 	return func(s *PostService) {
@@ -134,7 +162,7 @@ func WithPurgeRetention(after, warnBefore time.Duration) Option {
 }
 
 func NewPostService(r *repository.PostRepository, opts ...Option) *PostService {
-	s := &PostService{repo: r, notif: notifier.Noop{}}
+	s := &PostService{repo: r, notif: notifier.Noop{}, feed: noopBroadcaster{}}
 	for _, opt := range opts {
 		opt(s)
 	}
@@ -214,7 +242,31 @@ func (s *PostService) CreatePost(ctx context.Context, authorID, content, quotePo
 			MentionHandles: handles,
 		})
 	}
+	// Diffuse le nouveau post en temps réel (ping WebSocket) — best-effort,
+	// uniquement pour les comptes publics (voir broadcastNewPost). N'impacte
+	// jamais la création.
+	s.broadcastNewPost(authorID, post.ID.Hex())
 	return post, nil
+}
+
+// broadcastNewPost notifie en temps réel (best-effort, fire-and-forget) que
+// authorID vient de publier postID. On ne diffuse qu'aux comptes PUBLICS : un
+// post de compte privé ne concerne que les abonnés approuvés et ne doit pas
+// révéler l'activité de l'auteur aux autres (la sécurité ne dépend jamais du
+// front). Le ping ne porte que des ids — le contenu reste protégé par la
+// barrière de visibilité du fil normal côté lecture.
+func (s *PostService) broadcastNewPost(authorID, postID string) {
+	go func() {
+		if s.profilClient != nil {
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
+			vis, err := s.profilClient.Visibility(ctx, authorID)
+			if err != nil || vis != client.VisibilityPublic {
+				return
+			}
+		}
+		s.feed.PostCreated(postID, authorID)
+	}()
 }
 
 // GetPosts renvoie le fil global, du plus récent au plus ancien, paginé.
@@ -263,6 +315,53 @@ func (s *PostService) GetPost(ctx context.Context, id, viewerID, viewerRole stri
 	s.hydratePoll(ctx, post, viewerID)
 	s.hydrateReplyPermission(ctx, post, viewerID, viewerRole)
 	return post, nil
+}
+
+// PostStats renvoie les compteurs (likes/commentaires/reposts) des posts
+// demandés que le visiteur courant a le droit de voir. Léger (projection sur les
+// compteurs, une seule requête `$in`) : sert au rafraîchissement périodique des
+// compteurs côté front, façon X. Les posts invisibles (compte privé non suivi,
+// masqués par la modération, introuvables, id invalide) sont simplement absents
+// de la réponse — pas d'erreur (le front ne fait que patcher ce qu'il connaît).
+func (s *PostService) PostStats(ctx context.Context, ids []string, viewerID string) ([]models.PostStat, error) {
+	if len(ids) > MaxStatsIDs {
+		ids = ids[:MaxStatsIDs]
+	}
+	oids := make([]bson.ObjectID, 0, len(ids))
+	for _, id := range ids {
+		if oid, err := parseID(id); err == nil {
+			oids = append(oids, oid)
+		}
+	}
+	posts, err := s.repo.StatsByIDs(ctx, oids)
+	if err != nil {
+		return nil, err
+	}
+	// Même barrière de visibilité que le fil (canReadAuthor), mémoïsée par auteur
+	// pour ne pas multiplier les appels profil/follow quand une page contient
+	// plusieurs posts du même auteur.
+	allowedByAuthor := make(map[string]bool)
+	stats := make([]models.PostStat, 0, len(posts))
+	for _, post := range posts {
+		allowed, ok := allowedByAuthor[post.AuthorID]
+		if !ok {
+			allowed, err = s.canReadAuthor(ctx, viewerID, post.AuthorID)
+			if err != nil {
+				return nil, err
+			}
+			allowedByAuthor[post.AuthorID] = allowed
+		}
+		if !allowed {
+			continue
+		}
+		stats = append(stats, models.PostStat{
+			ID:            post.ID.Hex(),
+			LikesCount:    post.LikesCount,
+			CommentsCount: post.CommentsCount,
+			RepostsCount:  post.RepostsCount,
+		})
+	}
+	return stats, nil
 }
 
 // UpdatePost modifie le contenu d'un post si l'acteur en a le droit (auteur,

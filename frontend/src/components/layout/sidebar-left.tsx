@@ -153,6 +153,7 @@ export function SidebarLeft() {
       <div className="flex flex-col gap-1">
         <Link
           href={ROUTES.feed}
+          scroll={false}
           className="mb-3 flex w-fit items-center rounded-2xl p-2 transition hover:scale-105"
         >
           <Image
@@ -185,6 +186,7 @@ export function SidebarLeft() {
             <Link
               key={item.href}
               href={item.href === ROUTES.explorer ? searchHref : item.href}
+              scroll={false}
               className={cn(
                 'flex w-fit items-center gap-4 rounded-full px-4 py-3 text-xl font-normal text-foreground/80 transition hover:bg-accent hover:text-[#5B6CFF] hover:shadow-sm dark:hover:text-[#9aa6ff]',
                 active &&
@@ -281,7 +283,7 @@ export function SidebarLeft() {
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              <Link href={ROUTES.parametres}>
+              <Link href={ROUTES.parametres} scroll={false}>
                 <Settings className="mr-2 h-4 w-4" />
                 {t('nav.settings')}
               </Link>
