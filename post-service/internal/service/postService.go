@@ -66,6 +66,11 @@ const (
 	MaxLimit     = 100
 )
 
+// MaxStatsIDs borne le nombre d'ids acceptés par une requête de compteurs
+// (GET /posts/stats) — au-delà, on n'honore que les premiers. Couvre largement
+// une page de fil affichée côté front.
+const MaxStatsIDs = 100
+
 var hashtagPattern = regexp.MustCompile(`(^|[^\p{L}\p{N}_])#([\p{L}\p{N}_]{1,64})`)
 
 type PostService struct {
@@ -310,6 +315,53 @@ func (s *PostService) GetPost(ctx context.Context, id, viewerID, viewerRole stri
 	s.hydratePoll(ctx, post, viewerID)
 	s.hydrateReplyPermission(ctx, post, viewerID, viewerRole)
 	return post, nil
+}
+
+// PostStats renvoie les compteurs (likes/commentaires/reposts) des posts
+// demandés que le visiteur courant a le droit de voir. Léger (projection sur les
+// compteurs, une seule requête `$in`) : sert au rafraîchissement périodique des
+// compteurs côté front, façon X. Les posts invisibles (compte privé non suivi,
+// masqués par la modération, introuvables, id invalide) sont simplement absents
+// de la réponse — pas d'erreur (le front ne fait que patcher ce qu'il connaît).
+func (s *PostService) PostStats(ctx context.Context, ids []string, viewerID string) ([]models.PostStat, error) {
+	if len(ids) > MaxStatsIDs {
+		ids = ids[:MaxStatsIDs]
+	}
+	oids := make([]bson.ObjectID, 0, len(ids))
+	for _, id := range ids {
+		if oid, err := parseID(id); err == nil {
+			oids = append(oids, oid)
+		}
+	}
+	posts, err := s.repo.StatsByIDs(ctx, oids)
+	if err != nil {
+		return nil, err
+	}
+	// Même barrière de visibilité que le fil (canReadAuthor), mémoïsée par auteur
+	// pour ne pas multiplier les appels profil/follow quand une page contient
+	// plusieurs posts du même auteur.
+	allowedByAuthor := make(map[string]bool)
+	stats := make([]models.PostStat, 0, len(posts))
+	for _, post := range posts {
+		allowed, ok := allowedByAuthor[post.AuthorID]
+		if !ok {
+			allowed, err = s.canReadAuthor(ctx, viewerID, post.AuthorID)
+			if err != nil {
+				return nil, err
+			}
+			allowedByAuthor[post.AuthorID] = allowed
+		}
+		if !allowed {
+			continue
+		}
+		stats = append(stats, models.PostStat{
+			ID:            post.ID.Hex(),
+			LikesCount:    post.LikesCount,
+			CommentsCount: post.CommentsCount,
+			RepostsCount:  post.RepostsCount,
+		})
+	}
+	return stats, nil
 }
 
 // UpdatePost modifie le contenu d'un post si l'acteur en a le droit (auteur,

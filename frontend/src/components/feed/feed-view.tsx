@@ -16,6 +16,7 @@ import { subscribeProfilUpdated } from '@/lib/profil-client'
 import { useInfiniteScroll } from '@/lib/use-infinite-scroll'
 import {
   applyProfilUpdateToPosts,
+  applyStatsToPosts,
   connectFeedRealtime,
   getPostAuthor,
   listFeed,
@@ -28,6 +29,7 @@ import {
   type PostAuthor,
   type PostMedia,
 } from '@/lib/posts'
+import { usePostStatsPolling } from '@/lib/use-post-stats-polling'
 import { ROUTES, hashtagHref, postHref, searchHref } from '@/lib/routes'
 import { CreatePost } from '@/components/feed/create-post'
 import { PostCard } from '@/components/feed/post-card'
@@ -285,6 +287,13 @@ export function FeedView() {
         setPosts((prev) => applyProfilUpdateToPosts(prev, profil))
       }),
     [],
+  )
+
+  // Compteurs dynamiques : refetch périodique des likes/commentaires/reposts des
+  // posts affichés (façon X), sans toucher l'état « moi » (liked/reposted local).
+  usePostStatsPolling(
+    () => postsRef.current.map((p) => p.id),
+    (stats) => setPosts((prev) => applyStatsToPosts(prev, stats)),
   )
 
   const handleDeleted = useCallback((id: string) => {

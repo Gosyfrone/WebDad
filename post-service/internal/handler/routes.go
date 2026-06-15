@@ -48,6 +48,9 @@ func RegisterRoutes(r *gin.Engine, serviceName string, postService *service.Post
 		posts.GET("/me/bookmarked-ids", auth, BookmarkHandler.BookmarkedByMe)
 		// Tendances hashtags — route STATIQUE avant `/:id`.
 		posts.GET("/trends", optionalAuth, PostHandler.ListHashtagTrends)
+		// Compteurs des posts affichés (rafraîchissement périodique côté front) —
+		// route STATIQUE avant `/:id` (sinon « stats » serait capturé comme un id).
+		posts.GET("/stats", optionalAuth, PostHandler.PostStats)
 		// Réponses d'un auteur — route STATIQUE avant `/:id`.
 		posts.GET("/comments", optionalAuth, CommentHandler.ListCommentsByAuthor)
 

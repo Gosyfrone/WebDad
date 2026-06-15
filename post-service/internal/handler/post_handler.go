@@ -195,6 +195,36 @@ func (h *PostHandler) ListHashtagTrends(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": trends})
 }
 
+// PostStats : GET /posts/stats?ids=a,b,c — compteurs (likes/commentaires/
+// reposts) des posts demandés, pour le rafraîchissement périodique des
+// compteurs côté front (façon X, sans recharger les posts). Lecture publique ;
+// le JWT optionnel sert la barrière de visibilité des comptes privés. Les posts
+// invisibles sont absents de la réponse (pas d'erreur).
+// @Summary     Compteurs de posts (rafraîchissement)
+// @Tags        posts
+// @Produce     json
+// @Param       ids query string true "IDs de posts séparés par des virgules (max 100)"
+// @Success     200 {array} models.PostStat
+// @Failure     500 {object} map[string]string
+// @Router      /posts/stats [get]
+func (h *PostHandler) PostStats(c *gin.Context) {
+	ids := splitIDs(c.Query("ids"))
+	if len(ids) == 0 {
+		c.JSON(http.StatusOK, gin.H{"data": []models.PostStat{}})
+		return
+	}
+	viewerID := ""
+	if claims, ok := middleware.ClaimsFrom(c); ok {
+		viewerID = claims.UserID
+	}
+	stats, err := h.service.PostStats(c.Request.Context(), ids, viewerID)
+	if err != nil {
+		respondPostError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": stats})
+}
+
 // GetPost : GET /posts/:id (public). Un post masqué par la modération n'est
 // visible qu'à un modérateur/admin (rôle lu dans le JWT optionnel).
 // @Summary     Détail d'un post

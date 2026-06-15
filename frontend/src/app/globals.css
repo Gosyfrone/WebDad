@@ -295,6 +295,38 @@
   .animate-like-burst {
     animation: like-burst 420ms ease-out forwards;
   }
+
+  /* Compteurs dynamiques (polling) : la nouvelle valeur « roule » verticalement
+     dans son conteneur clippé — montée si le nombre augmente, descente sinon. */
+  @keyframes count-up {
+    0% {
+      transform: translateY(60%);
+      opacity: 0;
+    }
+    100% {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+
+  @keyframes count-down {
+    0% {
+      transform: translateY(-60%);
+      opacity: 0;
+    }
+    100% {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+
+  .animate-count-up {
+    animation: count-up 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  .animate-count-down {
+    animation: count-down 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
 }
 
 @layer base {

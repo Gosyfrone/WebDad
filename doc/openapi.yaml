@@ -2047,6 +2047,32 @@ paths:
             type: object
             additionalProperties:
               type: string
+  /posts/stats:
+    get:
+      produces:
+      - application/json
+      tags:
+      - posts
+      summary: Compteurs de posts (rafraîchissement)
+      parameters:
+      - type: string
+        description: IDs de posts séparés par des virgules (max 100)
+        name: ids
+        in: query
+        required: true
+      responses:
+        '200':
+          description: OK
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/models.PostStat'
+        '500':
+          description: Internal Server Error
+          schema:
+            type: object
+            additionalProperties:
+              type: string
   /posts/trends:
     get:
       produces:
@@ -4256,6 +4282,17 @@ definitions:
         type: integer
       updated_at:
         type: string
+  models.PostStat:
+    type: object
+    properties:
+      comments_count:
+        type: integer
+      id:
+        type: string
+      likes_count:
+        type: integer
+      reposts_count:
+        type: integer
   models.RenameCollectionRequest:
     type: object
     required:

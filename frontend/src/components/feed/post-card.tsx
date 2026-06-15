@@ -56,6 +56,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { AnimatedCount } from '@/components/feed/animated-count'
 import { CommentSection } from '@/components/feed/comment-section'
 import { FeedVideo } from '@/components/feed/feed-video'
 import { PostComposer } from '@/components/feed/post-composer'
@@ -157,6 +158,17 @@ export function PostCard({ post, showPinBadge = false, focusCommentId, embedded 
     setRepostedById(post.repostedById)
     setRepostCount(post.repostsCount)
   }, [post.reposted, post.repostedById, post.repostsCount])
+
+  // Compteurs rafraîchis dynamiquement (polling périodique côté fil/détail/profil) :
+  // on resynchronise l'affichage sur la prop. L'état « liked » par moi n'est PAS
+  // touché (le polling ne le modifie pas) — seul le nombre suit le serveur.
+  useEffect(() => {
+    setLikeCount(post.likesCount)
+  }, [post.likesCount])
+
+  useEffect(() => {
+    setCommentCount(post.commentsCount)
+  }, [post.commentsCount])
 
   async function toggleLike() {
     const next = !liked
@@ -500,7 +512,7 @@ export function PostCard({ post, showPinBadge = false, focusCommentId, embedded 
                 ) : (
                   <Repeat2 className={cn('h-4 w-4', reposted && 'stroke-[2.6]')} />
                 )}
-                {repostCount > 0 && <span>{formatCount(repostCount)}</span>}
+                <AnimatedCount value={repostCount} />
               </button>
             </PopoverTrigger>
             <PopoverContent align="start" className="w-36 p-1">
@@ -940,13 +952,7 @@ function ActionButton({
           )}
         />
       </span>
-      {count > 0 && <span>{formatCount(count)}</span>}
+      <AnimatedCount value={count} />
     </button>
   )
-}
-
-function formatCount(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
-  return String(n)
 }

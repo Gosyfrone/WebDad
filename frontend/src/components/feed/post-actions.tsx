@@ -23,6 +23,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { AnimatedCount } from '@/components/feed/animated-count'
 import { PostComposer } from '@/components/feed/post-composer'
 
 interface PostActionsProps {
@@ -61,6 +62,12 @@ export function PostActions({ post, commentCount, commentActive = false, onComme
     setReposted(post.reposted)
     setRepostCount(post.repostsCount)
   }, [post.reposted, post.repostsCount])
+
+  // Compteur de likes resynchronisé sur la prop (rafraîchissement dynamique).
+  // L'état « liked » par moi reste piloté par mes actions locales.
+  useEffect(() => {
+    setLikeCount(post.likesCount)
+  }, [post.likesCount])
 
   async function toggleLike() {
     const next = !liked
@@ -141,7 +148,7 @@ export function PostActions({ post, commentCount, commentActive = false, onComme
               ) : (
                 <Repeat2 className={cn('h-4 w-4', reposted && 'stroke-[2.6]')} />
               )}
-              {repostCount > 0 && <span>{formatCount(repostCount)}</span>}
+              <AnimatedCount value={repostCount} />
             </button>
           </PopoverTrigger>
           <PopoverContent align="start" className="w-36 p-1">
@@ -256,13 +263,7 @@ function ActionButton({
           )}
         />
       </span>
-      {count > 0 && <span>{formatCount(count)}</span>}
+      <AnimatedCount value={count} />
     </button>
   )
-}
-
-function formatCount(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
-  return String(n)
 }

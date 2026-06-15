@@ -16,6 +16,8 @@ import {
 } from '@/lib/profil-client'
 import {
   applyProfilUpdateToPosts,
+  applyStatsToPost,
+  applyStatsToPosts,
   listByAuthor,
   listCommentsByAuthor,
   listLikedByUser,
@@ -23,6 +25,7 @@ import {
   type FeedPost,
   type ReplyContext,
 } from '@/lib/posts'
+import { usePostStatsPolling } from '@/lib/use-post-stats-polling'
 import { FOLLOW_CHANGE_EVENT, type FollowChangeDetail } from '@/lib/use-follow'
 import { useToast } from '@/hooks/use-toast'
 import type { ProfilDetails, ProfilEditableFields } from '@/types'
@@ -260,6 +263,32 @@ export function ProfilView({ username }: ProfilViewProps) {
         setPosts((prev) => applyProfilUpdateToPosts(prev, updatedProfil))
       }),
     [],
+  )
+
+  // Compteurs dynamiques : refetch périodique des likes/commentaires/reposts des
+  // posts affichés (onglets Posts / J'aime / Réponses), façon X, sans toucher
+  // l'état « moi ». Un lot couvre l'union des trois listes.
+  usePostStatsPolling(
+    () => [
+      ...posts.map((p) => p.id),
+      ...likedPosts.map((p) => p.id),
+      ...replies.flatMap((r) => (r.parentPost ? [r.parentPost.id] : [])),
+    ],
+    (stats) => {
+      setPosts((prev) => applyStatsToPosts(prev, stats))
+      setLikedPosts((prev) => applyStatsToPosts(prev, stats))
+      setReplies((prev) => {
+        let changed = false
+        const next = prev.map((r) => {
+          if (!r.parentPost) return r
+          const updated = applyStatsToPost(r.parentPost, stats)
+          if (updated === r.parentPost) return r
+          changed = true
+          return { ...r, parentPost: updated }
+        })
+        return changed ? next : prev
+      })
+    },
   )
 
   function handleDeleted(id: string) {
