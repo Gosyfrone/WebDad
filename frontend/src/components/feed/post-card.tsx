@@ -759,7 +759,7 @@ function PostPollCard({
   const [closing, setClosing] = useState(false)
   const [now, setNow] = useState(() => Date.now())
   const closed = isPollClosedAt(poll, now)
-  const showResults = poll.canViewResults || compact
+  const showResults = poll.canViewResults
   const total = Math.max(0, poll.totalVotes)
 
   useEffect(() => {
@@ -823,27 +823,43 @@ function PostPollCard({
                 'relative flex min-h-10 w-full items-center justify-between overflow-hidden rounded-lg border border-border px-3 py-2 text-left text-sm transition',
                 onVote && !closed && !poll.votedChoiceId && 'hover:border-primary hover:bg-primary/5',
                 selected && 'border-primary text-primary',
+                winner && closed && 'border-emerald-500 bg-emerald-500/10 ring-1 ring-emerald-500/35',
               )}
             >
               {showResults && (
                 <span
                   aria-hidden
-                  className="absolute inset-y-0 left-0 bg-primary/12 transition-all"
+                  className={cn(
+                    'absolute inset-y-0 left-0 transition-all',
+                    winner && closed ? 'bg-emerald-500/16' : 'bg-primary/12',
+                  )}
                   style={{ width: `${percent}%` }}
                 />
               )}
               <span className="relative z-10 min-w-0 truncate font-medium">{choice.label}</span>
               <span className="relative z-10 ml-3 flex shrink-0 items-center gap-2 font-semibold">
                 {winner && <span className="text-xs text-primary">{t('post.poll_winner')}</span>}
-                {voting === choice.id ? <Loader2 className="h-4 w-4 animate-spin" /> : showResults ? `${percent}%` : t('post.poll_vote')}
+                {voting === choice.id ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : selected ? (
+                  t('post.poll_voted')
+                ) : showResults ? (
+                  `${percent}%`
+                ) : (
+                  t('post.poll_vote')
+                )}
               </span>
             </button>
           )
         })}
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-        <span>{t('post.poll_votes', { count: total })}</span>
-        <span>·</span>
+        {showResults && (
+          <>
+            <span>{t('post.poll_votes', { count: total })}</span>
+            <span>·</span>
+          </>
+        )}
         <span>{closed ? t('post.poll_closed') : t('post.poll_ends_in', { time: formatPollRemaining(poll.endsAt, now) })}</span>
         {poll.audience === 'followers' && (
           <>

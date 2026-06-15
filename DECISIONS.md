@@ -210,10 +210,11 @@
   index so "one vote per account" is enforced by Mongo, not by the UI. Choice counters stay denormalized in the embedded
   poll as `int32` for fast feed rendering and validator consistency. The post-service owns duration expiry and the
   `everyone|followers` audience rule; followers-only polls reuse the existing follow client, so private/follower logic
-  remains server-side and cannot be bypassed by a custom front. Results visibility is also server-side: before closure,
-  only the author receives counters (`can_view_results=true`); ordinary voters receive their own `voted_choice_id` but
-  zeroed counters until `ends_at` or manual `closed_at`. Manual close is author-only (`can_close`) and stores `closed_at`
-  instead of rewriting the planned end date, preserving the original duration while making the poll immediately final.
+  remains server-side and cannot be bypassed by a custom front. Results visibility is also server-side: before voting,
+  ordinary viewers receive zeroed counters; after their unique vote, `voted_choice_id` makes `can_view_results=true` so
+  they can see the current percentages without being able to vote again. The author always receives live counters, and
+  everyone receives them after `ends_at` or manual `closed_at`. Manual close is author-only (`can_close`) and stores
+  `closed_at` instead of rewriting the planned end date, preserving the original duration while making the poll final.
 
 ## Vue visiteur (fil public)
 

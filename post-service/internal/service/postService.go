@@ -1345,7 +1345,7 @@ func hydratePoll(post *models.Post, viewerID, votedChoiceID string) {
 	now := time.Now()
 	closed := pollIsClosed(post.Poll, now)
 	isAuthor := viewerID != "" && viewerID == post.AuthorID
-	canViewResults := closed || isAuthor
+	canViewResults := closed || isAuthor || votedChoiceID != ""
 	post.Poll.VotedChoiceID = votedChoiceID
 	post.Poll.CanViewResults = canViewResults
 	post.Poll.CanClose = isAuthor && !closed
