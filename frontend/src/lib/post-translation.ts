@@ -13,6 +13,16 @@ const translationCache = new Map<string, Promise<PostTranslation | null>>()
 const CLIENT_TRANSLATION_TIMEOUT_MS = 12_000
 const MIN_SCRIPT_LETTERS = 4
 const MIN_SOURCE_MARKERS = 3
+const MIN_TEXT_LENGTH = 12
+
+// Écritures sans espaces / logographiques : un caractère porte ~un mot, donc le
+// seuil latin de MIN_TEXT_LENGTH caractères les filtrerait injustement (une
+// phrase chinoise/japonaise/coréenne normale fait 2-11 caractères, ex. « 你好吗 »
+// = « comment vas-tu ? »). Pour ces écritures denses on s'appuie sur un petit
+// nombre de caractères significatifs (MIN_DENSE_LETTERS), bien en deçà du seuil
+// alphabétique.
+const DENSE_SCRIPTS = ['han', 'kana', 'hangul', 'thai', 'khmer', 'lao', 'myanmar'] as const
+const MIN_DENSE_LETTERS = 2
 
 const LANGUAGE_MARKERS: Record<string, Set<string>> = {
   de: new Set([
@@ -391,9 +401,21 @@ export function isTranslationCandidate(text: string, targetLanguage: string): bo
   const normalizedText = text.trim()
 
   return Boolean(normalizedText) &&
-    normalizedText.length >= 12 &&
     Boolean(normalizedTarget) &&
+    meetsMinimumLength(normalizedText) &&
     shouldAttemptTranslation(normalizedText, normalizedTarget)
+}
+
+// meetsMinimumLength filtre les fragments trop courts pour être traduits de façon
+// fiable. Les alphabets (latin, cyrillique, arabe…) sont jugés sur le nombre de
+// caractères ; les écritures denses (CJK, asiatiques sans espaces) sur le nombre
+// de caractères significatifs, car un caractère y vaut ~un mot.
+function meetsMinimumLength(text: string): boolean {
+  if (text.length >= MIN_TEXT_LENGTH) return true
+
+  const counts = countScriptLetters(text)
+  const denseLetters = DENSE_SCRIPTS.reduce((sum, script) => sum + (counts[script] ?? 0), 0)
+  return denseLetters >= MIN_DENSE_LETTERS
 }
 
 function extractWords(text: string): string[] {
@@ -405,12 +427,20 @@ function extractWords(text: string): string[] {
 function shouldTranslateByScript(text: string, targetLanguage: string): boolean | null {
   const counts = countScriptLetters(text)
 
-  // Han seul = chinois ; la présence significative de kana = japonais.
-  // Les séparer évite de bloquer chinois→japonais et japonais→chinois.
-  const kanaCount = counts.kana ?? 0
-  const hanCount = counts.han ?? 0
-  if (kanaCount >= MIN_SCRIPT_LETTERS) return targetLanguage !== 'ja'
-  if (hanCount >= MIN_SCRIPT_LETTERS) return targetLanguage !== 'zh'
+  // Écritures denses (logographiques / sans espaces) : quelques caractères
+  // suffisent à identifier la langue source, car un caractère ≈ un mot. On les
+  // tranche avant le calcul de dominance générique (calibré pour les alphabets à
+  // espaces, MIN_SCRIPT_LETTERS) sinon une phrase comme « 你好吗 » (3 sinogrammes)
+  // serait rejetée.
+  // Kana avant Han : la présence de kana tranche japonais vs chinois (le Han
+  // seul, partagé par les deux, est rattaché au chinois).
+  if ((counts.kana ?? 0) >= MIN_DENSE_LETTERS) return targetLanguage !== 'ja'
+  if ((counts.han ?? 0) >= MIN_DENSE_LETTERS) return targetLanguage !== 'zh'
+  for (const script of ['hangul', 'thai', 'khmer', 'lao', 'myanmar'] as const) {
+    if ((counts[script] ?? 0) >= MIN_DENSE_LETTERS) {
+      return LANGUAGE_SCRIPTS[targetLanguage] !== script
+    }
+  }
 
   const totalScriptLetters = Object.values(counts).reduce((sum, count) => sum + count, 0)
   if (totalScriptLetters < MIN_SCRIPT_LETTERS) return null
