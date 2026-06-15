@@ -574,6 +574,7 @@ export function PostCard({ post, showPinBadge = false, focusCommentId, embedded 
               postId={post.id}
               focusCommentId={focusCommentId}
               onCountChange={(delta) => setCommentCount((n) => Math.max(0, n + delta))}
+              canReply={post.canReply}
             />
           </div>
         )}

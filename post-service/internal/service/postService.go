@@ -38,6 +38,11 @@ var (
 	ErrInvalidPoll           = errors.New("sondage invalide")
 	ErrPollClosed            = errors.New("sondage terminé")
 	ErrPollAlreadyVoted      = errors.New("vote déjà enregistré")
+	// ErrInvalidReplyAudience : valeur d'audience des réponses hors enum → 400.
+	ErrInvalidReplyAudience = errors.New("audience des réponses invalide")
+	// ErrReplyNotAllowed : le post restreint les réponses aux abonnés et le lecteur
+	// n'est ni l'auteur, ni un abonné, ni un modérateur/admin → 403.
+	ErrReplyNotAllowed = errors.New("réponses réservées aux abonnés")
 	// ErrCollectionNotFound : collection de signets absente ou n'appartenant pas à
 	// l'utilisateur (on ne distingue pas pour ne pas divulguer l'existence) → 404.
 	ErrCollectionNotFound = errors.New("collection de signets introuvable")
@@ -145,7 +150,7 @@ func (s *PostService) SetNotifier(n notifier.Notifier) {
 
 // CreatePost crée un post pour authorID (dérivé du JWT) et renvoie le document
 // créé (avec son id généré). Les compteurs sont posés à 0 explicitement.
-func (s *PostService) CreatePost(ctx context.Context, authorID, content, quotePostID string, media []models.MediaRef, pollReq *models.CreatePollRequest) (*models.Post, error) {
+func (s *PostService) CreatePost(ctx context.Context, authorID, content, quotePostID string, media []models.MediaRef, pollReq *models.CreatePollRequest, replyAudience string) (*models.Post, error) {
 	quotedAuthorID := "" // auteur du post cité (destinataire de la notif « citation »)
 	if quotePostID != "" {
 		quoteOID, err := parseID(quotePostID)
@@ -163,12 +168,20 @@ func (s *PostService) CreatePost(ctx context.Context, authorID, content, quotePo
 	if err != nil {
 		return nil, err
 	}
+	audience := replyAudience
+	if audience == "" {
+		audience = models.ReplyAudienceEveryone
+	}
+	if audience != models.ReplyAudienceEveryone && audience != models.ReplyAudienceFollowers {
+		return nil, ErrInvalidReplyAudience
+	}
 	post := &models.Post{
 		AuthorID:      authorID,
 		Content:       content,
 		Hashtags:      ExtractHashtags(content),
 		Media:         media,
 		Poll:          poll,
+		ReplyAudience: audience,
 		QuotePostID:   quotePostID,
 		LikesCount:    0,
 		CommentsCount: 0,
@@ -180,6 +193,7 @@ func (s *PostService) CreatePost(ctx context.Context, authorID, content, quotePo
 		return nil, err
 	}
 	hydratePoll(post, authorID, "")
+	post.CanReply = true // l'auteur peut toujours répondre à son propre post
 	// Citation = tag implicite de l'auteur cité → notif (navigation vers le post
 	// citant). Une notif par citation (façon mention, pas d'agrégation). La
 	// suppression du post citant la purge via la cascade post_deleted.
@@ -220,6 +234,7 @@ func (s *PostService) GetPosts(ctx context.Context, viewerID, hashtag, sortMode 
 		return nil, err
 	}
 	s.hydratePolls(ctx, posts, viewerID)
+	s.hydrateReplyPermissions(ctx, posts, viewerID)
 	return posts, nil
 }
 
@@ -246,6 +261,7 @@ func (s *PostService) GetPost(ctx context.Context, id, viewerID, viewerRole stri
 		return nil, ErrPrivateProfil
 	}
 	s.hydratePoll(ctx, post, viewerID)
+	s.hydrateReplyPermission(ctx, post, viewerID, viewerRole)
 	return post, nil
 }
 
@@ -499,6 +515,7 @@ func (s *PostService) GetByProfile(ctx context.Context, authorID, viewerID, hash
 		return nil, err
 	}
 	s.hydratePolls(ctx, posts, viewerID)
+	s.hydrateReplyPermissions(ctx, posts, viewerID)
 	return posts, nil
 }
 
@@ -519,6 +536,7 @@ func (s *PostService) GetFeed(ctx context.Context, authorIDs []string, viewerID,
 		return nil, err
 	}
 	s.hydratePolls(ctx, posts, viewerID)
+	s.hydrateReplyPermissions(ctx, posts, viewerID)
 	return posts, nil
 }
 
@@ -565,6 +583,7 @@ func (s *PostService) VotePoll(ctx context.Context, postID, actorID, choiceID st
 	}
 	if !created {
 		s.hydratePoll(ctx, post, actorID)
+		s.hydrateReplyPermission(ctx, post, actorID, "")
 		return post, ErrPollAlreadyVoted
 	}
 	updated, err := s.repo.IncPollChoice(ctx, oid, choiceID)
@@ -572,6 +591,7 @@ func (s *PostService) VotePoll(ctx context.Context, postID, actorID, choiceID st
 		return nil, translateNotFound(err)
 	}
 	hydratePoll(updated, actorID, choiceID)
+	s.hydrateReplyPermission(ctx, updated, actorID, "")
 	return updated, nil
 }
 
@@ -592,6 +612,7 @@ func (s *PostService) ClosePoll(ctx context.Context, postID, actorID string) (*m
 	}
 	if pollIsClosed(post.Poll, time.Now()) {
 		s.hydratePoll(ctx, post, actorID)
+		s.hydrateReplyPermission(ctx, post, actorID, "")
 		return post, nil
 	}
 	closed, err := s.repo.ClosePoll(ctx, oid, time.Now())
@@ -599,6 +620,7 @@ func (s *PostService) ClosePoll(ctx context.Context, postID, actorID string) (*m
 		return nil, translateNotFound(err)
 	}
 	hydratePoll(closed, actorID, "")
+	s.hydrateReplyPermission(ctx, closed, actorID, "")
 	return closed, nil
 }
 
@@ -914,7 +936,7 @@ func (s *PostService) RepostedPostIDs(ctx context.Context, actorID string) ([]st
 // existant et incrémente son compteur. Si `parentID` est fourni, c'est une
 // réponse : elle est rattachée à plat au commentaire RACINE (cf. resolveParentID,
 // threading à 2 niveaux) et incrémente le `reply_count` de cette racine.
-func (s *PostService) CreateComment(ctx context.Context, postID, authorID, content, parentID string, media []models.MediaRef) (*models.Comment, error) {
+func (s *PostService) CreateComment(ctx context.Context, postID, authorID, authorRole, content, parentID string, media []models.MediaRef) (*models.Comment, error) {
 	oid, err := parseID(postID)
 	if err != nil {
 		return nil, err
@@ -922,6 +944,16 @@ func (s *PostService) CreateComment(ctx context.Context, postID, authorID, conte
 	post, err := s.repo.Get(ctx, oid)
 	if err != nil {
 		return nil, translateNotFound(err)
+	}
+
+	// Barrière « qui peut répondre » : si le post réserve les réponses aux abonnés,
+	// seuls l'auteur, ses abonnés et les modérateurs/admins peuvent commenter.
+	allowed, err := s.canReplyTo(ctx, post, authorID, authorRole)
+	if err != nil {
+		return nil, err
+	}
+	if !allowed {
+		return nil, ErrReplyNotAllowed
 	}
 
 	rootID := ""
@@ -1317,6 +1349,54 @@ func pollHasChoice(poll *models.Poll, choiceID string) bool {
 		}
 	}
 	return false
+}
+
+// canReplyTo applique la barrière « qui peut répondre » d'un post. Renvoie `true`
+// si l'audience est `everyone`, ou si le lecteur est l'auteur, un modérateur/admin,
+// ou un abonné de l'auteur. Le check d'abonnement (appel user-service) n'est fait
+// que pour les posts effectivement restreints aux abonnés — coût nul sinon.
+func (s *PostService) canReplyTo(ctx context.Context, post *models.Post, actorID, actorRole string) (bool, error) {
+	if models.ReplyAudienceOf(post) != models.ReplyAudienceFollowers {
+		return true, nil
+	}
+	if actorID != "" && actorID == post.AuthorID {
+		return true, nil
+	}
+	if actorRole == models.RoleModerator || actorRole == models.RoleAdmin {
+		return true, nil
+	}
+	if actorID == "" || s.followClient == nil {
+		return false, nil
+	}
+	follows, err := s.followClient.IsFollowing(ctx, actorID, post.AuthorID)
+	if err != nil {
+		return false, fmt.Errorf("%w: vérification abonnement: %v", ErrDependencyUnavailable, err)
+	}
+	return follows, nil
+}
+
+// hydrateReplyPermission renseigne le champ transient CanReply d'un post pour le
+// lecteur courant (rôle inconnu ici → on n'accorde pas le bypass mod/admin, mais
+// le serveur reste autoritaire à l'écriture via canReplyTo). Pour une restriction,
+// on échoue FERMÉ : en cas d'erreur de dépendance (vérification d'abonnement
+// indisponible) on masque le composer (CanReply=false) plutôt que de l'offrir à
+// tort — l'écriture re-tranchera de toute façon.
+func (s *PostService) hydrateReplyPermissions(ctx context.Context, posts []models.Post, viewerID string) {
+	for i := range posts {
+		s.hydrateReplyPermission(ctx, &posts[i], viewerID, "")
+	}
+}
+
+func (s *PostService) hydrateReplyPermission(ctx context.Context, post *models.Post, viewerID, viewerRole string) {
+	if post == nil {
+		return
+	}
+	allowed, err := s.canReplyTo(ctx, post, viewerID, viewerRole)
+	if err != nil {
+		post.CanReply = false
+		return
+	}
+	post.CanReply = allowed
 }
 
 func (s *PostService) hydratePolls(ctx context.Context, posts []models.Post, viewerID string) {

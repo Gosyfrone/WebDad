@@ -2366,6 +2366,12 @@ paths:
             type: object
             additionalProperties:
               type: string
+        '403':
+          description: Forbidden
+          schema:
+            type: object
+            additionalProperties:
+              type: string
         '404':
           description: Not Found
           schema:
@@ -4092,6 +4098,15 @@ definitions:
         $ref: '#/definitions/models.CreatePollRequest'
       quote_post_id:
         type: string
+      reply_audience:
+        description: 'ReplyAudience (optionnel) : qui peut répondre — `everyone` (défaut)
+          ou
+
+          `followers`. Vide = `everyone`.'
+        type: string
+        enum:
+        - everyone
+        - followers
   models.HashtagTrend:
     type: object
     properties:
@@ -4150,6 +4165,14 @@ definitions:
     properties:
       author_id:
         type: string
+      can_reply:
+        description: 'CanReply : transient, hydraté par viewer — `true` si le lecteur
+          courant peut
+
+          commenter/répondre (toujours `true` si reply_audience=everyone ; sinon auteur,
+
+          abonné, ou mod/admin). Sert à (dés)activer le composer côté front. Non stocké.'
+        type: boolean
       comments_count:
         type: integer
       content:
@@ -4196,6 +4219,18 @@ definitions:
           calculée à la lecture de la corbeille pour l''affichage front. NON stockée.'
         type: string
       quote_post_id:
+        type: string
+      reply_audience:
+        description: 'ReplyAudience : qui peut commenter/répondre au post — `everyone`
+          (défaut)
+
+          ou `followers` (auteur + abonnés ; mods/admins toujours autorisés). Choisi
+
+          à la création, non éditable ensuite (parité avec l''audience d''un sondage).
+
+          `omitempty` ⇒ jamais de `""` persisté ; absent sur un vieux doc = `everyone`
+
+          (cf. ReplyAudienceOf), donc aucune migration nécessaire.'
         type: string
       reposted_at:
         type: string

@@ -133,6 +133,7 @@ var validators = map[string]bson.M{
 						"total_votes": bson.M{"bsonType": "int", "minimum": 0},
 					},
 				},
+				"reply_audience":  bson.M{"enum": bson.A{"everyone", "followers"}},
 				"is_hidden":       bson.M{"bsonType": "bool"},
 				"hidden_by":       bson.M{"bsonType": bson.A{"string", "null"}},
 				"hidden_at":       bson.M{"bsonType": bson.A{"date", "null"}},

@@ -3689,6 +3689,15 @@
               }
             }
           },
+          "403": {
+            "description": "Forbidden",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
           "404": {
             "description": "Not Found",
             "schema": {
@@ -6297,6 +6306,14 @@
         },
         "quote_post_id": {
           "type": "string"
+        },
+        "reply_audience": {
+          "description": "ReplyAudience (optionnel) : qui peut répondre — `everyone` (défaut) ou\n`followers`. Vide = `everyone`.",
+          "type": "string",
+          "enum": [
+            "everyone",
+            "followers"
+          ]
         }
       }
     },
@@ -6387,6 +6404,10 @@
         "author_id": {
           "type": "string"
         },
+        "can_reply": {
+          "description": "CanReply : transient, hydraté par viewer — `true` si le lecteur courant peut\ncommenter/répondre (toujours `true` si reply_audience=everyone ; sinon auteur,\nabonné, ou mod/admin). Sert à (dés)activer le composer côté front. Non stocké.",
+          "type": "boolean"
+        },
         "comments_count": {
           "type": "integer"
         },
@@ -6435,6 +6456,10 @@
           "type": "string"
         },
         "quote_post_id": {
+          "type": "string"
+        },
+        "reply_audience": {
+          "description": "ReplyAudience : qui peut commenter/répondre au post — `everyone` (défaut)\nou `followers` (auteur + abonnés ; mods/admins toujours autorisés). Choisi\nà la création, non éditable ensuite (parité avec l'audience d'un sondage).\n`omitempty` ⇒ jamais de `\"\"` persisté ; absent sur un vieux doc = `everyone`\n(cf. ReplyAudienceOf), donc aucune migration nécessaire.",
           "type": "string"
         },
         "reposted_at": {

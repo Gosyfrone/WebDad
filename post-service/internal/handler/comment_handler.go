@@ -106,6 +106,7 @@ func (h *CommentHandler) ListCommentReplies(c *gin.Context) {
 // @Success     201 {object} models.Comment
 // @Failure     400 {object} map[string]string
 // @Failure     401 {object} map[string]string
+// @Failure     403 {object} map[string]string
 // @Failure     404 {object} map[string]string
 // @Router      /posts/{id}/comments [post]
 func (h *CommentHandler) CreatPostComment(c *gin.Context) {
@@ -125,7 +126,7 @@ func (h *CommentHandler) CreatPostComment(c *gin.Context) {
 		return
 	}
 
-	comment, err := h.service.CreateComment(c.Request.Context(), c.Param("id"), claims.UserID, strings.TrimSpace(req.Content), req.ParentID, req.Media)
+	comment, err := h.service.CreateComment(c.Request.Context(), c.Param("id"), claims.UserID, claims.Role, strings.TrimSpace(req.Content), req.ParentID, req.Media)
 	if err != nil {
 		respondPostError(c, err)
 		return
