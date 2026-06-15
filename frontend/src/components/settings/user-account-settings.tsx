@@ -147,10 +147,10 @@ export function UserAccountSettings() {
       <div className="grid gap-4 px-4 py-5 md:grid-cols-[minmax(0,1fr)_minmax(280px,380px)]">
         <div className="flex items-start gap-3">
           <Mail className="mt-1 h-5 w-5 shrink-0 text-primary" aria-hidden />
-          <div>
+          <div className="min-w-0">
             <h3 className="font-semibold">{t('settings.email.title')}</h3>
             <p className="mt-1 text-sm text-muted-foreground">{t('settings.email.desc')}</p>
-            {session?.email ? <p className="mt-2 text-sm font-medium">{session.email}</p> : null}
+            {session?.email ? <p className="mt-2 break-words text-sm font-medium">{session.email}</p> : null}
           </div>
         </div>
         <form className="panel space-y-3 rounded-xl border p-4 shadow-sm" onSubmit={requestEmailChange}>
