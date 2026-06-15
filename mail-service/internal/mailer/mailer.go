@@ -12,6 +12,7 @@ package mailer
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"log"
 	"mime"
@@ -22,6 +23,11 @@ import (
 
 	"github.com/webdad/mail-service/internal/config"
 )
+
+// ErrDeliveryUnavailable indique qu'aucun transport capable de remettre le
+// message n'est configuré. Le transport console conserve le rendu local du
+// mail, mais ne doit jamais être assimilé à un envoi réussi.
+var ErrDeliveryUnavailable = errors.New("transport e-mail non configuré")
 
 // Message : un e-mail à envoyer. Au moins l'un de HTML/Text est attendu ;
 // HTML prime s'il est présent.
@@ -63,7 +69,7 @@ func (m *consoleMailer) Send(msg Message) error {
 	}
 	log.Printf("[mailer:console] e-mail (NON envoyé)\n  From   : %s\n  To     : %s\n  Subject: %s\n  ---\n%s\n  ---",
 		from, msg.To, msg.Subject, body)
-	return nil
+	return ErrDeliveryUnavailable
 }
 
 // ─── Transport SMTP (prod) ───────────────────────────────────────

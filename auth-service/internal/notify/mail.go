@@ -1,7 +1,7 @@
 // Package notify porte le client serveur-à-serveur vers le mail-service.
 // auth-service y délègue l'envoi des e-mails transactionnels (vérification
-// d'adresse) en best-effort : une panne du mail-service ne casse jamais
-// l'inscription ni la connexion.
+// d'adresse). Chaque appelant décide si l'envoi est best-effort (inscription)
+// ou bloquant (changement d'adresse e-mail).
 package notify
 
 import (
@@ -22,7 +22,7 @@ type MailClient struct {
 	http    *http.Client
 }
 
-// NewMailClient construit le client avec un timeout court (best-effort).
+// NewMailClient construit le client avec un timeout court.
 func NewMailClient(baseURL, secret string) *MailClient {
 	return &MailClient{
 		baseURL: baseURL,
@@ -39,8 +39,7 @@ type sendPayload struct {
 	Text    string `json:"text,omitempty"`
 }
 
-// Send transmet un e-mail au mail-service. Renvoie une erreur que l'appelant
-// logge sans la propager (best-effort).
+// Send transmet un e-mail au mail-service et renvoie toute erreur de remise.
 func (c *MailClient) Send(to, subject, html, text string) error {
 	body, err := json.Marshal(sendPayload{To: to, Subject: subject, HTML: html, Text: text})
 	if err != nil {

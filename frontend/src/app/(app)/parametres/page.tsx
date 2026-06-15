@@ -7,6 +7,7 @@ import { LanguageSelector } from '@/components/language-selector'
 import { LegalLinks } from '@/components/legal/legal-links'
 import { MutedWordsSettings } from '@/components/settings/muted-words-settings'
 import { VisibilitySettings } from '@/components/settings/visibility-settings'
+import { UserAccountSettings } from '@/components/settings/user-account-settings'
 
 export default function ParametresPage() {
   const t = useT()
@@ -25,10 +26,10 @@ export default function ParametresPage() {
             </span>
             <div className="min-w-0">
               <h2 className="text-lg font-bold text-foreground">
-                {t('settings.account_title')}
+                {t('settings.general_title')}
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                {t('settings.account_desc')}
+                {t('settings.general_desc')}
               </p>
             </div>
           </div>
@@ -84,6 +85,19 @@ export default function ParametresPage() {
               <MutedWordsSettings />
             </div>
           </div>
+        </section>
+
+        <section className="glass rounded-2xl border backdrop-blur-xl">
+          <div className="flex items-start gap-3 border-b px-4 py-4">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <Lock className="h-5 w-5" aria-hidden />
+            </span>
+            <div className="min-w-0">
+              <h2 className="text-lg font-bold text-foreground">{t('settings.user_title')}</h2>
+              <p className="mt-1 text-sm text-muted-foreground">{t('settings.user_desc')}</p>
+            </div>
+          </div>
+          <UserAccountSettings />
         </section>
       </div>
 

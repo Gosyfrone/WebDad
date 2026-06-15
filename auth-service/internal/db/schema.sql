@@ -36,6 +36,11 @@ ALTER TABLE credentials ADD COLUMN IF NOT EXISTS deactivated_at TIMESTAMPTZ;
 -- Tant qu'il est à true, le front impose un changement de mot de passe bloquant
 -- à la première connexion (cf. POST /auth/password/change qui le repasse à false).
 ALTER TABLE credentials ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN NOT NULL DEFAULT false;
+-- Changement d'adresse : l'adresse courante reste valable tant que la nouvelle
+-- n'a pas été prouvée via le lien envoyé dans sa boîte.
+ALTER TABLE credentials ADD COLUMN IF NOT EXISTS pending_email VARCHAR(255);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_credentials_pending_email
+    ON credentials(pending_email) WHERE pending_email IS NOT NULL;
 
 -- Refresh tokens (préparé pour la feature bonus).
 CREATE TABLE IF NOT EXISTS refresh_tokens (
@@ -53,12 +58,18 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
 CREATE TABLE IF NOT EXISTS account_tokens (
     id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id     UUID NOT NULL REFERENCES credentials(id) ON DELETE CASCADE,
-    purpose     VARCHAR(16) NOT NULL CHECK (purpose IN ('verify', 'reset')),
+    purpose     VARCHAR(16) NOT NULL CHECK (purpose IN ('verify', 'reset', 'email_change')),
     token_hash  TEXT NOT NULL UNIQUE,
     expires_at  TIMESTAMPTZ NOT NULL,
     used_at     TIMESTAMPTZ,                    -- NULL tant que non consommé
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Une base créée avant le flux de changement d'e-mail possède encore la
+-- contrainte à deux valeurs. La remplacer au boot est idempotent.
+ALTER TABLE account_tokens DROP CONSTRAINT IF EXISTS account_tokens_purpose_check;
+ALTER TABLE account_tokens ADD CONSTRAINT account_tokens_purpose_check
+    CHECK (purpose IN ('verify', 'reset', 'email_change'));
 
 -- ─── Connexion via fournisseurs OIDC (Login with Google / Microsoft) ──
 -- ALTER idempotents : la base existante est migrée au boot sans script externe.

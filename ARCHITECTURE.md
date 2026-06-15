@@ -57,6 +57,9 @@ composed by the **caller** (front/BFF).
   the Next BFF same-origin). Login accepts email directly; username login is resolved by the
   BFF through `GET /users/by-username/:username`, then auth-service checks credentials by
   `user_id`. Refresh is single-flight on 401.
+- **Credential settings:** password changes reuse the authenticated BFF route and rotate the session.
+  Email changes use `pending_email` plus a one-use 24h token sent to the new address; confirmation
+  atomically promotes it, revokes prior refresh tokens, and opens a session carrying the new email.
 - **Cross-service reads (privacy):** post-service calls profil-service (`visibility`) and
   user-service (follow status) to filter post visibility; clients have no-op fallbacks for autonomy.
 - **Notifications (server→server):** post/message/user-service POST best-effort fire-and-forget
@@ -89,6 +92,8 @@ From GRAPH_REPORT "God Nodes":
 
 - **Route groups:** `(auth)` (public), `(app)` (authenticated, guarded by `middleware.ts`),
   `(legal)` (public, outside session guard).
+- **Settings:** `/parametres` separates general preferences from user credentials; the public
+  `/verify-email-change` page completes proof of the new mailbox through a same-origin BFF handler.
 - **Business clients** over `apiFetch`: `lib/{api,posts,bookmarks,messages,notifications,media}.ts`.
 - **App-wide providers** in `(app)/layout`: `NotificationsProvider` (badge + single WS),
   `MessagesProvider` (unread badge + single messages WS), `LanguageProvider`, `ThemeProvider`.

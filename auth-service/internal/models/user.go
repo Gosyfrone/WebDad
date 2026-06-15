@@ -120,6 +120,17 @@ type ChangePasswordRequest struct {
 	NewPassword     string `json:"new_password"     binding:"required,min=8"`
 }
 
+// ChangeEmailRequest démarre le changement vers une nouvelle adresse. Elle ne
+// devient active qu'après consommation du jeton reçu dans cette boîte.
+type ChangeEmailRequest struct {
+	Email string `json:"email" binding:"required,email"`
+}
+
+// ConfirmEmailChangeRequest confirme le changement d'adresse par jeton.
+type ConfirmEmailChangeRequest struct {
+	Token string `json:"token" binding:"required"`
+}
+
 // UpdateRoleRequest : payload de PATCH /auth/users/:id/role (admin).
 type UpdateRoleRequest struct {
 	Role string `json:"role" binding:"required"`
