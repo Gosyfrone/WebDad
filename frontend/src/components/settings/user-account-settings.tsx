@@ -23,6 +23,20 @@ export function UserAccountSettings() {
   const [emailNotice, setEmailNotice] = React.useState<Notice>()
   const [emailBusy, setEmailBusy] = React.useState(false)
 
+  // Retour depuis la page de vérification (`/parametres?email_changed=1`) :
+  // afficher le bandeau de succès une fois, puis nettoyer l'URL pour qu'un
+  // rafraîchissement ne le ré-affiche pas. La nouvelle adresse est déjà rendue
+  // par `session.email` (JWT renouvelé à la confirmation).
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('email_changed') !== '1') return
+    setEmailNotice({ kind: 'success', text: t('settings.email.changed') })
+    params.delete('email_changed')
+    const query = params.toString()
+    window.history.replaceState(null, '', query ? `${window.location.pathname}?${query}` : window.location.pathname)
+  }, [t])
+
   const changePassword = async (event: React.FormEvent) => {
     event.preventDefault()
     setPasswordNotice(undefined)

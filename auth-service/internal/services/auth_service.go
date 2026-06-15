@@ -90,6 +90,7 @@ type AuthService struct {
 	refreshExpiry time.Duration
 	mailer        Mailer // nil = envoi d'e-mails désactivé (no-op loggé)
 	appBaseURL    string // base URL du front (liens dans les e-mails)
+	mailLogoURL   string // URL absolue PUBLIQUE du logo dans les e-mails
 	// adminCreateAutoVerify : DEV/LOCAL — marque les comptes créés par un admin
 	// comme vérifiés d'office (court-circuit de la vérif e-mail). False en prod.
 	adminCreateAutoVerify bool
@@ -97,7 +98,7 @@ type AuthService struct {
 
 // New construit le service. mailer peut être nil (mail non configuré) : l'envoi
 // devient alors un no-op loggé et auth reste pleinement fonctionnel.
-func New(db *sql.DB, jwtSecret string, jwtExpiry, refreshExpiry time.Duration, mailer Mailer, appBaseURL string, adminCreateAutoVerify bool) *AuthService {
+func New(db *sql.DB, jwtSecret string, jwtExpiry, refreshExpiry time.Duration, mailer Mailer, appBaseURL, mailLogoURL string, adminCreateAutoVerify bool) *AuthService {
 	return &AuthService{
 		db:                    db,
 		jwtSecret:             []byte(jwtSecret),
@@ -105,6 +106,7 @@ func New(db *sql.DB, jwtSecret string, jwtExpiry, refreshExpiry time.Duration, m
 		refreshExpiry:         refreshExpiry,
 		mailer:                mailer,
 		appBaseURL:            appBaseURL,
+		mailLogoURL:           mailLogoURL,
 		adminCreateAutoVerify: adminCreateAutoVerify,
 	}
 }
@@ -398,7 +400,7 @@ func (s *AuthService) sendEmailChangeMail(userID, newEmail, rawToken string) err
 		strings.TrimRight(s.appBaseURL, "/"), url.QueryEscape(rawToken))
 	subject := "Confirme ta nouvelle adresse e-mail — Breezy"
 	text := fmt.Sprintf("Confirme ta nouvelle adresse e-mail en ouvrant ce lien :\n%s\n\nCe lien expire dans 24 heures. Si tu n'es pas à l'origine de cette demande, ignore ce message.", link)
-	htmlBody := brandedEmailHTML(s.appBaseURL,
+	htmlBody := brandedEmailHTML(s.mailLogoURL,
 		"Nouvelle adresse e-mail",
 		"Confirme cette adresse pour l'utiliser sur ton compte Breezy.",
 		"", "Confirmer mon adresse", link,
@@ -442,7 +444,7 @@ func (s *AuthService) sendAdminWelcomeMail(u *models.User, username, tempPasswor
 				"Pour des raisons de sécurité, tu devras choisir un nouveau mot de "+
 				"passe dès ta première connexion.",
 			who, u.Email, tempPassword, loginURL)
-		htmlBody := brandedEmailHTML(s.appBaseURL,
+		htmlBody := brandedEmailHTML(s.mailLogoURL,
 			"Ton compte Breezy est prêt 🎉",
 			fmt.Sprintf("Un administrateur a créé ton compte. Connecte-toi avec l'e-mail %s et le mot de passe temporaire ci-dessous — tu devras le changer dès ta première connexion.",
 				u.Email),
@@ -475,7 +477,7 @@ func (s *AuthService) sendAdminWelcomeMail(u *models.User, username, tempPasswor
 			"Ce lien expire dans 24 heures. À ta première connexion, tu devras "+
 			"choisir un nouveau mot de passe.",
 		who, u.Email, tempPassword, link)
-	htmlBody := brandedEmailHTML(s.appBaseURL,
+	htmlBody := brandedEmailHTML(s.mailLogoURL,
 		"Ton compte Breezy est prêt 🎉",
 		"Un administrateur a créé ton compte. Ton mot de passe temporaire est ci-dessous. Vérifie ton adresse e-mail pour te connecter — tu devras ensuite choisir un nouveau mot de passe.",
 		tempPassword,
@@ -722,7 +724,7 @@ func (s *AuthService) sendVerificationMail(u *models.User) {
 			"Ce lien expire dans 24 heures. Si tu n'es pas à l'origine de cette "+
 			"inscription, ignore ce message.",
 		link)
-	htmlBody := brandedEmailHTML(s.appBaseURL,
+	htmlBody := brandedEmailHTML(s.mailLogoURL,
 		"Bienvenue sur Breezy 👋",
 		"Plus qu'une étape : confirme ton adresse e-mail pour activer ton compte et rejoindre la conversation.",
 		"",
@@ -815,7 +817,7 @@ func (s *AuthService) sendResetMail(u *models.User) {
 			"Ce lien expire dans 1 heure. Si tu n'es pas à l'origine de cette "+
 			"demande, ignore ce message : ton mot de passe reste inchangé.",
 		link)
-	htmlBody := brandedEmailHTML(s.appBaseURL,
+	htmlBody := brandedEmailHTML(s.mailLogoURL,
 		"Réinitialise ton mot de passe 🔒",
 		"Tu as demandé à changer ton mot de passe Breezy. Choisis-en un nouveau en un clic — c'est rapide et sécurisé.",
 		"",

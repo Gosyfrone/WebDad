@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { CircleCheck, CircleX, Loader2 } from 'lucide-react'
 
 import { useT } from '@/components/language-provider'
@@ -10,11 +10,13 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { setAccessToken } from '@/lib/auth-client'
 import { ROUTES } from '@/lib/routes'
+import { notifySessionChanged } from '@/lib/session'
 
 type Status = 'loading' | 'success' | 'invalid'
 
 function Content() {
   const t = useT()
+  const router = useRouter()
   const token = useSearchParams().get('token') ?? ''
   const [status, setStatus] = React.useState<Status>('loading')
   const once = React.useRef(false)
@@ -37,9 +39,14 @@ function Content() {
         return
       }
       if (payload?.accessToken) setAccessToken(payload.accessToken)
+      // La nouvelle adresse vit désormais dans le JWT : on resynchronise la
+      // session puis on ramène l'utilisateur sur l'écran de changement d'e-mail,
+      // où un bandeau « Adresse e-mail modifiée » s'affichera (cf. ?email_changed).
+      notifySessionChanged()
       setStatus('success')
+      router.replace(`${ROUTES.parametres}?email_changed=1`)
     }).catch(() => setStatus('invalid'))
-  }, [token])
+  }, [token, router])
 
   return (
     <Card className="glass-strong w-full max-w-md rounded-[30px] border text-center shadow-xl">

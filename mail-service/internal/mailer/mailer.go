@@ -125,6 +125,9 @@ func buildMIME(fromHeader, envelopeFrom string, msg Message) []byte {
 
 	var b strings.Builder
 	fmt.Fprintf(&b, "From: %s\r\n", fromHeader)
+	// Reply-To explicite (= From) : une adresse de réponse réelle et alignée
+	// améliore la réputation et évite que les réponses partent dans le vide.
+	fmt.Fprintf(&b, "Reply-To: %s\r\n", fromHeader)
 	fmt.Fprintf(&b, "To: %s\r\n", msg.To)
 	fmt.Fprintf(&b, "Subject: %s\r\n", mime.QEncoding.Encode("utf-8", msg.Subject))
 	fmt.Fprintf(&b, "Date: %s\r\n", time.Now().Format(time.RFC1123Z))
