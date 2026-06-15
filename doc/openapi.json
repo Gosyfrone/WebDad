@@ -4735,6 +4735,72 @@
       }
     },
     "/messages/conversations/{id}/messages/{messageId}": {
+      "delete": {
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "messages"
+        ],
+        "summary": "Supprimer un message (pour tous)",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "Conversation ID",
+            "name": "id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "Message ID",
+            "name": "messageId",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Message tombstoné",
+            "schema": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
       "patch": {
         "security": [
           {
@@ -4813,6 +4879,51 @@
           },
           "404": {
             "description": "Not Found",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/messages/conversations/{id}/typing": {
+      "post": {
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "tags": [
+          "messages"
+        ],
+        "summary": "Signaler « en train d'écrire »",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "Conversation ID",
+            "name": "id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Diffusé (best-effort)"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
             "schema": {
               "type": "object",
               "additionalProperties": {
@@ -6409,6 +6520,13 @@
             "type": "string"
           }
         },
+        "member_receipts": {
+          "description": "MemberReceipts : curseurs « remis » / « ouvert » des AUTRES membres (jamais\nsoi), pour les accusés de réception côté expéditeur. Renseigné pour DM et\ngroupes uniquement (pas les communautés). Métadonnée d'horodatage, jamais le\ncontenu chiffré.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/models.MemberReceipt"
+          }
+        },
         "muted": {
           "description": "Muted : la conversation est-elle en sourdine pour CE membre ? (exclue du\nbadge non-lu app-wide, mais toujours « non lue » dans la liste).",
           "type": "boolean"
@@ -6517,6 +6635,20 @@
         },
         "wrapped_private_key": {
           "description": "clé privée emballée (base64)",
+          "type": "string"
+        }
+      }
+    },
+    "models.MemberReceipt": {
+      "type": "object",
+      "properties": {
+        "delivered_at": {
+          "type": "string"
+        },
+        "read_at": {
+          "type": "string"
+        },
+        "user_id": {
           "type": "string"
         }
       }

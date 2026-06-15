@@ -8,7 +8,9 @@ import type {
 } from '@/components/ui/toast'
 
 const TOAST_LIMIT = 1
-const TOAST_REMOVE_DELAY = 1000000
+// Délai entre la fermeture (open=false, après la durée d'affichage) et le retrait
+// du DOM — juste de quoi laisser jouer l'animation de sortie.
+const TOAST_REMOVE_DELAY = 1000
 
 type ToasterToast = ToastProps & {
   id: string

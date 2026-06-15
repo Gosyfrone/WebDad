@@ -24,6 +24,7 @@ import { getAccessToken, logout } from '@/lib/auth-client'
 import { getMyProfil, subscribeProfilUpdated } from '@/lib/profil-client'
 import { useSession } from '@/lib/session'
 import { ROUTES } from '@/lib/routes'
+import { getSearchPath, isSearchSectionPath } from '@/lib/search-tab'
 import { useAuthGate } from '@/components/auth-prompt-provider'
 import { useNotifications } from '@/components/notifications-provider'
 import { useMessages } from '@/components/messages-provider'
@@ -97,6 +98,14 @@ export function SidebarLeft() {
     : NAV_ITEMS.filter(
         (item) => !item.roles || (role !== null && item.roles.includes(role)),
       )
+  // Loupe (Recherche) : `href` dynamique (mémoire de navigation par onglet).
+  // Depuis un autre onglet → dernier chemin de la section recherche ; déjà dans la
+  // section → recherche neuve (`/explorer`). Href natif d'ancre (fiable iOS).
+  const [searchHref, setSearchHref] = useState<string>(ROUTES.explorer)
+  useEffect(() => {
+    setSearchHref(isSearchSectionPath(pathname) ? ROUTES.explorer : getSearchPath())
+  }, [pathname])
+
   const fallbackInitial = (account.displayName || account.username || 'U')
     .charAt(0)
     .toUpperCase()
@@ -175,7 +184,7 @@ export function SidebarLeft() {
           return (
             <Link
               key={item.href}
-              href={item.href}
+              href={item.href === ROUTES.explorer ? searchHref : item.href}
               className={cn(
                 'flex w-fit items-center gap-4 rounded-full px-4 py-3 text-xl font-normal text-foreground/80 transition hover:bg-accent hover:text-[#5B6CFF] hover:shadow-sm dark:hover:text-[#9aa6ff]',
                 active &&

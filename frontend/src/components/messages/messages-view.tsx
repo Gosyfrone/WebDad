@@ -6,6 +6,7 @@ import { MessagesSquare } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import {
+  applyReceipt,
   clearConversation,
   currentUserId,
   decryptMessage,
@@ -16,6 +17,7 @@ import {
   listConversations,
   listMessagesPage,
   muteConversation,
+  PeerKeyMissingError,
   pinConversation,
   startDM,
   unmuteConversation,
@@ -71,6 +73,7 @@ function toPreview(m: ChatMessage, myUsername: string): ConversationPreview {
     // « X vous a mentionné » : dernier message d'autrui, déchiffré, citant mon handle.
     mentionsMe: !m.mine && m.decrypted && textMentionsUser(m.text, myUsername),
     hasMedia: m.media.length > 0,
+    deleted: Boolean(m.deletedAt),
   }
 }
 
@@ -123,6 +126,9 @@ export function MessagesView() {
   const [dialog, setDialog] = useState<DialogKind>(null)
   const [previews, setPreviews] = useState<Record<string, ConversationPreview>>({})
   const [unread, setUnread] = useState<Record<string, boolean>>({})
+  // « En train d'écrire » (éphémère) : conversation → { userId → expiration ms }.
+  // Un ping `typing` (re)pose une échéance à +6 s ; un effet périodique purge.
+  const [typing, setTyping] = useState<Record<string, Record<string, number>>>({})
   // Ancre de la ligne « Nouveaux messages » (dernier lu CAPTURÉ à l'ouverture).
   const [dividerAnchor, setDividerAnchor] = useState<{ convId: string; anchor: string | null }>({
     convId: '',
@@ -135,6 +141,36 @@ export function MessagesView() {
   selectedIdRef.current = selectedId
 
   const selected = conversations.find((c) => c.id === selectedId) ?? null
+
+  // Purge périodique des échéances « en train d'écrire » expirées (re-render léger).
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTyping((prev) => {
+        const now = Date.now()
+        let changed = false
+        const next: Record<string, Record<string, number>> = {}
+        for (const [cid, users] of Object.entries(prev)) {
+          const kept: Record<string, number> = {}
+          for (const [uid, until] of Object.entries(users)) {
+            if (until > now) kept[uid] = until
+            else changed = true
+          }
+          if (Object.keys(kept).length > 0) next[cid] = kept
+        }
+        return changed ? next : prev
+      })
+    }, 1500)
+    return () => clearInterval(interval)
+  }, [])
+
+  // Membres « en train d'écrire » dans la conversation ouverte (hors moi, non expirés).
+  const typingUserIds = useMemo(() => {
+    if (!selectedId) return [] as string[]
+    const now = Date.now()
+    return Object.entries(typing[selectedId] ?? {})
+      .filter(([, until]) => until > now)
+      .map(([uid]) => uid)
+  }, [typing, selectedId])
 
   /** Intègre un message (WS, envoi local, ou aperçu) : aperçu + ordre + pastille.
    *  Le marquage « lu » serveur d'une conv ouverte est géré par le provider. */
@@ -279,6 +315,26 @@ export function MessagesView() {
         case 'conversation_updated':
           refetch()
           break
+        case 'receipt': {
+          // Accusé « remis »/« ouvert » d'un autre membre → met à jour les coches
+          // de mes messages dans cette conversation, en temps réel.
+          const uid = typeof data.user_id === 'string' ? data.user_id : ''
+          if (!uid || uid === myId) break
+          const deliveredAt = typeof data.delivered_at === 'string' ? data.delivered_at : ''
+          const readAt = typeof data.read_at === 'string' ? data.read_at : ''
+          setConversations((prev) =>
+            prev.map((c) => (c.id === cid ? applyReceipt(c, uid, deliveredAt, readAt) : c)),
+          )
+          break
+        }
+        case 'typing': {
+          // Signal éphémère « en train d'écrire » : on (re)pose une échéance à +6 s
+          // pour ce membre ; l'effet de purge l'efface à expiration.
+          const uid = typeof data.user_id === 'string' ? data.user_id : ''
+          if (!uid || uid === myId) break
+          setTyping((prev) => ({ ...prev, [cid]: { ...(prev[cid] ?? {}), [uid]: Date.now() + 6000 } }))
+          break
+        }
       }
     },
     [myId, loadConversations],
@@ -320,16 +376,32 @@ export function MessagesView() {
     // Attend que l'identité soit disponible (déblocage passé) avant d'ouvrir.
     if (!dmTarget || identityState !== 'ready' || handledDmRef.current === dmTarget) return
     handledDmRef.current = dmTarget
+    // Nettoie l'URL via le routeur Next (PAS window.history : l'API brute écrase
+    // l'état interne de Next et casse la navigation arrière).
+    const cleanUrl = () => router.replace('/messages', { scroll: false })
+    // Conversation déjà ouverte avec cette personne → on l'ouvre directement (pas
+    // besoin de la clé du destinataire pour rejoindre un DM existant).
+    const existing = conversationsRef.current.find(
+      (c) => c.type === 'dm' && c.memberIds.includes(dmTarget),
+    )
+    if (existing) {
+      upsertAndSelect(existing)
+      cleanUrl()
+      return
+    }
     ensureMyKeys()
       .then(() => startDM(dmTarget))
       .then((conv) => {
-        // Sélectionne la conversation PUIS nettoie l'URL via le routeur Next
-        // (router.replace, PAS window.history : l'API History brute écrase l'état
-        // interne de Next et casse la navigation arrière depuis la recherche).
         upsertAndSelect(conv)
-        router.replace('/messages', { scroll: false })
+        cleanUrl()
       })
-      .catch(() => {})
+      .catch((err) => {
+        // Le destinataire n'a pas activé sa messagerie → message dédié (pas rouge).
+        if (err instanceof PeerKeyMissingError) {
+          toast({ title: t('messages.peer_not_activated'), variant: 'brand' })
+        }
+        cleanUrl()
+      })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dmTarget, identityState])
 
@@ -477,6 +549,7 @@ export function MessagesView() {
             myId={myId}
             liveMessage={liveMessage}
             liveUpdatedMessage={liveUpdatedMessage}
+            typingUserIds={typingUserIds}
             dividerAnchor={anchorForSelected}
             onBack={() => setSelectedId(null)}
             onOpenInfo={() => setDialog('info')}

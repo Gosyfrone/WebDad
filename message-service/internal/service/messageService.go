@@ -42,6 +42,7 @@ var (
 	ErrTargetNotMember      = errors.New("cet utilisateur n'est pas membre")
 	ErrMessageNotFound      = errors.New("message introuvable")
 	ErrNotMessageOwner      = errors.New("seul l'expéditeur peut modifier ce message")
+	ErrCannotDelete         = errors.New("suppression non autorisée (auteur, owner ou admin requis)")
 )
 
 // Bornes de pagination des messages.
@@ -583,7 +584,9 @@ func (s *MessageService) ListConversations(ctx context.Context, userID string) (
 				continue
 			}
 		}
-		views = append(views, buildView(conv, &m))
+		view := buildView(conv, &m)
+		s.attachReceipts(ctx, &view, userID)
+		views = append(views, view)
 	}
 
 	sort.SliceStable(views, func(i, j int) bool {
@@ -651,15 +654,63 @@ func (s *MessageService) MuteConversation(ctx context.Context, conversationID, u
 }
 
 // MarkRead avance le curseur de lecture du membre courant à maintenant (la
-// conversation est désormais « lue jusqu'ici »). Membre requis.
-func (s *MessageService) MarkRead(ctx context.Context, conversationID, userID string) error {
+// conversation est désormais « lue jusqu'ici »). Membre requis. Renvoie l'instant
+// retenu + les ids des AUTRES membres (à qui diffuser l'accusé « ouvert ») pour
+// que les expéditeurs voient les coches se mettre à jour en temps réel.
+func (s *MessageService) MarkRead(ctx context.Context, conversationID, userID string) (time.Time, []string, error) {
 	if _, err := s.requireMember(ctx, conversationID, userID); err != nil {
-		return err
+		return time.Time{}, nil, err
 	}
-	if err := s.repo.SetMemberRead(ctx, conversationID, userID, time.Now()); err != nil {
-		return translateNotFound(err)
+	now := time.Now()
+	if err := s.repo.SetMemberRead(ctx, conversationID, userID, now); err != nil {
+		return time.Time{}, nil, translateNotFound(err)
 	}
-	return nil
+	return now, s.otherMembers(ctx, conversationID, userID), nil
+}
+
+// MarkDelivered avance le curseur de LIVRAISON (« remis ») de plusieurs membres à
+// `at` (best-effort, par membre). Sert au marquage des destinataires EN LIGNE au
+// moment de l'envoi (livraison instantanée par WebSocket).
+func (s *MessageService) MarkDelivered(ctx context.Context, conversationID string, userIDs []string, at time.Time) {
+	for _, uid := range userIDs {
+		_ = s.repo.SetMemberDelivered(ctx, conversationID, uid, at)
+	}
+}
+
+// TouchDelivered marque le membre courant « remis » jusqu'à maintenant (il vient
+// de récupérer l'historique) et renvoie l'instant + les autres membres à notifier.
+// Membre requis. Best-effort : utilisé en marge de la lecture de l'historique.
+func (s *MessageService) TouchDelivered(ctx context.Context, conversationID, userID string) (time.Time, []string, error) {
+	now := time.Now()
+	if err := s.repo.SetMemberDelivered(ctx, conversationID, userID, now); err != nil {
+		return time.Time{}, nil, translateNotFound(err)
+	}
+	return now, s.otherMembers(ctx, conversationID, userID), nil
+}
+
+// TypingTargets valide l'appartenance et renvoie les autres membres (cibles du
+// signal éphémère « en train d'écrire »). Aucune persistance.
+func (s *MessageService) TypingTargets(ctx context.Context, conversationID, userID string) ([]string, error) {
+	if _, err := s.requireMember(ctx, conversationID, userID); err != nil {
+		return nil, err
+	}
+	return s.otherMembers(ctx, conversationID, userID), nil
+}
+
+// otherMembers renvoie les ids des membres d'une conversation distincts de
+// `userID` (cibles d'un accusé de réception). Best-effort (nil si échec).
+func (s *MessageService) otherMembers(ctx context.Context, conversationID, userID string) []string {
+	ids, err := s.repo.MemberIDs(ctx, conversationID)
+	if err != nil {
+		return nil
+	}
+	others := make([]string, 0, len(ids))
+	for _, id := range ids {
+		if id != userID {
+			others = append(others, id)
+		}
+	}
+	return others
 }
 
 // UnreadCount renvoie le nombre de conversations de l'utilisateur ayant au moins
@@ -803,6 +854,60 @@ func (s *MessageService) EditMessage(ctx context.Context, conversationID, messag
 	return updated, memberIDs, nil
 }
 
+// DeleteMessage supprime « pour tout le monde » (tombstone) : vide le contenu
+// chiffré et pose `deleted_at`. Autorisé à l'AUTEUR du message, ou à l'owner /
+// admin d'un groupe ou d'une communauté (modération). Renvoie le message
+// tombstoné + les ids des membres (diffusion WS).
+func (s *MessageService) DeleteMessage(ctx context.Context, conversationID, messageID, actorID string) (*models.Message, []string, error) {
+	member, err := s.requireMember(ctx, conversationID, actorID)
+	if err != nil {
+		return nil, nil, err
+	}
+	oid, err := parseID(messageID)
+	if err != nil {
+		return nil, nil, err
+	}
+	msg, err := s.repo.GetMessage(ctx, conversationID, oid)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return nil, nil, ErrMessageNotFound
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+	conv, err := s.getConversationByID(ctx, conversationID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if !canDeleteMessage(member.Role, conv.Type, msg.SenderID, actorID) {
+		return nil, nil, ErrCannotDelete
+	}
+
+	updated, err := s.repo.SoftDeleteMessage(ctx, conversationID, oid, time.Now())
+	if err != nil {
+		return nil, nil, translateNotFound(err)
+	}
+
+	memberIDs, err := s.repo.MemberIDs(ctx, conversationID)
+	if err != nil {
+		memberIDs = nil
+	}
+	return updated, memberIDs, nil
+}
+
+// canDeleteMessage : règle d'autorisation de la suppression d'un message
+// (fonction PURE, testée). L'auteur peut toujours supprimer le sien ; dans un
+// groupe ou une communauté, l'owner et l'admin peuvent supprimer ceux des autres
+// (modération). Aucun droit de modération en DM (pas de hiérarchie).
+func canDeleteMessage(actorRole, convType, senderID, actorID string) bool {
+	if senderID == actorID {
+		return true
+	}
+	if convType == models.TypeGroup || convType == models.TypeCommunity {
+		return actorRole == models.MemberOwner || actorRole == models.MemberAdmin
+	}
+	return false
+}
+
 // mentionedTargets filtre les ids mentionnés pour ne garder que des membres
 // réels, distincts, et différents de l'expéditeur. Fonction PURE (testée).
 func mentionedTargets(mentioned, memberIDs []string, senderID string) []string {
@@ -879,7 +984,34 @@ func (s *MessageService) viewFor(ctx context.Context, conv *models.Conversation,
 		return nil, err
 	}
 	v := buildView(conv, m)
+	s.attachReceipts(ctx, &v, userID)
 	return &v, nil
+}
+
+// attachReceipts renseigne `MemberReceipts` (curseurs remis/ouvert des AUTRES
+// membres) pour les accusés de réception côté expéditeur. DM et groupes
+// uniquement (pas les communautés : trop de membres, accusés non pertinents).
+// Best-effort : un échec laisse simplement les accusés vides.
+func (s *MessageService) attachReceipts(ctx context.Context, view *models.ConversationView, requesterID string) {
+	if view.Type != models.TypeDM && view.Type != models.TypeGroup {
+		return
+	}
+	members, err := s.repo.ListMembers(ctx, view.ID)
+	if err != nil {
+		return
+	}
+	receipts := make([]models.MemberReceipt, 0, len(members))
+	for _, m := range members {
+		if m.UserID == requesterID {
+			continue
+		}
+		receipts = append(receipts, models.MemberReceipt{
+			UserID:      m.UserID,
+			DeliveredAt: m.LastDeliveredAt,
+			ReadAt:      m.LastReadAt,
+		})
+	}
+	view.MemberReceipts = receipts
 }
 
 // --- Fonctions pures (testées unitairement) ----------------------------------
