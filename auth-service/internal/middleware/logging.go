@@ -36,11 +36,11 @@ func RequestLogger() gin.HandlerFunc {
 		status := c.Writer.Status()
 
 		attrs := []any{
-			"method",     c.Request.Method,
-			"path",       c.Request.URL.Path,
-			"status",     status,
+			"method", c.Request.Method,
+			"path", c.Request.URL.Path,
+			"status", status,
 			"latency_ms", time.Since(start).Milliseconds(),
-			"client_ip",  c.ClientIP(),
+			"client_ip", c.ClientIP(),
 			"request_id", c.GetString("request_id"),
 		}
 		if uid := c.GetString("user_id"); uid != "" {
