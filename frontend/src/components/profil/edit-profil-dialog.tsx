@@ -1,8 +1,14 @@
 'use client'
 
-import { useRef, useState } from 'react'
-import { Camera, Loader2 } from 'lucide-react'
+import { useMemo, useRef, useState } from 'react'
+import { Camera, Check, ChevronDown, Loader2, Search } from 'lucide-react'
 
+import {
+  buildCountryOptions,
+  countryName,
+  filterCountries,
+  type CountryOption,
+} from '@/lib/countries'
 import { cn } from '@/lib/utils'
 import { mediaUrl, uploadMedia } from '@/lib/media'
 import type { ProfilEditableFields } from '@/types'
@@ -67,6 +73,7 @@ export function EditProfilDialog({
   const [location, setLocation] = useState(initial.location)
   const [birthDate, setBirthDate] = useState(initial.birthDate)
   const [gender, setGender] = useState<ProfilEditableFields['gender']>(initial.gender)
+  const [nationality, setNationality] = useState(initial.nationality)
 
   /** Recharge le formulaire avec les valeurs courantes à chaque ouverture. */
   function handleOpenChange(next: boolean) {
@@ -79,6 +86,7 @@ export function EditProfilDialog({
       setLocation(initial.location)
       setBirthDate(initial.birthDate)
       setGender(initial.gender)
+      setNationality(initial.nationality)
     }
     setOpen(next)
   }
@@ -104,6 +112,7 @@ export function EditProfilDialog({
         location: location.trim(),
         birthDate: birthDateLocked ? '' : birthDate,
         gender: genderLocked ? '' : gender,
+        nationality,
       })
       setOpen(false)
     } catch {
@@ -255,6 +264,10 @@ export function EditProfilDialog({
                 </select>
               </Field>
             </div>
+
+            <Field label={t('editprofil.nationality_label')} htmlFor="profil-nationality">
+              <CountryCombobox value={nationality} onChange={setNationality} />
+            </Field>
           </div>
         </div>
 
@@ -269,6 +282,148 @@ export function EditProfilDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  )
+}
+
+function CountryCombobox({
+  value,
+  onChange,
+}: {
+  value: string
+  onChange: (code: string) => void
+}) {
+  const { t, locale } = useLanguage()
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const [codes, setCodes] = useState<string[]>([])
+  const [loading, setLoading] = useState(false)
+  const [loadFailed, setLoadFailed] = useState(false)
+  const [activeIndex, setActiveIndex] = useState(0)
+  const options = useMemo(() => buildCountryOptions(codes, locale), [codes, locale])
+  const filtered = useMemo(() => filterCountries(options, query).slice(0, 8), [options, query])
+  const selected = options.find((country) => country.code === value)
+
+  async function openAndLoad() {
+    setOpen(true)
+    setQuery('')
+    setActiveIndex(0)
+    if (codes.length || loading) return
+
+    setLoading(true)
+    setLoadFailed(false)
+    try {
+      const response = await fetch('/api/countries')
+      const payload = (await response.json().catch(() => null)) as { data?: string[] } | null
+      if (!response.ok || !payload?.data) throw new Error('countries unavailable')
+      setCodes(payload.data)
+    } catch {
+      setLoadFailed(true)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  function select(country: CountryOption) {
+    onChange(country.code)
+    setOpen(false)
+    setQuery('')
+  }
+
+  function handleKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
+    if (event.key === 'ArrowDown') {
+      event.preventDefault()
+      setActiveIndex((index) => Math.min(index + 1, filtered.length - 1))
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault()
+      setActiveIndex((index) => Math.max(index - 1, 0))
+    } else if (event.key === 'Enter' && filtered[activeIndex]) {
+      event.preventDefault()
+      select(filtered[activeIndex])
+    } else if (event.key === 'Escape') {
+      setOpen(false)
+    }
+  }
+
+  return (
+    <div className="relative">
+      <button
+        id="profil-nationality"
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={openAndLoad}
+        className="flex h-10 w-full items-center justify-between rounded-2xl border border-white/70 bg-white/82 px-3 py-2 text-left text-sm shadow-sm shadow-slate-200/50 transition-all hover:border-[#47D9FF]/70 focus-visible:border-[#5B6CFF] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15 dark:border-white/15 dark:bg-white/5"
+      >
+        <span className={value ? '' : 'text-muted-foreground'}>
+          {(selected?.name ?? countryName(value, locale)) ||
+            t('editprofil.nationality_placeholder')}
+        </span>
+        <ChevronDown className="h-4 w-4 text-muted-foreground" aria-hidden />
+      </button>
+
+      {open && (
+        <div className="absolute z-50 mt-2 w-full rounded-2xl border bg-popover p-2 text-popover-foreground shadow-xl">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+            <Input
+              autoFocus
+              value={query}
+              onChange={(event) => {
+                setQuery(event.target.value)
+                setActiveIndex(0)
+              }}
+              onKeyDown={handleKeyDown}
+              onBlur={() => setTimeout(() => setOpen(false), 100)}
+              placeholder={t('editprofil.nationality_search')}
+              className="rounded-xl pl-9"
+              role="combobox"
+              aria-controls="nationality-options"
+              aria-expanded={open}
+            />
+          </div>
+
+          <div id="nationality-options" role="listbox" className="mt-2 max-h-64 overflow-y-auto">
+            {loading && (
+              <div className="flex items-center justify-center gap-2 px-3 py-5 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                {t('editprofil.nationality_loading')}
+              </div>
+            )}
+            {loadFailed && (
+              <p className="px-3 py-5 text-center text-sm text-destructive">
+                {t('editprofil.nationality_error')}
+              </p>
+            )}
+            {!loading && !loadFailed && filtered.length === 0 && (
+              <p className="px-3 py-5 text-center text-sm text-muted-foreground">
+                {t('editprofil.nationality_empty')}
+              </p>
+            )}
+            {filtered.map((country, index) => (
+              <button
+                key={country.code}
+                type="button"
+                role="option"
+                aria-selected={country.code === value}
+                onMouseDown={(event) => event.preventDefault()}
+                onMouseEnter={() => setActiveIndex(index)}
+                onClick={() => select(country)}
+                className={cn(
+                  'flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm',
+                  index === activeIndex && 'bg-accent text-accent-foreground',
+                )}
+              >
+                <span>{country.name}</span>
+                <span className="flex items-center gap-2 text-xs text-muted-foreground">
+                  {country.code}
+                  {country.code === value && <Check className="h-4 w-4" aria-hidden />}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
 

@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { CalendarDays, LinkIcon, Mail, MapPin } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
+import { countryFlag, countryName } from '@/lib/countries'
 import { ROUTES } from '@/lib/routes'
 import type { RelationKind } from '@/lib/api'
 import { useFollow } from '@/lib/use-follow'
@@ -97,6 +98,7 @@ export function ProfilHeader({
                   location: profil.location,
                   birthDate: toDateInputValue(profil.birthDate),
                   gender: profil.gender,
+                  nationality: profil.nationality,
                 }}
                 birthDateLocked={Boolean(profil.birthDate)}
                 genderLocked={Boolean(profil.gender)}
@@ -143,9 +145,39 @@ export function ProfilHeader({
 
         {/* Identité */}
         <div className="mt-3 flex flex-col gap-0.5">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-xl font-extrabold text-foreground">{profil.displayName}</h1>
             <Badge variant="secondary">{t(`role.${profil.role}`)}</Badge>
+            {profil.gender && (
+              <span
+                tabIndex={0}
+                aria-label={
+                  profil.gender === 'male'
+                    ? t('auth.register.gender_male')
+                    : t('auth.register.gender_female')
+                }
+                className="group relative inline-flex h-6 w-6 items-center justify-center rounded-full bg-secondary text-sm font-bold text-secondary-foreground outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFF]"
+              >
+                <span aria-hidden>{profil.gender === 'male' ? '♂' : '♀'}</span>
+                <span className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1 -translate-x-1/2 whitespace-nowrap rounded-md bg-foreground px-2 py-1 text-xs font-medium text-background opacity-0 shadow-md transition-opacity group-hover:opacity-100 group-focus:opacity-100">
+                  {profil.gender === 'male'
+                    ? t('auth.register.gender_male')
+                    : t('auth.register.gender_female')}
+                </span>
+              </span>
+            )}
+            {profil.nationality && (
+              <span
+                tabIndex={0}
+                aria-label={countryName(profil.nationality, locale)}
+                className="group relative inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-lg leading-none outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFF]"
+              >
+                <span aria-hidden>{countryFlag(profil.nationality)}</span>
+                <span className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1 -translate-x-1/2 whitespace-nowrap rounded-md bg-foreground px-2 py-1 text-xs font-medium leading-normal text-background opacity-0 shadow-md transition-opacity group-hover:opacity-100 group-focus:opacity-100">
+                  {countryName(profil.nationality, locale)}
+                </span>
+              </span>
+            )}
           </div>
           <span className="text-sm text-muted-foreground">@{profil.username}</span>
         </div>

@@ -228,7 +228,7 @@ const FR: Record<LegalSlug, LegalDoc> = {
           {
             list: [
               'Données de compte : adresse e-mail, nom d’utilisateur, mot de passe (stocké haché, jamais en clair).',
-              'Données de profil : nom affiché, biographie, avatar, bannière, site web, localisation, date de naissance et genre (facultatifs).',
+              'Données de profil : nom affiché, biographie, avatar, bannière, site web, localisation, date de naissance, genre et nationalité (facultatifs).',
               'Contenus et interactions publics : publications, commentaires, likes, reposts/citations, abonnements (graphe social).',
               'Messagerie : pour les messages privés et les groupes, le serveur ne stocke que des données chiffrées (texte chiffré + clé emballée par destinataire) et n’a pas accès à leur contenu ; pour les communautés (semi-publiques), la clé de contenu est détenue par le serveur.',
               'Données techniques : jetons d’authentification (JWT et jeton de rafraîchissement) et journaux nécessaires au fonctionnement.',
@@ -510,7 +510,7 @@ const EN: Record<LegalSlug, LegalDoc> = {
           {
             list: [
               'Account data: e-mail address, username, password (stored hashed, never in clear text).',
-              'Profile data: display name, biography, avatar, banner, website, location, date of birth and gender (optional).',
+              'Profile data: display name, biography, avatar, banner, website, location, date of birth, gender and nationality (optional).',
               'Public content and interactions: posts, comments, likes, reposts/quotes, follows (social graph).',
               'Messaging: for private messages and groups, the server stores only encrypted data (ciphertext + per-recipient wrapped key) and has no access to their content; for communities (semi-public), the content key is held by the server.',
               'Technical data: authentication tokens (JWT and refresh token) and logs required for operation.',

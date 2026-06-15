@@ -5777,6 +5777,10 @@
         "location": {
           "type": "string"
         },
+        "nationality": {
+          "description": "ISO 3166-1 alpha-2",
+          "type": "string"
+        },
         "updated_at": {
           "type": "string"
         },
@@ -5826,6 +5830,9 @@
           ]
         },
         "location": {
+          "type": "string"
+        },
+        "nationality": {
           "type": "string"
         },
         "visibility": {

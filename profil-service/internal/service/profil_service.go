@@ -168,6 +168,9 @@ func planUpdate(current *models.Profil, req models.UpdateProfilRequest, now time
 	if req.Gender != nil {
 		set["gender"] = *req.Gender
 	}
+	if req.Nationality != nil {
+		set["nationality"] = strings.ToUpper(strings.TrimSpace(*req.Nationality))
+	}
 	if req.Visibility != nil && *req.Visibility != current.Visibility {
 		set["visibility"] = *req.Visibility
 	}

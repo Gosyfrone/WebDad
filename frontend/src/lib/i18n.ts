@@ -844,6 +844,12 @@ export const messages: Record<Locale, Messages> = {
       "La date de naissance ne peut pas être changée une fois renseignée.",
     'editprofil.gender_locked': 'Le genre ne peut pas être changé une fois renseigné.',
     'editprofil.gender_none': 'Non renseigné',
+    'editprofil.nationality_label': 'Nationalité',
+    'editprofil.nationality_placeholder': 'Choisir une nationalité',
+    'editprofil.nationality_search': 'Rechercher un pays',
+    'editprofil.nationality_loading': 'Chargement des pays...',
+    'editprofil.nationality_error': 'Impossible de charger les pays.',
+    'editprofil.nationality_empty': 'Aucun pays trouvé.',
     'editprofil.saving': 'Enregistrement...',
 
     // — Explorer —
@@ -1647,6 +1653,12 @@ export const messages: Record<Locale, Messages> = {
     'editprofil.birthdate_locked': "Your date of birth can't be changed once set.",
     'editprofil.gender_locked': "Gender can't be changed once set.",
     'editprofil.gender_none': 'Not specified',
+    'editprofil.nationality_label': 'Nationality',
+    'editprofil.nationality_placeholder': 'Choose a nationality',
+    'editprofil.nationality_search': 'Search for a country',
+    'editprofil.nationality_loading': 'Loading countries...',
+    'editprofil.nationality_error': "Couldn't load countries.",
+    'editprofil.nationality_empty': 'No country found.',
     'editprofil.saving': 'Saving...',
 
     // — Explore —
