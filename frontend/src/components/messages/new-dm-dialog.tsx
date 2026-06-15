@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Loader2 } from 'lucide-react'
 
-import { startDM, type Conversation } from '@/lib/messages'
+import { PeerKeyMissingError, startDM, type Conversation } from '@/lib/messages'
 import type { RelationUser } from '@/types'
 import { useToast } from '@/hooks/use-toast'
 import { useLanguage } from '@/components/language-provider'
@@ -37,8 +37,12 @@ export function NewDMDialog({ open, onOpenChange, myId, onCreated }: NewDMDialog
       const conv = await startDM(user.id)
       onCreated(conv)
       onOpenChange(false)
-    } catch {
-      toast({ title: t('messages.dm_failed'), variant: 'destructive' })
+    } catch (err) {
+      if (err instanceof PeerKeyMissingError) {
+        toast({ title: t('messages.peer_not_activated'), variant: 'brand' })
+      } else {
+        toast({ title: t('messages.dm_failed'), variant: 'destructive' })
+      }
     } finally {
       setPending(false)
     }

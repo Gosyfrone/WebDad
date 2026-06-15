@@ -16,6 +16,7 @@ import {
   inviteToGroup,
   leaveGroup,
   listMembers,
+  PeerKeyMissingError,
   removeMember,
   renameCommunity,
   renameGroup,
@@ -122,8 +123,12 @@ export function ConversationInfoDialog({
     try {
       await inviteToGroup(conversation, user.id)
       await refresh()
-    } catch {
-      fail()
+    } catch (err) {
+      if (err instanceof PeerKeyMissingError) {
+        toast({ title: t('messages.peer_not_activated'), variant: 'brand' })
+      } else {
+        fail()
+      }
     } finally {
       setBusy(false)
     }

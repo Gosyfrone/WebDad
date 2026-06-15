@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Loader2, X } from 'lucide-react'
 
-import { createGroup, type Conversation } from '@/lib/messages'
+import { createGroup, PeerKeyMissingError, type Conversation } from '@/lib/messages'
 import type { RelationUser } from '@/types'
 import { useToast } from '@/hooks/use-toast'
 import { useLanguage } from '@/components/language-provider'
@@ -64,8 +64,12 @@ export function NewGroupDialog({ open, onOpenChange, myId, onCreated }: NewGroup
       onCreated(conv)
       reset()
       onOpenChange(false)
-    } catch {
-      toast({ title: t('messages.group_failed'), variant: 'destructive' })
+    } catch (err) {
+      if (err instanceof PeerKeyMissingError) {
+        toast({ title: t('messages.peer_not_activated'), variant: 'brand' })
+      } else {
+        toast({ title: t('messages.group_failed'), variant: 'destructive' })
+      }
     } finally {
       setPending(false)
     }

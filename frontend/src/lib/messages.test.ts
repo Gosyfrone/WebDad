@@ -22,6 +22,7 @@ function msg(id: string, mine = false): ChatMessage {
     decrypted: true,
     createdAt: '2026-06-08T00:00:00Z',
     editedAt: '',
+    deletedAt: '',
     mine,
   }
 }
@@ -171,5 +172,105 @@ describe('mediaKind', () => {
     expect(mediaKind('image/jpeg')).toBe('image')
     expect(mediaKind('video/mp4')).toBe('video')
     expect(mediaKind('application/pdf')).toBe('file')
+  })
+})
+
+import { applyReceipt, planReceipts, type Conversation } from './messages'
+
+function conv(type: Conversation['type'], receipts: Conversation['memberReceipts']): Conversation {
+  return {
+    id: 'c',
+    type,
+    memberIds: [],
+    title: '',
+    myRole: 'talker',
+    createdBy: '',
+    createdAt: '',
+    updatedAt: '',
+    pinnedAt: '',
+    lastReadAt: '',
+    muted: false,
+    memberReceipts: receipts,
+    contentKey: null,
+  }
+}
+
+function mineAt(id: string, iso: string): ChatMessage {
+  return { ...msg(id, true), createdAt: iso }
+}
+
+describe('planReceipts (accusés Envoyé/Ouvert, sous le dernier message)', () => {
+  const m1 = mineAt('m1', '2026-06-08T10:00:00Z')
+  const m2 = mineAt('m2', '2026-06-08T11:00:00Z')
+  const m3 = mineAt('m3', '2026-06-08T12:00:00Z')
+
+  it('DM : la marque suit le dernier message (Envoyé tant que non lu)', () => {
+    const c = conv('dm', [{ userId: 'p', deliveredAt: '2026-06-08T11:30:00Z', readAt: '2026-06-08T10:30:00Z' }])
+    const marks = planReceipts([m1, m2, m3], c)
+    // Seul m3 (le dernier) porte la marque, et il n'est pas encore lu → Envoyé.
+    expect(marks.get('m3')).toEqual({ kind: 'delivered' })
+    expect(marks.has('m1')).toBe(false)
+    expect(marks.has('m2')).toBe(false)
+  })
+
+  it('DM : dernier message lu → 2 coches sous le dernier', () => {
+    const c = conv('dm', [{ userId: 'p', deliveredAt: '2026-06-08T12:30:00Z', readAt: '2026-06-08T12:30:00Z' }])
+    const marks = planReceipts([m1, m2, m3], c)
+    expect(marks.get('m3')).toEqual({ kind: 'read-all' })
+    expect(marks.size).toBe(1)
+  })
+
+  it('DM : pas d’info destinataire → Envoyé sous le dernier', () => {
+    const c = conv('dm', [])
+    expect(planReceipts([m1, m2], c).get('m2')).toEqual({ kind: 'delivered' })
+  })
+
+  it('groupe : personne ne l’a lu → 1 coche grise (Envoyé) sous le dernier', () => {
+    const c = conv('group', [
+      { userId: 'a', deliveredAt: '2026-06-08T12:30:00Z', readAt: '' },
+      { userId: 'b', deliveredAt: '', readAt: '' },
+    ])
+    expect(planReceipts([m1, m3], c).get('m3')).toEqual({ kind: 'delivered' })
+  })
+
+  it('groupe : lu par une partie → 1 coche couleur + nombre', () => {
+    const c = conv('group', [
+      { userId: 'a', deliveredAt: '2026-06-08T12:30:00Z', readAt: '2026-06-08T12:30:00Z' },
+      { userId: 'b', deliveredAt: '2026-06-08T12:30:00Z', readAt: '' },
+    ])
+    expect(planReceipts([m3], c).get('m3')).toEqual({ kind: 'read-count', count: 1 })
+  })
+
+  it('groupe : lu par tous → 2 coches', () => {
+    const c = conv('group', [
+      { userId: 'a', deliveredAt: '', readAt: '2026-06-08T12:30:00Z' },
+      { userId: 'b', deliveredAt: '', readAt: '2026-06-08T12:30:00Z' },
+    ])
+    expect(planReceipts([m3], c).get('m3')).toEqual({ kind: 'read-all' })
+  })
+
+  it('communauté : aucun accusé', () => {
+    const c = conv('community', [{ userId: 'a', deliveredAt: '2026-06-08T12:30:00Z', readAt: '2026-06-08T12:30:00Z' }])
+    expect(planReceipts([m3], c).size).toBe(0)
+  })
+})
+
+describe('applyReceipt (mise à jour temps réel)', () => {
+  it('avance les curseurs et ne recule jamais', () => {
+    const c = conv('dm', [{ userId: 'p', deliveredAt: '2026-06-08T11:00:00Z', readAt: '2026-06-08T10:00:00Z' }])
+    const next = applyReceipt(c, 'p', '2026-06-08T12:00:00Z', '2026-06-08T09:00:00Z')
+    expect(next.memberReceipts[0].deliveredAt).toBe('2026-06-08T12:00:00Z') // avancé
+    expect(next.memberReceipts[0].readAt).toBe('2026-06-08T10:00:00Z') // pas reculé
+  })
+
+  it('crée l’entrée si le membre est absent', () => {
+    const c = conv('group', [])
+    const next = applyReceipt(c, 'x', '2026-06-08T12:00:00Z', '')
+    expect(next.memberReceipts).toEqual([{ userId: 'x', deliveredAt: '2026-06-08T12:00:00Z', readAt: '' }])
+  })
+
+  it('communauté : inchangée', () => {
+    const c = conv('community', [])
+    expect(applyReceipt(c, 'x', '2026-06-08T12:00:00Z', '')).toBe(c)
   })
 })

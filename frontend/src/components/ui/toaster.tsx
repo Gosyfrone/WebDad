@@ -16,7 +16,8 @@ export function Toaster() {
   const t = useT()
 
   return (
-    <ToastProvider>
+    // duration : auto-fermeture des toasts après 3 s.
+    <ToastProvider duration={3000}>
       {toasts.map(function ({ id, title, description, action, ...props }) {
         return (
           <Toast key={id} {...props}>

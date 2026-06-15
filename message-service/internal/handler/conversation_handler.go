@@ -3,6 +3,7 @@ package handler
 import (
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -21,6 +22,35 @@ type ConversationHandler struct {
 
 func NewConversationHandler(svc *service.MessageService, hub *realtime.Hub) *ConversationHandler {
 	return &ConversationHandler{service: svc, hub: hub}
+}
+
+// broadcastReceipt diffuse un accusé de réception (« remis » / « ouvert ») d'un
+// membre vers les `targets` (les autres membres) pour mettre à jour les coches
+// côté expéditeur en temps réel. `delivered`/`read` en pointeurs (nil = omis).
+func (h *ConversationHandler) broadcastReceipt(targets []string, convID, userID string, delivered, read *time.Time) {
+	if len(targets) == 0 {
+		return
+	}
+	data := gin.H{"conversation_id": convID, "user_id": userID}
+	if delivered != nil {
+		data["delivered_at"] = delivered
+	}
+	if read != nil {
+		data["read_at"] = read
+	}
+	h.hub.Publish(targets, gin.H{"type": "receipt", "data": data})
+}
+
+// excluding renvoie `ids` privé de `exclude` (cibles d'un accusé : tous sauf le
+// sujet de l'accusé).
+func excluding(ids []string, exclude string) []string {
+	out := make([]string, 0, len(ids))
+	for _, id := range ids {
+		if id != exclude {
+			out = append(out, id)
+		}
+	}
+	return out
 }
 
 // CreateConversation : POST /messages/conversations — crée (ou retrouve) une
@@ -291,10 +321,14 @@ func (h *ConversationHandler) MarkRead(c *gin.Context) {
 		return
 	}
 
-	if err := h.service.MarkRead(c.Request.Context(), c.Param("id"), claims.UserID); err != nil {
+	readAt, others, err := h.service.MarkRead(c.Request.Context(), c.Param("id"), claims.UserID)
+	if err != nil {
 		respondError(c, err)
 		return
 	}
+	// « Ouvert » implique « remis » : on diffuse les deux curseurs aux autres
+	// membres (expéditeurs) pour mettre à jour leurs coches en temps réel.
+	h.broadcastReceipt(others, c.Param("id"), claims.UserID, &readAt, &readAt)
 	c.Status(http.StatusNoContent)
 }
 
@@ -480,6 +514,11 @@ func (h *ConversationHandler) ListMessages(c *gin.Context) {
 		respondError(c, err)
 		return
 	}
+	// Récupérer l'historique = avoir « reçu » : on avance le curseur « remis » du
+	// lecteur et on diffuse l'accusé aux expéditeurs (best-effort, hors-bande).
+	if at, others, derr := h.service.TouchDelivered(c.Request.Context(), c.Param("id"), claims.UserID); derr == nil {
+		h.broadcastReceipt(others, c.Param("id"), claims.UserID, &at, nil)
+	}
 	c.JSON(http.StatusOK, gin.H{"data": msgs})
 }
 
@@ -521,6 +560,18 @@ func (h *ConversationHandler) SendMessage(c *gin.Context) {
 
 	// Diffusion temps réel (le payload reste chiffré ; le serveur ne lit rien).
 	h.hub.Publish(memberIDs, gin.H{"type": "message", "data": msg})
+
+	// Marque « remis » les destinataires EN LIGNE (le message vient de leur être
+	// poussé par WebSocket) et diffuse l'accusé à l'expéditeur → coche grise
+	// instantanée. Les destinataires hors-ligne seront marqués à leur prochaine
+	// récupération d'historique (cf. ListMessages).
+	if online := h.hub.OnlineFrom(excluding(memberIDs, claims.UserID)); len(online) > 0 {
+		now := time.Now()
+		h.service.MarkDelivered(c.Request.Context(), c.Param("id"), online, now)
+		for _, uid := range online {
+			h.broadcastReceipt(excluding(memberIDs, uid), c.Param("id"), uid, &now, nil)
+		}
+	}
 
 	c.JSON(http.StatusCreated, gin.H{"data": msg})
 }
@@ -566,6 +617,70 @@ func (h *ConversationHandler) EditMessage(c *gin.Context) {
 	h.hub.Publish(memberIDs, gin.H{"type": "message_updated", "data": msg})
 
 	c.JSON(http.StatusOK, gin.H{"data": msg})
+}
+
+// DeleteMessage : DELETE /messages/conversations/:id/messages/:messageId —
+// supprime « pour tout le monde » (tombstone : contenu chiffré effacé). Réservé à
+// l'auteur, ou à l'owner/admin d'un groupe/communauté. Diffusé via l'événement
+// `message_updated` existant (le tombstone remplace la bulle).
+// @Summary     Supprimer un message (pour tous)
+// @Tags        messages
+// @Produce     json
+// @Security    BearerAuth
+// @Param       id        path string true "Conversation ID"
+// @Param       messageId path string true "Message ID"
+// @Success     200 {object} map[string]interface{} "Message tombstoné"
+// @Failure     401 {object} map[string]string
+// @Failure     403 {object} map[string]string
+// @Failure     404 {object} map[string]string
+// @Router      /messages/conversations/{id}/messages/{messageId} [delete]
+func (h *ConversationHandler) DeleteMessage(c *gin.Context) {
+	claims, ok := middleware.ClaimsFrom(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "claims absents"})
+		return
+	}
+
+	msg, memberIDs, err := h.service.DeleteMessage(
+		c.Request.Context(), c.Param("id"), c.Param("messageId"), claims.UserID,
+	)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+
+	h.hub.Publish(memberIDs, gin.H{"type": "message_updated", "data": msg})
+
+	c.JSON(http.StatusOK, gin.H{"data": msg})
+}
+
+// Typing : POST /messages/conversations/:id/typing — signale que l'utilisateur
+// courant est « en train d'écrire ». Éphémère (rien n'est persisté) : on diffuse
+// simplement un événement `typing` aux AUTRES membres connectés. Membre requis.
+// @Summary     Signaler « en train d'écrire »
+// @Tags        messages
+// @Security    BearerAuth
+// @Param       id path string true "Conversation ID"
+// @Success     204 "Diffusé (best-effort)"
+// @Failure     401 {object} map[string]string
+// @Failure     403 {object} map[string]string
+// @Router      /messages/conversations/{id}/typing [post]
+func (h *ConversationHandler) Typing(c *gin.Context) {
+	claims, ok := middleware.ClaimsFrom(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "claims absents"})
+		return
+	}
+
+	others, err := h.service.TypingTargets(c.Request.Context(), c.Param("id"), claims.UserID)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	h.hub.Publish(others, gin.H{"type": "typing", "data": gin.H{
+		"conversation_id": c.Param("id"), "user_id": claims.UserID,
+	}})
+	c.Status(http.StatusNoContent)
 }
 
 // pageLimit lit ?limit (défaut/borne appliqués côté service).

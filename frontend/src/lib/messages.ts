@@ -50,6 +50,22 @@ export class MessageApiError extends Error {
   }
 }
 
+/**
+ * Levée quand un destinataire n'a PAS encore « activé » sa messagerie : il n'a
+ * jamais publié sa clé publique d'identité (`GET /messages/keys/:id` → 404), donc
+ * on ne peut pas lui sceller d'enveloppe (DM, invitation groupe/communauté).
+ * L'UI affiche « Cette personne n'a pas encore activé ces messages » plutôt qu'une
+ * erreur générique.
+ */
+export class PeerKeyMissingError extends Error {
+  userId: string
+  constructor(userId: string) {
+    super('peer has not activated messaging')
+    this.name = 'PeerKeyMissingError'
+    this.userId = userId
+  }
+}
+
 // --- Formes brutes (snake_case) de l'API ------------------------------------
 
 interface ApiUserKey {
@@ -69,9 +85,18 @@ interface ApiConversation {
   pinned_at?: string // épinglage PAR-UTILISATEUR (absent = non épinglée)
   last_read_at?: string // curseur de lecture PAR-UTILISATEUR (absent = jamais lu)
   muted?: boolean // sourdine PAR-UTILISATEUR (exclue du badge, pas de la liste)
+  // Curseurs remis/ouvert des AUTRES membres (accusés de réception côté
+  // expéditeur). Présent pour DM/groupes ; absent pour les communautés.
+  member_receipts?: ApiMemberReceipt[]
   created_by: string
   created_at: string
   updated_at: string
+}
+
+interface ApiMemberReceipt {
+  user_id: string
+  delivered_at?: string
+  read_at?: string
 }
 
 interface ApiMember {
@@ -99,6 +124,7 @@ interface ApiMessage {
   original_nonce?: string
   created_at: string
   edited_at?: string
+  deleted_at?: string
 }
 
 /** Message brut tel que poussé par la WebSocket (chiffré). Le `MessagesProvider`
@@ -127,9 +153,20 @@ export interface Conversation {
   /** Conversation en sourdine PAR CET utilisateur : exclue du badge non-lu
    *  app-wide, mais toujours affichée « non lue » dans la liste. */
   muted: boolean
+  /** Curseurs remis/ouvert des AUTRES membres (accusés de réception côté
+   *  expéditeur) ; vide pour les communautés. */
+  memberReceipts: MemberReceipt[]
   /** Clé de contenu déchiffrée ; null si l'enveloppe ne s'ouvre pas ici
    *  (clé créée sur un autre appareil). */
   contentKey: Uint8Array | null
+}
+
+/** Curseurs « remis »/« ouvert » d'un membre (autre que soi). Dates ISO ; '' =
+ *  jamais remis / jamais lu. */
+export interface MemberReceipt {
+  userId: string
+  deliveredAt: string
+  readAt: string
 }
 
 /** Membre d'une conversation (sans enveloppe : on ne voit que id + rôle). */
@@ -187,6 +224,8 @@ export interface ChatMessage {
   decrypted: boolean
   createdAt: string
   editedAt: string
+  /** Date ISO de suppression « pour tout le monde » (tombstone) ; '' sinon. */
+  deletedAt: string
   mine: boolean
 }
 
@@ -378,10 +417,16 @@ export function currentUserId(): string {
 
 // --- Clés publiques ----------------------------------------------------------
 
-/** Récupère la clé publique (base64) d'un utilisateur. 404 → MessageApiError. */
+/** Récupère la clé publique (base64) d'un utilisateur. Un 404 signifie que la
+ *  personne n'a jamais activé sa messagerie → `PeerKeyMissingError`. */
 async function fetchPeerPublicKey(userId: string): Promise<string> {
-  const key = await unwrap<ApiUserKey>(await apiFetch(`/messages/keys/${encodeURIComponent(userId)}`))
-  return key.public_key
+  try {
+    const key = await unwrap<ApiUserKey>(await apiFetch(`/messages/keys/${encodeURIComponent(userId)}`))
+    return key.public_key
+  } catch (e) {
+    if (e instanceof MessageApiError && e.status === 404) throw new PeerKeyMissingError(userId)
+    throw e
+  }
 }
 
 // --- Conversations -----------------------------------------------------------
@@ -429,6 +474,11 @@ function toConversation(api: ApiConversation, identity: KeyPair): Conversation {
     pinnedAt: api.pinned_at ?? '',
     lastReadAt: api.last_read_at ?? '',
     muted: api.muted ?? false,
+    memberReceipts: (api.member_receipts ?? []).map((r) => ({
+      userId: r.user_id,
+      deliveredAt: r.delivered_at ?? '',
+      readAt: r.read_at ?? '',
+    })),
     contentKey,
   }
 }
@@ -758,6 +808,23 @@ export function decryptMessage(conv: Conversation, api: ApiMessage, myId: string
   let originalText = ''
   let media: ChatAttachment[] = []
   let decrypted = false
+  // Message supprimé « pour tout le monde » (tombstone) : le serveur a vidé le
+  // contenu chiffré → on n'essaie pas de déchiffrer, le client affiche le libellé.
+  if (api.deleted_at) {
+    return {
+      id: api.id,
+      conversationId: api.conversation_id,
+      senderId: api.sender_id,
+      text: '',
+      media: [],
+      decrypted: true,
+      createdAt: api.created_at,
+      editedAt: '',
+      deletedAt: api.deleted_at,
+      originalText: '',
+      mine: api.sender_id === myId,
+    }
+  }
   if (conv.contentKey) {
     try {
       const body = decodeMessageBody(decryptText(conv.contentKey, api.ciphertext, api.nonce))
@@ -783,6 +850,7 @@ export function decryptMessage(conv: Conversation, api: ApiMessage, myId: string
     decrypted,
     createdAt: api.created_at,
     editedAt: api.edited_at ?? '',
+    deletedAt: '',
     originalText,
     mine: api.sender_id === myId,
   }
@@ -847,6 +915,89 @@ export function computeDivider(messages: ChatMessage[], lastReadAt: string | nul
     if (!m.mine && new Date(m.createdAt).getTime() > anchorMs) return m.id
   }
   return null
+}
+
+/**
+ * Marque d'accusé de réception à afficher sous l'un de MES messages :
+ *   - `delivered`  → 1 coche grise (« remis », pas encore lu) ;
+ *   - `read`       → 2 coches couleur (DM : lu par l'interlocuteur) ;
+ *   - `read-count` → 1 coche couleur + nombre (groupe : lu par une partie) ;
+ *   - `read-all`   → 2 coches couleur (groupe : lu par tous).
+ */
+export type ReceiptMark =
+  | { kind: 'delivered' }
+  | { kind: 'read' }
+  | { kind: 'read-count'; count: number }
+  | { kind: 'read-all' }
+
+/** ms epoch d'une date ISO, ou -1 si vide/invalide. Fonction PURE. */
+function isoMs(iso: string): number {
+  if (!iso) return -1
+  const ms = new Date(iso).getTime()
+  return Number.isNaN(ms) ? -1 : ms
+}
+
+/**
+ * Calcule les accusés de réception à placer sous MES messages. Renvoie une map
+ * `messageId -> ReceiptMark` — UNE seule marque, sous mon DERNIER message (la
+ * coche suit toujours le dernier message envoyé). Fonction PURE (testée).
+ *
+ * Statut du dernier message :
+ *   - lu par l'interlocuteur (DM) / par TOUS (groupe) → 2 coches couleur ;
+ *   - groupe lu par une PARTIE → 1 coche couleur + nombre de lecteurs ;
+ *   - sinon (« Envoyé », pas encore lu) → 1 coche grise.
+ *
+ * Communauté : aucun accusé (trop de membres, non pertinent).
+ */
+export function planReceipts(messages: ChatMessage[], conv: Conversation): Map<string, ReceiptMark> {
+  const marks = new Map<string, ReceiptMark>()
+  if (conv.type === 'community') return marks
+  const mine = messages.filter((m) => m.mine && !m.deletedAt)
+  if (mine.length === 0) return marks
+
+  // Toujours sous mon dernier message (pas un message supprimé).
+  const last = mine[mine.length - 1]
+  const lastTs = isoMs(last.createdAt)
+  const peers = conv.memberReceipts
+  const total = peers.length
+  // Pas (encore) d'info destinataires → simplement « Envoyé ».
+  if (total === 0) {
+    marks.set(last.id, { kind: 'delivered' })
+    return marks
+  }
+  let readers = 0
+  for (const p of peers) {
+    const rMs = isoMs(p.readAt)
+    if (rMs >= 0 && rMs >= lastTs) readers++
+  }
+  if (readers >= total) marks.set(last.id, { kind: 'read-all' })
+  else if (readers > 0) marks.set(last.id, { kind: 'read-count', count: readers })
+  else marks.set(last.id, { kind: 'delivered' }) // envoyé, pas encore lu
+  return marks
+}
+
+/**
+ * Applique un accusé reçu en temps réel (`receipt`) : avance — jamais ne recule —
+ * les curseurs remis/ouvert du membre `userId` dans la conversation. Crée l'entrée
+ * si le membre n'y figure pas encore. Fonction PURE (testée). Aucune entrée pour
+ * les communautés.
+ */
+export function applyReceipt(
+  conv: Conversation,
+  userId: string,
+  deliveredAt: string,
+  readAt: string,
+): Conversation {
+  if (conv.type === 'community') return conv
+  const max = (a: string, b: string) => (isoMs(b) > isoMs(a) ? b : a)
+  let found = false
+  const next = conv.memberReceipts.map((r) => {
+    if (r.userId !== userId) return r
+    found = true
+    return { userId, deliveredAt: max(r.deliveredAt, deliveredAt), readAt: max(r.readAt, readAt) }
+  })
+  if (!found) next.push({ userId, deliveredAt, readAt })
+  return { ...conv, memberReceipts: next }
 }
 
 /**
@@ -953,6 +1104,32 @@ export async function editMessage(
     }),
   )
   return decryptMessage(conv, updated, currentUserId())
+}
+
+/**
+ * Supprime un message « pour tout le monde » (tombstone). Autorisé à l'auteur, ou
+ * à l'owner/admin d'un groupe/communauté (modération, contrôlé côté serveur).
+ * Renvoie le message tombstoné (déchiffré = libellé « supprimé »). Le serveur
+ * diffuse l'événement `message_updated` aux autres membres.
+ */
+export async function deleteMessage(conv: Conversation, messageId: string): Promise<ChatMessage> {
+  const deleted = await unwrap<ApiMessage>(
+    await apiFetch(`/messages/conversations/${conv.id}/messages/${messageId}`, { method: 'DELETE' }),
+  )
+  return decryptMessage(conv, deleted, currentUserId())
+}
+
+/**
+ * Signale « en train d'écrire » dans une conversation : éphémère, best-effort
+ * (fire-and-forget). Le serveur rediffuse l'événement `typing` aux autres membres
+ * connectés. À appeler de façon THROTTLÉE par l'appelant (cf. composer).
+ */
+export async function sendTyping(conversationId: string): Promise<void> {
+  try {
+    await apiFetch(`/messages/conversations/${conversationId}/typing`, { method: 'POST' })
+  } catch {
+    /* best-effort : l'indicateur de frappe n'est pas critique */
+  }
 }
 
 // --- Recherche dans une conversation (côté client, E2EE) --------------------

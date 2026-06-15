@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -7,6 +8,7 @@ import { Bell, LogIn, Mail, Search } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import { ROUTES } from '@/lib/routes'
+import { getSearchPath, isSearchSectionPath } from '@/lib/search-tab'
 import { useAuthGate } from '@/components/auth-prompt-provider'
 import { useNotifications } from '@/components/notifications-provider'
 import { useMessages } from '@/components/messages-provider'
@@ -41,6 +43,16 @@ export function MobileTabBar() {
   const t = useT()
   const pathname = usePathname()
   const { isVisitor } = useAuthGate()
+
+  // Loupe (Recherche) : `href` dynamique (mémoire de navigation par onglet).
+  // Depuis un autre onglet → dernier chemin de la section recherche (profil,
+  // résultats…) ; déjà dans la section → recherche neuve (`/explorer`). On utilise
+  // l'href natif de l'ancre (fiable sur iOS, contrairement à un `preventDefault`).
+  // Défaut `/explorer` au 1er rendu (SSR) puis recalcul client à chaque navigation.
+  const [searchHref, setSearchHref] = useState<string>(ROUTES.explorer)
+  useEffect(() => {
+    setSearchHref(isSearchSectionPath(pathname) ? ROUTES.explorer : getSearchPath())
+  }, [pathname])
   const { unreadCount } = useNotifications()
   const { unreadCount: msgUnread } = useMessages()
   const tabs = isVisitor ? VISITOR_TABS : TABS
@@ -68,7 +80,7 @@ export function MobileTabBar() {
         return (
           <Link
             key={tab.href}
-            href={tab.href}
+            href={tab.href === ROUTES.explorer ? searchHref : tab.href}
             aria-label={t(tab.labelKey)}
             aria-current={active ? 'page' : undefined}
             className="flex flex-1 items-center justify-center transition-colors hover:bg-accent"

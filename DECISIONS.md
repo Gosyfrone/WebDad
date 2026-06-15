@@ -272,6 +272,35 @@
 - **"Read" state is server data** (`members.last_read_at`), multi-device; `GET /unread-count` computes from metadata only
   (never the `ciphertext`) → E2EE intact. **Mute** (`members.muted_at`) excludes from the badge but stays unread in the list.
   Chosen over per-device localStorage (tranché with the user).
+- **Message read/delivery receipts ("Remis / Ouvert", 15/06/2026, validated with user).** Sender-side acknowledgements
+  using **server metadata only** (timestamps, never the `ciphertext` → E2EE intact). Two per-member cursors: existing
+  `last_read_at` (= *Ouvert*/opened) + new `last_delivered_at` (= *Remis*/delivered). **Delivery is server-driven (no client
+  ack):** a message is *Remis* when the server actually delivers it — pushed to a member's open WS socket at send time
+  (`hub.OnlineFrom`) or fetched via `ListMessages` (`TouchDelivered`). Offline recipient ⇒ not yet delivered (correct).
+  Reading implies receiving, so `SetMemberRead` also advances delivery (remis ≥ ouvert). A new WS event `receipt`
+  `{conversation_id, user_id, delivered_at?, read_at?}` is broadcast to the **other** members (the senders) on read/delivery
+  so the checks update live; `ConversationView.member_receipts` exposes the other members' cursors for the initial render
+  (**DM + groups only**, not communities — too many members, not meaningful). **UI convention (chosen by user, refined after
+  iPhone testing):** a **single marker, always under my LAST message** (the check follows the latest sent message): 1 grey
+  check = "Envoyé" (sent, not yet read) ; 2 brand-coloured checks = "Ouvert" (read by peer / by all in a group) ; group
+  partially read = 1 coloured check + reader count. The label "Envoyé"/"Ouvert" is revealed by tapping the check (PC + mobile).
+  (An earlier two-marker DM design — last-read vs last-delivered on different messages — was dropped: in practice the check
+  appeared "stuck" on an older message.) Placement logic is a pure tested function (`planReceipts`); live updates via pure
+  `applyReceipt` (monotonic). New field `last_delivered_at` is **nullable/optional** (no enum, no `required`) ⇒ no boot
+  migration needed (règle 5b). The `last_delivered_at` cursor is still maintained server-side (harmless) though the simplified
+  UI keys off the read cursor only.
+- **Message deletion = tombstone "for everyone" (15/06/2026, validated with user).** `DELETE …/messages/:messageId`
+  soft-deletes: sets `deleted_at` and **wipes** `ciphertext`/`nonce` (content really gone — the server was already blind, so
+  this is honest "delete for everyone"). The client renders "Message supprimé" in place. **Authorization** (pure tested
+  `canDeleteMessage`): the **author** always; in a **group/community**, the **owner/admin** can also delete others' messages
+  (moderation); **no moderation in DM** (no hierarchy). Broadcast reuses the existing **`message_updated`** WS event (the
+  tombstone replaces the bubble) — no new event type. `deleted_at` is nullable/optional ⇒ no migration. Encrypted media blobs
+  in media-service are left orphaned (acceptable; cleanup is a TODO).
+- **Typing indicator "en train d'écrire" (15/06/2026, validated with user).** Ephemeral, **not persisted**, E2EE-safe
+  (metadata only: `user_id` + `conversation_id`, never content). Transport = **REST** `POST …/typing` (chosen over making the
+  WS bidirectional): the client pings **throttled ~3 s** while typing; the server broadcasts a `typing` WS event to the other
+  members. No "stop" signal — the receiver sets a **+6 s expiry** per member, pruned client-side, so the indicator fades on
+  its own. Shows "écrit…" (DM) / "X écrit…" / "Plusieurs personnes écrivent…" (group).
 - **Passphrase key backup (multi-device), zero-knowledge** (11/06/2026, validated with user). The X25519 private key was
   per-device only → unreadable on a 2nd device. Now the private key is wrapped client-side (`XChaCha20-Poly1305`) under a
   KEK derived from a **user passphrase** (Argon2id, **19 MiB / t=2 = OWASP minimum**, chosen for mobile: the pure-JS KDF is

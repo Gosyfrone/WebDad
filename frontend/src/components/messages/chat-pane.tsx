@@ -1,18 +1,28 @@
 'use client'
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, ImageOff, Info, Loader2, Lock, Paperclip, Pencil, Send, X } from 'lucide-react'
+import { ArrowLeft, Check, CheckCheck, ImageOff, Info, Loader2, Lock, MoreHorizontal, Paperclip, Pencil, Send, Trash2, X } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import {
   computeDivider,
   decryptAttachment,
+  deleteMessage,
   editMessage,
   listMessagesPage,
+  planReceipts,
   sendMessage,
+  sendTyping,
   type ChatAttachment,
   type ChatMessage,
   type Conversation,
+  type ReceiptMark,
 } from '@/lib/messages'
 import { extractMentionHandles, type MentionCandidate } from '@/lib/mentions'
 import { makeMemberFirstSearch } from '@/lib/mention-search'
@@ -37,6 +47,8 @@ interface ChatPaneProps {
   liveMessage: ChatMessage | null
   /** Message modifié reçu en temps réel pour CETTE conversation (ou null). */
   liveUpdatedMessage: ChatMessage | null
+  /** Ids des membres « en train d'écrire » dans cette conversation (hors moi). */
+  typingUserIds: string[]
   /** Curseur de lecture (`lastReadAt` ISO) capturé à l'ouverture (ancre
    *  « Nouveaux messages ») ; null si jamais lu. */
   dividerAnchor: string | null
@@ -70,6 +82,7 @@ export function ChatPane({
   myId,
   liveMessage,
   liveUpdatedMessage,
+  typingUserIds,
   dividerAnchor,
   onBack,
   onOpenInfo,
@@ -135,11 +148,30 @@ export function ChatPane({
     search: mentionSearch,
   })
 
+  // Accusés de réception (remis/ouvert) à placer sous MES messages, recalculés
+  // quand les messages ou les curseurs des autres membres changent (temps réel).
+  const receiptMarks = useMemo(() => planReceipts(messages, conversation), [messages, conversation])
+
   const keyMissing = conversation.contentKey === null
   const readOnly =
     conversation.type === 'community' && conversation.myRole === 'viewer'
   const canSend = !keyMissing && !readOnly
   const isEditing = editingMessage !== null
+  // Modérateur : owner/admin d'un groupe ou d'une communauté peut supprimer les
+  // messages des autres (contrôlé aussi côté serveur).
+  const isModerator =
+    (conversation.type === 'group' || conversation.type === 'community') &&
+    (conversation.myRole === 'owner' || conversation.myRole === 'admin')
+
+  // Ping « en train d'écrire » throttlé (au plus 1 / 3 s pendant la frappe).
+  const lastTypingRef = useRef(0)
+  const pingTyping = useCallback(() => {
+    const now = Date.now()
+    if (now - lastTypingRef.current < 3000) return
+    lastTypingRef.current = now
+    void sendTyping(convRef.current.id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const scrollToBottom = useCallback((behavior: ScrollBehavior = 'auto') => {
     const el = scrollRef.current
@@ -284,6 +316,19 @@ export function ChatPane({
     setAttachments([])
   }
 
+  async function handleDelete(message: ChatMessage) {
+    if (message.deletedAt || sending) return
+    if (!window.confirm(t('messages.delete_confirm'))) return
+    try {
+      const deleted = await deleteMessage(convRef.current, message.id)
+      setMessages((prev) => prev.map((m) => (m.id === deleted.id ? deleted : m)))
+      if (editingMessage?.id === deleted.id) cancelEdit()
+      onLocalMessage(deleted, true) // edited=true → met à jour l'aperçu si concerné
+    } catch {
+      toast({ title: t('messages.delete_failed'), variant: 'destructive' })
+    }
+  }
+
   function handlePickFiles(e: React.ChangeEvent<HTMLInputElement>) {
     const picked = Array.from(e.target.files ?? [])
     e.target.value = ''
@@ -329,6 +374,8 @@ export function ChatPane({
                   message={m}
                   conversation={conversation}
                   memberUsernames={memberUsernames}
+                  receipt={m.mine ? receiptMarks.get(m.id) : undefined}
+                  canDelete={!m.deletedAt && canSend && (m.mine || isModerator)}
                   // Affiche l'avatar/nom de l'expéditeur si l'auteur change (groupes/communautés).
                   showSender={
                     conversation.type !== 'dm' &&
@@ -336,12 +383,16 @@ export function ChatPane({
                     (i === 0 || messages[i - 1].senderId !== m.senderId)
                   }
                   onEditStart={startEdit}
+                  onDelete={handleDelete}
                 />
               </Fragment>
             ))}
           </ul>
         )}
       </div>
+
+      {/* Indicateur « en train d'écrire » */}
+      <TypingIndicator conversation={conversation} userIds={typingUserIds} />
 
       {/* Composer */}
       <div className="panel border-t px-3 py-2.5 sm:px-4">
@@ -396,6 +447,7 @@ export function ChatPane({
                   onChange={(e) => {
                     setDraft(e.target.value)
                     mention.sync()
+                    if (canSend) pingTyping()
                   }}
                   onKeyUp={mention.sync}
                   onClick={mention.sync}
@@ -497,21 +549,46 @@ function MessageBubble({
   message,
   conversation,
   memberUsernames,
+  receipt,
+  canDelete,
   showSender,
   onEditStart,
+  onDelete,
 }: {
   message: ChatMessage
   conversation: Conversation
   memberUsernames: Set<string>
+  /** Accusé de réception à afficher sous ce message (mes messages uniquement). */
+  receipt?: ReceiptMark
+  /** L'utilisateur courant peut-il supprimer ce message (auteur / modérateur) ? */
+  canDelete: boolean
   showSender: boolean
   onEditStart: (message: ChatMessage) => void
+  onDelete: (message: ChatMessage) => void
 }) {
   const { t, locale } = useLanguage()
   const sender = useResolvedUser(showSender ? message.senderId : null)
   const time = formatTime(message.createdAt, locale)
-  const canEdit = message.mine && message.decrypted
+  const isDeleted = Boolean(message.deletedAt)
+  const canEdit = message.mine && message.decrypted && !isDeleted
   const [showOriginal, setShowOriginal] = useState(false)
-  const hasOriginal = message.decrypted && Boolean(message.originalText)
+  const hasOriginal = !isDeleted && message.decrypted && Boolean(message.originalText)
+
+  // Message supprimé « pour tout le monde » (tombstone) : rendu sobre, sans média,
+  // sans actions, sans accusé.
+  if (isDeleted) {
+    return (
+      <li className={cn('flex flex-col', message.mine ? 'items-end' : 'items-start')}>
+        <div className="mt-1 max-w-[78%] rounded-2xl border border-dashed border-border bg-background/40 px-3.5 py-2 text-sm italic text-muted-foreground">
+          <span className="flex items-center gap-1.5">
+            <Trash2 className="h-3.5 w-3.5" aria-hidden />
+            {t('messages.deleted')}
+          </span>
+        </div>
+        <span className="mt-0.5 px-1 text-[11px] text-muted-foreground">{time}</span>
+      </li>
+    )
+  }
 
   return (
     <li className={cn('flex flex-col', message.mine ? 'items-end' : 'items-start')}>
@@ -528,12 +605,30 @@ function MessageBubble({
           </span>
         </div>
       )}
-      {/* Pièces jointes (déchiffrées à la volée), hors bulle texte. */}
+      {/* Pièces jointes (déchiffrées à la volée), hors bulle texte. Le menu d'actions
+          « … » apparaît ici quand le message n'a PAS de texte (média seul) — sinon il
+          est rendu dans la rangée texte plus bas. */}
       {message.decrypted && message.media.length > 0 && (
-        <div className={cn('flex max-w-[78%] flex-col gap-1.5', message.mine ? 'items-end' : 'items-start')}>
-          {message.media.map((att) => (
-            <AttachmentView key={att.id} contentKey={conversation.contentKey} att={att} />
-          ))}
+        <div
+          className={cn(
+            'group flex max-w-[78%] items-end gap-1.5',
+            message.mine && 'flex-row-reverse',
+          )}
+        >
+          <div className={cn('flex flex-col gap-1.5', message.mine ? 'items-end' : 'items-start')}>
+            {message.media.map((att) => (
+              <AttachmentView key={att.id} contentKey={conversation.contentKey} att={att} />
+            ))}
+          </div>
+          {!message.text && (
+            <MessageActionsMenu
+              canEdit={canEdit}
+              canDelete={canDelete}
+              onEdit={() => onEditStart(message)}
+              onDelete={() => onDelete(message)}
+              className="mb-1"
+            />
+          )}
         </div>
       )}
 
@@ -589,21 +684,149 @@ function MessageBubble({
               )}
             </div>
           </div>
-          {canEdit && (
-            <button
-              type="button"
-              onClick={() => onEditStart(message)}
-              className="mb-1 rounded-full p-1.5 text-muted-foreground opacity-0 transition hover:bg-background/70 hover:text-foreground group-focus-within:opacity-100 group-hover:opacity-100"
-              aria-label={t('messages.edit')}
-              title={t('messages.edit')}
-            >
-              <Pencil className="h-3.5 w-3.5" />
-            </button>
-          )}
+          <MessageActionsMenu
+            canEdit={canEdit}
+            canDelete={canDelete}
+            onEdit={() => onEditStart(message)}
+            onDelete={() => onDelete(message)}
+            className="mb-1"
+          />
         </div>
       )}
-      <span className="mt-0.5 px-1 text-[11px] text-muted-foreground">{time}</span>
+      <div className="mt-0.5 flex items-center gap-1 px-1 text-[11px] text-muted-foreground">
+        <span>{time}</span>
+        {receipt && <ReceiptIndicator receipt={receipt} />}
+      </div>
     </li>
+  )
+}
+
+/**
+ * Menu d'actions « … » d'un message (éditer / supprimer). Vrai `<button>` (Radix
+ * DropdownMenu) → tap fiable sur iOS, contrairement à un `onClick` sur `<div>` ;
+ * un seul menu ouvert à la fois. Toujours visible sur tactile ; révélé au survol
+ * sur les appareils à survol réel (desktop). Rien si aucune action permise.
+ */
+function MessageActionsMenu({
+  canEdit,
+  canDelete,
+  onEdit,
+  onDelete,
+  className,
+}: {
+  canEdit: boolean
+  canDelete: boolean
+  onEdit: () => void
+  onDelete: () => void
+  className?: string
+}) {
+  const { t } = useLanguage()
+  if (!canEdit && !canDelete) return null
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        aria-label={t('messages.actions')}
+        className={cn(
+          'shrink-0 rounded-full p-1.5 text-muted-foreground transition hover:bg-background/70 hover:text-foreground focus:outline-none',
+          'opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-focus-within:opacity-100 data-[state=open]:opacity-100',
+          className,
+        )}
+      >
+        <MoreHorizontal className="h-4 w-4" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        {canEdit && (
+          <DropdownMenuItem onClick={onEdit} className="cursor-pointer">
+            <Pencil className="mr-2 h-4 w-4" />
+            {t('messages.edit')}
+          </DropdownMenuItem>
+        )}
+        {canDelete && (
+          <DropdownMenuItem onClick={onDelete} className="cursor-pointer text-red-500 focus:text-red-500">
+            <Trash2 className="mr-2 h-4 w-4" />
+            {t('messages.delete')}
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
+/**
+ * Indicateur d'accusé de réception sous l'un de MES messages :
+ *   - remis (pas encore lu) → 1 coche grise ;
+ *   - ouvert (DM / groupe lu par tous) → 2 coches couleur Breezy ;
+ *   - groupe lu par une partie → 1 coche couleur + nombre de lecteurs.
+ *
+ * Cliquable (tap PC + mobile) : un clic révèle le libellé « Remis » / « Ouvert »
+ * à droite de la coche, un second le masque.
+ */
+function ReceiptIndicator({ receipt }: { receipt: ReceiptMark }) {
+  const { t } = useLanguage()
+  const [showLabel, setShowLabel] = useState(false)
+  const brand = 'text-[#5B6CFF] dark:text-[#9aa6ff]'
+  const isRead = receipt.kind !== 'delivered'
+  const label = t(isRead ? 'messages.receipt_read' : 'messages.receipt_delivered')
+
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation()
+        setShowLabel((v) => !v)
+      }}
+      aria-label={label}
+      aria-pressed={showLabel}
+      title={label}
+      className="flex items-center gap-0.5 rounded-full transition hover:opacity-80"
+    >
+      {receipt.kind === 'delivered' && <Check className="h-3.5 w-3.5" />}
+      {receipt.kind === 'read-count' && (
+        <span className={cn('flex items-center gap-0.5 font-semibold', brand)}>
+          <Check className="h-3.5 w-3.5" />
+          {receipt.count}
+        </span>
+      )}
+      {(receipt.kind === 'read' || receipt.kind === 'read-all') && (
+        <CheckCheck className={cn('h-3.5 w-3.5', brand)} />
+      )}
+      {showLabel && (
+        <span className={cn('text-[11px] font-medium', isRead ? brand : 'text-muted-foreground')}>
+          {label}
+        </span>
+      )}
+    </button>
+  )
+}
+
+/**
+ * Indicateur « en train d'écrire » sous l'historique : DM → « écrit… » ; groupe →
+ * « X écrit… » (ou « Plusieurs personnes écrivent… » à plusieurs). Rien si
+ * personne ne tape. Éphémère : le parent gère l'expiration des signaux.
+ */
+function TypingIndicator({ conversation, userIds }: { conversation: Conversation; userIds: string[] }) {
+  const { t } = useLanguage()
+  // Hook appelé inconditionnellement (règle des hooks) ; on ne résout le nom que
+  // pour les groupes/communautés (DM = interlocuteur implicite).
+  const first = useResolvedUser(conversation.type !== 'dm' ? userIds[0] ?? null : null)
+  if (userIds.length === 0) return null
+
+  let label: string
+  if (conversation.type === 'dm') label = t('messages.typing')
+  else if (userIds.length === 1) label = t('messages.typing_user', { name: first?.displayName ?? '…' })
+  else label = t('messages.typing_several')
+
+  return (
+    <div className="px-4 pb-1 pt-0.5 text-[12px] italic text-muted-foreground">
+      <span className="inline-flex items-center gap-1.5">
+        <span className="inline-flex gap-0.5" aria-hidden>
+          <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-current [animation-delay:-0.2s]" />
+          <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-current [animation-delay:-0.1s]" />
+          <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-current" />
+        </span>
+        {label}
+      </span>
+    </div>
   )
 }
 

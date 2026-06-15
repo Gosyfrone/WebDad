@@ -83,6 +83,31 @@ func TestCheckRemoval(t *testing.T) {
 	}
 }
 
+func TestCanDeleteMessage(t *testing.T) {
+	cases := []struct {
+		name      string
+		actorRole string
+		convType  string
+		senderID  string
+		actorID   string
+		want      bool
+	}{
+		{"auteur supprime le sien (DM)", models.MemberTalker, models.TypeDM, "u1", "u1", true},
+		{"auteur supprime le sien (groupe)", models.MemberTalker, models.TypeGroup, "u1", "u1", true},
+		{"non-auteur en DM : interdit", models.MemberTalker, models.TypeDM, "u1", "u2", false},
+		{"owner de groupe supprime autrui", models.MemberOwner, models.TypeGroup, "u1", "u2", true},
+		{"admin de communauté supprime autrui", models.MemberAdmin, models.TypeCommunity, "u1", "u2", true},
+		{"talker de groupe ne supprime PAS autrui", models.MemberTalker, models.TypeGroup, "u1", "u2", false},
+		{"viewer de communauté ne supprime PAS autrui", models.MemberViewer, models.TypeCommunity, "u1", "u2", false},
+	}
+	for _, tc := range cases {
+		if got := canDeleteMessage(tc.actorRole, tc.convType, tc.senderID, tc.actorID); got != tc.want {
+			t.Errorf("%s : canDeleteMessage(%q,%q,%q,%q) = %v, want %v",
+				tc.name, tc.actorRole, tc.convType, tc.senderID, tc.actorID, got, tc.want)
+		}
+	}
+}
+
 func TestMaxTalkers(t *testing.T) {
 	// La règle métier (cap des participants pouvant écrire) doit valoir 32.
 	if MaxTalkers != 32 {

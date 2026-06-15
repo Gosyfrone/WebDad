@@ -99,6 +99,21 @@ func (h *Hub) Publish(userIDs []string, event any) {
 	}
 }
 
+// OnlineFrom renvoie le sous-ensemble de `userIDs` ayant au moins une connexion
+// WebSocket active. Sert au marquage « remis » instantané des destinataires en
+// ligne au moment de l'envoi.
+func (h *Hub) OnlineFrom(userIDs []string) []string {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	online := make([]string, 0, len(userIDs))
+	for _, uid := range userIDs {
+		if len(h.conns[uid]) > 0 {
+			online = append(online, uid)
+		}
+	}
+	return online
+}
+
 // readPump draine les messages entrants (on n'attend rien du client : l'envoi
 // se fait via l'API REST). Sert surtout à détecter la fermeture de la socket.
 func (c *Conn) readPump() {

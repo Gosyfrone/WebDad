@@ -79,6 +79,9 @@ func RegisterRoutes(
 				conv.GET("/messages", convH.ListMessages)
 				conv.POST("/messages", convH.SendMessage)
 				conv.PATCH("/messages/:messageId", convH.EditMessage)
+				conv.DELETE("/messages/:messageId", convH.DeleteMessage) // supprimer pour tous (auteur / owner / admin)
+
+				conv.POST("/typing", convH.Typing) // signal « en train d'écrire » (éphémère)
 
 				members := conv.Group("/members")
 				{

@@ -108,6 +108,12 @@ type Member struct {
 	// calcul du non-lu côté serveur (compteur + pastille) — métadonnée, jamais le
 	// contenu chiffré.
 	LastReadAt *time.Time `bson:"last_read_at,omitempty" json:"-"`
+	// LastDeliveredAt : curseur de LIVRAISON de CE membre (nil = jamais reçu ici).
+	// « Remis » = le serveur a livré les messages jusqu'ici (poussés sur sa socket
+	// ou récupérés via l'historique). Sert aux accusés « remis » des EXPÉDITEURS —
+	// métadonnée d'horodatage, jamais le contenu chiffré. Toujours >= LastReadAt
+	// (lire implique avoir reçu).
+	LastDeliveredAt *time.Time `bson:"last_delivered_at,omitempty" json:"-"`
 	// MutedAt : mise en sourdine de la conversation par CE membre (nil = active).
 	// En sourdine, la conversation est EXCLUE du badge non-lu (mais reste « non
 	// lue » dans la liste). État par-utilisateur.
@@ -126,6 +132,10 @@ type Message struct {
 	OriginalNonce      string        `bson:"original_nonce,omitempty" json:"original_nonce,omitempty"`
 	CreatedAt          time.Time     `bson:"created_at" json:"created_at"`
 	EditedAt           *time.Time    `bson:"edited_at,omitempty" json:"edited_at,omitempty"`
+	// DeletedAt : suppression « pour tout le monde » (tombstone). Non nil = le
+	// contenu chiffré a été effacé (ciphertext/nonce vidés) ; le client affiche
+	// « Message supprimé ». Métadonnée d'horodatage.
+	DeletedAt *time.Time `bson:"deleted_at,omitempty" json:"deleted_at,omitempty"`
 }
 
 // ConversationView — vue renvoyée au client : la conversation + l'enveloppe de
@@ -149,10 +159,24 @@ type ConversationView struct {
 	LastReadAt *time.Time `json:"last_read_at,omitempty"`
 	// Muted : la conversation est-elle en sourdine pour CE membre ? (exclue du
 	// badge non-lu app-wide, mais toujours « non lue » dans la liste).
-	Muted     bool      `json:"muted"`
-	CreatedBy string    `json:"created_by"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	Muted bool `json:"muted"`
+	// MemberReceipts : curseurs « remis » / « ouvert » des AUTRES membres (jamais
+	// soi), pour les accusés de réception côté expéditeur. Renseigné pour DM et
+	// groupes uniquement (pas les communautés). Métadonnée d'horodatage, jamais le
+	// contenu chiffré.
+	MemberReceipts []MemberReceipt `json:"member_receipts,omitempty"`
+	CreatedBy      string          `json:"created_by"`
+	CreatedAt      time.Time       `json:"created_at"`
+	UpdatedAt      time.Time       `json:"updated_at"`
+}
+
+// MemberReceipt — curseurs de livraison/lecture d'un membre, exposés à
+// l'expéditeur pour afficher les accusés « remis » (1 coche) / « ouvert » (2
+// coches). `nil` = jamais livré / jamais lu.
+type MemberReceipt struct {
+	UserID      string     `json:"user_id"`
+	DeliveredAt *time.Time `json:"delivered_at,omitempty"`
+	ReadAt      *time.Time `json:"read_at,omitempty"`
 }
 
 // MemberView — un membre exposé dans la liste des membres (sans son enveloppe :

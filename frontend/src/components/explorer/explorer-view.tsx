@@ -20,6 +20,7 @@ import {
   type HashtagTrend,
 } from '@/lib/posts'
 import { hashtagHref } from '@/lib/routes'
+import { rememberSearchPath } from '@/lib/search-tab'
 import { useFollow } from '@/lib/use-follow'
 import type { RelationUser } from '@/types'
 import { cn } from '@/lib/utils'
@@ -193,7 +194,11 @@ export function ExplorerView() {
     setSubmittedQuery(term)
     setFilters(filters)
     setSubmittedSearchActive(true)
-    router.replace(`/explorer?q=${encodeURIComponent(term)}`, { scroll: false })
+    const url = `/explorer?q=${encodeURIComponent(term)}`
+    router.replace(url, { scroll: false })
+    // Le pathname ne change pas (juste la query) → le RouteOriginTracker ne se
+    // redéclenche pas ; on mémorise donc la recherche ici pour la loupe.
+    rememberSearchPath(url)
   }
 
   function handleSearchSubmit(event: FormEvent<HTMLFormElement>) {

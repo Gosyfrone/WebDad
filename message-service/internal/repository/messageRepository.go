@@ -314,12 +314,28 @@ func (r *MessageRepository) HasMessagesAfter(ctx context.Context, conversationID
 	return n > 0, err
 }
 
-// SetMemberRead avance le curseur de lecture d'un membre (`last_read_at`).
+// SetMemberRead avance le curseur de lecture d'un membre (`last_read_at`) ET sa
+// livraison (`last_delivered_at`) : lire implique avoir reçu, donc remis >= ouvert.
 // mongo.ErrNoDocuments si le membre n'existe pas.
 func (r *MessageRepository) SetMemberRead(ctx context.Context, conversationID, userID string, at time.Time) error {
 	res, err := r.members.UpdateOne(ctx,
 		bson.M{"conversation_id": conversationID, "user_id": userID},
-		bson.M{"$set": bson.M{"last_read_at": at}})
+		bson.M{"$set": bson.M{"last_read_at": at, "last_delivered_at": at}})
+	if err != nil {
+		return err
+	}
+	if res.MatchedCount == 0 {
+		return mongo.ErrNoDocuments
+	}
+	return nil
+}
+
+// SetMemberDelivered avance le curseur de LIVRAISON d'un membre
+// (`last_delivered_at`) — « remis ». mongo.ErrNoDocuments si le membre n'existe pas.
+func (r *MessageRepository) SetMemberDelivered(ctx context.Context, conversationID, userID string, at time.Time) error {
+	res, err := r.members.UpdateOne(ctx,
+		bson.M{"conversation_id": conversationID, "user_id": userID},
+		bson.M{"$set": bson.M{"last_delivered_at": at}})
 	if err != nil {
 		return err
 	}
@@ -514,6 +530,22 @@ func (r *MessageRepository) UpdateMessageCiphertext(ctx context.Context, msg *mo
 	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
 	var updated models.Message
 	if err := r.messages.FindOneAndUpdate(ctx, bson.M{"_id": msg.ID, "conversation_id": msg.ConversationID}, update, opts).Decode(&updated); err != nil {
+		return nil, err
+	}
+	return &updated, nil
+}
+
+// SoftDeleteMessage supprime « pour tout le monde » (tombstone) : pose
+// `deleted_at`, VIDE le contenu chiffré (ciphertext/nonce) et retire toute
+// version originale conservée. Renvoie le message tombstoné (pour la diffusion).
+func (r *MessageRepository) SoftDeleteMessage(ctx context.Context, conversationID string, id bson.ObjectID, at time.Time) (*models.Message, error) {
+	update := bson.M{
+		"$set":   bson.M{"ciphertext": "", "nonce": "", "deleted_at": at},
+		"$unset": bson.M{"original_ciphertext": "", "original_nonce": "", "edited_at": ""},
+	}
+	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
+	var updated models.Message
+	if err := r.messages.FindOneAndUpdate(ctx, bson.M{"_id": id, "conversation_id": conversationID}, update, opts).Decode(&updated); err != nil {
 		return nil, err
 	}
 	return &updated, nil
