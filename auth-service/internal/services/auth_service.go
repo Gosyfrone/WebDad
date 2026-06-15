@@ -45,14 +45,18 @@ var (
 	// ErrInvalidCurrentPassword : changement de mot de passe refusé car le mot de
 	// passe actuel fourni ne correspond pas (ou le compte n'a pas de mot de passe local).
 	ErrInvalidCurrentPassword = errors.New("mot de passe actuel invalide")
+	ErrSameEmail              = errors.New("cette adresse e-mail est déjà celle du compte")
+	ErrEmailDelivery          = errors.New("envoi de l'e-mail de confirmation impossible")
 )
 
 // Usages des account_tokens + TTL de la vérification d'e-mail.
 const (
-	purposeVerify  = "verify"
-	purposeReset   = "reset"
-	verifyTokenTTL = 24 * time.Hour
-	resetTokenTTL  = 1 * time.Hour
+	purposeVerify       = "verify"
+	purposeReset        = "reset"
+	purposeEmailChange  = "email_change"
+	verifyTokenTTL      = 24 * time.Hour
+	resetTokenTTL       = 1 * time.Hour
+	emailChangeTokenTTL = 24 * time.Hour
 )
 
 // defaultAdminID : UUID figé de l'admin par défaut, partagé avec les autres
@@ -86,6 +90,7 @@ type AuthService struct {
 	refreshExpiry time.Duration
 	mailer        Mailer // nil = envoi d'e-mails désactivé (no-op loggé)
 	appBaseURL    string // base URL du front (liens dans les e-mails)
+	mailLogoURL   string // URL absolue PUBLIQUE du logo dans les e-mails
 	// adminCreateAutoVerify : DEV/LOCAL — marque les comptes créés par un admin
 	// comme vérifiés d'office (court-circuit de la vérif e-mail). False en prod.
 	adminCreateAutoVerify bool
@@ -93,7 +98,7 @@ type AuthService struct {
 
 // New construit le service. mailer peut être nil (mail non configuré) : l'envoi
 // devient alors un no-op loggé et auth reste pleinement fonctionnel.
-func New(db *sql.DB, jwtSecret string, jwtExpiry, refreshExpiry time.Duration, mailer Mailer, appBaseURL string, adminCreateAutoVerify bool) *AuthService {
+func New(db *sql.DB, jwtSecret string, jwtExpiry, refreshExpiry time.Duration, mailer Mailer, appBaseURL, mailLogoURL string, adminCreateAutoVerify bool) *AuthService {
 	return &AuthService{
 		db:                    db,
 		jwtSecret:             []byte(jwtSecret),
@@ -101,6 +106,7 @@ func New(db *sql.DB, jwtSecret string, jwtExpiry, refreshExpiry time.Duration, m
 		refreshExpiry:         refreshExpiry,
 		mailer:                mailer,
 		appBaseURL:            appBaseURL,
+		mailLogoURL:           mailLogoURL,
 		adminCreateAutoVerify: adminCreateAutoVerify,
 	}
 }
@@ -223,6 +229,189 @@ func (s *AuthService) ChangePassword(userID, currentPassword, newPassword string
 	return s.issueTokens(u)
 }
 
+// RequestEmailChange conserve l'adresse actuelle, mémorise la nouvelle et
+// envoie un lien de confirmation à cette dernière. Un nouvel appel remplace la
+// demande précédente et invalide son jeton.
+func (s *AuthService) RequestEmailChange(userID, newEmail string) error {
+	newEmail = strings.ToLower(strings.TrimSpace(newEmail))
+
+	var currentEmail string
+	var active bool
+	err := s.db.QueryRow(`SELECT email, is_active FROM credentials WHERE id = $1`, userID).
+		Scan(&currentEmail, &active)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrUserNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("lecture utilisateur : %w", err)
+	}
+	if !active {
+		return ErrUserInactive
+	}
+	if strings.EqualFold(currentEmail, newEmail) {
+		return ErrSameEmail
+	}
+
+	var unavailable bool
+	if err := s.db.QueryRow(`
+		SELECT EXISTS(
+			SELECT 1 FROM credentials
+			WHERE id <> $1 AND (LOWER(email) = LOWER($2) OR LOWER(pending_email) = LOWER($2))
+		)`, userID, newEmail).Scan(&unavailable); err != nil {
+		return fmt.Errorf("vérification disponibilité e-mail : %w", err)
+	}
+	if unavailable {
+		return ErrEmailTaken
+	}
+
+	if _, err := s.db.Exec(`UPDATE credentials SET pending_email = $1 WHERE id = $2`, newEmail, userID); err != nil {
+		if isUniqueViolation(err) {
+			return ErrEmailTaken
+		}
+		return fmt.Errorf("enregistrement e-mail en attente : %w", err)
+	}
+
+	raw, err := s.createAccountToken(userID, purposeEmailChange, emailChangeTokenTTL)
+	if err != nil {
+		if cleanupErr := s.clearPendingEmail(userID, newEmail); cleanupErr != nil {
+			return fmt.Errorf("création jeton changement e-mail : %v (nettoyage : %v)", err, cleanupErr)
+		}
+		return err
+	}
+	if err := s.sendEmailChangeMail(userID, newEmail, raw); err != nil {
+		if cleanupErr := s.cancelEmailChangeRequest(userID, newEmail, raw); cleanupErr != nil {
+			return fmt.Errorf("envoi confirmation changement e-mail : %v (nettoyage : %v)", err, cleanupErr)
+		}
+		return fmt.Errorf("%w : %v", ErrEmailDelivery, err)
+	}
+	return nil
+}
+
+func (s *AuthService) clearPendingEmail(userID, newEmail string) error {
+	_, err := s.db.Exec(`
+		UPDATE credentials SET pending_email = NULL
+		WHERE id = $1 AND LOWER(pending_email) = LOWER($2)`, userID, newEmail)
+	if err != nil {
+		return fmt.Errorf("suppression e-mail en attente : %w", err)
+	}
+	return nil
+}
+
+// cancelEmailChangeRequest annule uniquement la demande qui vient d'échouer.
+// Les prédicats sur l'adresse et le hash évitent d'effacer une demande plus
+// récente qui aurait été créée en parallèle.
+func (s *AuthService) cancelEmailChangeRequest(userID, newEmail, rawToken string) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("début transaction annulation changement e-mail : %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if _, err := tx.Exec(`
+		DELETE FROM account_tokens
+		WHERE user_id = $1 AND purpose = $2 AND token_hash = $3`,
+		userID, purposeEmailChange, hashToken(rawToken)); err != nil {
+		return fmt.Errorf("suppression jeton changement e-mail : %w", err)
+	}
+	if _, err := tx.Exec(`
+		UPDATE credentials SET pending_email = NULL
+		WHERE id = $1 AND LOWER(pending_email) = LOWER($2)`, userID, newEmail); err != nil {
+		return fmt.Errorf("suppression e-mail en attente : %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("validation annulation changement e-mail : %w", err)
+	}
+	return nil
+}
+
+// ConfirmEmailChange promeut atomiquement pending_email, consomme le jeton et
+// révoque toutes les sessions. Une nouvelle paire portant la bonne adresse est
+// ensuite émise pour la session ouverte par le lien.
+func (s *AuthService) ConfirmEmailChange(rawToken string) (string, string, *models.User, error) {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return "", "", nil, fmt.Errorf("début transaction changement e-mail : %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	const tokenQuery = `
+		SELECT id, user_id, expires_at, used_at
+		FROM account_tokens
+		WHERE token_hash = $1 AND purpose = $2
+		FOR UPDATE`
+	var tokenID, userID string
+	var expiresAt time.Time
+	var usedAt sql.NullTime
+	if err := tx.QueryRow(tokenQuery, hashToken(rawToken), purposeEmailChange).
+		Scan(&tokenID, &userID, &expiresAt, &usedAt); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", "", nil, ErrInvalidToken
+		}
+		return "", "", nil, fmt.Errorf("lecture jeton changement e-mail : %w", err)
+	}
+	if usedAt.Valid || time.Now().After(expiresAt) {
+		return "", "", nil, ErrInvalidToken
+	}
+
+	u := &models.User{}
+	const update = `
+		UPDATE credentials
+		SET email = pending_email, pending_email = NULL, email_verified = true
+		WHERE id = $1 AND pending_email IS NOT NULL
+		RETURNING id, email, role, is_active, email_verified, must_change_password, created_at`
+	if err := tx.QueryRow(update, userID).Scan(
+		&u.ID, &u.Email, &u.Role, &u.IsActive, &u.EmailVerified, &u.MustChangePassword, &u.CreatedAt,
+	); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", "", nil, ErrInvalidToken
+		}
+		if isUniqueViolation(err) {
+			return "", "", nil, ErrEmailTaken
+		}
+		return "", "", nil, fmt.Errorf("promotion nouvelle adresse : %w", err)
+	}
+	if !u.IsActive {
+		return "", "", nil, ErrUserInactive
+	}
+	if _, err := tx.Exec(`UPDATE account_tokens SET used_at = NOW() WHERE id = $1`, tokenID); err != nil {
+		return "", "", nil, fmt.Errorf("consommation jeton changement e-mail : %w", err)
+	}
+	// Un lien de reset/vérification émis vers l'ancienne boîte ne doit plus
+	// pouvoir agir sur le compte après que son adresse a changé.
+	if _, err := tx.Exec(
+		`DELETE FROM account_tokens WHERE user_id = $1 AND id <> $2`, userID, tokenID,
+	); err != nil {
+		return "", "", nil, fmt.Errorf("invalidation anciens jetons de compte : %w", err)
+	}
+	if _, err := tx.Exec(`DELETE FROM refresh_tokens WHERE user_id = $1`, userID); err != nil {
+		return "", "", nil, fmt.Errorf("révocation sessions changement e-mail : %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return "", "", nil, fmt.Errorf("validation changement e-mail : %w", err)
+	}
+	return s.issueTokens(u)
+}
+
+func (s *AuthService) sendEmailChangeMail(userID, newEmail, rawToken string) error {
+	if s.mailer == nil {
+		return errors.New("client mail désactivé")
+	}
+	link := fmt.Sprintf("%s/verify-email-change?token=%s",
+		strings.TrimRight(s.appBaseURL, "/"), url.QueryEscape(rawToken))
+	subject := "Confirme ta nouvelle adresse e-mail — Breezy"
+	text := fmt.Sprintf("Confirme ta nouvelle adresse e-mail en ouvrant ce lien :\n%s\n\nCe lien expire dans 24 heures. Si tu n'es pas à l'origine de cette demande, ignore ce message.", link)
+	htmlBody := brandedEmailHTML(s.mailLogoURL,
+		"Nouvelle adresse e-mail",
+		"Confirme cette adresse pour l'utiliser sur ton compte Breezy.",
+		"", "Confirmer mon adresse", link,
+		"Ce lien expire dans 24 heures. Ton ancienne adresse reste active tant que tu ne confirmes pas celle-ci.")
+	if err := s.mailer.Send(newEmail, subject, htmlBody, text); err != nil {
+		slog.Warn("envoi confirmation changement e-mail échoué", "user_id", userID, "error", err)
+		return err
+	}
+	return nil
+}
+
 // sendAdminWelcomeMail envoie l'e-mail de bienvenue d'un compte créé par un
 // admin : il porte TOUJOURS le mot de passe temporaire, et — quand la
 // vérification est requise (prod) — un lien de vérification d'e-mail qui ouvre la
@@ -255,7 +444,7 @@ func (s *AuthService) sendAdminWelcomeMail(u *models.User, username, tempPasswor
 				"Pour des raisons de sécurité, tu devras choisir un nouveau mot de "+
 				"passe dès ta première connexion.",
 			who, u.Email, tempPassword, loginURL)
-		htmlBody := brandedEmailHTML(s.appBaseURL,
+		htmlBody := brandedEmailHTML(s.mailLogoURL,
 			"Ton compte Breezy est prêt 🎉",
 			fmt.Sprintf("Un administrateur a créé ton compte. Connecte-toi avec l'e-mail %s et le mot de passe temporaire ci-dessous — tu devras le changer dès ta première connexion.",
 				u.Email),
@@ -288,7 +477,7 @@ func (s *AuthService) sendAdminWelcomeMail(u *models.User, username, tempPasswor
 			"Ce lien expire dans 24 heures. À ta première connexion, tu devras "+
 			"choisir un nouveau mot de passe.",
 		who, u.Email, tempPassword, link)
-	htmlBody := brandedEmailHTML(s.appBaseURL,
+	htmlBody := brandedEmailHTML(s.mailLogoURL,
 		"Ton compte Breezy est prêt 🎉",
 		"Un administrateur a créé ton compte. Ton mot de passe temporaire est ci-dessous. Vérifie ton adresse e-mail pour te connecter — tu devras ensuite choisir un nouveau mot de passe.",
 		tempPassword,
@@ -535,7 +724,7 @@ func (s *AuthService) sendVerificationMail(u *models.User) {
 			"Ce lien expire dans 24 heures. Si tu n'es pas à l'origine de cette "+
 			"inscription, ignore ce message.",
 		link)
-	htmlBody := brandedEmailHTML(s.appBaseURL,
+	htmlBody := brandedEmailHTML(s.mailLogoURL,
 		"Bienvenue sur Breezy 👋",
 		"Plus qu'une étape : confirme ton adresse e-mail pour activer ton compte et rejoindre la conversation.",
 		"",
@@ -628,7 +817,7 @@ func (s *AuthService) sendResetMail(u *models.User) {
 			"Ce lien expire dans 1 heure. Si tu n'es pas à l'origine de cette "+
 			"demande, ignore ce message : ton mot de passe reste inchangé.",
 		link)
-	htmlBody := brandedEmailHTML(s.appBaseURL,
+	htmlBody := brandedEmailHTML(s.mailLogoURL,
 		"Réinitialise ton mot de passe 🔒",
 		"Tu as demandé à changer ton mot de passe Breezy. Choisis-en un nouveau en un clic — c'est rapide et sécurisé.",
 		"",

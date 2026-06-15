@@ -48,6 +48,8 @@ func New(auth *services.AuthService, oauthReg *oauth.Registry) *gin.Engine {
 		// /auth/password/change : changement de mot de passe authentifié (volontaire
 		// ou imposé après création par un admin). Protégé par le JWT.
 		authGroup.POST("/password/change", middleware.JWTAuth(auth), h.ChangePassword)
+		authGroup.POST("/email/change/request", middleware.JWTAuth(auth), h.RequestEmailChange)
+		authGroup.POST("/email/change/confirm", h.ConfirmEmailChange)
 		// /auth/refresh : échange le refresh token (cookie httpOnly relayé par
 		// le BFF) contre une nouvelle paire access+refresh (rotation).
 		authGroup.POST("/refresh", h.Refresh)

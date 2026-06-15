@@ -14,6 +14,7 @@ export const ROUTES = {
   register: '/register',
   checkEmail: '/check-email',
   verifyEmail: '/verify-email',
+  verifyEmailChange: '/verify-email-change',
   forgotPassword: '/forgot-password',
   resetPassword: '/reset-password',
   // Pages légales (route group (legal), publiques)

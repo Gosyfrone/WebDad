@@ -21,10 +21,12 @@ import (
 //   - ctaLabel : libellé du bouton d'action ;
 //   - ctaURL   : URL du bouton (token déjà encodé), réaffichée en repli copiable ;
 //   - footnote : mention sécurité / expiration en pied de carte.
-func brandedEmailHTML(baseURL, heading, intro, code, ctaLabel, ctaURL, footnote string) string {
-	logo := strings.TrimRight(baseURL, "/") + "/logo_breezy.png"
+//
+// logoURL est l'URL ABSOLUE du logo (découplée d'APP_BASE_URL pour rester
+// publique même en dev local — cf. config.MailLogoURL).
+func brandedEmailHTML(logoURL, heading, intro, code, ctaLabel, ctaURL, footnote string) string {
 	return strings.NewReplacer(
-		"{{LOGO}}", html.EscapeString(logo),
+		"{{LOGO}}", html.EscapeString(logoURL),
 		"{{HEADING}}", html.EscapeString(heading),
 		"{{INTRO}}", html.EscapeString(intro),
 		"{{CODE_BLOCK}}", codeBlockHTML(code),

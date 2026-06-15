@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"log/slog"
 	"net/http"
 
@@ -25,7 +26,7 @@ func NewSendHandler(m mailer.Mailer, secret string) *SendHandler {
 }
 
 // Send : POST /internal/send — envoie un e-mail.
-// Répond 202 (accepté) : l'émetteur (auth) appelle en best-effort.
+// Répond 202 uniquement quand le transport a accepté le message.
 func (h *SendHandler) Send(c *gin.Context) {
 	if c.GetHeader("X-Internal-Secret") != h.secret {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "secret interne invalide"})
@@ -49,6 +50,13 @@ func (h *SendHandler) Send(c *gin.Context) {
 		Text:    req.Text,
 	}); err != nil {
 		slog.Error("envoi e-mail échoué", "subject", req.Subject, "error", err)
+		if errors.Is(err, mailer.ErrDeliveryUnavailable) {
+			c.JSON(http.StatusServiceUnavailable, gin.H{
+				"error": "transport e-mail non configuré",
+				"code":  "delivery_unavailable",
+			})
+			return
+		}
 		c.JSON(http.StatusBadGateway, gin.H{"error": "envoi impossible"})
 		return
 	}

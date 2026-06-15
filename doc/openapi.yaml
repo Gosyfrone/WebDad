@@ -5,6 +5,107 @@ info:
   description: API agrégée de la plateforme Breezy (réseau social microservices).
   version: '1.0'
 paths:
+  /auth/email/change/confirm:
+    post:
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      tags:
+      - auth
+      summary: Confirmer un changement d'adresse e-mail
+      parameters:
+      - description: Jeton reçu à la nouvelle adresse
+        name: body
+        in: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.ConfirmEmailChangeRequest'
+      responses:
+        '200':
+          description: 'Adresse modifiée et session ouverte — data: {token, refresh_token,
+            user}'
+          schema:
+            $ref: '#/definitions/models.AuthUser'
+        '400':
+          description: Jeton invalide/expiré ou adresse devenue indisponible
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '403':
+          description: Compte désactivé
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '500':
+          description: Erreur interne
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /auth/email/change/request:
+    post:
+      security:
+      - BearerAuth: []
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      tags:
+      - auth
+      summary: Demander un changement d'adresse e-mail
+      parameters:
+      - description: Nouvelle adresse e-mail
+        name: body
+        in: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.ChangeEmailRequest'
+      responses:
+        '200':
+          description: Lien de confirmation envoyé à la nouvelle adresse
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '400':
+          description: Payload invalide, adresse identique ou déjà utilisée
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '401':
+          description: Non authentifié
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '403':
+          description: Compte désactivé
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '404':
+          description: Compte introuvable
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '500':
+          description: Erreur interne
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '503':
+          description: Service d'envoi d'e-mail indisponible
+          schema:
+            type: object
+            additionalProperties:
+              type: string
   /auth/login:
     post:
       description: Accepte `email` pour le login classique, ou `user_id` quand le
@@ -3699,6 +3800,13 @@ definitions:
         type: string
       role:
         type: string
+  models.ChangeEmailRequest:
+    type: object
+    required:
+    - email
+    properties:
+      email:
+        type: string
   models.ChangePasswordRequest:
     type: object
     required:
@@ -3710,6 +3818,13 @@ definitions:
       new_password:
         type: string
         minLength: 8
+  models.ConfirmEmailChangeRequest:
+    type: object
+    required:
+    - token
+    properties:
+      token:
+        type: string
   models.ForgotPasswordRequest:
     type: object
     required:

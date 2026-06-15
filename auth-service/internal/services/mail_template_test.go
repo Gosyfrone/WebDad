@@ -8,7 +8,7 @@ import (
 func TestBrandedEmailHTML(t *testing.T) {
 	link := "https://breezy.app/verify-email?token=abc123"
 	out := brandedEmailHTML(
-		"https://breezy.app/",
+		"https://breezy.app/logo_breezy.png",
 		"Bienvenue sur Breezy",
 		"Confirme ton adresse.",
 		"", // pas d'encart code sur ce mail
@@ -27,7 +27,7 @@ func TestBrandedEmailHTML(t *testing.T) {
 		"Confirme ton adresse.",              // intro / pré-en-tête
 		"Vérifier mon adresse",               // libellé du bouton
 		link,                                 // CTA + repli copiable
-		"https://breezy.app/logo_breezy.png", // logo dérivé du baseURL (slash final normalisé)
+		"https://breezy.app/logo_breezy.png", // URL absolue du logo (telle quelle)
 		"Ce lien expire dans 24 heures.",     // footnote
 	} {
 		if !strings.Contains(out, want) {
@@ -43,7 +43,7 @@ func TestBrandedEmailHTML(t *testing.T) {
 
 func TestBrandedEmailHTMLWithCode(t *testing.T) {
 	out := brandedEmailHTML(
-		"https://breezy.app/",
+		"https://breezy.app/logo_breezy.png",
 		"Ton compte est prêt",
 		"Voici ton mot de passe.",
 		"S3cr3t<Pass>",

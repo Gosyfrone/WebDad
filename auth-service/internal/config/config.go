@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -31,6 +32,11 @@ type Config struct {
 	MailServiceURL     string // base URL du mail-service (POST /internal/send)
 	MailInternalSecret string // secret partagé X-Internal-Secret (= .env racine)
 	AppBaseURL         string // base URL du front (liens dans les e-mails)
+	// MailLogoURL : URL ABSOLUE du logo affiché dans les e-mails. Découplée d'
+	// AppBaseURL pour rester PUBLIQUE même quand on teste en local (sinon
+	// l'<img> pointe vers http://localhost:3000 → logo cassé dans la boîte du
+	// destinataire). Défaut rétro-compatible : AppBaseURL/logo_breezy.png.
+	MailLogoURL string
 
 	// AdminCreateAutoVerify : raccourci de DEV/LOCAL. Quand true, un compte créé
 	// par un admin est marqué vérifié d'office (email_verified=true) → la
@@ -89,6 +95,7 @@ func Load() *Config {
 	cfg.MailServiceURL = getEnv("MAIL_SERVICE_URL", "http://localhost:8089")
 	cfg.MailInternalSecret = os.Getenv("MAIL_INTERNAL_SECRET")
 	cfg.AppBaseURL = getEnv("APP_BASE_URL", "http://localhost:3000")
+	cfg.MailLogoURL = getEnv("MAIL_LOGO_URL", strings.TrimRight(cfg.AppBaseURL, "/")+"/logo_breezy.png")
 	// DEV/LOCAL : court-circuite la vérification d'e-mail des comptes créés par
 	// un admin (l'envoi de mail réel se fait en ligne). À laisser false en prod.
 	cfg.AdminCreateAutoVerify = getEnv("ADMIN_CREATE_AUTO_VERIFY", "false") == "true"

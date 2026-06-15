@@ -47,7 +47,7 @@ func main() {
 		slog.Warn("MAIL_INTERNAL_SECRET absent — envoi d'e-mails désactivé (no-op)")
 	}
 
-	auth := services.New(conn, cfg.JWTSecret, cfg.JWTExpiry, cfg.RefreshExpiry, mailer, cfg.AppBaseURL, cfg.AdminCreateAutoVerify)
+	auth := services.New(conn, cfg.JWTSecret, cfg.JWTExpiry, cfg.RefreshExpiry, mailer, cfg.AppBaseURL, cfg.MailLogoURL, cfg.AdminCreateAutoVerify)
 
 	if cfg.SeedAdmin {
 		if err := auth.EnsureDefaultAdmin(cfg.SeedAdminEmail, cfg.SeedAdminPassword); err != nil {

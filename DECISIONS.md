@@ -64,7 +64,7 @@
   409 (`ErrNoLocalPassword`) steering the user to the external provider. Schema migrated via idempotent `ALTER`
   (`provider` enum default `'local'`, `provider_subject`, `password` nullable) — `'local'` keeps prior behavior intact.
 
-## Email (vérification & reset)
+## Email (vérification, changement & reset)
 
 - **`mail-service` dédié pour le transport SMTP ; la logique-token reste dans auth-service (PG).**
   `POST /internal/send` hors gateway, authentifié par `MAIL_INTERNAL_SECRET` (`X-Internal-Secret`),
@@ -73,12 +73,20 @@
 - **Tokens vérif/reset = opaques aléatoires, stockés SHA-256 hachés, usage unique (`used_at`), TTL
   vérif 24h / reset 1h.** Réutilise le pattern refresh-token : révocables sans denylist (vs JWT
   auto-portant), une fuite de table ne livre aucun token. Table unique `account_tokens(purpose enum
-  'verify'|'reset', …)`. Toute nouvelle demande invalide les précédents du même `(user_id, purpose)` ;
+  'verify'|'reset'|'email_change', …)`. Toute nouvelle demande invalide les précédents du même `(user_id, purpose)` ;
   un reset réussi **révoque toutes les sessions** (`DELETE refresh_tokens`) — un changement de
   mot de passe doit déconnecter partout. **Un reset réussi pose aussi `email_verified=true` :**
   cliquer le lien (envoyé à l'adresse du compte, TTL 1h) prouve la possession de la boîte, donc
   débloque un compte non vérifié sans vérification séparée — le reset est un second chemin de
   preuve d'adresse, équivalent au lien de vérification.
+- **Changement d'e-mail en deux temps, sans couper l'accès.** `POST /auth/email/change/request`
+  (JWT) place la nouvelle adresse normalisée dans `credentials.pending_email` (index unique partiel)
+  et lui envoie un jeton `email_change` 24h. L'adresse courante reste l'identifiant actif tant que
+  le lien n'est pas cliqué : une faute de frappe ne verrouille donc jamais le compte. La confirmation
+  publique verrouille le jeton (`FOR UPDATE`), promeut `pending_email`, consomme le jeton et révoque
+  les refresh tokens ainsi que les anciens jetons vérif/reset liés à l'ancienne boîte dans **une transaction** ; elle émet ensuite une nouvelle session dont le JWT
+  porte la nouvelle adresse. Si l'adresse est devenue indisponible entre demande et confirmation,
+  l'unicité SQL refuse la promotion sans altérer l'adresse actuelle.
 - **`forgot-password` = anti-énumération stricte** : `ForgotPassword(email)` renvoie TOUJOURS `nil`
   et le handler répond TOUJOURS `200` générique, que le compte existe, soit actif, ou non ; le mail
   n'est envoyé (best-effort) que pour un compte existant ET actif. La page front affiche le même
@@ -104,7 +112,7 @@
   et fragile.* **Admin seedé forcé `email_verified=true`** (pas de vraie boîte) pour garder un compte
   démo. Le renvoi de mail de vérif est accessible depuis la page login (les users existants passent
   `email_verified=false` et doivent se vérifier).
-- **Liens dans le mail → pages front** (`APP_BASE_URL/verify-email|reset-password?token=…`), pas
+- **Liens dans le mail → pages front** (`APP_BASE_URL/verify-email|verify-email-change|reset-password?token=…`), pas
   l'API directement : maîtrise de l'UX (succès/expiré/erreur), API qui reste JSON-only.
 - **Corps HTML des e-mails = coquille de marque partagée** (`services/mail_template.go`,
   `brandedEmailHTML`, pure & testée) : layout table + styles inline (compat Outlook/Gmail/Apple Mail),
@@ -503,3 +511,10 @@
 - **Application côté serveur dans post-service** : `GET /posts/liked?author_id=<id>` vérifie `LikesVisibility` avant de renvoyer la liste ; si privé et caller ≠ owner → 403. Le front affiche un état vide explicite (`LikesPrivateTab`) sur 403.
 - **Barrière de visibilité secondaire** : les posts hiddens (`is_hidden=true`) sont exclus directement en base (`$ne: true` dans la query Mongo). La visibilité par auteur (profil privé + non-abonné) n'est pas recheckée post par post pour éviter N appels à profil-service (acceptable à l'échelle du projet).
 - **Pas de changement sur les routes existantes** (`/posts/me/liked-ids`, `POST /like`, etc.) — la préférence ne change que la visibilité de la liste publique de likes.
+
+## Changement d'e-mail : remise stricte, autres mails best-effort (15/06/2026)
+
+- `mail-service` ne confond plus le rendu console avec une remise : sans SMTP configuré, `Mailer.Send` retourne `ErrDeliveryUnavailable` et `/internal/send` répond 503 `delivery_unavailable`.
+- Le choix de fiabilité appartient au cas métier. Inscription, reset et création admin gardent leur comportement best-effort existant ; un changement d'adresse est strict, car annoncer un lien inexistant laisserait l'utilisateur sans moyen de terminer l'opération.
+- Après une erreur de remise, auth supprime dans une transaction uniquement le jeton `email_change` exact et efface `pending_email` seulement s'il correspond encore à la demande. Ces prédicats protègent une éventuelle demande concurrente plus récente.
+- L'API publique répond 503 `email_delivery_failed`; le front n'affiche le succès qu'après acceptation réelle par SMTP. Les secrets SMTP restent exclusivement dans `mail-service/.env`.
