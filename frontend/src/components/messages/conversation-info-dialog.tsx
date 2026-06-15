@@ -26,6 +26,7 @@ import {
 } from '@/lib/messages'
 import type { RelationUser } from '@/types'
 import { useResolvedUser } from '@/lib/use-resolved-user'
+import { initialOf } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { useLanguage } from '@/components/language-provider'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -314,7 +315,7 @@ function MemberRow({
     <li className="flex items-center gap-3 py-2.5">
       <Avatar className="h-9 w-9 shrink-0">
         {user?.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user.displayName} />}
-        <AvatarFallback>{(user?.displayName.charAt(0) || '?').toUpperCase()}</AvatarFallback>
+        <AvatarFallback>{initialOf(user?.displayName, user?.username)}</AvatarFallback>
         <ActivityPresenceDot userId={user?.id} />
       </Avatar>
       <div className="flex min-w-0 flex-1 flex-col">

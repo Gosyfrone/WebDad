@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { CalendarDays, LinkIcon, Mail, MapPin } from 'lucide-react'
 
-import { cn } from '@/lib/utils'
+import { cn, initialOf } from '@/lib/utils'
 import { countryFlag, countryName } from '@/lib/countries'
 import { ROUTES } from '@/lib/routes'
 import type { RelationKind } from '@/lib/api'
@@ -49,7 +49,7 @@ export function ProfilHeader({
   onFollowChanged,
 }: ProfilHeaderProps) {
   const { t, locale } = useLanguage()
-  const initials = profil.displayName.charAt(0).toUpperCase()
+  const initials = initialOf(profil.displayName, profil.username)
   const [relationsOpen, setRelationsOpen] = useState(false)
   const [relationsTab, setRelationsTab] = useState<RelationKind>('followers')
 

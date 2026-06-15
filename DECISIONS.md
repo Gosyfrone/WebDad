@@ -193,6 +193,11 @@
   Counters are **calculated (COUNT)** on detail reads; denormalization deferred until load requires it.
 - **Identity cooldown architecture posed now, enforcement off by default.** `display_name_changed_at` /
   `username_changed_at` recorded only on real change; refusal (429) gated by env (`*_CHANGE_COOLDOWN`, default 0 = off).
+- **Profile display names use a restricted Unicode character set.** A newly created or genuinely changed
+  `display_name` accepts Unicode letters/combining marks, digits, ASCII spaces, `-` and `_` only. The same pure rule is
+  applied in the edit UI and profil-service (`POST /profils`, admin create and `PATCH /profils/me`), so bypassing the
+  browser cannot persist punctuation, `@`, `#` or emoji. Existing legacy names are not migrated or rejected when unchanged:
+  users can still edit their bio/avatar and must choose a compliant value only when they actually rename themselves.
   Capturing the baseline today avoids a contournable cooldown later; the timestamp is free, only refusal is config-driven.
 
 ## Posts
@@ -503,6 +508,13 @@
   ≥lg sidebar; ≥xl right column. Manual edge-swipe to open the drawer (Radix Sheet has no native swipe).
 - **Identity is clickable → profile everywhere** (`UserListItem` stretched link; the Follow button is raised `z-10`).
   Convention posed now so DM/notifications respect it (profile photo = minimal guaranteed anchor).
+- **Avatar fallback uses the first actual Unicode letter, globally.** Shared `initialOf(displayName, username)` skips
+  spaces, digits, separators and legacy punctuation, then falls back to the first letter of the username and finally `?`.
+  Feed, profile, navigation, search, moderation, notifications and messaging all use this helper, avoiding `_`/`-`/digits
+  as pseudo-initials. In profile editing, clearing avatar/banner stores an empty media reference and restores the existing
+  generated initial avatar or gradient banner; the old MinIO object is deliberately not deleted, matching media replacement.
+  The shared Avatar wrapper keys its Radix root by image identity because Radix otherwise retains `loaded` after a conditional
+  `AvatarImage` unmount and keeps the fallback hidden when an avatar URL is cleared.
 
 ## CI/CD
 

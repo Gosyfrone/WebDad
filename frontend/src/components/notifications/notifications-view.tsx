@@ -4,7 +4,7 @@ import { useEffect } from 'react'
 import Link from 'next/link'
 import { AtSign, Bell, Heart, MessageCircle, Quote, Repeat2, Reply, Send, Trash2, UserPlus } from 'lucide-react'
 
-import { cn, timeAgo } from '@/lib/utils'
+import { cn, initialOf, timeAgo } from '@/lib/utils'
 import { type AppNotification, type NotificationType, notificationHref } from '@/lib/notifications'
 import { acceptFollowRequest, rejectFollowRequest } from '@/lib/api'
 import { useLanguage } from '@/components/language-provider'
@@ -110,7 +110,7 @@ export function NotificationsView() {
               Icon: Bell,
               className: 'text-muted-foreground',
             }
-            const fallback = (n.actor.displayName || 'U').charAt(0).toUpperCase()
+            const fallback = initialOf(n.actor.displayName, n.actor.username)
             // Notification SYSTÈME (sans acteur) : préavis de purge RGPD. Pas de
             // lien profil, pas de navigation (le tweet masqué n'est pas visible).
             const isSystem = n.type === 'post_purge_warning'

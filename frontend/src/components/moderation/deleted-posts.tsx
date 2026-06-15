@@ -10,7 +10,7 @@ import {
   type DeletedPost,
 } from '@/lib/moderation'
 import { resolveUser, type ResolvedUser } from '@/lib/user-cache'
-import { timeAgo } from '@/lib/utils'
+import { initialOf, timeAgo } from '@/lib/utils'
 import { ProfilLink } from '@/components/profil/profil-link'
 import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
 import { useLanguage } from '@/components/language-provider'
@@ -122,7 +122,7 @@ export function DeletedPosts() {
         const author = people[post.authorId]
         const remover = people[post.hiddenBy]
         const busy = busyId === post.id
-        const initial = (author?.displayName || author?.username || 'U').charAt(0).toUpperCase()
+        const initial = initialOf(author?.displayName, author?.username)
         return (
           <article
             key={post.id}

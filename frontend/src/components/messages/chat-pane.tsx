@@ -24,7 +24,7 @@ import {
   X,
 } from 'lucide-react'
 
-import { cn } from '@/lib/utils'
+import { cn, initialOf } from '@/lib/utils'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -718,7 +718,7 @@ function MessageBubble({
               <AvatarImage src={sender.avatarUrl} alt={sender.displayName} />
             )}
             <AvatarFallback className="text-[10px]">
-              {(sender?.displayName.charAt(0) || '?').toUpperCase()}
+              {initialOf(sender?.displayName, sender?.username)}
             </AvatarFallback>
             <ActivityPresenceDot userId={sender?.id} className="h-2 w-2 border" />
           </Avatar>

@@ -40,6 +40,45 @@ func TestPlanUpdate_DisplayNameChange(t *testing.T) {
 	}
 }
 
+func TestValidDisplayName(t *testing.T) {
+	valid := []string{"Jean Dupont", "Élodie_75", "Anne-Marie", "山田 太郎", "Мария-2"}
+	for _, name := range valid {
+		if !validDisplayName(name) {
+			t.Errorf("nom valide refusé : %q", name)
+		}
+	}
+
+	invalid := []string{"", "Jean@Dupont", "#Jean", "O'Connor", "Jean.Dupont", "Jean 😊", "Jean\tDupont"}
+	for _, name := range invalid {
+		if validDisplayName(name) {
+			t.Errorf("nom invalide accepté : %q", name)
+		}
+	}
+}
+
+func TestPlanUpdate_DisplayNameValidationPreservesLegacyNames(t *testing.T) {
+	now := time.Now().UTC()
+	current := &models.Profil{DisplayName: "O'Connor"}
+
+	set, err := planUpdate(current, models.UpdateProfilRequest{
+		DisplayName: ptr("O'Connor"),
+		Bio:         ptr("Nouvelle bio"),
+	}, now, 0)
+	if err != nil {
+		t.Fatalf("nom legacy inchangé refusé : %v", err)
+	}
+	if _, ok := set["display_name"]; ok {
+		t.Fatal("le nom legacy inchangé ne doit pas être réécrit")
+	}
+	if set["bio"] != "Nouvelle bio" {
+		t.Fatalf("la bio doit rester modifiable, obtenu %v", set["bio"])
+	}
+
+	if _, err := planUpdate(current, models.UpdateProfilRequest{DisplayName: ptr("Jean@Dupont")}, now, 0); !errors.Is(err, ErrInvalidDisplayName) {
+		t.Fatalf("attendu ErrInvalidDisplayName, obtenu %v", err)
+	}
+}
+
 // TestPlanUpdate_Cooldown : avec un cooldown actif, un changement trop proche
 // du précédent est refusé ; passé le délai il est autorisé ; cooldown=0 ne
 // refuse jamais.

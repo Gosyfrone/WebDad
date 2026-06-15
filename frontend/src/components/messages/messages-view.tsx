@@ -399,6 +399,8 @@ export function MessagesView() {
         // Le destinataire n'a pas activé sa messagerie → message dédié (pas rouge).
         if (err instanceof PeerKeyMissingError) {
           toast({ title: t('messages.peer_not_activated'), variant: 'brand' })
+        } else {
+          toast({ title: t('messages.dm_failed'), variant: 'destructive' })
         }
         cleanUrl()
       })

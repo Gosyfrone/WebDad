@@ -30,7 +30,11 @@ export function timeAgo(iso: string, locale: string = 'fr'): string {
   return date.toLocaleDateString(en ? 'en-US' : 'fr-FR', { day: 'numeric', month: 'short' })
 }
 
-/** Première lettre (majuscule) d'un nom, pour les fallbacks d'avatar. */
-export function initialOf(name: string): string {
-  return (name.trim().charAt(0) || 'U').toUpperCase()
+/** Première vraie lettre Unicode du nom, puis du username, pour les avatars. */
+export function initialOf(displayName?: string | null, username?: string | null): string {
+  for (const value of [displayName, username]) {
+    const letter = value?.match(/\p{L}/u)?.[0]
+    if (letter) return letter.toLocaleUpperCase()
+  }
+  return '?'
 }

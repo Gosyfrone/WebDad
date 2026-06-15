@@ -1,6 +1,6 @@
 'use client'
 
-import { cn } from '@/lib/utils'
+import { cn, initialOf } from '@/lib/utils'
 import type { MentionController } from '@/lib/use-mention'
 import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -57,7 +57,7 @@ export function MentionAutocomplete({
           <Avatar className="h-8 w-8 shrink-0">
             {c.avatarUrl && <AvatarImage src={c.avatarUrl} alt="" />}
             <AvatarFallback className="bg-gradient-to-br from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] text-xs font-bold text-white">
-              {(c.displayName || c.username || 'U').charAt(0).toUpperCase()}
+              {initialOf(c.displayName, c.username)}
             </AvatarFallback>
             <ActivityPresenceDot userId={c.id} className="h-2.5 w-2.5" />
           </Avatar>

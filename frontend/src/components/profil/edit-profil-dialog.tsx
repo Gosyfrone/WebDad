@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useRef, useState } from 'react'
-import { Camera, Check, ChevronDown, Loader2, Search } from 'lucide-react'
+import { Camera, Check, ChevronDown, Loader2, Search, X } from 'lucide-react'
 
 import {
   buildCountryOptions,
@@ -9,8 +9,9 @@ import {
   filterCountries,
   type CountryOption,
 } from '@/lib/countries'
-import { cn } from '@/lib/utils'
+import { cn, initialOf } from '@/lib/utils'
 import { exceedsMediaLimit, MAX_MEDIA_MB, mediaUrl, uploadMedia } from '@/lib/media'
+import { isValidDisplayName } from '@/lib/display-name'
 import type { ProfilEditableFields } from '@/types'
 import { useToast } from '@/hooks/use-toast'
 import { useLanguage } from '@/components/language-provider'
@@ -96,9 +97,15 @@ export function EditProfilDialog({
   const nameTooLong = displayName.length > MAX_NAME
   const bioTooLong = bioRemaining < 0
   const displayNameChanged = trimmedName !== initial.displayName
+  const displayNameInvalid = displayNameChanged && !isValidDisplayName(trimmedName)
   const nextDisplayNameDate = getNextDisplayNameDate(displayNameChangedAt)
   const displayNameLocked = displayNameChanged && nextDisplayNameDate > new Date()
-  const canSave = trimmedName.length > 0 && !nameTooLong && !bioTooLong && !displayNameLocked
+  const canSave =
+    trimmedName.length > 0 &&
+    !nameTooLong &&
+    !displayNameInvalid &&
+    !bioTooLong &&
+    !displayNameLocked
 
   async function handleSubmit() {
     if (!canSave) return
@@ -133,22 +140,31 @@ export function EditProfilDialog({
 
         <div className="min-h-0 overflow-y-auto overscroll-contain">
           {/* Bannière éditable */}
-          <ImagePicker
-            label={t('editprofil.change_banner')}
-            onPick={setBannerUrl}
-            onError={() => toast({ title: t('editprofil.upload_failed'), variant: 'destructive' })}
-            onTooLarge={() => toast({ title: t('media.too_large', { max: MAX_MEDIA_MB }), variant: 'brand' })}
-            className={cn(
-              'relative flex h-36 w-full items-center justify-center overflow-hidden bg-cover bg-center',
-              !bannerUrl &&
-                'bg-gradient-to-r from-[#8D3DFF]/35 via-[#EADCFF] to-[#47D9FF]/25 dark:from-[#8D3DFF]/45 dark:via-[#1c1338] dark:to-[#47D9FF]/35',
+          <div className="relative">
+            <ImagePicker
+              label={t('editprofil.change_banner')}
+              onPick={setBannerUrl}
+              onError={() => toast({ title: t('editprofil.upload_failed'), variant: 'destructive' })}
+              onTooLarge={() => toast({ title: t('media.too_large', { max: MAX_MEDIA_MB }), variant: 'brand' })}
+              className={cn(
+                'relative flex h-36 w-full items-center justify-center overflow-hidden bg-cover bg-center',
+                !bannerUrl &&
+                  'bg-gradient-to-r from-[#8D3DFF]/35 via-[#EADCFF] to-[#47D9FF]/25 dark:from-[#8D3DFF]/45 dark:via-[#1c1338] dark:to-[#47D9FF]/35',
+              )}
+              style={bannerUrl ? { backgroundImage: `url(${bannerUrl})` } : undefined}
+            />
+            {bannerUrl && (
+              <ResetMediaButton
+                label={t('editprofil.reset_banner')}
+                onClick={() => setBannerUrl('')}
+                className="right-3 top-3"
+              />
             )}
-            style={bannerUrl ? { backgroundImage: `url(${bannerUrl})` } : undefined}
-          />
+          </div>
 
           {/* Avatar éditable, superposé à la bannière */}
           <div className="px-4">
-            <div className="-mt-12 w-fit">
+            <div className="relative -mt-12 w-fit">
               <ImagePicker
                 label={t('editprofil.change_avatar')}
                 onPick={setAvatarUrl}
@@ -159,10 +175,17 @@ export function EditProfilDialog({
                 <Avatar className="h-24 w-24 border-4 border-[#F8F3FF] shadow-[0_18px_44px_rgba(91,108,255,0.22)] dark:border-[#171026]">
                   {avatarUrl && <AvatarImage src={avatarUrl} alt="" />}
                   <AvatarFallback className="bg-gradient-to-br from-[#F8F3FF] via-white to-[#EEF9FF] text-2xl text-slate-950 dark:from-[#1c1338] dark:via-[#171026] dark:to-[#141a2e] dark:text-white">
-                    {trimmedName.charAt(0).toUpperCase() || '?'}
+                    {initialOf(trimmedName)}
                   </AvatarFallback>
                 </Avatar>
               </ImagePicker>
+              {avatarUrl && (
+                <ResetMediaButton
+                  label={t('editprofil.reset_avatar')}
+                  onClick={() => setAvatarUrl('')}
+                  className="right-0 top-0"
+                />
+              )}
             </div>
           </div>
 
@@ -174,13 +197,16 @@ export function EditProfilDialog({
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
                 placeholder={t('editprofil.name_placeholder')}
-                aria-invalid={nameTooLong}
+                aria-invalid={nameTooLong || displayNameInvalid}
                 className="rounded-2xl border-white/70 bg-white/82 shadow-sm shadow-slate-200/50 transition-all placeholder:text-slate-400 hover:border-[#47D9FF]/70 focus-visible:border-[#5B6CFF] focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15 dark:border-white/15 dark:bg-white/5 dark:placeholder:text-muted-foreground"
               />
               {nameTooLong && (
                 <p className="text-xs text-destructive">
                   {t('editprofil.name_max', { count: MAX_NAME })}
                 </p>
+              )}
+              {displayNameInvalid && (
+                <p className="text-xs text-destructive">{t('editprofil.name_invalid')}</p>
               )}
               {displayNameLocked && (
                 <p className="text-xs text-destructive">
@@ -507,6 +533,31 @@ function ImagePicker({ label, onPick, onError, onTooLarge, className, style, chi
         onChange={handleChange}
         className="sr-only"
       />
+    </button>
+  )
+}
+
+function ResetMediaButton({
+  label,
+  onClick,
+  className,
+}: {
+  label: string
+  onClick: () => void
+  className?: string
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      onClick={onClick}
+      className={cn(
+        'absolute z-10 rounded-full bg-black/65 p-1.5 text-white shadow-md transition hover:bg-black/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white',
+        className,
+      )}
+    >
+      <X className="h-4 w-4" aria-hidden />
     </button>
   )
 }

@@ -24,7 +24,7 @@ import { hashtagHref } from '@/lib/routes'
 import { rememberSearchPath } from '@/lib/search-tab'
 import { useFollow } from '@/lib/use-follow'
 import type { RelationUser } from '@/types'
-import { cn } from '@/lib/utils'
+import { cn, initialOf } from '@/lib/utils'
 import { useExplorerFilters } from '@/components/explorer/explorer-filter-context'
 import { MobileFilterMenu } from '@/components/explorer/explorer-filter-controls'
 import { useT } from '@/components/language-provider'
@@ -859,7 +859,7 @@ function EmptyState({
 }
 
 function initials(user: RelationUser): string {
-  return (user.displayName.charAt(0) || user.username.charAt(0) || '?').toUpperCase()
+  return initialOf(user.displayName, user.username)
 }
 
 function postMatchesQuery(post: FeedPost, query: string): boolean {

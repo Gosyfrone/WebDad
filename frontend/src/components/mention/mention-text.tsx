@@ -9,7 +9,7 @@ import { Loader2 } from 'lucide-react'
 import { getUserByUsername } from '@/lib/api'
 import { parseMentionSegments } from '@/lib/mentions'
 import { ROUTES, profilHref } from '@/lib/routes'
-import { cn } from '@/lib/utils'
+import { cn, initialOf } from '@/lib/utils'
 import type { RelationUser } from '@/types'
 import { useLanguage } from '@/components/language-provider'
 import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
@@ -164,7 +164,7 @@ function NonMemberMention({
             <Avatar className="h-11 w-11 shrink-0">
               {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt="" />}
               <AvatarFallback className="bg-gradient-to-br from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] font-bold text-white">
-                {(user.displayName || user.username || 'U').charAt(0).toUpperCase()}
+                {initialOf(user.displayName, user.username)}
               </AvatarFallback>
               <ActivityPresenceDot userId={user.id} />
             </Avatar>

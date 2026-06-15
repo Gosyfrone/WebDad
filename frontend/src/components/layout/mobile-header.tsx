@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { ArrowLeft, Bell, LogIn, LogOut, Palette, Settings } from 'lucide-react'
 
-import { cn } from '@/lib/utils'
+import { cn, initialOf } from '@/lib/utils'
 import { getAccessToken, logout } from '@/lib/auth-client'
 import { getMyProfil, subscribeProfilUpdated } from '@/lib/profil-client'
 import { useSession } from '@/lib/session'
@@ -101,9 +101,7 @@ export function MobileHeader() {
 
   // Rôle réel issu du JWT (cf. lib/session) ; `null` au 1er rendu (hydratation).
   const role = session?.role ?? null
-  const fallbackInitial = (account.displayName || account.username || 'U')
-    .charAt(0)
-    .toUpperCase()
+  const fallbackInitial = initialOf(account.displayName, account.username)
   // Avant le chargement du profil (username vide) on affiche un libellé traduit.
   const shownName = account.username ? account.displayName : t('common.user')
   const handle = account.username ? `@${account.username}` : `@${t('common.username_fallback')}`

@@ -1,6 +1,6 @@
 'use client'
 
-import { cn } from '@/lib/utils'
+import { cn, initialOf } from '@/lib/utils'
 import type { RelationUser } from '@/types'
 import { useT } from '@/components/language-provider'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -62,7 +62,7 @@ export function UserListItem({
   onRemoveFollower,
 }: UserListItemProps) {
   const t = useT()
-  const initials = (user.displayName.charAt(0) || user.username.charAt(0) || '?').toUpperCase()
+  const initials = initialOf(user.displayName, user.username)
 
   return (
     <div

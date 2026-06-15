@@ -11,7 +11,7 @@ import {
   type AdminUser,
 } from '@/lib/admin'
 import { useSession } from '@/lib/session'
-import { timeAgo } from '@/lib/utils'
+import { initialOf, timeAgo } from '@/lib/utils'
 import { ProfilLink } from '@/components/profil/profil-link'
 import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
 import { useLanguage } from '@/components/language-provider'
@@ -170,9 +170,7 @@ export function AccountsPanel({ canGovern }: AccountsPanelProps) {
             // Un modérateur ne peut bannir qu'un utilisateur simple (le back le
             // refuse aussi). Un admin agit sur tout le monde sauf lui-même.
             const banAllowed = !isSelf && (canGovern || user.role === 'user')
-            const initial = (user.displayName || user.username || user.email || 'U')
-              .charAt(0)
-              .toUpperCase()
+            const initial = initialOf(user.displayName, user.username || user.email)
             return (
               <li
                 key={user.id}
