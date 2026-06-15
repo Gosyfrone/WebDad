@@ -21,17 +21,23 @@ const (
 // `$inc` au fil des likes/commentaires (le validateur Mongo les déclare en
 // `int` → on utilise `int32`, sinon un `int64` casserait la validation).
 type Post struct {
-	ID            bson.ObjectID `bson:"_id,omitempty" json:"id"`
-	AuthorID      string        `bson:"author_id" json:"author_id"`
-	Content       string        `bson:"content" json:"content"`
-	Hashtags      []string      `bson:"hashtags,omitempty" json:"hashtags,omitempty"`
-	Media         []MediaRef    `bson:"media,omitempty" json:"media,omitempty"`
-	Poll          *Poll         `bson:"poll,omitempty" json:"poll,omitempty"`
-	QuotePostID   string        `bson:"quote_post_id,omitempty" json:"quote_post_id,omitempty"`
-	LikesCount    int32         `bson:"likes_count" json:"likes_count"`
-	CommentsCount int32         `bson:"comments_count" json:"comments_count"`
-	RepostsCount  int32         `bson:"reposts_count" json:"reposts_count"`
-	PinnedAt      *time.Time    `bson:"pinned_at,omitempty" json:"pinned_at,omitempty"`
+	ID          bson.ObjectID `bson:"_id,omitempty" json:"id"`
+	AuthorID    string        `bson:"author_id" json:"author_id"`
+	Content     string        `bson:"content" json:"content"`
+	Hashtags    []string      `bson:"hashtags,omitempty" json:"hashtags,omitempty"`
+	Media       []MediaRef    `bson:"media,omitempty" json:"media,omitempty"`
+	Poll        *Poll         `bson:"poll,omitempty" json:"poll,omitempty"`
+	QuotePostID string        `bson:"quote_post_id,omitempty" json:"quote_post_id,omitempty"`
+	// ReplyAudience : qui peut commenter/répondre au post — `everyone` (défaut)
+	// ou `followers` (auteur + abonnés ; mods/admins toujours autorisés). Choisi
+	// à la création, non éditable ensuite (parité avec l'audience d'un sondage).
+	// `omitempty` ⇒ jamais de `""` persisté ; absent sur un vieux doc = `everyone`
+	// (cf. ReplyAudienceOf), donc aucune migration nécessaire.
+	ReplyAudience string     `bson:"reply_audience,omitempty" json:"reply_audience"`
+	LikesCount    int32      `bson:"likes_count" json:"likes_count"`
+	CommentsCount int32      `bson:"comments_count" json:"comments_count"`
+	RepostsCount  int32      `bson:"reposts_count" json:"reposts_count"`
+	PinnedAt      *time.Time `bson:"pinned_at,omitempty" json:"pinned_at,omitempty"`
 	// Suppression « douce » par la modération : un modérateur/admin qui retire le
 	// post d'autrui le MASQUE (is_hidden) au lieu de l'effacer → il sort des fils
 	// publics mais reste restaurable depuis la corbeille de modération. HiddenAt
@@ -47,14 +53,33 @@ type Post struct {
 	PurgeAt      *time.Time `bson:"-" json:"purge_at,omitempty"`
 	RepostedByID string     `bson:"-" json:"reposted_by_id,omitempty"`
 	RepostedAt   *time.Time `bson:"-" json:"reposted_at,omitempty"`
-	CreatedAt    time.Time  `bson:"created_at" json:"created_at"`
-	UpdatedAt    time.Time  `bson:"updated_at" json:"updated_at"`
+	// CanReply : transient, hydraté par viewer — `true` si le lecteur courant peut
+	// commenter/répondre (toujours `true` si reply_audience=everyone ; sinon auteur,
+	// abonné, ou mod/admin). Sert à (dés)activer le composer côté front. Non stocké.
+	CanReply  bool      `bson:"-" json:"can_reply"`
+	CreatedAt time.Time `bson:"created_at" json:"created_at"`
+	UpdatedAt time.Time `bson:"updated_at" json:"updated_at"`
 }
 
 const (
 	PollAudienceEveryone  = "everyone"
 	PollAudienceFollowers = "followers"
 )
+
+// Audience des réponses à un post (qui peut commenter/répondre).
+const (
+	ReplyAudienceEveryone  = "everyone"
+	ReplyAudienceFollowers = "followers"
+)
+
+// ReplyAudienceOf normalise l'audience des réponses d'un post : une valeur vide
+// ou absente (vieux documents antérieurs au champ) vaut `everyone`.
+func ReplyAudienceOf(p *Post) string {
+	if p == nil || p.ReplyAudience == "" {
+		return ReplyAudienceEveryone
+	}
+	return p.ReplyAudience
+}
 
 // Poll — sondage embarqué dans un post. Les votes sont stockés à part dans
 // `poll_votes` pour garantir "un vote par utilisateur", tandis que les
@@ -147,10 +172,13 @@ type MediaRef struct {
 // est optionnel SI au moins un média est joint (vérifié dans le handler) ;
 // jusqu'à 4 médias.
 type CreatePostRequest struct {
-	Content     string             `json:"content" binding:"max=280"`
-	Media       []MediaRef         `json:"media" binding:"max=4,dive"`
-	Poll        *CreatePollRequest `json:"poll"`
-	QuotePostID string             `json:"quote_post_id"`
+	Content string             `json:"content" binding:"max=280"`
+	Media   []MediaRef         `json:"media" binding:"max=4,dive"`
+	Poll    *CreatePollRequest `json:"poll"`
+	// ReplyAudience (optionnel) : qui peut répondre — `everyone` (défaut) ou
+	// `followers`. Vide = `everyone`.
+	ReplyAudience string `json:"reply_audience" binding:"omitempty,oneof=everyone followers"`
+	QuotePostID   string `json:"quote_post_id"`
 }
 
 type CreatePollRequest struct {

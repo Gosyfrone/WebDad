@@ -151,6 +151,7 @@ export function PostPhotoModal({ post, index, onClose }: PostPhotoModalProps) {
           <CommentSection
             postId={post.id}
             onCountChange={(delta) => setCommentCount((n) => Math.max(0, n + delta))}
+            canReply={post.canReply}
           />
         </div>
       </div>

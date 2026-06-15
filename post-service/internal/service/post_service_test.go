@@ -249,6 +249,81 @@ func TestExtractHashtags(t *testing.T) {
 	}
 }
 
+// TestReplyAudienceOf : audience vide/absente = everyone (rétrocompat vieux docs).
+func TestReplyAudienceOf(t *testing.T) {
+	cases := []struct {
+		name string
+		post *models.Post
+		want string
+	}{
+		{"nil", nil, models.ReplyAudienceEveryone},
+		{"vide", &models.Post{}, models.ReplyAudienceEveryone},
+		{"everyone", &models.Post{ReplyAudience: models.ReplyAudienceEveryone}, models.ReplyAudienceEveryone},
+		{"followers", &models.Post{ReplyAudience: models.ReplyAudienceFollowers}, models.ReplyAudienceFollowers},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := models.ReplyAudienceOf(tc.post); got != tc.want {
+				t.Fatalf("ReplyAudienceOf = %q, attendu %q", got, tc.want)
+			}
+		})
+	}
+}
+
+// stubFollow implémente followStatusClient pour les tests de la barrière.
+type stubFollow struct {
+	follows bool
+	err     error
+	calls   int
+}
+
+func (s *stubFollow) IsFollowing(context.Context, string, string) (bool, error) {
+	s.calls++
+	return s.follows, s.err
+}
+
+// TestCanReplyTo : barrière « qui peut répondre ». everyone → toujours OK sans
+// appel user-service ; followers → auteur/mod/admin bypass, sinon check abonnement.
+func TestCanReplyTo(t *testing.T) {
+	postEveryone := &models.Post{AuthorID: "author-1", ReplyAudience: models.ReplyAudienceEveryone}
+	postFollowers := &models.Post{AuthorID: "author-1", ReplyAudience: models.ReplyAudienceFollowers}
+
+	cases := []struct {
+		name      string
+		post      *models.Post
+		actorID   string
+		actorRole string
+		follows   bool
+		want      bool
+		wantCalls int // appels IsFollowing attendus
+	}{
+		{"everyone tiers", postEveryone, "x", models.RoleUser, false, true, 0},
+		{"followers auteur", postFollowers, "author-1", models.RoleUser, false, true, 0},
+		{"followers modérateur", postFollowers, "mod-9", models.RoleModerator, false, true, 0},
+		{"followers admin", postFollowers, "admin-9", models.RoleAdmin, false, true, 0},
+		{"followers abonné", postFollowers, "x", models.RoleUser, true, true, 1},
+		{"followers non-abonné", postFollowers, "x", models.RoleUser, false, false, 1},
+		{"followers visiteur", postFollowers, "", "", false, false, 0},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			follow := &stubFollow{follows: tc.follows}
+			s := NewPostService(nil, WithFollowClient(follow))
+			got, err := s.canReplyTo(context.Background(), tc.post, tc.actorID, tc.actorRole)
+			if err != nil {
+				t.Fatalf("canReplyTo erreur inattendue : %v", err)
+			}
+			if got != tc.want {
+				t.Fatalf("canReplyTo = %v, attendu %v", got, tc.want)
+			}
+			if follow.calls != tc.wantCalls {
+				t.Fatalf("IsFollowing appelé %d fois, attendu %d", follow.calls, tc.wantCalls)
+			}
+		})
+	}
+}
+
 func TestTrendQueryMatching(t *testing.T) {
 	query := normalizeTrendQuery(" #Br")
 	if query != "br" {

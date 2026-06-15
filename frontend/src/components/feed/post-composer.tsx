@@ -1,7 +1,20 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Image as ImageIcon, ListChecks, Loader2, Pin, Plus, Smile, Trash2, X } from 'lucide-react'
+import {
+  Check,
+  ChevronDown,
+  Globe,
+  Image as ImageIcon,
+  ListChecks,
+  Loader2,
+  Pin,
+  Plus,
+  Smile,
+  Trash2,
+  Users,
+  X,
+} from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import { getAccessToken } from '@/lib/auth-client'
@@ -15,6 +28,7 @@ import {
   type FeedPost,
   type PollAudience,
   type PostMedia,
+  type ReplyAudience,
 } from '@/lib/posts'
 import { useToast } from '@/hooks/use-toast'
 import type { ProfilDetails } from '@/types'
@@ -26,6 +40,12 @@ import { useT } from '@/components/language-provider'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { EmojiPicker } from '@/components/feed/emoji-picker'
 import { MentionAutocomplete } from '@/components/mention/mention-autocomplete'
 import { HashtagAutocomplete } from '@/components/hashtag/hashtag-autocomplete'
@@ -78,6 +98,7 @@ export function PostComposer({
   const [pollHours, setPollHours] = useState(0)
   const [pollMinutes, setPollMinutes] = useState(10)
   const [pollAudience, setPollAudience] = useState<PollAudience>('everyone')
+  const [replyAudience, setReplyAudience] = useState<ReplyAudience>('everyone')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const mention = useMention({
@@ -119,13 +140,14 @@ export function PostComposer({
     if (isEmpty || isOver || submitting || uploadingMedia) return
     setSubmitting(true)
     try {
-      const created = await createPost(content.trim(), media, quotePost?.id, pollPayload)
+      const created = await createPost(content.trim(), media, quotePost?.id, pollPayload, replyAudience)
       const post = pinOnProfile ? await pinPost(created.id) : created
       notifyPostCreated(post) // le fil prépend sans refetch
       onPosted?.(content)
       setContent('')
       setMedia([])
       setPinOnProfile(false)
+      setReplyAudience('everyone')
       resetPoll()
     } catch {
       toast({ title: t('composer.post_failed'), variant: 'destructive' })
@@ -272,6 +294,8 @@ export function PostComposer({
           <QuotePreview post={quotePost} />
         )}
 
+        <ReplyAudiencePill value={replyAudience} onChange={setReplyAudience} />
+
         <Separator className="bg-border" />
 
         {/* Toolbar */}
@@ -360,6 +384,57 @@ export function PostComposer({
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+/**
+ * Pilule « Qui peut répondre » (façon X) : bouton toujours visible sous le texte
+ * qui ouvre un menu Tout le monde / Abonnés. Le défaut est `everyone`.
+ */
+function ReplyAudiencePill({
+  value,
+  onChange,
+}: {
+  value: ReplyAudience
+  onChange: (value: ReplyAudience) => void
+}) {
+  const t = useT()
+  const Icon = value === 'followers' ? Users : Globe
+  const pill = value === 'followers' ? t('composer.reply_pill_followers') : t('composer.reply_pill_everyone')
+  const options: { value: ReplyAudience; label: string; icon: typeof Globe }[] = [
+    { value: 'everyone', label: t('composer.reply_everyone'), icon: Globe },
+    { value: 'followers', label: t('composer.reply_followers'), icon: Users },
+  ]
+  return (
+    <div className="-mt-1">
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            aria-label={t('composer.reply_audience')}
+            className="inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-sm font-semibold text-[#5B6CFF] transition-colors hover:bg-primary/10"
+          >
+            <Icon className="h-4 w-4" />
+            <span>{pill}</span>
+            <ChevronDown className="h-4 w-4" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-60">
+          <p className="px-2 py-1.5 text-sm font-bold">{t('composer.reply_audience')}</p>
+          {options.map((opt) => (
+            <DropdownMenuItem
+              key={opt.value}
+              onClick={() => onChange(opt.value)}
+              className="flex items-center gap-2"
+            >
+              <opt.icon className="h-4 w-4 text-muted-foreground" />
+              <span className="flex-1">{opt.label}</span>
+              {value === opt.value && <Check className="h-4 w-4 text-[#5B6CFF]" />}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   )
 }

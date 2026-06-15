@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Image as ImageIcon, Loader2, Smile, Trash2, X } from 'lucide-react'
+import { Image as ImageIcon, Loader2, Smile, Trash2, Users, X } from 'lucide-react'
 
 import { cn, initialOf, timeAgo } from '@/lib/utils'
 import { getAccessToken } from '@/lib/auth-client'
@@ -45,6 +45,10 @@ interface CommentSectionProps {
   focusCommentId?: string
   /** Notifie le parent d'une variation du nombre de commentaires (+1 / -N). */
   onCountChange?: (delta: number) => void
+  /** L'utilisateur courant peut-il commenter/répondre (audience du post) ?
+   *  `false` → composer remplacé par un message « réservé aux abonnés ». Le
+   *  serveur reste autoritaire ; défaut `true`. */
+  canReply?: boolean
 }
 
 /**
@@ -52,7 +56,7 @@ interface CommentSectionProps {
  * commentaires racine (« Voir plus de commentaires »). Chaque commentaire gère
  * ses propres réponses (threading à 2 niveaux, cf. CommentThread).
  */
-export function CommentSection({ postId, focusCommentId, onCountChange }: CommentSectionProps) {
+export function CommentSection({ postId, focusCommentId, onCountChange, canReply = true }: CommentSectionProps) {
   const { toast } = useToast()
   const { t } = useLanguage()
   const { isVisitor, promptLogin } = useAuthGate()
@@ -215,7 +219,8 @@ export function CommentSection({ postId, focusCommentId, onCountChange }: Commen
 
   return (
     <div className="mt-2 border-t border-border pt-3">
-      {/* Composer racine — remplacé par une invite de connexion pour le visiteur. */}
+      {/* Composer racine — invite de connexion pour le visiteur ; message
+          « réservé aux abonnés » si l'audience du post bloque le lecteur. */}
       {isVisitor ? (
         <button
           type="button"
@@ -224,6 +229,11 @@ export function CommentSection({ postId, focusCommentId, onCountChange }: Commen
         >
           {t('comment.placeholder')}
         </button>
+      ) : !canReply ? (
+        <p className="flex items-center justify-center gap-2 rounded-full border border-border bg-muted/40 px-4 py-2 text-center text-sm text-muted-foreground">
+          <Users className="h-4 w-4 shrink-0" aria-hidden />
+          {t('comment.restricted_followers')}
+        </p>
       ) : (
       <div className="flex flex-col gap-2">
         {media.length > 0 && (
@@ -319,6 +329,7 @@ export function CommentSection({ postId, focusCommentId, onCountChange }: Commen
                 highlightId={highlightId}
                 onRemove={handleRemoveRoot}
                 onCountChange={onCountChange}
+                canReply={canReply}
               />
             ))}
             {/* Sentinelle de défilement infini (commentaires racine). */}
@@ -345,13 +356,16 @@ interface CommentThreadProps {
   highlightId?: string
   onRemove: (id: string) => void
   onCountChange?: (delta: number) => void
+  /** L'audience du post autorise-t-elle le lecteur à répondre ? Masque les
+   *  boutons « Répondre » sinon (le serveur reste autoritaire). */
+  canReply?: boolean
 }
 
 /**
  * Un commentaire racine + ses réponses (repliées par défaut, indentées).
  * Réponses paginées (« Voir plus de réponses ») ; composer de réponse inline.
  */
-function CommentThread({ postId, comment, focusCommentId, highlightId, onRemove, onCountChange }: CommentThreadProps) {
+function CommentThread({ postId, comment, focusCommentId, highlightId, onRemove, onCountChange, canReply = true }: CommentThreadProps) {
   const { toast } = useToast()
   const { t } = useLanguage()
   const { promptLogin } = useAuthGate()
@@ -528,12 +542,14 @@ function CommentThread({ postId, comment, focusCommentId, highlightId, onRemove,
         onDelete={deleteRoot}
         footer={
           <div className="mt-1 flex items-center gap-3 text-xs font-semibold text-muted-foreground">
-            <button
-              className="transition-colors hover:text-[#5B6CFF]"
-              onClick={() => openReplyTo({ id: comment.id, username: comment.author.username })}
-            >
-              {t('comment.reply')}
-            </button>
+            {canReply && (
+              <button
+                className="transition-colors hover:text-[#5B6CFF]"
+                onClick={() => openReplyTo({ id: comment.id, username: comment.author.username })}
+              >
+                {t('comment.reply')}
+              </button>
+            )}
             {replyCount > 0 && (
               <button className="transition-colors hover:text-[#5B6CFF]" onClick={toggleReplies}>
                 {open
@@ -635,14 +651,16 @@ function CommentThread({ postId, comment, focusCommentId, highlightId, onRemove,
                 highlighted={highlightId === r.id}
                 onDelete={() => deleteReply(r)}
                 footer={
-                  <div className="mt-1 text-xs font-semibold text-muted-foreground">
-                    <button
-                      className="transition-colors hover:text-[#5B6CFF]"
-                      onClick={() => openReplyTo({ id: r.id, username: r.author.username })}
-                    >
-                      {t('comment.reply')}
-                    </button>
-                  </div>
+                  canReply ? (
+                    <div className="mt-1 text-xs font-semibold text-muted-foreground">
+                      <button
+                        className="transition-colors hover:text-[#5B6CFF]"
+                        onClick={() => openReplyTo({ id: r.id, username: r.author.username })}
+                      >
+                        {t('comment.reply')}
+                      </button>
+                    </div>
+                  ) : undefined
                 }
               />
             ))}

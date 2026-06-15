@@ -55,7 +55,7 @@ func (h *PostHandler) CreatePost(c *gin.Context) {
 		return
 	}
 
-	post, err := h.service.CreatePost(c.Request.Context(), claims.UserID, req.Content, req.QuotePostID, req.Media, req.Poll)
+	post, err := h.service.CreatePost(c.Request.Context(), claims.UserID, req.Content, req.QuotePostID, req.Media, req.Poll, req.ReplyAudience)
 	if err != nil {
 		respondPostError(c, err)
 		return
@@ -479,9 +479,9 @@ func respondPostError(c *gin.Context, err error) {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 	case errors.Is(err, service.ErrInvalidID):
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-	case errors.Is(err, service.ErrInvalidPoll):
+	case errors.Is(err, service.ErrInvalidPoll), errors.Is(err, service.ErrInvalidReplyAudience):
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-	case errors.Is(err, service.ErrForbidden), errors.Is(err, service.ErrDefaultCollection):
+	case errors.Is(err, service.ErrForbidden), errors.Is(err, service.ErrDefaultCollection), errors.Is(err, service.ErrReplyNotAllowed):
 		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
 	case errors.Is(err, service.ErrPrivateProfil):
 		logging.FromGin(c).Warn("accès refusé : profil privé")

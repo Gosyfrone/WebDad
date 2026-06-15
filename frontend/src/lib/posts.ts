@@ -36,6 +36,8 @@ export interface ApiPost {
   media?: { url: string; type: 'image' | 'video' }[]
   poll?: ApiPoll
   quote_post_id?: string
+  reply_audience?: ReplyAudience
+  can_reply?: boolean
   likes_count: number
   comments_count: number
   reposts_count?: number
@@ -119,6 +121,10 @@ export interface FeedPost {
   poll: PostPoll | null
   quotePostId: string
   quotedPost: FeedPost | null
+  /** Qui peut répondre/commenter (`everyone` par défaut). */
+  replyAudience: ReplyAudience
+  /** L'utilisateur courant peut-il répondre/commenter ce post ? */
+  canReply: boolean
   likesCount: number
   commentsCount: number
   repostsCount: number
@@ -140,6 +146,9 @@ export interface FeedPost {
 }
 
 export type PollAudience = 'everyone' | 'followers'
+
+/** Audience des réponses d'un post : tout le monde, ou seulement les abonnés. */
+export type ReplyAudience = 'everyone' | 'followers'
 
 export interface PostPollChoice {
   id: string
@@ -332,6 +341,10 @@ async function toFeedPost(
     poll: p.poll ? toPostPoll(p.poll) : null,
     quotePostId: p.quote_post_id ?? '',
     quotedPost,
+    replyAudience: p.reply_audience === 'followers' ? 'followers' : 'everyone',
+    // Absent dans la réponse = non restreint ⇒ on autorise (le serveur reste
+    // autoritaire à l'écriture). Seul un `false` explicite désactive le composer.
+    canReply: p.can_reply !== false,
     likesCount: p.likes_count ?? 0,
     commentsCount: p.comments_count ?? 0,
     repostsCount: p.reposts_count ?? 0,
@@ -524,10 +537,13 @@ export async function createPost(
   media: PostMedia[] = [],
   quotePostId?: string,
   poll?: CreatePollPayload,
+  replyAudience: ReplyAudience = 'everyone',
 ): Promise<FeedPost> {
   const payload: Record<string, unknown> = { content }
   if (media.length > 0) payload.media = media
   if (quotePostId) payload.quote_post_id = quotePostId
+  // `everyone` est le défaut serveur → n'envoyer le champ que s'il est restreint.
+  if (replyAudience === 'followers') payload.reply_audience = replyAudience
   if (poll) {
     payload.poll = {
       choices: poll.choices,
