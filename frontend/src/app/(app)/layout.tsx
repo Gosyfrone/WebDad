@@ -22,7 +22,13 @@ import { ExplorerFilterProvider } from '@/components/explorer/explorer-filter-co
  * Le rôle réel est désormais dérivé du JWT par `useSession()` directement dans
  * `SidebarLeft` / `MobileHeader` (cf. lib/session.ts) — plus de placeholder.
  */
-export default function AppLayout({ children }: { children: React.ReactNode }) {
+export default function AppLayout({
+  children,
+  modal,
+}: {
+  children: React.ReactNode
+  modal: React.ReactNode
+}) {
   return (
     <AuthPromptProvider>
       <NotificationsProvider>
@@ -57,6 +63,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   (prioritaire), puis du username provisoire si suffixé. */}
               <PasswordChangeGate />
               <UsernamePendingGate />
+
+              {/* Slot parallèle : détail d'un post en panneau plein écran
+                  (intercepting route), feed gardé monté derrière. */}
+              {modal}
             </div>
           </ExplorerFilterProvider>
         </MessagesProvider>
