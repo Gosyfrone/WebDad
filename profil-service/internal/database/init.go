@@ -198,6 +198,7 @@ var validators = map[string]bson.M{
 				// Champs optionnels (validés uniquement s'ils sont présents).
 				"birth_date":              bson.M{"bsonType": "date"},
 				"gender":                  bson.M{"bsonType": "string", "enum": bson.A{"male", "female"}},
+				"nationality":             bson.M{"bsonType": "string", "pattern": "^[A-Z]{2}$"},
 				"display_name_changed_at": bson.M{"bsonType": "date"},
 				"created_at":              bson.M{"bsonType": "date"},
 				"updated_at":              bson.M{"bsonType": "date"},

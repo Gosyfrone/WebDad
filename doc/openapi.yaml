@@ -3744,6 +3744,9 @@ definitions:
         type: string
       location:
         type: string
+      nationality:
+        description: ISO 3166-1 alpha-2
+        type: string
       updated_at:
         type: string
       user_id:
@@ -3778,6 +3781,8 @@ definitions:
         - public
         - private
       location:
+        type: string
+      nationality:
         type: string
       visibility:
         type: string

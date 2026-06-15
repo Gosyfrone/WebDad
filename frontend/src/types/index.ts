@@ -48,6 +48,8 @@ export interface ProfilDetails {
   location: string
   birthDate: string
   gender: 'male' | 'female' | ''
+  /** Code pays ISO 3166-1 alpha-2. */
+  nationality: string
   /** Date d'inscription (ISO 8601). */
   joinedAt: string
   updatedAt: string
@@ -70,6 +72,7 @@ export interface ProfilEditableFields {
   location: string
   birthDate: string
   gender: 'male' | 'female' | ''
+  nationality: string
 }
 
 /**

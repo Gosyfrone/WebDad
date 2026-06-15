@@ -29,7 +29,8 @@ type Profil struct {
 	Website         string     `json:"website"               bson:"website"`
 	Location        string     `json:"location"              bson:"location"`
 	BirthDate       *time.Time `json:"birth_date,omitempty"  bson:"birth_date,omitempty"`
-	Gender          string     `json:"gender,omitempty"      bson:"gender,omitempty"` // "male" | "female"
+	Gender          string     `json:"gender,omitempty"      bson:"gender,omitempty"`      // "male" | "female"
+	Nationality     string     `json:"nationality,omitempty" bson:"nationality,omitempty"` // ISO 3166-1 alpha-2
 	CreatedAt       time.Time  `json:"created_at"            bson:"created_at"`
 	UpdatedAt       time.Time  `json:"updated_at"            bson:"updated_at"`
 	Visibility      string     `json:"visibility"       bson:"visibility,omitempty"`
@@ -75,6 +76,7 @@ type UpdateProfilRequest struct {
 	Location        *string    `json:"location"     binding:"omitempty"`
 	BirthDate       *time.Time `json:"birth_date"   binding:"omitempty"`
 	Gender          *string    `json:"gender"       binding:"omitempty,oneof=male female"`
+	Nationality     *string    `json:"nationality"  binding:"omitempty,iso3166_1_alpha2"`
 	Visibility      *string    `json:"visibility"        binding:"omitempty,oneof=public private"`
 	LikesVisibility *string    `json:"likes_visibility"   binding:"omitempty,oneof=public private"`
 }

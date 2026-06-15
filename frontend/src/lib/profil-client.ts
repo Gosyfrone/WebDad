@@ -27,6 +27,7 @@ type ApiProfil = {
   location?: string
   birth_date?: string
   gender?: 'male' | 'female'
+  nationality?: string
   created_at?: string
   updated_at?: string
   display_name_changed_at?: string
@@ -146,6 +147,7 @@ function mergeProfil(
     location: profil?.location ?? '',
     birthDate: profil?.birth_date ?? '',
     gender: profil?.gender ?? '',
+    nationality: profil?.nationality ?? '',
     joinedAt: user.created_at,
     updatedAt: profil?.updated_at ?? user.updated_at ?? user.created_at,
     displayNameChangedAt: profil?.display_name_changed_at ?? '',
@@ -191,6 +193,7 @@ function toUpdatePayload(fields: ProfilEditableFields) {
     website: fields.website,
     location: fields.location,
     gender: fields.gender || undefined,
+    nationality: fields.nationality || undefined,
     birth_date: fields.birthDate ? new Date(fields.birthDate).toISOString() : undefined,
   }
 }

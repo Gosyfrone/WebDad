@@ -149,6 +149,10 @@
 - **Profile visibility defaults to public, then is user-configurable in settings.** `POST /profils` always stores
   `visibility=public`; `/parametres` calls `PATCH /profils/me` with `public|private`. This keeps signup friction low
   and leaves the privacy barrier enforceable server-side by post-service.
+- **Nationality is stored as an ISO 3166-1 alpha-2 code in profil-service, never as a translated label.** The
+  searchable edit combobox loads the public FIRST country catalogue through cached BFF route `/api/countries`;
+  `Intl.DisplayNames` localizes names in FR/EN. The external API is only a catalogue source: persisted profiles
+  and profile rendering remain functional if it is unavailable.
 - **`ProfilDetails` aggregation (read) is composed by the caller** (front/BFF), not the service — decouples
   service from aggregation, no routing change.
 - **Each service owns its schema** (`EnsureSchema` at boot, idempotent, Mongo `collMod` resync). Single source

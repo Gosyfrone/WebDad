@@ -121,3 +121,14 @@ func TestPlanUpdate_Visibility(t *testing.T) {
 		t.Fatal("visibility ne devrait pas être réécrite (valeur identique)")
 	}
 }
+
+func TestPlanUpdate_Nationality(t *testing.T) {
+	now := time.Now().UTC()
+	set, err := planUpdate(&models.Profil{}, models.UpdateProfilRequest{Nationality: ptr("FR")}, now, 0)
+	if err != nil {
+		t.Fatalf("err inattendue : %v", err)
+	}
+	if set["nationality"] != "FR" {
+		t.Fatalf("nationality = %v, attendu FR", set["nationality"])
+	}
+}
