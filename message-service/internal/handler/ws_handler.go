@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -59,6 +60,7 @@ func (h *WSHandler) Connect(c *gin.Context) {
 		return
 	}
 
+	slog.Debug("ws messages connecté", "user_id", claims.UserID)
 	// Bloque jusqu'à la fermeture de la socket (lecture/écriture gérées par le hub).
 	h.hub.Register(claims.UserID, ws)
 }

@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/webdad/post-service/internal/logging"
 	"github.com/webdad/post-service/internal/middleware"
 	"github.com/webdad/post-service/internal/models"
 	"github.com/webdad/post-service/internal/service"
@@ -59,6 +60,7 @@ func (h *PostHandler) CreatePost(c *gin.Context) {
 		respondPostError(c, err)
 		return
 	}
+	logging.FromGin(c).Info("post créé", "post_id", post.ID)
 	c.JSON(http.StatusCreated, gin.H{"data": post})
 }
 
@@ -338,6 +340,7 @@ func (h *PostHandler) DeletePost(c *gin.Context) {
 		respondPostError(c, err)
 		return
 	}
+	logging.FromGin(c).Info("post supprimé", "post_id", c.Param("id"))
 	c.Status(http.StatusNoContent)
 }
 
@@ -370,6 +373,7 @@ func (h *PostHandler) RestorePost(c *gin.Context) {
 		respondPostError(c, err)
 		return
 	}
+	logging.FromGin(c).Info("post restauré (modération)", "post_id", c.Param("id"))
 	c.JSON(http.StatusOK, gin.H{"data": post})
 }
 
@@ -385,6 +389,7 @@ func (h *PostHandler) PurgePost(c *gin.Context) {
 		respondPostError(c, err)
 		return
 	}
+	logging.FromGin(c).Info("post purgé définitivement (modération)", "post_id", c.Param("id"))
 	c.Status(http.StatusNoContent)
 }
 
@@ -401,6 +406,7 @@ func (h *PostHandler) PurgeUserData(c *gin.Context) {
 		respondPostError(c, err)
 		return
 	}
+	logging.FromGin(c).Info("données utilisateur purgées RGPD (admin)", "target_id", c.Param("id"), "posts_deleted", n)
 	c.JSON(http.StatusOK, gin.H{"data": gin.H{"posts_deleted": n}})
 }
 
@@ -414,10 +420,13 @@ func respondPostError(c *gin.Context, err error) {
 	case errors.Is(err, service.ErrForbidden), errors.Is(err, service.ErrDefaultCollection):
 		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
 	case errors.Is(err, service.ErrPrivateProfil):
+		logging.FromGin(c).Warn("accès refusé : profil privé")
 		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
 	case errors.Is(err, service.ErrDependencyUnavailable):
+		logging.FromGin(c).Warn("dépendance inter-services indisponible", "error", err)
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": err.Error()})
 	default:
+		logging.FromGin(c).Error("erreur post inattendue", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "erreur interne"})
 	}
 }

@@ -2,13 +2,15 @@ package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
+	"os"
 
 	"github.com/gin-gonic/gin"
 
 	"github.com/webdad/auth-service/internal/config"
 	"github.com/webdad/auth-service/internal/db"
 	"github.com/webdad/auth-service/internal/eraser"
+	"github.com/webdad/auth-service/internal/logging"
 	"github.com/webdad/auth-service/internal/notify"
 	"github.com/webdad/auth-service/internal/oauth"
 	"github.com/webdad/auth-service/internal/router"
@@ -18,17 +20,21 @@ import (
 const serviceName = "auth-service"
 
 func main() {
+	logging.Setup(serviceName)
+
 	cfg := config.Load()
 	gin.SetMode(ginMode(cfg.GinMode))
 
 	conn, err := db.Connect(cfg.DatabaseURL)
 	if err != nil {
-		log.Fatalf("[%s] connexion DB : %v", serviceName, err)
+		slog.Error("connexion DB", "error", err)
+		os.Exit(1)
 	}
 	defer func() { _ = conn.Close() }()
 
 	if err := db.EnsureSchema(conn); err != nil {
-		log.Fatalf("[%s] schéma : %v", serviceName, err)
+		slog.Error("schéma", "error", err)
+		os.Exit(1)
 	}
 
 	// Client mail (best-effort). Secret absent → mailer nil : l'envoi devient un
@@ -36,18 +42,19 @@ func main() {
 	var mailer services.Mailer
 	if cfg.MailInternalSecret != "" {
 		mailer = notify.NewMailClient(cfg.MailServiceURL, cfg.MailInternalSecret)
-		log.Printf("[%s] mail-service configuré (%s)", serviceName, cfg.MailServiceURL)
+		slog.Info("mail-service configuré", "url", cfg.MailServiceURL)
 	} else {
-		log.Printf("[%s] WARNING: MAIL_INTERNAL_SECRET absent — envoi d'e-mails désactivé (no-op)", serviceName)
+		slog.Warn("MAIL_INTERNAL_SECRET absent — envoi d'e-mails désactivé (no-op)")
 	}
 
 	auth := services.New(conn, cfg.JWTSecret, cfg.JWTExpiry, cfg.RefreshExpiry, mailer, cfg.AppBaseURL, cfg.AdminCreateAutoVerify)
 
 	if cfg.SeedAdmin {
 		if err := auth.EnsureDefaultAdmin(cfg.SeedAdminEmail, cfg.SeedAdminPassword); err != nil {
-			log.Fatalf("[%s] seed admin : %v", serviceName, err)
+			slog.Error("seed admin", "error", err)
+			os.Exit(1)
 		}
-		log.Printf("[%s] admin par défaut assuré (%s)", serviceName, cfg.SeedAdminEmail)
+		slog.Info("admin par défaut assuré", "email", cfg.SeedAdminEmail)
 	}
 
 	// Balayage RGPD des comptes bannis depuis > 5 ans (purge cross-service via un
@@ -77,9 +84,10 @@ func main() {
 
 	r := router.New(auth, oauthReg)
 
-	log.Printf("[%s] en écoute sur le port %s", serviceName, cfg.Port)
+	slog.Info("en écoute", "port", cfg.Port)
 	if err := r.Run(":" + cfg.Port); err != nil {
-		log.Fatalf("[%s] échec du démarrage : %v", serviceName, err)
+		slog.Error("échec du démarrage", "error", err)
+		os.Exit(1)
 	}
 }
 

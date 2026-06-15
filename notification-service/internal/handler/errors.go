@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/webdad/notification-service/internal/logging"
 	"github.com/webdad/notification-service/internal/service"
 )
 
@@ -17,6 +18,7 @@ func respondError(c *gin.Context, err error) {
 	case errors.Is(err, service.ErrInvalidID):
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 	default:
+		logging.FromGin(c).Error("erreur notification inattendue", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "erreur interne"})
 	}
 }

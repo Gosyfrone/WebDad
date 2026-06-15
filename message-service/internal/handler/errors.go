@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/webdad/message-service/internal/logging"
 	"github.com/webdad/message-service/internal/service"
 )
 
@@ -30,6 +31,7 @@ func respondError(c *gin.Context, err error) {
 		errors.Is(err, service.ErrTalkersFull):
 		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
 	default:
+		logging.FromGin(c).Error("erreur messagerie inattendue", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "erreur interne"})
 	}
 }

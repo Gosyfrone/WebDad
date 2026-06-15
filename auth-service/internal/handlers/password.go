@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/webdad/auth-service/internal/logging"
 	"github.com/webdad/auth-service/internal/middleware"
 	"github.com/webdad/auth-service/internal/models"
 	"github.com/webdad/auth-service/internal/services"
@@ -57,16 +58,19 @@ func (h *Handler) ResetPassword(c *gin.Context) {
 
 	if err := h.auth.ResetPassword(req.Token, req.NewPassword); err != nil {
 		if errors.Is(err, services.ErrInvalidToken) {
+			logging.FromGin(c).Warn("reset mot de passe refusé", "reason", "invalid_token")
 			c.JSON(http.StatusBadRequest, gin.H{
 				"error": "lien de réinitialisation invalide ou expiré",
 				"code":  "invalid_token",
 			})
 			return
 		}
+		logging.FromGin(c).Error("reset mot de passe : erreur inattendue", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "réinitialisation impossible"})
 		return
 	}
 
+	logging.FromGin(c).Info("mot de passe réinitialisé")
 	c.JSON(http.StatusOK, gin.H{"data": gin.H{
 		"message": "Mot de passe réinitialisé. Tu peux te connecter avec ton nouveau mot de passe.",
 	}})
@@ -106,18 +110,22 @@ func (h *Handler) ChangePassword(c *gin.Context) {
 	if err != nil {
 		switch {
 		case errors.Is(err, services.ErrInvalidCurrentPassword):
+			logging.FromGin(c).Warn("changement mot de passe refusé", "reason", "invalid_current_password")
 			c.JSON(http.StatusBadRequest, gin.H{
 				"error": err.Error(),
 				"code":  "invalid_current_password",
 			})
 		case errors.Is(err, services.ErrUserNotFound):
+			logging.FromGin(c).Warn("changement mot de passe refusé", "reason", "user_not_found")
 			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		default:
+			logging.FromGin(c).Error("changement mot de passe : erreur inattendue", "error", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "changement de mot de passe impossible"})
 		}
 		return
 	}
 
+	logging.FromGin(c).Info("mot de passe changé", "user_id", user.ID)
 	c.JSON(http.StatusOK, gin.H{"data": gin.H{
 		"token":         token,
 		"refresh_token": refresh,

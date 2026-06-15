@@ -1,13 +1,15 @@
 package main
 
 import (
-	"log"
+	"log/slog"
+	"os"
 
 	"github.com/gin-gonic/gin"
 
 	"github.com/webdad/user-service/internal/client"
 	"github.com/webdad/user-service/internal/config"
 	"github.com/webdad/user-service/internal/db"
+	"github.com/webdad/user-service/internal/logging"
 	"github.com/webdad/user-service/internal/repository"
 	"github.com/webdad/user-service/internal/router"
 	"github.com/webdad/user-service/internal/service"
@@ -16,17 +18,21 @@ import (
 const serviceName = "user-service"
 
 func main() {
+	logging.Setup(serviceName)
+
 	cfg := config.Load()
 	gin.SetMode(ginMode(cfg.GinMode))
 
 	conn, err := db.Connect(cfg.DatabaseURL)
 	if err != nil {
-		log.Fatalf("[%s] connexion DB : %v", serviceName, err)
+		slog.Error("connexion DB", "error", err)
+		os.Exit(1)
 	}
 	defer func() { _ = conn.Close() }()
 
 	if err := db.EnsureSchema(conn); err != nil {
-		log.Fatalf("[%s] schéma : %v", serviceName, err)
+		slog.Error("schéma", "error", err)
+		os.Exit(1)
 	}
 
 	opts := []service.Option{
@@ -38,9 +44,10 @@ func main() {
 	users := service.New(repository.New(conn), cfg.UsernameCooldown, opts...)
 	r := router.New(users, cfg.JWTSecret)
 
-	log.Printf("[%s] en écoute sur le port %s", serviceName, cfg.Port)
+	slog.Info("en écoute", "port", cfg.Port)
 	if err := r.Run(":" + cfg.Port); err != nil {
-		log.Fatalf("[%s] échec du démarrage : %v", serviceName, err)
+		slog.Error("échec du démarrage", "error", err)
+		os.Exit(1)
 	}
 }
 

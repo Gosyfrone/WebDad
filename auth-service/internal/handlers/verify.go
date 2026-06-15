@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/webdad/auth-service/internal/logging"
 	"github.com/webdad/auth-service/internal/models"
 	"github.com/webdad/auth-service/internal/services"
 )
@@ -33,18 +34,22 @@ func (h *Handler) ConfirmVerifyEmail(c *gin.Context) {
 	if err != nil {
 		switch {
 		case errors.Is(err, services.ErrInvalidToken):
+			logging.FromGin(c).Warn("vérification e-mail échouée", "reason", "invalid_token")
 			c.JSON(http.StatusBadRequest, gin.H{
 				"error": "lien de vérification invalide ou expiré",
 				"code":  "invalid_token",
 			})
 		case errors.Is(err, services.ErrUserInactive):
+			logging.FromGin(c).Warn("vérification e-mail échouée", "reason", "user_inactive")
 			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
 		default:
+			logging.FromGin(c).Error("vérification e-mail : erreur inattendue", "error", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "vérification impossible"})
 		}
 		return
 	}
 
+	logging.FromGin(c).Info("e-mail vérifié", "user_id", user.ID)
 	// Session émise (comme /login) : le BFF posera le cookie refresh et renverra
 	// l'access token au client → l'utilisateur entre directement dans l'app.
 	c.JSON(http.StatusOK, gin.H{"data": gin.H{

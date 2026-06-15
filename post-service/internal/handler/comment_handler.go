@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/webdad/post-service/internal/logging"
 	"github.com/webdad/post-service/internal/middleware"
 	"github.com/webdad/post-service/internal/models"
 	"github.com/webdad/post-service/internal/service"
@@ -129,6 +130,7 @@ func (h *CommentHandler) CreatPostComment(c *gin.Context) {
 		respondPostError(c, err)
 		return
 	}
+	logging.FromGin(c).Info("commentaire créé", "post_id", c.Param("id"), "comment_id", comment.ID)
 	c.JSON(http.StatusCreated, gin.H{"data": comment})
 }
 
@@ -155,5 +157,6 @@ func (h *CommentHandler) DeletePostComment(c *gin.Context) {
 		respondPostError(c, err)
 		return
 	}
+	logging.FromGin(c).Info("commentaire supprimé", "comment_id", c.Param("commentId"))
 	c.Status(http.StatusNoContent)
 }

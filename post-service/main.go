@@ -2,7 +2,8 @@ package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
+	"os"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -11,6 +12,8 @@ import (
 	"github.com/webdad/post-service/internal/config"
 	"github.com/webdad/post-service/internal/database"
 	"github.com/webdad/post-service/internal/handler"
+	"github.com/webdad/post-service/internal/logging"
+	"github.com/webdad/post-service/internal/middleware"
 	"github.com/webdad/post-service/internal/notifier"
 	"github.com/webdad/post-service/internal/repository"
 	"github.com/webdad/post-service/internal/service"
@@ -19,12 +22,15 @@ import (
 const serviceName = "post-service"
 
 func main() {
+	logging.Setup(serviceName)
+
 	cfg := config.Load()
 	gin.SetMode(ginMode(cfg.GinMode))
 
 	mongoClient, err := database.ConnectMongo(cfg.MongoURI)
 	if err != nil {
-		log.Fatalf("[%s] connexion Mongo : %v", serviceName, err)
+		slog.Error("connexion Mongo", "error", err)
+		os.Exit(1)
 	}
 	defer func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -40,7 +46,8 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	if err := database.EnsureSchema(ctx, db); err != nil {
-		log.Fatalf("[%s] schéma : %v", serviceName, err)
+		slog.Error("schéma", "error", err)
+		os.Exit(1)
 	}
 
 	postRepo := repository.NewPostRepository(db)
@@ -60,12 +67,14 @@ func main() {
 	defer stopSweeper()
 	go postService.RunPurgeSweeper(sweepCtx, cfg.PurgeSweepInterval)
 
-	r := gin.Default()
+	r := gin.New()
+	r.Use(middleware.RequestID(), middleware.Recovery(), middleware.RequestLogger())
 	handler.RegisterRoutes(r, serviceName, postService, cfg.JWTSecret)
 
-	log.Printf("[%s] en écoute sur le port %s", serviceName, cfg.Port)
+	slog.Info("en écoute", "port", cfg.Port)
 	if err := r.Run(":" + cfg.Port); err != nil {
-		log.Fatalf("[%s] échec du démarrage : %v", serviceName, err)
+		slog.Error("échec du démarrage", "error", err)
+		os.Exit(1)
 	}
 }
 

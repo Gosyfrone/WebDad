@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/webdad/user-service/internal/logging"
 	"github.com/webdad/user-service/internal/middleware"
 	"github.com/webdad/user-service/internal/models"
 	"github.com/webdad/user-service/internal/service"
@@ -84,6 +85,7 @@ func (h *Handler) AdminCreate(c *gin.Context) {
 		return
 	}
 
+	logging.FromGin(c).Info("compte utilisateur créé (admin)", "new_user_id", user.ID)
 	c.JSON(http.StatusCreated, gin.H{"data": user})
 }
 
@@ -200,6 +202,7 @@ func (h *Handler) GetMe(c *gin.Context) {
 
 	user, err := h.users.ProvisionFromClaims(claims.UserID, claims.Email)
 	if err != nil {
+		logging.FromGin(c).Error("provisioning utilisateur échoué", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "récupération de l'utilisateur impossible"})
 		return
 	}
@@ -239,6 +242,9 @@ func (h *Handler) UpdateMe(c *gin.Context) {
 		return
 	}
 
+	if req.Username != nil {
+		logging.FromGin(c).Info("username modifié")
+	}
 	c.JSON(http.StatusOK, gin.H{"data": user})
 }
 
@@ -259,6 +265,7 @@ func (h *Handler) Delete(c *gin.Context) {
 		return
 	}
 
+	logging.FromGin(c).Info("compte désactivé (admin)", "target_id", c.Param("id"))
 	c.Status(http.StatusNoContent)
 }
 
@@ -269,6 +276,7 @@ func (h *Handler) PurgeUser(c *gin.Context) {
 		respondUserError(c, err)
 		return
 	}
+	logging.FromGin(c).Info("compte purgé RGPD (admin)", "target_id", c.Param("id"))
 	c.Status(http.StatusNoContent)
 }
 
@@ -287,6 +295,7 @@ func (h *Handler) SetStatus(c *gin.Context) {
 		return
 	}
 
+	logging.FromGin(c).Info("statut compte modifié (admin)", "target_id", c.Param("id"), "is_active", *req.IsActive)
 	c.JSON(http.StatusOK, gin.H{"data": gin.H{"id": c.Param("id"), "is_active": *req.IsActive}})
 }
 
@@ -296,12 +305,15 @@ func respondUserError(c *gin.Context, err error) {
 	case errors.Is(err, service.ErrUserNotFound), errors.Is(err, service.ErrFollowRequestNotFound):
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 	case errors.Is(err, service.ErrUsernameTaken):
+		logging.FromGin(c).Warn("conflit de username", "reason", "username_taken")
 		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
 	case errors.Is(err, service.ErrInvalidUsername), errors.Is(err, service.ErrSelfFollow):
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 	case errors.Is(err, service.ErrUsernameCooldown):
+		logging.FromGin(c).Warn("changement de username refusé", "reason", "cooldown")
 		c.JSON(http.StatusTooManyRequests, gin.H{"error": err.Error()})
 	default:
+		logging.FromGin(c).Error("erreur utilisateur inattendue", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "erreur interne"})
 	}
 }

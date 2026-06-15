@@ -2,7 +2,7 @@
 package proxy
 
 import (
-	"log"
+	"log/slog"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -25,7 +25,7 @@ func New(target string) (gin.HandlerFunc, error) {
 	// Réponse homogène ({"error": ...}) si le service est injoignable, plutôt
 	// que la page d'erreur 502 par défaut du reverse proxy.
 	rp.ErrorHandler = func(w http.ResponseWriter, _ *http.Request, e error) {
-		log.Printf("[gateway] service injoignable (%s) : %v", target, e)
+		slog.Error("service injoignable", "target", target, "error", e)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusServiceUnavailable)
 		_, _ = w.Write([]byte(`{"error":"service indisponible"}`))

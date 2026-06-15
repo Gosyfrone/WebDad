@@ -16,7 +16,7 @@ const serviceName = "api-gateway"
 
 // New construit le routeur : CORS, /health, puis un reverse proxy par service.
 func New(cfg *config.Config) (*gin.Engine, error) {
-	r := gin.Default()
+	r := gin.New()
 
 	// On NE redirige PAS sur le slash final : la gateway transmet le chemin tel
 	// quel au service. Sans ça, un `POST /users` (endpoint collection, sans
@@ -26,7 +26,11 @@ func New(cfg *config.Config) (*gin.Engine, error) {
 	r.RedirectTrailingSlash = false
 	r.RedirectFixedPath = false
 
+	// Ordre : CORS en premier (pré-flight), puis RequestID, Recovery, RequestLogger.
 	r.Use(middleware.CORS(cfg.AllowedOrigins))
+	r.Use(middleware.RequestID())
+	r.Use(middleware.Recovery())
+	r.Use(middleware.RequestLogger())
 
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok", "service": serviceName})

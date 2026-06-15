@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/webdad/auth-service/internal/logging"
 	"github.com/webdad/auth-service/internal/middleware"
 	"github.com/webdad/auth-service/internal/models"
 	"github.com/webdad/auth-service/internal/services"
@@ -37,6 +38,7 @@ func (h *Handler) ListUsers(c *gin.Context) {
 	limit, offset := paginate(c)
 	users, err := h.auth.ListUsers(limit, offset, c.Query("q"))
 	if err != nil {
+		logging.FromGin(c).Error("liste des comptes : erreur DB", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "liste des comptes impossible"})
 		return
 	}
@@ -71,13 +73,16 @@ func (h *Handler) AdminCreateUser(c *gin.Context) {
 	user, err := h.auth.AdminCreateUser(req.Email, req.Password, req.Username)
 	if err != nil {
 		if errors.Is(err, services.ErrEmailTaken) {
+			logging.FromGin(c).Warn("création compte (admin) refusée", "reason", "email_taken")
 			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
 			return
 		}
+		logging.FromGin(c).Error("création compte (admin) : erreur inattendue", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "création du compte impossible"})
 		return
 	}
 
+	logging.FromGin(c).Info("compte créé par admin", "new_user_id", user.ID)
 	c.JSON(http.StatusCreated, gin.H{"data": gin.H{"id": user.ID, "email": user.Email}})
 }
 
@@ -120,6 +125,7 @@ func (h *Handler) SetRole(c *gin.Context) {
 		respondAdminError(c, err)
 		return
 	}
+	logging.FromGin(c).Info("rôle modifié", "target_id", id, "new_role", req.Role)
 	c.JSON(http.StatusOK, gin.H{"data": gin.H{"id": id, "role": req.Role}})
 }
 
@@ -177,6 +183,11 @@ func (h *Handler) SetStatus(c *gin.Context) {
 		respondAdminError(c, err)
 		return
 	}
+	action := "réactivé"
+	if !*req.IsActive {
+		action = "banni"
+	}
+	logging.FromGin(c).Info("statut compte modifié", "target_id", id, "action", action)
 	c.JSON(http.StatusOK, gin.H{"data": gin.H{"id": id, "is_active": *req.IsActive}})
 }
 
@@ -210,6 +221,7 @@ func (h *Handler) DeleteUser(c *gin.Context) {
 		respondAdminError(c, err)
 		return
 	}
+	logging.FromGin(c).Info("compte supprimé (RGPD)", "target_id", id)
 	c.Status(http.StatusNoContent)
 }
 
@@ -223,6 +235,7 @@ func respondAdminError(c *gin.Context, err error) {
 	case errors.Is(err, services.ErrInsufficientPrivilege):
 		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
 	default:
+		logging.FromGin(c).Error("erreur admin inattendue", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "erreur interne"})
 	}
 }

@@ -6,7 +6,7 @@ package service
 import (
 	"context"
 	"errors"
-	"log"
+	"log/slog"
 	"strings"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
@@ -129,7 +129,7 @@ func (s *NotificationService) handleMentions(ctx context.Context, ev models.Even
 		}
 		id, found, err := s.resolver.ResolveHandle(ctx, handle)
 		if err != nil {
-			log.Printf("[notification] résolution du handle @%s : %v", handle, err)
+			slog.Warn("résolution handle mention échouée", "handle", handle, "error", err)
 			continue
 		}
 		if !found || id == ev.ActorID || seen[id] {
@@ -137,7 +137,7 @@ func (s *NotificationService) handleMentions(ctx context.Context, ev models.Even
 		}
 		seen[id] = true
 		if err := s.applyToGroup(ctx, id, gk, ev); err != nil {
-			log.Printf("[notification] mention pour %s : %v", id, err)
+			slog.Warn("fan-out mention échoué", "recipient_id", id, "error", err)
 		}
 	}
 	return nil

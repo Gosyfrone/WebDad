@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -59,5 +60,6 @@ func (h *WSHandler) Connect(c *gin.Context) {
 		return
 	}
 
+	slog.Debug("ws notifications connecté", "user_id", claims.UserID)
 	h.hub.Register(claims.UserID, ws)
 }

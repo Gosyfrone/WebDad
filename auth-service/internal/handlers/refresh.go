@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/webdad/auth-service/internal/logging"
 	"github.com/webdad/auth-service/internal/models"
 	"github.com/webdad/auth-service/internal/services"
 )
@@ -35,10 +36,13 @@ func (h *Handler) Refresh(c *gin.Context) {
 	if err != nil {
 		switch {
 		case errors.Is(err, services.ErrInvalidRefreshToken):
+			logging.FromGin(c).Warn("refresh refusé", "reason", "invalid_refresh_token")
 			c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		case errors.Is(err, services.ErrUserInactive):
+			logging.FromGin(c).Warn("refresh refusé", "reason", "user_inactive")
 			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
 		default:
+			logging.FromGin(c).Error("refresh : erreur inattendue", "error", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "rafraîchissement impossible"})
 		}
 		return

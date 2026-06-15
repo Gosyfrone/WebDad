@@ -6,6 +6,10 @@
 
 ---
 
+## Observability
+
+- **Structured logging — slog + X-Request-Id (user-service pilote, 13/06/2026).** `log/slog` stdlib (Go 1.21+, aucune dépendance externe). Format JSON en `release`, texte en `debug/test` (lisible humain). Niveau depuis `LOG_LEVEL`. Trois middlewares Gin dédiés : `RequestID` (lit ou génère un UUID hex 16 B, propagé dans la réponse), `Recovery` (panic → `slog.Error` + 500 sans stack exposée), `RequestLogger` (une ligne/requête avec method, path sans query, status, latency_ms, client_ip, request_id, user_id). `JWTAuth` pose `user_id` dans le contexte Gin pour que `RequestLogger` corrèle l'utilisateur. `gin.Default()` remplacé par `gin.New()` + chaîne explicite. Ce motif sera répliqué à l'identique sur les autres services.
+
 ## Platform & frontend
 
 - **Frontend = Next.js 14 (App Router) + TS + Tailwind/shadcn (slate).** Imposed stack.
@@ -361,6 +365,8 @@
   Convention posed now so DM/notifications respect it (profile photo = minimal guaranteed anchor).
 
 ## CI/CD
+
+- **Smoke-test externe post-déploiement (`deploy.yml`, job `smoke-test`).** Tourne sur un runner GitHub (vue externe, pas depuis le VPS) après le job `deploy`. Vérifie que `API_PUBLIC_URL/health` et `FRONT_PUBLIC_URL` répondent 200 en HTTPS — ce qui aurait attrapé le bug Cloudflare (handshake TLS KO côté edge alors que les conteneurs étaient sains). 3 tentatives espacées de 10 s pour absorber le redémarrage des conteneurs ; URLs dans des variables GitHub Actions (`vars.API_PUBLIC_URL` / `vars.FRONT_PUBLIC_URL`, non-sensibles → `vars.*` et non `secrets.*`).
 
 - **3 GitHub Actions workflows by domain:** `ci-go` (per-service matrix: gofmt + vet + build + `test -race` + tidy +
   golangci-lint v2 + govulncheck report-only), `ci-frontend` (lint + build/typecheck), `ci-integration` (docker compose up the
