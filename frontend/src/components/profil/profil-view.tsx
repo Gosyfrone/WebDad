@@ -323,6 +323,7 @@ export function ProfilView({ username }: ProfilViewProps) {
         <div className="panel sticky top-0 z-10 flex items-center gap-6 border-b px-4 py-2">
           <Link
             href={ROUTES.feed}
+            scroll={false}
             aria-label={t('profil.back_aria')}
             className="rounded-full p-2 transition-colors hover:bg-accent hover:text-[#5B6CFF] dark:hover:text-[#9aa6ff]"
           >
@@ -345,6 +346,7 @@ export function ProfilView({ username }: ProfilViewProps) {
       <div className="panel sticky top-0 z-10 flex items-center gap-6 border-b px-4 py-2">
         <Link
           href={ROUTES.feed}
+          scroll={false}
           aria-label={t('profil.back_aria')}
           className="rounded-full p-2 transition-colors hover:bg-accent hover:text-[#5B6CFF] dark:hover:text-[#9aa6ff]"
         >

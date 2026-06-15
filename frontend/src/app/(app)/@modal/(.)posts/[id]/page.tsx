@@ -1,10 +1,10 @@
-import { PostDetailModal } from '@/components/feed/post-detail-modal'
+import { FeedOverlay } from '@/components/feed/feed-overlay'
+import { PostDetail } from '@/components/feed/post-detail'
 
 /**
  * Intercepting route : capte les navigations soft vers `/posts/[id]` depuis
- * l'espace `(app)` (feed, explorer, profil, notifications) et affiche le détail
- * en panneau plein écran, le feed restant monté derrière. L'accès direct/refresh
- * d'une URL `/posts/[id]` tombe sur la vraie page `(app)/posts/[id]/page.tsx`.
+ * l'espace `(app)` et affiche le détail en panneau au-dessus du feed (gardé
+ * monté). Accès direct/refresh → vraie page `(app)/posts/[id]/page.tsx`.
  */
 export default async function InterceptedPostPage({
   params,
@@ -12,5 +12,9 @@ export default async function InterceptedPostPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  return <PostDetailModal id={id} />
+  return (
+    <FeedOverlay>
+      <PostDetail id={id} />
+    </FeedOverlay>
+  )
 }
