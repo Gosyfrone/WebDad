@@ -315,9 +315,13 @@ export function CommentSection({ postId, focusCommentId, onCountChange, canReply
         ) : error ? (
           <p className="py-2 text-center text-xs text-muted-foreground">{error}</p>
         ) : comments.length === 0 ? (
-          <p className="py-2 text-center text-xs text-muted-foreground">
-            {t('comment.empty')}
-          </p>
+          // Quand l'utilisateur ne peut pas répondre (post réservé aux abonnés),
+          // l'incitation « Soyez le premier à réagir » n'a aucun sens : on masque.
+          canReply ? (
+            <p className="py-2 text-center text-xs text-muted-foreground">
+              {t('comment.empty')}
+            </p>
+          ) : null
         ) : (
           <>
             {comments.map((c) => (

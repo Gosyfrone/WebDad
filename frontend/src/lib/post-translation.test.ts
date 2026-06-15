@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { shouldAttemptTranslation } from '@/lib/post-translation'
+import { isTranslationCandidate, shouldAttemptTranslation } from '@/lib/post-translation'
 
 describe('shouldAttemptTranslation', () => {
   it('traduit une phrase clairement anglaise vers le français', () => {
@@ -83,5 +83,45 @@ describe('shouldAttemptTranslation', () => {
     for (const [locale, text] of Object.entries(samples)) {
       expect(shouldAttemptTranslation(text, locale), locale).toBe(false)
     }
+  })
+})
+
+describe('isTranslationCandidate', () => {
+  it('traduit les phrases courtes en écriture dense (1 caractère ≈ 1 mot)', () => {
+    // Phrases normales mais < 12 caractères : le seuil latin les filtrait à tort.
+    expect(isTranslationCandidate('안녕하세요 반갑습니다', 'fr')).toBe(true) // coréen
+    expect(isTranslationCandidate('こんにちは、元気ですか', 'fr')).toBe(true) // japonais
+    expect(isTranslationCandidate('你好，今天很高兴', 'fr')).toBe(true) // chinois
+    expect(isTranslationCandidate('행복합니다', 'en')).toBe(true) // coréen très court
+    expect(isTranslationCandidate('สวัสดีครับ', 'fr')).toBe(true) // thaï
+  })
+
+  it('traduit les phrases denses très courtes (2-3 caractères)', () => {
+    expect(isTranslationCandidate('你好吗 ？', 'fr')).toBe(true) // 3 sinogrammes
+    expect(isTranslationCandidate('你要去哪里？', 'fr')).toBe(true) // 5 sinogrammes
+    expect(isTranslationCandidate('你好', 'fr')).toBe(true) // 2 sinogrammes
+    expect(isTranslationCandidate('元気？', 'fr')).toBe(true) // japonais kanji court
+  })
+
+  it('rejette un unique caractère dense (trop ambigu)', () => {
+    expect(isTranslationCandidate('好', 'fr')).toBe(false)
+    expect(isTranslationCandidate('好 ？', 'fr')).toBe(false)
+  })
+
+  it('ne traduit pas une écriture dense déjà dans la langue cible', () => {
+    expect(isTranslationCandidate('안녕하세요 반갑습니다', 'ko')).toBe(false)
+    expect(isTranslationCandidate('你好，今天很高兴', 'zh')).toBe(false)
+    expect(isTranslationCandidate('你好吗 ？', 'zh')).toBe(false)
+  })
+
+  it('garde le seuil de longueur pour les alphabets (anti-fragments)', () => {
+    expect(isTranslationCandidate('hello', 'fr')).toBe(false)
+    expect(isTranslationCandidate('ok go', 'fr')).toBe(false)
+    expect(isTranslationCandidate('hello my name is maxime', 'fr')).toBe(true)
+  })
+
+  it('rejette les textes vides ou sans langue cible', () => {
+    expect(isTranslationCandidate('   ', 'fr')).toBe(false)
+    expect(isTranslationCandidate('안녕하세요 반갑습니다', '')).toBe(false)
   })
 })
