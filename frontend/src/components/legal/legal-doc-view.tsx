@@ -21,7 +21,7 @@ const ROUTE_BY_SLUG: Record<LegalSlug, string> = {
  */
 export function LegalDocView({ slug }: { slug: LegalSlug }) {
   const { locale } = useLanguage()
-  const doc = legalContent[locale]?.[slug] ?? legalContent.fr[slug]
+  const doc = legalContent[locale]?.[slug] ?? legalContent.en[slug]
 
   return (
     <LegalShell title={doc.title} updatedAt={doc.updatedAt} current={ROUTE_BY_SLUG[slug]}>

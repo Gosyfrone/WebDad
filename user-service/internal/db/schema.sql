@@ -35,6 +35,25 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS username_changed_at TIMESTAMPTZ;
 -- disponible (repassé à false dès qu'il en choisit un libre via PATCH /users/me).
 ALTER TABLE users ADD COLUMN IF NOT EXISTS username_pending BOOLEAN NOT NULL DEFAULT false;
 
+-- Langue d'interface choisie par l'utilisateur. NULL signifie qu'aucun choix
+-- manuel n'a encore été enregistré : le frontend utilise alors la langue du
+-- navigateur. La colonne nullable rend la migration rétrocompatible avec les
+-- comptes existants.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS preferred_locale VARCHAR(5);
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'users_preferred_locale_check'
+    ) THEN
+        ALTER TABLE users ADD CONSTRAINT users_preferred_locale_check
+            CHECK (preferred_locale IS NULL OR preferred_locale IN (
+                'fr', 'en', 'zh', 'es', 'pt', 'ru',
+                'ja', 'ko', 'ar', 'hi', 'de', 'it'
+            ));
+    END IF;
+END $$;
+
 -- Graphe de follows (relations entre utilisateurs).
 CREATE TABLE IF NOT EXISTS follows (
     follower_id  UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,

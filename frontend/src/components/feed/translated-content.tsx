@@ -11,6 +11,7 @@ import {
 } from '@/lib/post-translation'
 import { cn } from '@/lib/utils'
 import { MentionText } from '@/components/mention/mention-text'
+import { useLanguage } from '@/components/language-provider'
 
 interface TranslatedContentProps {
   contentId: string
@@ -25,6 +26,7 @@ export function TranslatedContent({
   className,
   indicatorClassName,
 }: TranslatedContentProps) {
+  const { locale, t } = useLanguage()
   const [translation, setTranslation] = useState<PostTranslation | null>(null)
   const [translating, setTranslating] = useState(false)
   const [showOriginal, setShowOriginal] = useState(false)
@@ -33,7 +35,7 @@ export function TranslatedContent({
 
   useEffect(() => {
     let active = true
-    const targetLanguage = getPageLanguage()
+    const targetLanguage = locale || getPageLanguage()
 
     setTranslation(null)
     setShowOriginal(false)
@@ -60,7 +62,7 @@ export function TranslatedContent({
     return () => {
       active = false
     }
-  }, [contentId, content])
+  }, [contentId, content, locale])
 
   return (
     <>
@@ -78,21 +80,23 @@ export function TranslatedContent({
             <>
               <span>
                 {showOriginal
-                  ? 'Texte original'
-                  : `Traduit automatiquement${translation.detectedSourceLanguage ? ` depuis ${translation.detectedSourceLanguage.toUpperCase()}` : ''}`}
+                  ? t('translation.original')
+                  : `${t('translation.automatic')}${translation.detectedSourceLanguage ? ` ${t('translation.from', { language: translation.detectedSourceLanguage.toUpperCase() })}` : ''}`}
               </span>
               <button
                 type="button"
                 onClick={() => setShowOriginal((value) => !value)}
                 className="font-semibold text-primary transition hover:underline"
               >
-                {showOriginal ? 'Voir la traduction' : "Voir l'original"}
+                {showOriginal
+                  ? t('translation.show_translation')
+                  : t('translation.show_original')}
               </button>
             </>
           ) : (
             <span className="inline-flex items-center gap-1">
               <Loader2 className="h-3 w-3 animate-spin" />
-              Traduction...
+              {t('translation.loading')}
             </span>
           )}
         </div>

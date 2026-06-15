@@ -6,9 +6,13 @@ import {
   DEFAULT_LOCALE,
   LOCALE_STORAGE_KEY,
   isLocale,
+  localeFromBrowser,
   translate,
   type Locale,
 } from '@/lib/i18n'
+import { getAccessToken } from '@/lib/auth-client'
+import { getMe, updatePreferredLocale } from '@/lib/api'
+import { SESSION_CHANGED_EVENT } from '@/lib/session'
 
 interface LanguageContextValue {
   /** Locale effective (DEFAULT_LOCALE tant que le client n'est pas monté). */
@@ -32,28 +36,65 @@ const LanguageContext = React.createContext<LanguageContextValue | null>(null)
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [locale, setLocaleState] = React.useState<Locale>(DEFAULT_LOCALE)
 
-  // Lecture de la préférence persistée au montage (client uniquement).
-  React.useEffect(() => {
-    try {
-      const stored = window.localStorage.getItem(LOCALE_STORAGE_KEY)
-      if (isLocale(stored)) {
-        setLocaleState(stored)
-        document.documentElement.lang = stored
-      }
-    } catch {
-      // localStorage indisponible (mode privé strict) → on garde le défaut.
-    }
-  }, [])
-
-  const setLocale = React.useCallback((next: Locale) => {
+  const applyLocale = React.useCallback((next: Locale) => {
     setLocaleState(next)
     document.documentElement.lang = next
+    document.documentElement.dir = next === 'ar' ? 'rtl' : 'ltr'
+  }, [])
+
+  React.useEffect(() => {
+    let syncID = 0
+
+    const sync = async () => {
+      const currentSyncID = ++syncID
+      const browserLocale = localeFromBrowser(window.navigator.language)
+
+      if (!getAccessToken()) {
+        let anonymousLocale = browserLocale
+        try {
+          const stored = window.localStorage.getItem(LOCALE_STORAGE_KEY)
+          if (isLocale(stored)) anonymousLocale = stored
+        } catch {
+          // localStorage indisponible : langue navigateur.
+        }
+        applyLocale(anonymousLocale)
+        return
+      }
+
+      try {
+        const me = await getMe()
+        if (currentSyncID !== syncID) return
+        applyLocale(isLocale(me.preferredLocale) ? me.preferredLocale : browserLocale)
+      } catch {
+        if (currentSyncID === syncID) applyLocale(browserLocale)
+      }
+    }
+
+    void sync()
+    window.addEventListener(SESSION_CHANGED_EVENT, sync)
+    return () => {
+      syncID += 1
+      window.removeEventListener(SESSION_CHANGED_EVENT, sync)
+    }
+  }, [applyLocale])
+
+  const setLocale = React.useCallback((next: Locale) => {
+    applyLocale(next)
+
+    if (getAccessToken()) {
+      void updatePreferredLocale(next).catch(() => {
+        // L'état reste appliqué pour la session ; la prochaine connexion
+        // rechargera la dernière préférence effectivement enregistrée.
+      })
+      return
+    }
+
     try {
       window.localStorage.setItem(LOCALE_STORAGE_KEY, next)
     } catch {
-      // Persistance best-effort : la langue reste appliquée pour la session.
+      // Persistance anonyme best-effort.
     }
-  }, [])
+  }, [applyLocale])
 
   const value = React.useMemo<LanguageContextValue>(
     () => ({

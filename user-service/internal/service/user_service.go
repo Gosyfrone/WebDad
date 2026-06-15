@@ -27,6 +27,7 @@ var (
 	ErrSelfFollow            = errors.New("impossible de se suivre soi-même")
 	ErrUsernameCooldown      = errors.New("nom d'utilisateur modifié trop récemment")
 	ErrFollowRequestNotFound = errors.New("demande de suivi introuvable")
+	ErrInvalidLocale         = errors.New("langue préférée invalide")
 )
 
 const (
@@ -36,6 +37,11 @@ const (
 
 // usernamePattern : charset autorisé pour un username (3-50, alphanum + _).
 var usernamePattern = regexp.MustCompile(`^[a-zA-Z0-9_]{3,50}$`)
+
+var supportedLocales = map[string]bool{
+	"fr": true, "en": true, "zh": true, "es": true, "pt": true, "ru": true,
+	"ja": true, "ko": true, "ar": true, "hi": true, "de": true, "it": true,
+}
 
 // reservedUsernames : handles interdits (mots structurants / sensibles).
 var reservedUsernames = map[string]bool{
@@ -183,7 +189,7 @@ func (s *UserService) Suggestions(limit, offset int) ([]models.User, error) {
 
 // Update modifie l'utilisateur (champs nil = inchangés). Valide le username
 // s'il est fourni.
-func (s *UserService) Update(id string, username *string) (*models.User, error) {
+func (s *UserService) Update(id string, username, preferredLocale *string) (*models.User, error) {
 	if username != nil {
 		if err := validateUsername(*username); err != nil {
 			return nil, err
@@ -205,7 +211,10 @@ func (s *UserService) Update(id string, username *string) (*models.User, error) 
 			}
 		}
 	}
-	u, err := s.repo.Update(id, username)
+	if preferredLocale != nil && !supportedLocales[*preferredLocale] {
+		return nil, ErrInvalidLocale
+	}
+	u, err := s.repo.Update(id, username, preferredLocale)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrUserNotFound
 	}

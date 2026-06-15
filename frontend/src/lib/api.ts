@@ -37,6 +37,7 @@ interface ApiUser {
   follower_count?: number
   following_count?: number
   username_pending?: boolean
+  preferred_locale?: string
 }
 
 interface ApiProfil {
@@ -69,6 +70,8 @@ export interface CurrentUser {
   joinedAt: string
   /** Username provisoire (suffixé par l'admin) à remplacer par un handle libre. */
   usernamePending: boolean
+  /** Langue choisie pour ce compte, absente tant que le navigateur fait foi. */
+  preferredLocale: string | null
 }
 
 export async function getMe(): Promise<CurrentUser> {
@@ -80,7 +83,19 @@ export async function getMe(): Promise<CurrentUser> {
     followingCount: u.following_count ?? 0,
     joinedAt: u.created_at,
     usernamePending: u.username_pending ?? false,
+    preferredLocale: u.preferred_locale ?? null,
   }
+}
+
+/** Enregistre la langue d'interface sur le compte courant. */
+export async function updatePreferredLocale(preferredLocale: string): Promise<void> {
+  await unwrap<ApiUser>(
+    await apiFetch('/users/me', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ preferred_locale: preferredLocale }),
+    }),
+  )
 }
 
 /** Décoratif du profil de l'utilisateur courant (`GET /profils/me`). */

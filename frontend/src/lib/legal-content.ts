@@ -598,7 +598,10 @@ const EN: Record<LegalSlug, LegalDoc> = {
 }
 
 /** Registre du contenu légal, par locale puis par page. */
-export const legalContent: Record<Locale, Record<LegalSlug, LegalDoc>> = {
+export const legalContent: Partial<Record<Locale, Record<LegalSlug, LegalDoc>>> & {
+  fr: Record<LegalSlug, LegalDoc>
+  en: Record<LegalSlug, LegalDoc>
+} = {
   fr: FR,
   en: EN,
 }

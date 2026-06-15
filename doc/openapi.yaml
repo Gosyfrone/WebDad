@@ -971,9 +971,9 @@ paths:
       - application/json
       tags:
       - users
-      summary: Modifier le username courant
+      summary: Modifier le compte courant
       parameters:
-      - description: Champs à modifier
+      - description: Username et/ou langue préférée
         name: body
         in: body
         required: true
@@ -3598,6 +3598,8 @@ definitions:
   models.UpdateUserRequest:
     type: object
     properties:
+      preferred_locale:
+        type: string
       username:
         type: string
         maxLength: 50
@@ -3611,6 +3613,12 @@ definitions:
         type: string
       is_active:
         type: boolean
+      preferred_locale:
+        description: 'PreferredLocale est la langue d''interface choisie pour ce compte.
+          nil
+
+          signifie qu''aucun choix manuel n''a encore été fait (langue navigateur).'
+        type: string
       updated_at:
         type: string
       username:
@@ -3645,6 +3653,12 @@ definitions:
         type: string
       is_active:
         type: boolean
+      preferred_locale:
+        description: 'PreferredLocale est la langue d''interface choisie pour ce compte.
+          nil
+
+          signifie qu''aucun choix manuel n''a encore été fait (langue navigateur).'
+        type: string
       updated_at:
         type: string
       username:

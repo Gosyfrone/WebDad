@@ -232,6 +232,10 @@
 - **Translation via Next BFF route `/api/translate`** (LibreTranslate + Google fallback), keys server-side; post-service
   stores no derived translation. Conservative client gate (`shouldAttemptTranslation`): script detection + Latin markers
   avoid false positives (a lone foreign word, a typo, mixed text must not auto-translate a French post).
+- **Coverage across the 12 locales:** upstream auto-detection is authoritative. The small local marker dictionaries are not
+  an allow-list: any meaningful text not clearly identified as already being in the target locale reaches the BFF. The
+  result is discarded when `detectedSourceLanguage === targetLanguage`. Local logic remains a cheap same-language veto;
+  Han (Chinese) and Kana (Japanese) are distinct so ZH↔JA works. Target language always comes from the account locale.
 
 ## Messaging (E2EE)
 
@@ -338,9 +342,14 @@
 
 ## i18n / theming / responsive
 
-- **i18n = home-grown, zero dependency** (`lib/i18n.ts` registry + `LanguageProvider` + `useT()` + globe dropdown). FR is the
-  reference; cascade locale→FR→raw key. 2 languages → a home dico beats `next-intl` (routing-by-locale overhaul). Adding a
-  language = 1 `LOCALES` entry + 1 `messages` block.
+- **i18n = home-grown, zero dependency** (`lib/i18n.ts` + dictionnaires statiques + `LanguageProvider` + `useT()`). 12 langues
+  sont disponibles : FR/EN/ZH/ES/PT/RU/JA/KO/AR/HI/DE/IT ; FR reste la référence et le repli final. Les pages légales restent
+  officiellement rédigées en FR/EN et retombent sur EN pour les autres locales afin de ne pas présenter une traduction
+  automatique comme juridiquement fiable.
+- **Préférence de langue = donnée de compte dans user-service**, pas une clé navigateur globale. `users.preferred_locale` est
+  nullable et contraint aux locales supportées ; NULL signifie « utiliser `navigator.language` ». `GET/PATCH /users/me`
+  transporte la préférence sans nouvelle route. Le logout ne l'efface pas : une reconnexion au même compte la restaure ; un
+  autre compte charge sa propre préférence ou la langue du navigateur. Le localStorage ne sert qu'aux visiteurs anonymes.
 - **Theme:** light/dark (next-themes) + brand accent. Brand gradient violet→indigo→cyan (logo "B"), glassmorphism.
   **Tokenized surfaces** (CSS vars in `globals.css`, light values = exact current state, dark declension) → dark lives in one
   place, light unchanged. ⚠️ a `bg-*`/`border-*` utility overrides `@layer components` classes.

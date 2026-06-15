@@ -1,3 +1,5 @@
+import { additionalMessages } from '@/lib/i18n-additional'
+
 /**
  * Registre i18n de Breezy (mécanisme maison léger, sans dépendance).
  *
@@ -31,10 +33,20 @@ export interface LocaleDef {
  * Pour l'instant : Français + English. Les suivantes (Español, Italiano, 中文…)
  * s'ajoutent ici + dans `messages`.
  */
-export const LOCALES: LocaleDef[] = [
+export const LOCALES = [
   { id: 'fr', label: 'Français', flag: '🇫🇷' },
   { id: 'en', label: 'English', flag: '🇬🇧' },
-]
+  { id: 'zh', label: '中文', flag: '🇨🇳' },
+  { id: 'es', label: 'Español', flag: '🇪🇸' },
+  { id: 'pt', label: 'Português', flag: '🇵🇹' },
+  { id: 'ru', label: 'Русский', flag: '🇷🇺' },
+  { id: 'ja', label: '日本語', flag: '🇯🇵' },
+  { id: 'ko', label: '한국어', flag: '🇰🇷' },
+  { id: 'ar', label: 'العربية', flag: '🇸🇦' },
+  { id: 'hi', label: 'हिन्दी', flag: '🇮🇳' },
+  { id: 'de', label: 'Deutsch', flag: '🇩🇪' },
+  { id: 'it', label: 'Italiano', flag: '🇮🇹' },
+] as const satisfies readonly LocaleDef[]
 
 export type Locale = (typeof LOCALES)[number]['id']
 
@@ -42,7 +54,13 @@ export type Locale = (typeof LOCALES)[number]['id']
 export const DEFAULT_LOCALE: Locale = LOCALES[0].id
 
 /** Clé localStorage de persistance de la préférence de langue. */
-export const LOCALE_STORAGE_KEY = 'breezy-locale'
+export const LOCALE_STORAGE_KEY = 'breezy-anonymous-locale'
+
+/** Normalise une locale navigateur (`pt-BR`, `zh-CN`...) vers le registre. */
+export function localeFromBrowser(language?: string | null): Locale {
+  const normalized = (language ?? '').trim().toLowerCase().split('-')[0]
+  return isLocale(normalized) ? normalized : DEFAULT_LOCALE
+}
 
 /** Garde de type : la valeur est-elle une locale connue ? */
 export function isLocale(value: unknown): value is Locale {
@@ -155,6 +173,13 @@ export const messages: Record<Locale, Messages> = {
     // — Sélecteur de langue —
     'lang.title': 'Langue',
     'lang.select_aria': 'Choisir la langue',
+    'lang.save_failed': "Impossible d'enregistrer la langue du compte.",
+    'translation.original': 'Texte original',
+    'translation.automatic': 'Traduit automatiquement',
+    'translation.from': 'depuis {language}',
+    'translation.show_translation': 'Voir la traduction',
+    'translation.show_original': "Voir l'original",
+    'translation.loading': 'Traduction...',
 
     // — Paramètres —
     'settings.title': 'Paramètres',
@@ -957,6 +982,13 @@ export const messages: Record<Locale, Messages> = {
     // — Language switch —
     'lang.title': 'Language',
     'lang.select_aria': 'Choose language',
+    'lang.save_failed': "Couldn't save the account language.",
+    'translation.original': 'Original text',
+    'translation.automatic': 'Automatically translated',
+    'translation.from': 'from {language}',
+    'translation.show_translation': 'View translation',
+    'translation.show_original': 'View original',
+    'translation.loading': 'Translating...',
 
     // — Settings —
     'settings.title': 'Settings',
@@ -1658,6 +1690,7 @@ export const messages: Record<Locale, Messages> = {
     'who.title': 'Who to follow',
     'who.empty': 'No suggestions yet.',
   },
+  ...additionalMessages,
 }
 
 /**

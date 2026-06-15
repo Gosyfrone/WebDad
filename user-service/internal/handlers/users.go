@@ -211,12 +211,12 @@ func (h *Handler) GetMe(c *gin.Context) {
 }
 
 // UpdateMe : PATCH /users/me — modifie l'utilisateur courant (protégé).
-// @Summary     Modifier le username courant
+// @Summary     Modifier le compte courant
 // @Tags        users
 // @Accept      json
 // @Produce     json
 // @Security    BearerAuth
-// @Param       body body models.UpdateUserRequest true "Champs à modifier"
+// @Param       body body models.UpdateUserRequest true "Username et/ou langue préférée"
 // @Success     200 {object} models.User
 // @Failure     400 {object} map[string]string
 // @Failure     401 {object} map[string]string
@@ -236,7 +236,7 @@ func (h *Handler) UpdateMe(c *gin.Context) {
 		return
 	}
 
-	user, err := h.users.Update(claims.UserID, req.Username)
+	user, err := h.users.Update(claims.UserID, req.Username, req.PreferredLocale)
 	if err != nil {
 		respondUserError(c, err)
 		return
@@ -244,6 +244,9 @@ func (h *Handler) UpdateMe(c *gin.Context) {
 
 	if req.Username != nil {
 		logging.FromGin(c).Info("username modifié")
+	}
+	if req.PreferredLocale != nil {
+		logging.FromGin(c).Info("langue préférée modifiée", "preferred_locale", *req.PreferredLocale)
 	}
 	c.JSON(http.StatusOK, gin.H{"data": user})
 }
@@ -307,7 +310,7 @@ func respondUserError(c *gin.Context, err error) {
 	case errors.Is(err, service.ErrUsernameTaken):
 		logging.FromGin(c).Warn("conflit de username", "reason", "username_taken")
 		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
-	case errors.Is(err, service.ErrInvalidUsername), errors.Is(err, service.ErrSelfFollow):
+	case errors.Is(err, service.ErrInvalidUsername), errors.Is(err, service.ErrInvalidLocale), errors.Is(err, service.ErrSelfFollow):
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 	case errors.Is(err, service.ErrUsernameCooldown):
 		logging.FromGin(c).Warn("changement de username refusé", "reason", "cooldown")
