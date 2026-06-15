@@ -270,12 +270,12 @@ export default function RegisterPage() {
   }
 
   return (
-    <main className="bg-page relative flex h-dvh w-full items-center justify-center overflow-hidden px-4 py-3 sm:px-6 lg:px-10">
+    <main className="bg-page relative flex h-dvh w-full items-start justify-center overflow-x-hidden overflow-y-auto px-4 py-3 sm:px-6 lg:px-10">
       <div className="bg-page-glow-1 pointer-events-none absolute inset-0" />
       <div className="bg-page-glow-2 pointer-events-none absolute inset-0" />
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/70 dark:bg-white/10" />
 
-      <section className="relative grid w-full max-w-6xl items-center gap-6 lg:grid-cols-[1.08fr_0.92fr]">
+      <section className="relative my-auto grid w-full max-w-6xl items-center gap-6 lg:grid-cols-[1.08fr_0.92fr]">
         <div className="hidden min-h-[560px] flex-col justify-between lg:flex">
           <Link
             href={ROUTES.home}
