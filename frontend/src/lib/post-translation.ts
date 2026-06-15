@@ -11,9 +11,8 @@ interface TranslationPayload {
 
 const translationCache = new Map<string, Promise<PostTranslation | null>>()
 const CLIENT_TRANSLATION_TIMEOUT_MS = 12_000
-const MIN_TRANSLATION_WORDS = 4
-const MIN_FOREIGN_SIGNAL_RATIO = 0.6
 const MIN_SCRIPT_LETTERS = 4
+const MIN_SOURCE_MARKERS = 3
 
 const LANGUAGE_MARKERS: Record<string, Set<string>> = {
   de: new Set([
@@ -114,6 +113,7 @@ const LANGUAGE_MARKERS: Record<string, Set<string>> = {
     'il',
     'ils',
     'je',
+    'jsuis',
     'la',
     'le',
     'les',
@@ -131,6 +131,7 @@ const LANGUAGE_MARKERS: Record<string, Set<string>> = {
     'quoi',
     'salut',
     'suis',
+    'trop',
     'sur',
     'ta',
     'te',
@@ -241,7 +242,7 @@ const LANGUAGE_SCRIPTS: Record<string, string> = {
   he: 'hebrew',
   hi: 'devanagari',
   hy: 'armenian',
-  ja: 'cjk',
+  ja: 'kana',
   ka: 'georgian',
   km: 'khmer',
   ko: 'hangul',
@@ -255,14 +256,13 @@ const LANGUAGE_SCRIPTS: Record<string, string> = {
   th: 'thai',
   uk: 'cyrillic',
   ur: 'arabic',
-  zh: 'cjk',
+  zh: 'han',
 }
 
 const SCRIPT_TESTS: Record<string, RegExp> = {
   arabic: /\p{Script=Arabic}/u,
   armenian: /\p{Script=Armenian}/u,
   bengali: /\p{Script=Bengali}/u,
-  cjk: /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u,
   cyrillic: /\p{Script=Cyrillic}/u,
   devanagari: /\p{Script=Devanagari}/u,
   ethiopic: /\p{Script=Ethiopic}/u,
@@ -271,8 +271,10 @@ const SCRIPT_TESTS: Record<string, RegExp> = {
   gujarati: /\p{Script=Gujarati}/u,
   gurmukhi: /\p{Script=Gurmukhi}/u,
   hangul: /\p{Script=Hangul}/u,
+  han: /\p{Script=Han}/u,
   hebrew: /\p{Script=Hebrew}/u,
   khmer: /\p{Script=Khmer}/u,
+  kana: /[\p{Script=Hiragana}\p{Script=Katakana}]/u,
   lao: /\p{Script=Lao}/u,
   myanmar: /\p{Script=Myanmar}/u,
   tamil: /\p{Script=Tamil}/u,
@@ -360,27 +362,28 @@ export function shouldAttemptTranslation(text: string, targetLanguage: string): 
   const scriptDecision = shouldTranslateByScript(text, target)
   if (scriptDecision !== null) return scriptDecision
 
-  const targetMarkers = LANGUAGE_MARKERS[target]
-  if (!targetMarkers) return true
-
   const words = extractWords(text)
-  if (words.length < MIN_TRANSLATION_WORDS) return false
+  if (words.length < 3) return false
 
   const scores = scoreLanguages(words)
   const targetScore = scores[target] ?? 0
-  const candidates = Object.entries(scores)
+  const strongestForeignScore = Object.entries(scores)
     .filter(([language]) => language !== target)
     .sort((a, b) => b[1] - a[1])
+    .at(0)?.[1] ?? 0
 
-  const [sourceLanguage, sourceScore = 0] = candidates[0] ?? []
-  if (!sourceLanguage || sourceScore === 0) return false
+  // Veto local uniquement si le texte porte des marqueurs de la langue cible
+  // sans signal étranger fort. Sinon le fournisseur, bien plus complet que nos
+  // petits lexiques, détecte la source et la réponse est rejetée si source=cible.
+  if (
+    targetScore > 0 &&
+    strongestForeignScore < MIN_SOURCE_MARKERS &&
+    targetScore >= strongestForeignScore
+  ) {
+    return false
+  }
 
-  const knownSignals = sourceScore + targetScore
-  if (knownSignals === 0) return false
-
-  return sourceScore >= MIN_TRANSLATION_WORDS - 1 &&
-    sourceScore / knownSignals >= MIN_FOREIGN_SIGNAL_RATIO &&
-    sourceScore > targetScore
+  return true
 }
 
 export function isTranslationCandidate(text: string, targetLanguage: string): boolean {
@@ -401,6 +404,14 @@ function extractWords(text: string): string[] {
 
 function shouldTranslateByScript(text: string, targetLanguage: string): boolean | null {
   const counts = countScriptLetters(text)
+
+  // Han seul = chinois ; la présence significative de kana = japonais.
+  // Les séparer évite de bloquer chinois→japonais et japonais→chinois.
+  const kanaCount = counts.kana ?? 0
+  const hanCount = counts.han ?? 0
+  if (kanaCount >= MIN_SCRIPT_LETTERS) return targetLanguage !== 'ja'
+  if (hanCount >= MIN_SCRIPT_LETTERS) return targetLanguage !== 'zh'
+
   const totalScriptLetters = Object.values(counts).reduce((sum, count) => sum + count, 0)
   if (totalScriptLetters < MIN_SCRIPT_LETTERS) return null
 
@@ -409,7 +420,7 @@ function shouldTranslateByScript(text: string, targetLanguage: string): boolean 
   if (!dominantScript || dominantCount < MIN_SCRIPT_LETTERS) return null
 
   const dominance = dominantCount / totalScriptLetters
-  if (dominance < MIN_FOREIGN_SIGNAL_RATIO) return null
+  if (dominance < 0.6) return null
 
   const targetScript = LANGUAGE_SCRIPTS[targetLanguage]
   return targetScript !== dominantScript

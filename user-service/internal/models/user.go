@@ -31,6 +31,10 @@ type User struct {
 	// impose alors un changement de username (repassé à false dès qu'un handle
 	// libre est choisi via PATCH /users/me).
 	UsernamePending bool `json:"username_pending"`
+
+	// PreferredLocale est la langue d'interface choisie pour ce compte. nil
+	// signifie qu'aucun choix manuel n'a encore été fait (langue navigateur).
+	PreferredLocale *string `json:"preferred_locale,omitempty"`
 }
 
 // UserDetails enrichit User des compteurs du graphe social, pour les vues
@@ -62,7 +66,8 @@ type AdminCreateUserRequest struct {
 // Champs optionnels (pointeurs) : seuls les champs fournis sont modifiés.
 // Le nom affiché se modifie via profil-service (PATCH /profils/me).
 type UpdateUserRequest struct {
-	Username *string `json:"username" binding:"omitempty,min=3,max=50"`
+	Username        *string `json:"username" binding:"omitempty,min=3,max=50"`
+	PreferredLocale *string `json:"preferred_locale" binding:"omitempty"`
 }
 
 // UpdateStatusRequest : payload de PATCH /users/:id/status (admin).

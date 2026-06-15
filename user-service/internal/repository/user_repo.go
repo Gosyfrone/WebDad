@@ -19,10 +19,10 @@ func New(db *sql.DB) *UserRepository {
 	return &UserRepository{db: db}
 }
 
-const userColumns = `id, username, is_active, created_at, updated_at, username_changed_at, username_pending`
+const userColumns = `id, username, is_active, created_at, updated_at, username_changed_at, username_pending, preferred_locale`
 
 // userColumnsU : mêmes colonnes préfixées par l'alias `u` (jointures follows).
-const userColumnsU = `u.id, u.username, u.is_active, u.created_at, u.updated_at, u.username_changed_at, u.username_pending`
+const userColumnsU = `u.id, u.username, u.is_active, u.created_at, u.updated_at, u.username_changed_at, u.username_pending, u.preferred_locale`
 
 // detailColumns : userColumns + compteurs du graphe social (sous-requêtes
 // corrélées). Réservé aux vues « profil » (un seul utilisateur).
@@ -35,7 +35,7 @@ type scanner interface{ Scan(...any) error }
 // scanUser projette une ligne vers un *User.
 func scanUser(row scanner) (*models.User, error) {
 	u := &models.User{}
-	if err := row.Scan(&u.ID, &u.Username, &u.IsActive, &u.CreatedAt, &u.UpdatedAt, &u.UsernameChangedAt, &u.UsernamePending); err != nil {
+	if err := row.Scan(&u.ID, &u.Username, &u.IsActive, &u.CreatedAt, &u.UpdatedAt, &u.UsernameChangedAt, &u.UsernamePending, &u.PreferredLocale); err != nil {
 		return nil, err
 	}
 	return u, nil
@@ -45,7 +45,7 @@ func scanUser(row scanner) (*models.User, error) {
 func scanDetails(row scanner) (*models.UserDetails, error) {
 	d := &models.UserDetails{}
 	if err := row.Scan(
-		&d.ID, &d.Username, &d.IsActive, &d.CreatedAt, &d.UpdatedAt, &d.UsernameChangedAt, &d.UsernamePending,
+		&d.ID, &d.Username, &d.IsActive, &d.CreatedAt, &d.UpdatedAt, &d.UsernameChangedAt, &d.UsernamePending, &d.PreferredLocale,
 		&d.FollowerCount, &d.FollowingCount,
 	); err != nil {
 		return nil, err
@@ -116,10 +116,11 @@ func (r *UserRepository) List(limit, offset int) ([]models.User, error) {
 // réellement (le CASE compare $2 à l'ancienne valeur — Postgres évalue les
 // expressions du SET sur la ligne d'origine), pour capturer la baseline du
 // cooldown sans la réinitialiser sur un PATCH sans-op.
-func (r *UserRepository) Update(id string, username *string) (*models.User, error) {
+func (r *UserRepository) Update(id string, username, preferredLocale *string) (*models.User, error) {
 	const q = `
 		UPDATE users
 		SET username = COALESCE($2, username),
+		    preferred_locale = COALESCE($3, preferred_locale),
 		    username_changed_at = CASE
 		        WHEN $2 IS NOT NULL AND $2 <> username THEN NOW()
 		        ELSE username_changed_at
@@ -132,7 +133,7 @@ func (r *UserRepository) Update(id string, username *string) (*models.User, erro
 		    END
 		WHERE id = $1
 		RETURNING ` + userColumns
-	return scanUser(r.db.QueryRow(q, id, username))
+	return scanUser(r.db.QueryRow(q, id, username, preferredLocale))
 }
 
 // SetActive active/désactive un compte (visibilité publique : les comptes

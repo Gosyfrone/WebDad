@@ -70,7 +70,7 @@ composed by the **caller** (front/BFF).
 From GRAPH_REPORT "God Nodes":
 1. `apiFetch()` (98 edges) — front HTTP client: Bearer injection, 401 catch, single-flight refresh, replay.
 2. `cn()` (76) — Tailwind class-merge util.
-3. `useT()` (64) / `useLanguage()` (53) — home-grown i18n (FR/EN) hook + context.
+3. `useT()` (64) / `useLanguage()` (53) — home-grown i18n (12 langues) + préférence de compte via user-service.
 4. `PostService` (52) / `PostRepository` (39) — post domain core (Mongo).
 5. `MessageService` (44) / `MessageRepository` (34) — E2EE messaging core (Mongo).
 6. `useToast()` (38) — UI notifications.
@@ -90,6 +90,8 @@ From GRAPH_REPORT "God Nodes":
 - **Business clients** over `apiFetch`: `lib/{api,posts,bookmarks,messages,notifications,media}.ts`.
 - **App-wide providers** in `(app)/layout`: `NotificationsProvider` (badge + single WS),
   `MessagesProvider` (unread badge + single messages WS), `LanguageProvider`, `ThemeProvider`.
+- **Language flow:** `LanguageProvider` écoute les changements de session, lit `preferred_locale` via `GET /users/me`, utilise
+  la locale navigateur si elle est absente, et persiste les choix authentifiés via `PATCH /users/me`. L'arabe pose `dir=rtl`.
 - **E2EE crypto** (`lib/crypto.ts`, `@noble/ciphers`/`@noble/curves`): X25519 sealed box +
   XChaCha20-Poly1305; identity key per device in IndexedDB.
 - **Aggregation:** caller-side enrichment with memoized caches (`authorCache`, `user-cache`).

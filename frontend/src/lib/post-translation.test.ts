@@ -13,11 +13,18 @@ describe('shouldAttemptTranslation', () => {
 
   it('ne traduit pas un texte trop court ou ambigu', () => {
     expect(shouldAttemptTranslation('hello', 'fr')).toBe(false)
-    expect(shouldAttemptTranslation('ok lets go', 'fr')).toBe(false)
+    expect(shouldAttemptTranslation('ok go', 'fr')).toBe(false)
   })
 
   it('ne traduit pas une phrase française avec des fautes ou accents manquants', () => {
     expect(shouldAttemptTranslation('salut les gars coment sa va ?', 'fr')).toBe(false)
+    expect(shouldAttemptTranslation('je mapelle maxime', 'fr')).toBe(false)
+  })
+
+  it('ne traduit pas du français familier avec quelques mots empruntés', () => {
+    expect(
+      shouldAttemptTranslation('OMG la nouvelles fonctionnalités jsuis chokbar', 'fr'),
+    ).toBe(false)
   })
 
   it('traduit une phrase clairement française vers l’anglais', () => {
@@ -38,5 +45,43 @@ describe('shouldAttemptTranslation', () => {
 
   it('traduit une phrase espagnole claire vers le français', () => {
     expect(shouldAttemptTranslation('hola como estas mi amigo', 'fr')).toBe(true)
+  })
+
+  it('détecte une source claire même si la langue cible utilise un autre alphabet', () => {
+    expect(shouldAttemptTranslation('hello my name is maxime', 'ja')).toBe(true)
+    expect(shouldAttemptTranslation('bonjour je suis maxime etudiant', 'ru')).toBe(true)
+  })
+
+  const samples = {
+    fr: 'bonjour je suis maxime et je suis très heureux aujourd’hui',
+    en: 'hello my name is maxime and i am very happy today',
+    zh: '你好，我叫马克西姆，今天真的非常高兴',
+    es: 'hola mi nombre es maxime y estoy muy feliz hoy',
+    pt: 'olá meu nome é maxime e estou muito feliz hoje',
+    ru: 'привет меня зовут максим и сегодня я очень счастлив',
+    ja: 'こんにちは、私の名前はマキシムです。今日はとても幸せです',
+    ko: '안녕하세요 제 이름은 막심이고 오늘 정말 행복합니다',
+    ar: 'مرحبا اسمي ماكسيم وأنا سعيد جدا اليوم',
+    hi: 'नमस्ते मेरा नाम मैक्सिम है और मैं आज बहुत खुश हूँ',
+    de: 'hallo ich heiße maxime und ich bin heute sehr glücklich',
+    it: 'ciao mi chiamo maxime e oggi sono molto felice',
+  } as const
+
+  it('laisse le fournisseur traiter toutes les paires de langues différentes', () => {
+    for (const [source, text] of Object.entries(samples)) {
+      for (const target of Object.keys(samples)) {
+        if (source === target) continue
+        expect(
+          shouldAttemptTranslation(text, target),
+          `${source} vers ${target}`,
+        ).toBe(true)
+      }
+    }
+  })
+
+  it('évite localement les textes clairement déjà dans la langue cible', () => {
+    for (const [locale, text] of Object.entries(samples)) {
+      expect(shouldAttemptTranslation(text, locale), locale).toBe(false)
+    }
   })
 })
