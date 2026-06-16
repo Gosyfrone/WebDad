@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeft, ImageIcon, Loader2, Search, Users } from 'lucide-react'
 
 import { cn, initialOf } from '@/lib/utils'
@@ -72,8 +72,23 @@ export function FeedView() {
   const { isVisitor } = useAuthGate()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const selectedHashtag = (searchParams.get('hashtag') ?? '').trim().replace(/^#/, '')
-  const hashtagTab = normalizeHashtagTab(searchParams.get('tab'))
+  // Le feed reste monté en permanence (layout) derrière les overlays des autres
+  // sections. Hors `/feed`, on **gèle** sa lecture des query params (`hashtag`,
+  // `tab`) : sinon, naviguer vers `/profil` etc. les remettrait à zéro et
+  // déclencherait un refetch invisible, perdant le contexte hashtag et la
+  // position. On conserve donc la dernière valeur vue sur `/feed`.
+  const pathname = usePathname()
+  const onFeed = pathname === ROUTES.feed
+  const rawHashtag = (searchParams.get('hashtag') ?? '').trim().replace(/^#/, '')
+  const rawHashtagTab = normalizeHashtagTab(searchParams.get('tab'))
+  const frozenHashtag = useRef(rawHashtag)
+  const frozenHashtagTab = useRef(rawHashtagTab)
+  if (onFeed) {
+    frozenHashtag.current = rawHashtag
+    frozenHashtagTab.current = rawHashtagTab
+  }
+  const selectedHashtag = onFeed ? rawHashtag : frozenHashtag.current
+  const hashtagTab = onFeed ? rawHashtagTab : frozenHashtagTab.current
   const [hashtagInput, setHashtagInput] = useState(selectedHashtag ? `#${selectedHashtag}` : '')
   const [tab, setTab] = useState<FeedTab>('for-you')
   const [posts, setPosts] = useState<FeedPost[]>([])

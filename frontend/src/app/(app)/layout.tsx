@@ -1,3 +1,5 @@
+import { Suspense } from 'react'
+
 import { SidebarLeft } from '@/components/layout/sidebar-left'
 import { SidebarRight } from '@/components/layout/sidebar-right'
 import { MobileHeader } from '@/components/layout/mobile-header'
@@ -10,6 +12,8 @@ import { OnboardingGate } from '@/components/onboarding/onboarding-gate'
 import { PasswordChangeGate } from '@/components/account/password-change-gate'
 import { UsernamePendingGate } from '@/components/account/username-pending-gate'
 import { ExplorerFilterProvider } from '@/components/explorer/explorer-filter-context'
+import { FeedView } from '@/components/feed/feed-view'
+import { OverlayScrollLock } from '@/components/feed/overlay-scroll-lock'
 
 /**
  * Layout de l'espace authentifié, responsive (mobile-first).
@@ -21,14 +25,17 @@ import { ExplorerFilterProvider } from '@/components/explorer/explorer-filter-co
  *
  * Le rôle réel est désormais dérivé du JWT par `useSession()` directement dans
  * `SidebarLeft` / `MobileHeader` (cf. lib/session.ts) — plus de placeholder.
+ *
+ * **Feed en arrière-plan persistant.** Le fil (`FeedView`) est monté **une seule
+ * fois ici**, dans la colonne centrale : il porte le défilement de la fenêtre et
+ * conserve son état (scroll, posts, WebSocket) sur toute la navigation. Chaque
+ * autre section est une page classique qui se rend en overlay plein écran
+ * (`FeedOverlay`) par-dessus, et `/feed` se rend en `null` (le fond transparaît).
+ * On a ainsi abandonné le combo parallel + intercepting routes (`@modal`),
+ * source des bugs 404/refresh/scroll : refresh et deep-link suivent désormais le
+ * routing normal, sans cas particulier soft/hard.
  */
-export default function AppLayout({
-  children,
-  modal,
-}: {
-  children: React.ReactNode
-  modal: React.ReactNode
-}) {
+export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <AuthPromptProvider>
       <NotificationsProvider>
@@ -46,8 +53,13 @@ export default function AppLayout({
                     casser les en-têtes sticky, contrairement à overflow-x-hidden). */}
                 <div className="glass-column flex min-h-screen w-full min-w-0 flex-1 flex-col overflow-x-clip backdrop-blur-2xl lg:border-x">
                   <MobileHeader />
-                  {/* pb-16 : dégage la barre d'onglets fixe (masquée ≥ lg) */}
-                  <main className="flex-1 pb-16 lg:pb-0">{children}</main>
+                  {/* pb-16 : dégage la barre d'onglets fixe (masquée ≥ lg).
+                      Feed persistant : reste monté derrière les overlays. */}
+                  <main className="flex-1 pb-16 lg:pb-0">
+                    <Suspense fallback={null}>
+                      <FeedView />
+                    </Suspense>
+                  </main>
                 </div>
 
                 <SidebarRight />
@@ -64,9 +76,14 @@ export default function AppLayout({
               <PasswordChangeGate />
               <UsernamePendingGate />
 
-              {/* Slot parallèle : détail d'un post en panneau plein écran
-                  (intercepting route), feed gardé monté derrière. */}
-              {modal}
+              {/* Gèle le défilement du feed quand un overlay est ouvert (≠ /feed). */}
+              <OverlayScrollLock />
+
+              {/* Overlays des sections. Rendus au niveau racine (hors colonne
+                  centrale) pour que leur position `fixed` se réfère au viewport :
+                  le `backdrop-blur` de la colonne créerait sinon un bloc conteneur
+                  qui rognerait l'overlay. `/feed` se rend en `null` → fond visible. */}
+              {children}
             </div>
           </ExplorerFilterProvider>
         </MessagesProvider>
