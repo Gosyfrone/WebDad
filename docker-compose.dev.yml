@@ -148,6 +148,11 @@ services:
     volumes:
       - ./frontend:/app              # code live
       - /app/node_modules            # garde le node_modules de l'image (volume anonyme)
+      - /app/.next                   # build Next DANS le conteneur (volume anonyme) :
+                                     # évite qu'un `.next` persistant sur l'hôte se
+                                     # désynchronise après un `git pull` → fast-refresh
+                                     # corrompu (« initialTree is not iterable »). Repart
+                                     # propre à chaque `make dev`.
     # !reset efface le depends_on hérité de la base (un simple `[]` ne suffit
     # pas : compose fusionne les mappings au lieu de les remplacer).
     depends_on: !reset null          # le frontend ne doit pas attendre l'api-gateway en dev

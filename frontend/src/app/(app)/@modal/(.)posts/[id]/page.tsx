@@ -1,4 +1,5 @@
 import { FeedOverlay } from '@/components/feed/feed-overlay'
+import { OverlayWhenPath } from '@/components/feed/overlay-when-path'
 import { PostDetail } from '@/components/feed/post-detail'
 
 /**
@@ -13,8 +14,10 @@ export default async function InterceptedPostPage({
 }) {
   const { id } = await params
   return (
-    <FeedOverlay>
-      <PostDetail id={id} />
-    </FeedOverlay>
+    <OverlayWhenPath path="/posts/" exact={false}>
+      <FeedOverlay>
+        <PostDetail id={id} />
+      </FeedOverlay>
+    </OverlayWhenPath>
   )
 }
