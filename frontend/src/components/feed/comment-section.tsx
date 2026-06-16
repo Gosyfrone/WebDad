@@ -6,7 +6,7 @@ import { Image as ImageIcon, Loader2, Smile, Trash2, Users, X } from 'lucide-rea
 import { cn, initialOf, timeAgo } from '@/lib/utils'
 import { getAccessToken } from '@/lib/auth-client'
 import { useInfiniteScroll } from '@/lib/use-infinite-scroll'
-import { resolveMediaUrl, uploadMedia } from '@/lib/media'
+import { exceedsMediaLimit, MAX_MEDIA_MB, resolveMediaUrl, uploadMedia } from '@/lib/media'
 import {
   createComment,
   deleteComment,
@@ -170,8 +170,14 @@ export function CommentSection({ postId, focusCommentId, onCountChange, canReply
   }
 
   async function handleFiles(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files ?? [])
+    const picked = Array.from(e.target.files ?? [])
     e.target.value = ''
+    if (picked.length === 0) return
+
+    const files = picked.filter((f) => !exceedsMediaLimit(f.size))
+    if (files.length < picked.length) {
+      toast({ title: t('media.too_large', { max: MAX_MEDIA_MB }), variant: 'brand' })
+    }
     if (files.length === 0) return
 
     const room = MAX_MEDIA - media.length
@@ -470,8 +476,14 @@ function CommentThread({ postId, comment, focusCommentId, highlightId, onRemove,
   }
 
   async function handleReplyFiles(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files ?? [])
+    const picked = Array.from(e.target.files ?? [])
     e.target.value = ''
+    if (picked.length === 0) return
+
+    const files = picked.filter((f) => !exceedsMediaLimit(f.size))
+    if (files.length < picked.length) {
+      toast({ title: t('media.too_large', { max: MAX_MEDIA_MB }), variant: 'brand' })
+    }
     if (files.length === 0) return
 
     const room = MAX_MEDIA - media.length

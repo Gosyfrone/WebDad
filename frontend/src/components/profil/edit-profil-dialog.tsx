@@ -10,7 +10,7 @@ import {
   type CountryOption,
 } from '@/lib/countries'
 import { cn } from '@/lib/utils'
-import { mediaUrl, uploadMedia } from '@/lib/media'
+import { exceedsMediaLimit, MAX_MEDIA_MB, mediaUrl, uploadMedia } from '@/lib/media'
 import type { ProfilEditableFields } from '@/types'
 import { useToast } from '@/hooks/use-toast'
 import { useLanguage } from '@/components/language-provider'
@@ -137,6 +137,7 @@ export function EditProfilDialog({
             label={t('editprofil.change_banner')}
             onPick={setBannerUrl}
             onError={() => toast({ title: t('editprofil.upload_failed'), variant: 'destructive' })}
+            onTooLarge={() => toast({ title: t('media.too_large', { max: MAX_MEDIA_MB }), variant: 'brand' })}
             className={cn(
               'relative flex h-36 w-full items-center justify-center overflow-hidden bg-cover bg-center',
               !bannerUrl &&
@@ -152,6 +153,7 @@ export function EditProfilDialog({
                 label={t('editprofil.change_avatar')}
                 onPick={setAvatarUrl}
                 onError={() => toast({ title: t('editprofil.upload_failed'), variant: 'destructive' })}
+                onTooLarge={() => toast({ title: t('media.too_large', { max: MAX_MEDIA_MB }), variant: 'brand' })}
                 className="relative rounded-full"
               >
                 <Avatar className="h-24 w-24 border-4 border-[#F8F3FF] shadow-[0_18px_44px_rgba(91,108,255,0.22)] dark:border-[#171026]">
@@ -434,6 +436,8 @@ interface ImagePickerProps {
   onPick: (url: string) => void
   /** Appelé si l'upload échoue (pour afficher un toast côté parent). */
   onError?: (message: string) => void
+  /** Appelé si le fichier dépasse le cap de taille (garde UX avant upload). */
+  onTooLarge?: () => void
   className?: string
   style?: React.CSSProperties
   /** Contenu superposé (ex. l'avatar). */
@@ -445,7 +449,7 @@ interface ImagePickerProps {
  * choisi au media-service et restitue son URL (prête à l'affichage). Affiche un
  * voile « appareil photo » au survol et un spinner pendant l'upload.
  */
-function ImagePicker({ label, onPick, onError, className, style, children }: ImagePickerProps) {
+function ImagePicker({ label, onPick, onError, onTooLarge, className, style, children }: ImagePickerProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
 
@@ -454,6 +458,12 @@ function ImagePicker({ label, onPick, onError, className, style, children }: Ima
     // Permet de re-sélectionner le même fichier deux fois de suite.
     e.target.value = ''
     if (!file) return
+
+    // Garde UX : fichier trop lourd → on n'uploade pas (cap aussi serveur).
+    if (exceedsMediaLimit(file.size)) {
+      onTooLarge?.()
+      return
+    }
 
     setUploading(true)
     try {

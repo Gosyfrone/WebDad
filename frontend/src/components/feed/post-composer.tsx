@@ -19,7 +19,7 @@ import {
 import { cn } from '@/lib/utils'
 import { getAccessToken } from '@/lib/auth-client'
 import { getMyProfil, subscribeProfilUpdated } from '@/lib/profil-client'
-import { resolveMediaUrl, uploadMedia } from '@/lib/media'
+import { exceedsMediaLimit, MAX_MEDIA_MB, resolveMediaUrl, uploadMedia } from '@/lib/media'
 import {
   createPost,
   notifyPostCreated,
@@ -158,8 +158,16 @@ export function PostComposer({
 
   /** Uploade les fichiers choisis au media-service et les ajoute aux médias joints. */
   async function handleFiles(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files ?? [])
+    const picked = Array.from(e.target.files ?? [])
     e.target.value = '' // permet de re-sélectionner les mêmes fichiers
+    if (picked.length === 0) return
+
+    // Garde UX : on écarte les fichiers trop lourds avant tout upload (le cap
+    // est aussi appliqué côté serveur). Les admins ne sont pas plafonnés.
+    const files = picked.filter((f) => !exceedsMediaLimit(f.size))
+    if (files.length < picked.length) {
+      toast({ title: t('media.too_large', { max: MAX_MEDIA_MB }), variant: 'brand' })
+    }
     if (files.length === 0) return
 
     const room = MAX_MEDIA - media.length

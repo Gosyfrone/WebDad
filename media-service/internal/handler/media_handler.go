@@ -18,7 +18,8 @@ import (
 )
 
 // roleAdmin : valeur du claim `role` autorisant la suppression de n'importe
-// quel média (aligné sur user-service / profil-service).
+// quel média ET le bypass des caps de taille à l'upload (aligné sur
+// user-service / profil-service).
 const roleAdmin = "admin"
 
 // sniffLen : nombre d'octets lus en tête pour la détection MIME réelle.
@@ -30,14 +31,17 @@ type MediaHandler struct {
 	store         *storage.Store
 	maxImageBytes int64
 	maxVideoBytes int64
+	maxBlobBytes  int64
 }
 
-// NewMediaHandler construit le handler avec ses caps de taille.
+// NewMediaHandler construit le handler avec ses caps de taille (appliqués aux
+// utilisateurs non-admin ; les admins bypassent, cf. Upload/UploadEncrypted).
 func NewMediaHandler(store *storage.Store, cfg *config.Config) *MediaHandler {
 	return &MediaHandler{
 		store:         store,
 		maxImageBytes: cfg.MaxImageBytes,
 		maxVideoBytes: cfg.MaxVideoBytes,
+		maxBlobBytes:  cfg.MaxBlobBytes,
 	}
 }
 
@@ -72,6 +76,10 @@ func (h *MediaHandler) Upload(c *gin.Context) {
 		return
 	}
 
+	// Les administrateurs ne sont pas plafonnés : ils peuvent uploader des
+	// médias plus lourds (bypass des caps de taille).
+	isAdmin := claims.Role == roleAdmin
+
 	fileHeader, err := c.FormFile("file")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "champ `file` manquant"})
@@ -79,8 +87,8 @@ func (h *MediaHandler) Upload(c *gin.Context) {
 	}
 
 	// Rejet précoce si la taille dépasse même le plus grand cap (vidéo), avant
-	// de lire le moindre octet.
-	if fileHeader.Size > h.maxVideoBytes {
+	// de lire le moindre octet. Ignoré pour les admins (non plafonnés).
+	if !isAdmin && fileHeader.Size > h.maxVideoBytes {
 		c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": validate.ErrTooLarge.Error()})
 		return
 	}
@@ -109,10 +117,12 @@ func (h *MediaHandler) Upload(c *gin.Context) {
 		c.JSON(http.StatusUnsupportedMediaType, gin.H{"error": err.Error()})
 		return
 	}
-	if err := validate.CheckSize(kind, fileHeader.Size, h.maxImageBytes, h.maxVideoBytes); err != nil {
-		logging.FromGin(c).Warn("upload refusé : fichier trop volumineux", "kind", string(kind), "size", fileHeader.Size)
-		c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": err.Error()})
-		return
+	if !isAdmin {
+		if err := validate.CheckSize(kind, fileHeader.Size, h.maxImageBytes, h.maxVideoBytes); err != nil {
+			logging.FromGin(c).Warn("upload refusé : fichier trop volumineux", "kind", string(kind), "size", fileHeader.Size)
+			c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": err.Error()})
+			return
+		}
 	}
 
 	id, err := randomID()
@@ -161,12 +171,15 @@ func (h *MediaHandler) UploadEncrypted(c *gin.Context) {
 		return
 	}
 
+	// Admins non plafonnés (bypass du cap blob), comme pour les médias en clair.
+	isAdmin := claims.Role == roleAdmin
+
 	fileHeader, err := c.FormFile("file")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "champ `file` manquant"})
 		return
 	}
-	if fileHeader.Size > h.maxVideoBytes {
+	if !isAdmin && fileHeader.Size > h.maxBlobBytes {
 		logging.FromGin(c).Warn("upload chiffré refusé : blob trop volumineux", "size", fileHeader.Size)
 		c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": validate.ErrTooLarge.Error()})
 		return

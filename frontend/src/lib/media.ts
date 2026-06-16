@@ -14,6 +14,26 @@
 
 import { apiFetch } from '@/lib/auth-client'
 import { API_URL } from '@/lib/config'
+import { isAdmin } from '@/lib/session'
+
+/**
+ * Cap de taille d'upload pour les utilisateurs NON-admin (doit refléter le cap
+ * serveur du media-service : `MEDIA_MAX_*_BYTES`, défaut 5 Mo). C'est une simple
+ * garde UX — la VRAIE limite est appliquée côté serveur, jamais par le front
+ * (cf. CLAUDE.md §6). Les administrateurs bypassent (cf. `exceedsMediaLimit`).
+ */
+export const MAX_MEDIA_BYTES = 5 * 1024 * 1024
+/** Cap exprimé en Mo, pour les messages i18n (`media.too_large`). */
+export const MAX_MEDIA_MB = MAX_MEDIA_BYTES / (1024 * 1024)
+
+/**
+ * Vrai si `size` (octets) dépasse le cap d'upload des non-admin. Les admins ne
+ * sont jamais bloqués côté client (ils bypassent aussi côté serveur) → on évite
+ * de leur afficher une erreur trompeuse avant un upload qui aboutira.
+ */
+export function exceedsMediaLimit(size: number): boolean {
+  return !isAdmin() && size > MAX_MEDIA_BYTES
+}
 
 /** Métadonnées renvoyées par le service après un upload. */
 export interface UploadedMedia {
