@@ -10,6 +10,7 @@
 > - Knowledge graph in `graphify-out/` — query it before reading source (Operating Rule 11).
 >
 > **Latest session work and suggested commit messages live in `CHANGELOG.md`, not here.**
+> **Session freshness:** current work log updated in `CHANGELOG.md` on 16/06/2026.
 
 ---
 

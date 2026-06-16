@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
-  BarChart2,
   Bookmark,
   Heart,
   Loader2,
@@ -553,12 +552,6 @@ export function PostCard({ post, showPinBadge = false, focusCommentId, embedded 
             burstKey={likeBurst}
             className="hover:text-red-500 hover:bg-red-500/10"
             activeClassName="text-red-500 fill-red-500"
-          />
-          <ActionButton
-            icon={BarChart2}
-            count={0}
-            label={t('post.views')}
-            className="hover:text-primary hover:bg-primary/10"
           />
           <button
             aria-label={bookmarked ? t('bookmarks.remove_aria') : t('bookmarks.add_aria')}

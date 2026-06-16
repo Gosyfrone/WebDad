@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { BarChart2, Heart, Loader2, MessageCircle, Repeat2, Share } from 'lucide-react'
+import { Heart, Loader2, MessageCircle, Repeat2, Share } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import {
@@ -182,12 +182,6 @@ export function PostActions({ post, commentCount, commentActive = false, onComme
           burstKey={likeBurst}
           className="hover:text-red-500 hover:bg-red-500/10"
           activeClassName="text-red-500 fill-red-500"
-        />
-        <ActionButton
-          icon={BarChart2}
-          count={0}
-          label={t('post.views')}
-          className="hover:text-primary hover:bg-primary/10"
         />
         <button
           aria-label={t('post.share')}
