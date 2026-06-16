@@ -49,7 +49,7 @@ function CallbackContent({ provider }: { provider: string }) {
         }
 
         // Navigation DURE (cf. login) : entrée cross-groupe `(auth)` → `(app)`,
-        // la nav soft ne résout pas le slot parallèle `@modal` → 404.
+        // repart sur un état d'app propre (feed persistant remonté).
         window.location.assign(ROUTES.feed)
       } catch {
         setError(t('auth.oauth.error'))

@@ -141,12 +141,10 @@ export default function LoginPage() {
         setAccessToken(payload.accessToken)
       }
 
-      // Navigation DURE vers le feed (et non `router.replace` soft) : l'entrée
-      // dans l'espace `(app)` depuis le groupe `(auth)` est une transition
-      // cross-groupe qui, en navigation soft, ne résout pas le slot parallèle
-      // `@modal` (routes interceptées sans `default` applicable) → 404. Un
-      // chargement complet se comporte comme un accès direct (qui marche) et
-      // repart sur un état d'app propre après connexion.
+      // Navigation DURE vers le feed (et non `router.replace` soft) : on entre
+      // dans l'espace `(app)` depuis le groupe `(auth)` avec un access token tout
+      // juste posé. Un chargement complet repart sur un état d'app propre (feed
+      // persistant remonté, providers réinitialisés) après connexion.
       window.location.assign(ROUTES.feed)
     } catch (error) {
       setErrors({

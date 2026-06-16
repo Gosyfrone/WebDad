@@ -81,6 +81,10 @@ export function NotificationsView() {
         return t('notifications.follow_request_accept_confirm', { name })
       case 'post_purge_warning':
         return t('notifications.post_purge_warning')
+      default:
+        // Type inconnu (notif legacy) : pas de texte descriptif, mais la ligne
+        // reste affichée (acteur + date) sans casser le rendu.
+        return ''
     }
   }
 
@@ -98,7 +102,13 @@ export function NotificationsView() {
       ) : (
         <ul className="flex flex-col">
           {items.map((n) => {
-            const { Icon, className } = TYPE_ICON[n.type]
+            // Garde défensive : un type inconnu (notif legacy d'avant l'ajout de
+            // l'enum côté base — validé à l'écriture, pas à la lecture) ne doit
+            // pas faire planter toute la page. Repli sur une icône neutre.
+            const { Icon, className } = TYPE_ICON[n.type] ?? {
+              Icon: Bell,
+              className: 'text-muted-foreground',
+            }
             const fallback = (n.actor.displayName || 'U').charAt(0).toUpperCase()
             // Notification SYSTÈME (sans acteur) : préavis de purge RGPD. Pas de
             // lien profil, pas de navigation (le tweet masqué n'est pas visible).
