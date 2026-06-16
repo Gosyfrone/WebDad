@@ -82,6 +82,10 @@ export function MobileTabBar() {
             key={tab.href}
             href={tab.href === ROUTES.explorer ? searchHref : tab.href}
             scroll={false}
+            // prefetch={false} : routes interceptées pilotant le slot @modal — le
+            // prefetch prod cache la version non interceptée et fige l'overlay (cf.
+            // sidebar-left / DECISIONS.md).
+            prefetch={false}
             aria-label={t(tab.labelKey)}
             aria-current={active ? 'page' : undefined}
             className="flex flex-1 items-center justify-center transition-colors hover:bg-accent"

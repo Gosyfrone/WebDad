@@ -191,6 +191,7 @@ export function MobileHeader() {
                 <SheetClose asChild key={item.href}>
                   <Link
                     href={item.href}
+                    prefetch={false}
                     className={cn(
                       'rounded-2xl px-3 py-3 text-base transition-colors hover:bg-accent',
                       active && 'bg-accent font-bold text-[#5B6CFF] shadow-sm dark:text-[#9aa6ff]',
@@ -224,6 +225,7 @@ export function MobileHeader() {
             <SheetClose asChild>
               <Link
                 href={ROUTES.parametres}
+                prefetch={false}
                 className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-base transition-colors hover:bg-accent"
               >
                 <Settings className="h-5 w-5" />
@@ -247,6 +249,7 @@ export function MobileHeader() {
       <Link
         href={ROUTES.feed}
         aria-label={t('nav.home')}
+        prefetch={false}
         className="absolute left-1/2 -translate-x-1/2"
       >
         <Image

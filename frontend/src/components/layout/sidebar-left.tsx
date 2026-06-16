@@ -154,6 +154,7 @@ export function SidebarLeft() {
         <Link
           href={ROUTES.feed}
           scroll={false}
+          prefetch={false}
           className="mb-3 flex w-fit items-center rounded-2xl p-2 transition hover:scale-105"
         >
           <Image
@@ -187,6 +188,13 @@ export function SidebarLeft() {
               key={item.href}
               href={item.href === ROUTES.explorer ? searchHref : item.href}
               scroll={false}
+              // prefetch={false} : ces liens visent des routes interceptées (`(.)`)
+              // qui pilotent le slot @modal (ouverture d'overlay, ou retour `/feed`
+              // → `(.)feed` qui vide le slot). En prod, le prefetch met en cache la
+              // version *page* (non interceptée) → l'interception ne se rejoue plus
+              // au clic et le slot reste figé. Le couper force un fetch complet qui
+              // résout `(.)` correctement (cf. DECISIONS.md).
+              prefetch={false}
               className={cn(
                 'flex w-fit items-center gap-4 rounded-full px-4 py-3 text-xl font-normal text-foreground/80 transition hover:bg-accent hover:text-[#5B6CFF] hover:shadow-sm dark:hover:text-[#9aa6ff]',
                 active &&
@@ -283,7 +291,7 @@ export function SidebarLeft() {
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              <Link href={ROUTES.parametres} scroll={false}>
+              <Link href={ROUTES.parametres} scroll={false} prefetch={false}>
                 <Settings className="mr-2 h-4 w-4" />
                 {t('nav.settings')}
               </Link>
