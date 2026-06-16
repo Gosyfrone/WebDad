@@ -36,6 +36,7 @@ import { useMention } from '@/lib/use-mention'
 import { mentionSearchGlobal } from '@/lib/mention-search'
 import { useHashtag } from '@/lib/use-hashtag'
 import { hashtagSearchGlobal } from '@/lib/hashtag-search'
+import { playAppSound } from '@/lib/sounds'
 import { useT } from '@/components/language-provider'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -143,6 +144,7 @@ export function PostComposer({
       const created = await createPost(content.trim(), media, quotePost?.id, pollPayload, replyAudience)
       const post = pinOnProfile ? await pinPost(created.id) : created
       notifyPostCreated(post) // le fil prépend sans refetch
+      playAppSound('breeze_posted')
       onPosted?.(content)
       setContent('')
       setMedia([])

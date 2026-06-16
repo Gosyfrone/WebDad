@@ -28,6 +28,7 @@ import {
   type RawMessage,
   type RealtimeEvent,
 } from '@/lib/messages'
+import { playAppSound } from '@/lib/sounds'
 
 interface MessagesContextValue {
   /** Nombre de conversations ayant au moins un message non lu (le badge). */
@@ -113,6 +114,7 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
         // métadonnées en clair (expéditeur + conversation).
         msgSubs.current.forEach((cb) => cb(raw))
         if (raw.sender_id === myId.current) return
+        playAppSound('message_received')
         if (raw.conversation_id === activeConvId.current) {
           // Conversation ouverte → lue à la volée (n'alourdit pas le badge).
           markRead(raw.conversation_id)

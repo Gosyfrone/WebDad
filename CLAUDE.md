@@ -18,6 +18,7 @@
 These govern *how* Claude works on this repo. They override default behavior.
 
 1. **Read this file first** at every session start.
+1b. **User preference:** before every assistant response, re-read this file; after each response/work unit, keep the relevant project docs updated.
 2. **⛔ NE PAS CODER avant validation de l'utilisateur.** Pour toute feature/tâche : d'abord proposer (a) l'**architecture** et (b) **comment la feature sera implémentée**, puis **attendre l'accord explicite** avant d'écrire/modifier du code. Pas d'implémentation spontanée.
 3. **Propose, then decide:** explain what you'll do before doing it; present viable approaches when several exist; confirm before any major architectural change. Analysis before code.
 4. **Update the docs after any significant change** (source of truth, not re-explanation): `PROJECT_STATUS.md` (status 🔴→🟡→🟢, TODOs), `DECISIONS.md` (new decision + rationale), `ARCHITECTURE.md` (only if boundaries/flows change), `CHANGELOG.md` (one session entry; push older entries to `CHANGELOG_ARCHIVE.md`).
