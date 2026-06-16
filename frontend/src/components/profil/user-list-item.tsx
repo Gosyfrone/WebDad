@@ -5,6 +5,7 @@ import type { RelationUser } from '@/types'
 import { useT } from '@/components/language-provider'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
+import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
 import { ProfilLink } from '@/components/profil/profil-link'
 
 interface UserListItemProps {
@@ -86,6 +87,7 @@ export function UserListItem({
         <Avatar className={cn(compact ? 'h-9 w-9' : 'h-10 w-10')}>
           {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user.displayName} />}
           <AvatarFallback>{initials}</AvatarFallback>
+          <ActivityPresenceDot userId={user.id} />
         </Avatar>
       </ProfilLink>
 

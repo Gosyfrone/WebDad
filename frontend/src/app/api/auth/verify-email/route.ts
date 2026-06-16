@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 import { apiUrl } from '@/lib/config'
-import { provisionUser } from '@/lib/provision'
+import { markLoginActivity, provisionUser } from '@/lib/provision'
 import { setRefreshCookie } from '@/lib/server/auth-cookie'
 
 type AuthPayload = {
@@ -83,6 +83,7 @@ export async function POST(request: NextRequest) {
   // créée au register, on s'aligne sur le flux login par robustesse.
   if (accessToken) {
     void provisionUser(accessToken)
+    void markLoginActivity(accessToken)
   }
 
   return nextResponse

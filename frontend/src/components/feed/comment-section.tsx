@@ -25,6 +25,7 @@ import { Button } from '@/components/ui/button'
 import { EmojiPicker } from '@/components/feed/emoji-picker'
 import { MentionAutocomplete } from '@/components/mention/mention-autocomplete'
 import { TranslatedContent } from '@/components/feed/translated-content'
+import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
 import { ProfilLink } from '@/components/profil/profil-link'
 
 const MAX_CHARS = 280
@@ -725,6 +726,12 @@ export function CommentRow({
           <AvatarFallback className="bg-gradient-to-br from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] text-xs font-bold text-white">
             {initialOf(comment.author.displayName)}
           </AvatarFallback>
+          <ActivityPresenceDot
+            userId={comment.author.id}
+            initialLastLoginAt={comment.author.lastLoginAt}
+            initialIsOnline={comment.author.isOnline}
+            className="h-2.5 w-2.5"
+          />
         </Avatar>
       </ProfilLink>
 

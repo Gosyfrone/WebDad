@@ -10,12 +10,23 @@ import {
 function makePost(overrides: Partial<FeedPost> = {}): FeedPost {
   return {
     id: 'p1',
-    author: { id: 'u1', username: 'u', displayName: 'U', avatarUrl: '', visibility: 'public' },
+    author: {
+      id: 'u1',
+      username: 'u',
+      displayName: 'U',
+      avatarUrl: '',
+      visibility: 'public',
+      lastLoginAt: '',
+      isOnline: false,
+    },
     content: '',
     hashtags: [],
     media: [],
+    poll: null,
     quotePostId: '',
     quotedPost: null,
+    replyAudience: 'everyone',
+    canReply: true,
     likesCount: 1,
     commentsCount: 2,
     repostsCount: 3,
@@ -33,11 +44,17 @@ function makePost(overrides: Partial<FeedPost> = {}): FeedPost {
   }
 }
 
-const stats = (s: Partial<PostStats> & { id?: string } = {}): Map<string, PostStats> =>
+const stats = (
+  s: Partial<PostStats> & { id?: string } = {},
+): Map<string, PostStats> =>
   new Map([
     [
       s.id ?? 'p1',
-      { likesCount: s.likesCount ?? 10, commentsCount: s.commentsCount ?? 20, repostsCount: s.repostsCount ?? 30 },
+      {
+        likesCount: s.likesCount ?? 10,
+        commentsCount: s.commentsCount ?? 20,
+        repostsCount: s.repostsCount ?? 30,
+      },
     ],
   ])
 
@@ -55,7 +72,11 @@ describe('applyStatsToPost', () => {
   })
 
   it('renvoie la même référence si les compteurs sont inchangés', () => {
-    const post = makePost({ likesCount: 10, commentsCount: 20, repostsCount: 30 })
+    const post = makePost({
+      likesCount: 10,
+      commentsCount: 20,
+      repostsCount: 30,
+    })
     expect(applyStatsToPost(post, stats())).toBe(post)
   })
 
@@ -67,12 +88,17 @@ describe('applyStatsToPost', () => {
 
 describe('applyStatsToPosts', () => {
   it('renvoie la même liste si rien n’a changé', () => {
-    const list = [makePost({ likesCount: 10, commentsCount: 20, repostsCount: 30 })]
+    const list = [
+      makePost({ likesCount: 10, commentsCount: 20, repostsCount: 30 }),
+    ]
     expect(applyStatsToPosts(list, stats())).toBe(list)
   })
 
   it('renvoie une nouvelle liste dès qu’un post change', () => {
-    const list = [makePost({ id: 'p1' }), makePost({ id: 'p2', likesCount: 99 })]
+    const list = [
+      makePost({ id: 'p1' }),
+      makePost({ id: 'p2', likesCount: 99 }),
+    ]
     const next = applyStatsToPosts(list, stats())
     expect(next).not.toBe(list)
     expect(next[0].likesCount).toBe(10)

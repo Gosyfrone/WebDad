@@ -16,6 +16,7 @@ import { useAuthGate } from '@/components/auth-prompt-provider'
 import { useT } from '@/components/language-provider'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { CustomThemeDialog } from '@/components/custom-theme-dialog'
+import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
   Sheet,
@@ -52,6 +53,7 @@ export function MobileHeader() {
   const [open, setOpen] = useState(false)
   const [themeDialogOpen, setThemeDialogOpen] = useState(false)
   const [account, setAccount] = useState({
+    userId: '',
     displayName: '',
     username: '',
     avatarUrl: '',
@@ -72,6 +74,7 @@ export function MobileHeader() {
 
     function applyProfil(profil: ProfilDetails) {
       setAccount({
+        userId: profil.userId,
         displayName: profil.displayName,
         username: profil.username,
         avatarUrl: profil.avatarUrl,
@@ -160,6 +163,7 @@ export function MobileHeader() {
                 <AvatarImage src={account.avatarUrl} alt={account.displayName} />
               )}
               <AvatarFallback>{fallbackInitial}</AvatarFallback>
+              <ActivityPresenceDot userId={account.userId} className="h-2.5 w-2.5" />
             </Avatar>
           </button>
         </SheetTrigger>
@@ -173,6 +177,7 @@ export function MobileHeader() {
                   <AvatarImage src={account.avatarUrl} alt={account.displayName} />
                 )}
                 <AvatarFallback className="text-lg">{fallbackInitial}</AvatarFallback>
+                <ActivityPresenceDot userId={account.userId} />
               </Avatar>
               <div className="flex min-w-0 flex-col">
                 <SheetTitle className="truncate">{shownName}</SheetTitle>

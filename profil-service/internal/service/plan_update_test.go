@@ -103,7 +103,7 @@ func TestPlanUpdate_BirthDateSetOnce(t *testing.T) {
 
 func TestPlanUpdate_Visibility(t *testing.T) {
 	now := time.Now().UTC()
-	current := &models.Profil{Visibility: models.VisibilityPublic}
+	current := &models.Profil{Visibility: models.VisibilityPublic, ActivityVisibility: models.VisibilityPublic}
 
 	set, err := planUpdate(current, models.UpdateProfilRequest{Visibility: ptr(models.VisibilityPrivate)}, now, 0)
 	if err != nil {
@@ -112,6 +112,9 @@ func TestPlanUpdate_Visibility(t *testing.T) {
 	if set["visibility"] != models.VisibilityPrivate {
 		t.Fatalf("visibility = %v, attendu %s", set["visibility"], models.VisibilityPrivate)
 	}
+	if _, ok := set["activity_visibility"]; ok {
+		t.Fatal("passer le profil en privé ne doit pas modifier la préférence d'activité")
+	}
 
 	set, err = planUpdate(current, models.UpdateProfilRequest{Visibility: ptr(models.VisibilityPublic)}, now, 0)
 	if err != nil {
@@ -119,6 +122,28 @@ func TestPlanUpdate_Visibility(t *testing.T) {
 	}
 	if _, ok := set["visibility"]; ok {
 		t.Fatal("visibility ne devrait pas être réécrite (valeur identique)")
+	}
+}
+
+func TestPlanUpdate_ActivityVisibility(t *testing.T) {
+	now := time.Now().UTC()
+	current := &models.Profil{Visibility: models.VisibilityPublic, ActivityVisibility: models.VisibilityPublic}
+
+	set, err := planUpdate(current, models.UpdateProfilRequest{ActivityVisibility: ptr(models.VisibilityPrivate)}, now, 0)
+	if err != nil {
+		t.Fatalf("err inattendue : %v", err)
+	}
+	if set["activity_visibility"] != models.VisibilityPrivate {
+		t.Fatalf("activity_visibility = %v, attendu %s", set["activity_visibility"], models.VisibilityPrivate)
+	}
+
+	current = &models.Profil{Visibility: models.VisibilityPrivate, ActivityVisibility: models.VisibilityPrivate}
+	set, err = planUpdate(current, models.UpdateProfilRequest{ActivityVisibility: ptr(models.VisibilityPublic)}, now, 0)
+	if err != nil {
+		t.Fatalf("err inattendue : %v", err)
+	}
+	if set["activity_visibility"] != models.VisibilityPublic {
+		t.Fatalf("activity_visibility = %v, attendu %s", set["activity_visibility"], models.VisibilityPublic)
 	}
 }
 

@@ -12,6 +12,7 @@ import {
 import { resolveUser, type ResolvedUser } from '@/lib/user-cache'
 import { timeAgo } from '@/lib/utils'
 import { ProfilLink } from '@/components/profil/profil-link'
+import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
 import { useLanguage } from '@/components/language-provider'
 import { useToast } from '@/hooks/use-toast'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -132,6 +133,7 @@ export function DeletedPosts() {
                 <Avatar className="h-9 w-9">
                   {author?.avatarUrl && <AvatarImage src={author.avatarUrl} alt={author.displayName} />}
                   <AvatarFallback>{initial}</AvatarFallback>
+                  <ActivityPresenceDot userId={post.authorId} />
                 </Avatar>
               </ProfilLink>
               <div className="flex min-w-0 flex-1 flex-col">

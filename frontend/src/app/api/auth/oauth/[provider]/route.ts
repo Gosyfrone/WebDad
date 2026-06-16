@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 import { apiUrl } from '@/lib/config'
-import { provisionUser } from '@/lib/provision'
+import { markLoginActivity, provisionUser } from '@/lib/provision'
 import { setRefreshCookie } from '@/lib/server/auth-cookie'
 
 type OAuthURLPayload = {
@@ -114,6 +114,7 @@ export async function POST(
 
   if (accessToken) {
     await provisionUser(accessToken)
+    void markLoginActivity(accessToken)
   }
 
   return nextResponse

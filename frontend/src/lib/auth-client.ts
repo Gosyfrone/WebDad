@@ -53,9 +53,9 @@ function refreshAccessToken(): Promise<string | null> {
         // same-origin → le cookie httpOnly refresh part automatiquement.
         const res = await fetch('/api/auth/refresh', { method: 'POST' })
         if (!res.ok) return null
-        const payload = (await res.json().catch(() => null)) as
-          | { accessToken?: string }
-          | null
+        const payload = (await res.json().catch(() => null)) as {
+          accessToken?: string
+        } | null
         const token = payload?.accessToken ?? null
         if (token) setAccessToken(token)
         return token
@@ -88,7 +88,7 @@ function resolveUrl(path: string): string {
  */
 export async function apiFetch(
   path: string,
-  init: RequestInit = {}
+  init: RequestInit = {},
 ): Promise<Response> {
   const url = resolveUrl(path)
 
@@ -124,8 +124,12 @@ export async function apiFetch(
  * session locale est nettoyée même si l'appel réseau échoue.
  */
 export async function logout(): Promise<void> {
+  const token = getAccessToken()
   try {
-    await fetch('/api/auth/logout', { method: 'POST' })
+    await fetch('/api/auth/logout', {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    })
   } catch {
     // best-effort : on nettoie quand même côté client.
   } finally {

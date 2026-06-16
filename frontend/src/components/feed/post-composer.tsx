@@ -50,6 +50,7 @@ import { EmojiPicker } from '@/components/feed/emoji-picker'
 import { MentionAutocomplete } from '@/components/mention/mention-autocomplete'
 import { HashtagAutocomplete } from '@/components/hashtag/hashtag-autocomplete'
 import { ComposerHighlight } from '@/components/hashtag/composer-highlight'
+import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
 
 const MAX_CHARS = 280
 /** Nombre maximal de médias par post (aligné sur le validateur post-service). */
@@ -88,6 +89,7 @@ export function PostComposer({
   const [content, setContent] = useState('')
   const [media, setMedia] = useState<PostMedia[]>([])
   const [uploadingMedia, setUploadingMedia] = useState(false)
+  const [userId, setUserId] = useState('')
   const [avatarUrl, setAvatarUrl] = useState('')
   const [initial, setInitial] = useState('U')
   const [submitting, setSubmitting] = useState(false)
@@ -122,6 +124,7 @@ export function PostComposer({
     let cancelled = false
     function apply(profil: ProfilDetails) {
       if (cancelled) return
+      setUserId(profil.userId)
       setAvatarUrl(profil.avatarUrl)
       setInitial((profil.displayName || profil.username || 'U').charAt(0).toUpperCase())
     }
@@ -239,6 +242,7 @@ export function PostComposer({
         <AvatarFallback className="bg-gradient-to-br from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] font-bold text-white">
           {initial}
         </AvatarFallback>
+        <ActivityPresenceDot userId={userId} />
       </Avatar>
 
       <div className="flex min-w-0 flex-1 flex-col gap-3">

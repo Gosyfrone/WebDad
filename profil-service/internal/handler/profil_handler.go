@@ -44,6 +44,9 @@ func (h *ProfilHandler) Search(c *gin.Context) {
 		respondProfilError(c, err)
 		return
 	}
+	for i := range profils {
+		h.sanitizePublicProfil(c, &profils[i])
+	}
 	c.JSON(http.StatusOK, gin.H{"data": profils})
 }
 
@@ -73,7 +76,30 @@ func (h *ProfilHandler) GetByUserID(c *gin.Context) {
 		respondProfilError(c, err)
 		return
 	}
+	h.sanitizePublicProfil(c, profil)
 	c.JSON(http.StatusOK, gin.H{"data": profil})
+}
+
+// GetActivity : GET /profils/:userId/activity — activité visible selon la
+// préférence de l'utilisateur, le profil privé et la relation d'abonnement.
+// @Summary     Activité visible d'un profil
+// @Tags        profils
+// @Produce     json
+// @Param       userId path string true "User ID"
+// @Success     200 {object} map[string]interface{} "last_login_at, is_online"
+// @Failure     404 {object} map[string]string
+// @Router      /profils/{userId}/activity [get]
+func (h *ProfilHandler) GetActivity(c *gin.Context) {
+	profil, err := h.profils.GetByUserID(c.Request.Context(), c.Param("userId"))
+	if err != nil {
+		respondProfilError(c, err)
+		return
+	}
+	h.sanitizePublicProfil(c, profil)
+	c.JSON(http.StatusOK, gin.H{
+		"last_login_at": profil.LastLoginAt,
+		"is_online":     profil.IsOnline,
+	})
 }
 
 // GetMe : GET /profils/me — profil de l'utilisateur courant (protégé).
@@ -131,6 +157,55 @@ func (h *ProfilHandler) UpdateMe(c *gin.Context) {
 		return
 	}
 	logging.FromGin(c).Info("profil modifié")
+	c.JSON(http.StatusOK, gin.H{"data": profil})
+}
+
+// TouchActivity : PATCH /profils/me/activity — marque l'utilisateur en ligne.
+// @Summary     Marquer la dernière connexion du profil courant
+// @Tags        profils
+// @Produce     json
+// @Security    BearerAuth
+// @Success     200 {object} models.Profil
+// @Failure     401 {object} map[string]string
+// @Failure     404 {object} map[string]string
+// @Router      /profils/me/activity [patch]
+func (h *ProfilHandler) TouchActivity(c *gin.Context) {
+	claims, ok := middleware.ClaimsFrom(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "claims absents"})
+		return
+	}
+	profil, err := h.profils.TouchActivity(c.Request.Context(), claims.UserID, true)
+	if err != nil {
+		respondProfilError(c, err)
+		return
+	}
+	logging.FromGin(c).Info("activité profil mise à jour")
+	c.JSON(http.StatusOK, gin.H{"data": profil})
+}
+
+// TouchActivityOffline : PATCH /profils/me/activity/offline — marque
+// l'utilisateur hors ligne dès sa déconnexion.
+// @Summary     Marquer le profil courant hors ligne
+// @Tags        profils
+// @Produce     json
+// @Security    BearerAuth
+// @Success     200 {object} models.Profil
+// @Failure     401 {object} map[string]string
+// @Failure     404 {object} map[string]string
+// @Router      /profils/me/activity/offline [patch]
+func (h *ProfilHandler) TouchActivityOffline(c *gin.Context) {
+	claims, ok := middleware.ClaimsFrom(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "claims absents"})
+		return
+	}
+	profil, err := h.profils.TouchActivity(c.Request.Context(), claims.UserID, false)
+	if err != nil {
+		respondProfilError(c, err)
+		return
+	}
+	logging.FromGin(c).Info("activité profil mise hors ligne")
 	c.JSON(http.StatusOK, gin.H{"data": profil})
 }
 
@@ -294,5 +369,19 @@ func respondProfilError(c *gin.Context, err error) {
 	default:
 		logging.FromGin(c).Error("erreur profil inattendue", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "erreur interne"})
+	}
+}
+
+func (h *ProfilHandler) sanitizePublicProfil(c *gin.Context, profil *models.Profil) {
+	if profil == nil {
+		return
+	}
+	viewerID := ""
+	if claims, ok := middleware.ClaimsFrom(c); ok {
+		viewerID = claims.UserID
+	}
+	if !h.profils.CanViewActivity(c.Request.Context(), viewerID, profil) {
+		profil.LastLoginAt = nil
+		profil.IsOnline = false
 	}
 }

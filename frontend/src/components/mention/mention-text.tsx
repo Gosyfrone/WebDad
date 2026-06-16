@@ -12,6 +12,7 @@ import { ROUTES, profilHref } from '@/lib/routes'
 import { cn } from '@/lib/utils'
 import type { RelationUser } from '@/types'
 import { useLanguage } from '@/components/language-provider'
+import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 
@@ -165,6 +166,7 @@ function NonMemberMention({
               <AvatarFallback className="bg-gradient-to-br from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] font-bold text-white">
                 {(user.displayName || user.username || 'U').charAt(0).toUpperCase()}
               </AvatarFallback>
+              <ActivityPresenceDot userId={user.id} />
             </Avatar>
             <div className="flex min-w-0 flex-col">
               <span className="truncate font-bold text-foreground">{user.displayName}</span>

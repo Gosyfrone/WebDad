@@ -6,6 +6,7 @@ import { Loader2, Search } from 'lucide-react'
 import { searchUsers } from '@/lib/api'
 import type { RelationUser } from '@/types'
 import { useLanguage } from '@/components/language-provider'
+import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 
 interface UserSearchProps {
@@ -99,6 +100,7 @@ export function UserSearch({ excludeIds = [], onPick, autoFocus = true }: UserSe
                     <AvatarFallback>
                       {(user.displayName.charAt(0) || user.username.charAt(0) || '?').toUpperCase()}
                     </AvatarFallback>
+                    <ActivityPresenceDot userId={user.id} />
                   </Avatar>
                   <div className="flex min-w-0 flex-col">
                     <span className="truncate text-sm font-bold text-foreground">

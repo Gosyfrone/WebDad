@@ -30,6 +30,7 @@ import { useT } from '@/components/language-provider'
 import { PostCard } from '@/components/feed/post-card'
 import { ProfilLink } from '@/components/profil/profil-link'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
 import { Button } from '@/components/ui/button'
 
 /**
@@ -423,6 +424,7 @@ function LiveSearchMenu({
                   <Avatar className="h-10 w-10">
                     {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user.displayName} />}
                     <AvatarFallback>{initials(user)}</AvatarFallback>
+                    <ActivityPresenceDot userId={user.id} />
                   </Avatar>
                   <span className="min-w-0">
                     <span className="block truncate font-bold text-foreground">{user.displayName}</span>
@@ -673,6 +675,7 @@ function SuggestionCard({
           <Avatar className="h-14 w-14">
             {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user.displayName} />}
             <AvatarFallback>{initials(user)}</AvatarFallback>
+            <ActivityPresenceDot userId={user.id} className="h-3.5 w-3.5" />
           </Avatar>
         </ProfilLink>
         <div className="min-w-0 flex-1">
@@ -754,6 +757,7 @@ function ExplorerUserRow({
         <Avatar className="h-11 w-11">
           {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user.displayName} />}
           <AvatarFallback>{initials(user)}</AvatarFallback>
+          <ActivityPresenceDot userId={user.id} />
         </Avatar>
       </ProfilLink>
       <div className="min-w-0 flex-1">

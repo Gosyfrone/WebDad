@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/webdad/profil-service/internal/client"
 	"github.com/webdad/profil-service/internal/config"
 	"github.com/webdad/profil-service/internal/database"
 	"github.com/webdad/profil-service/internal/handler"
@@ -25,7 +26,7 @@ func main() {
 	cfg := config.Load()
 	gin.SetMode(ginMode(cfg.GinMode))
 
-	client, err := database.ConnectMongo(cfg.MongoURI)
+	mongoClient, err := database.ConnectMongo(cfg.MongoURI)
 	if err != nil {
 		slog.Error("connexion Mongo", "error", err)
 		os.Exit(1)
@@ -33,10 +34,10 @@ func main() {
 	defer func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		_ = client.Disconnect(ctx)
+		_ = mongoClient.Disconnect(ctx)
 	}()
 
-	db := client.Database(cfg.MongoDB)
+	db := mongoClient.Database(cfg.MongoDB)
 
 	// Le service applique son propre schéma (collection + validateur + index +
 	// seed admin) au démarrage, de façon idempotente → autonome, sans script
@@ -48,7 +49,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	profils := service.New(repository.NewProfilRepository(db), cfg.DisplayNameCooldown)
+	profils := service.New(
+		repository.NewProfilRepository(db),
+		cfg.DisplayNameCooldown,
+		service.WithFollowChecker(client.NewUserClient(cfg.UserURL)),
+	)
 
 	r := gin.New()
 	r.Use(middleware.RequestID(), middleware.Recovery(), middleware.RequestLogger())

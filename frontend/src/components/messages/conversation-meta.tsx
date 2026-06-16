@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils'
 import type { Conversation } from '@/lib/messages'
 import type { ResolvedUser } from '@/lib/user-cache'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
 
 type Translate = (key: string, params?: Record<string, string | number>) => string
 
@@ -44,6 +45,7 @@ export function ConversationAvatar({
       <Avatar className={cn('shrink-0', className)}>
         {peer?.avatarUrl && <AvatarImage src={peer.avatarUrl} alt={peer.displayName} />}
         <AvatarFallback>{initials}</AvatarFallback>
+        <ActivityPresenceDot userId={peer?.id} />
       </Avatar>
     )
   }
