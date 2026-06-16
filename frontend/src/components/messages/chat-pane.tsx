@@ -472,7 +472,7 @@ export function ChatPane({
       <TypingIndicator conversation={conversation} userIds={typingUserIds} />
 
       {/* Composer */}
-      <div className="panel sticky bottom-0 z-20 shrink-0 border-t px-3 pb-[calc(0.625rem+env(safe-area-inset-bottom))] pt-2.5 shadow-[0_-14px_34px_rgba(91,108,255,0.10)] backdrop-blur-xl sm:px-4">
+      <div className="panel sticky bottom-0 z-20 shrink-0 border-t px-3 pb-2.5 pt-2.5 shadow-[0_-14px_34px_rgba(91,108,255,0.10)] backdrop-blur-xl sm:px-4">
         {readOnly ? (
           <p className="py-2 text-center text-sm text-muted-foreground">
             {t('messages.read_only')}
