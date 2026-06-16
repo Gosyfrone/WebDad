@@ -12,6 +12,7 @@ import {
   ArrowLeft,
   Check,
   CheckCheck,
+  Flag,
   ImageOff,
   Info,
   Loader2,
@@ -25,6 +26,7 @@ import {
 } from 'lucide-react'
 
 import { cn, initialOf } from '@/lib/utils'
+import { ReportDialog } from '@/components/moderation/report-dialog'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -682,6 +684,14 @@ function MessageBubble({
   const [showOriginal, setShowOriginal] = useState(false)
   const hasOriginal =
     !isDeleted && message.decrypted && Boolean(message.originalText)
+  // Signalement d'un message (hors message supprimé). Affiché aussi sur ses
+  // propres messages pour que l'action soit toujours visible ; sécurité côté
+  // back. Type d'entité selon la conversation : groupe/communauté → message de
+  // groupe, sinon message privé.
+  const canReport = !isDeleted
+  const [reportOpen, setReportOpen] = useState(false)
+  const reportEntityType =
+    conversation.type === 'group' || conversation.type === 'community' ? 'group_message' : 'message'
 
   // Message supprimé « pour tout le monde » (tombstone) : rendu sobre, sans média,
   // sans actions, sans accusé.
@@ -696,7 +706,7 @@ function MessageBubble({
         <div className="mt-1 max-w-[78%] rounded-2xl border border-dashed border-border bg-background/40 px-3.5 py-2 text-sm italic text-muted-foreground">
           <span className="flex items-center gap-1.5">
             <Trash2 className="h-3.5 w-3.5" aria-hidden />
-            {t('messages.deleted')}
+            {message.deletedByModeration ? t('messages.deleted_by_moderation') : t('messages.deleted')}
           </span>
         </div>
         <span className="mt-0.5 px-1 text-[11px] text-muted-foreground">
@@ -757,8 +767,10 @@ function MessageBubble({
             <MessageActionsMenu
               canEdit={canEdit}
               canDelete={canDelete}
+              canReport={canReport}
               onEdit={() => onEditStart(message)}
               onDelete={() => onDelete(message)}
+              onReport={() => setReportOpen(true)}
               className="mb-1"
             />
           )}
@@ -829,8 +841,10 @@ function MessageBubble({
           <MessageActionsMenu
             canEdit={canEdit}
             canDelete={canDelete}
+            canReport={canReport}
             onEdit={() => onEditStart(message)}
             onDelete={() => onDelete(message)}
+            onReport={() => setReportOpen(true)}
             className="mb-1"
           />
         </div>
@@ -839,6 +853,19 @@ function MessageBubble({
         <span>{time}</span>
         {receipt && <ReceiptIndicator receipt={receipt} />}
       </div>
+
+      {canReport && (
+        <ReportDialog
+          open={reportOpen}
+          onOpenChange={setReportOpen}
+          entityType={reportEntityType}
+          entityId={message.id}
+          entityOwnerId={message.senderId}
+          // E2EE : on transmet la copie EN CLAIR que CE destinataire a déchiffrée,
+          // pour que la modération puisse juger (le serveur, lui, reste aveugle).
+          disclosedContent={message.decrypted ? message.text || '' : ''}
+        />
+      )}
     </li>
   )
 }
@@ -852,18 +879,22 @@ function MessageBubble({
 function MessageActionsMenu({
   canEdit,
   canDelete,
+  canReport,
   onEdit,
   onDelete,
+  onReport,
   className,
 }: {
   canEdit: boolean
   canDelete: boolean
+  canReport: boolean
   onEdit: () => void
   onDelete: () => void
+  onReport: () => void
   className?: string
 }) {
   const { t } = useLanguage()
-  if (!canEdit && !canDelete) return null
+  if (!canEdit && !canDelete && !canReport) return null
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -890,6 +921,13 @@ function MessageActionsMenu({
           >
             <Trash2 className="mr-2 h-4 w-4" />
             {t('messages.delete')}
+          </DropdownMenuItem>
+        )}
+        {/* Signalement placé SOUS l'option de suppression (exigence fonctionnelle). */}
+        {canReport && (
+          <DropdownMenuItem onClick={onReport} className="cursor-pointer">
+            <Flag className="mr-2 h-4 w-4" />
+            {t('report.message_action')}
           </DropdownMenuItem>
         )}
       </DropdownMenuContent>

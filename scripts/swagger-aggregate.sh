@@ -6,7 +6,7 @@ set -euo pipefail
 SWAG="${HOME}/go/bin/swag"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-SERVICES=(auth-service user-service profil-service post-service message-service notification-service media-service)
+SERVICES=(auth-service user-service profil-service post-service message-service notification-service report-service media-service)
 
 echo "→ Génération par service..."
 for svc in "${SERVICES[@]}"; do

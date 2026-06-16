@@ -72,6 +72,24 @@ func AdminOnly() gin.HandlerFunc {
 	}
 }
 
+// ModeratorOnly exige un JWT dont le rôle est `moderator` ou `admin` (l'admin
+// est un sur-ensemble). À chaîner APRÈS JWTAuth. Garde la suppression de message
+// par la modération de plateforme (par id de message, hors appartenance).
+func ModeratorOnly() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		claims, ok := ClaimsFrom(c)
+		if !ok {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "token manquant"})
+			return
+		}
+		if claims.Role != "moderator" && claims.Role != "admin" {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "réservé à la modération"})
+			return
+		}
+		c.Next()
+	}
+}
+
 // ClaimsFrom récupère les claims posés par JWTAuth dans le contexte.
 func ClaimsFrom(c *gin.Context) (*Claims, bool) {
 	val, exists := c.Get(contextKey)

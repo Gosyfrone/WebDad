@@ -9,6 +9,7 @@ volumes:
   mongo-post-data:
   mongo-message-data:
   mongo-notification-data:
+  mongo-report-data:
   minio-data:
   caddy-data:
   caddy-config:
@@ -114,6 +115,21 @@ services:
       - ./notification-service/.env
     volumes:
       - mongo-notification-data:/data/db
+    networks:
+      - webdad-net
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  mongo-report:
+    image: mongo:7
+    restart: always
+    env_file:
+      - ./report-service/.env
+    volumes:
+      - mongo-report-data:/data/db
     networks:
       - webdad-net
     healthcheck:
@@ -291,6 +307,27 @@ services:
       retries: 5
       start_period: 5s
 
+  report-service:
+    image: ghcr.io/gosyfrone/webdad/report-service:${IMAGE_TAG:-latest}
+    restart: always
+    env_file:
+      - ./report-service/.env
+    environment:
+      GIN_MODE: release
+      MONGO_HOST: mongo-report
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET requis}
+    networks:
+      - webdad-net
+    depends_on:
+      mongo-report:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8090/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
   media-service:
     image: ghcr.io/gosyfrone/webdad/media-service:${IMAGE_TAG:-latest}
     restart: always
@@ -343,6 +380,7 @@ services:
       MESSAGE_SERVICE_URL: http://message-service:8085
       NOTIFICATION_SERVICE_URL: http://notification-service:8086
       MEDIA_SERVICE_URL: http://media-service:8087
+      REPORT_SERVICE_URL: http://report-service:8090
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET requis}
     networks:
       - webdad-net
@@ -360,6 +398,8 @@ services:
       notification-service:
         condition: service_healthy
       media-service:
+        condition: service_healthy
+      report-service:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]

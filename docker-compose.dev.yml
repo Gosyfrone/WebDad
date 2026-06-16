@@ -27,6 +27,8 @@ volumes:
   go-build-message:
   go-mod-notification:
   go-build-notification:
+  go-mod-report:
+  go-build-report:
   go-mod-media:
   go-build-media:
   go-mod-mail:
@@ -100,6 +102,17 @@ services:
       - /app/tmp
       - go-mod-notification:/go/pkg/mod
       - go-build-notification:/root/.cache/go-build
+    healthcheck:
+      start_period: 90s
+
+  report-service:
+    build:
+      target: dev
+    volumes:
+      - ./report-service:/app
+      - /app/tmp
+      - go-mod-report:/go/pkg/mod
+      - go-build-report:/root/.cache/go-build
     healthcheck:
       start_period: 90s
 

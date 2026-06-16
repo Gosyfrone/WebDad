@@ -654,6 +654,34 @@ func (h *ConversationHandler) DeleteMessage(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": msg})
 }
 
+// ModerateDeleteMessage : DELETE /messages/moderation/:messageId — supprime
+// « pour tout le monde » un message signalé, à la demande de la modération de
+// plateforme (rôle mod/admin, garde de route). Identifié par le seul id du
+// message (la modération n'est pas membre de la conversation). Tombstone marqué
+// `deleted_by_moderation` et diffusé via `message_updated`. E2EE préservé : le
+// serveur ne lit pas le contenu, il ne fait que le marquer supprimé.
+// @Summary     Supprimer un message par la modération
+// @Tags        messages
+// @Produce     json
+// @Security    BearerAuth
+// @Param       messageId path string true "Message ID"
+// @Success     200 {object} map[string]interface{} "Message tombstoné"
+// @Failure     401 {object} map[string]string
+// @Failure     403 {object} map[string]string
+// @Failure     404 {object} map[string]string
+// @Router      /messages/moderation/{messageId} [delete]
+func (h *ConversationHandler) ModerateDeleteMessage(c *gin.Context) {
+	msg, memberIDs, err := h.service.ModerateDeleteMessage(c.Request.Context(), c.Param("messageId"))
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+
+	h.hub.Publish(memberIDs, gin.H{"type": "message_updated", "data": msg})
+
+	c.JSON(http.StatusOK, gin.H{"data": msg})
+}
+
 // Typing : POST /messages/conversations/:id/typing — signale que l'utilisateur
 // courant est « en train d'écrire ». Éphémère (rien n'est persisté) : on diffuse
 // simplement un événement `typing` aux AUTRES membres connectés. Membre requis.

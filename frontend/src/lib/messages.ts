@@ -125,6 +125,7 @@ interface ApiMessage {
   created_at: string
   edited_at?: string
   deleted_at?: string
+  deleted_by_moderation?: boolean
 }
 
 /** Message brut tel que poussé par la WebSocket (chiffré). Le `MessagesProvider`
@@ -226,6 +227,8 @@ export interface ChatMessage {
   editedAt: string
   /** Date ISO de suppression « pour tout le monde » (tombstone) ; '' sinon. */
   deletedAt: string
+  /** true si la suppression a été faite par la modération de plateforme. */
+  deletedByModeration: boolean
   mine: boolean
 }
 
@@ -821,6 +824,7 @@ export function decryptMessage(conv: Conversation, api: ApiMessage, myId: string
       createdAt: api.created_at,
       editedAt: '',
       deletedAt: api.deleted_at,
+      deletedByModeration: Boolean(api.deleted_by_moderation),
       originalText: '',
       mine: api.sender_id === myId,
     }
@@ -851,6 +855,7 @@ export function decryptMessage(conv: Conversation, api: ApiMessage, myId: string
     createdAt: api.created_at,
     editedAt: api.edited_at ?? '',
     deletedAt: '',
+    deletedByModeration: false,
     originalText,
     mine: api.sender_id === myId,
   }
@@ -1117,6 +1122,20 @@ export async function deleteMessage(conv: Conversation, messageId: string): Prom
     await apiFetch(`/messages/conversations/${conv.id}/messages/${messageId}`, { method: 'DELETE' }),
   )
   return decryptMessage(conv, deleted, currentUserId())
+}
+
+/**
+ * Supprime un message signalé « pour tout le monde » EN TANT QUE MODÉRATION de
+ * plateforme (rôle mod/admin, par le seul id du message — la modération n'est pas
+ * membre de la conversation). Le tombstone est marqué `deleted_by_moderation` et
+ * diffusé aux participants (WS `message_updated`) → ils voient « supprimé par la
+ * modération ». À usage des écrans de modération (détail de ticket).
+ */
+export async function moderateDeleteMessage(messageId: string): Promise<void> {
+  const res = await apiFetch(`/messages/moderation/${encodeURIComponent(messageId)}`, { method: 'DELETE' })
+  if (!res.ok) {
+    throw new Error(`moderate delete failed: ${res.status}`)
+  }
 }
 
 /**

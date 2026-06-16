@@ -11,7 +11,7 @@ import {
   type AdminUser,
 } from '@/lib/admin'
 import { useSession } from '@/lib/session'
-import { initialOf, timeAgo } from '@/lib/utils'
+import { cn, initialOf, timeAgo } from '@/lib/utils'
 import { ProfilLink } from '@/components/profil/profil-link'
 import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
 import { useLanguage } from '@/components/language-provider'
@@ -61,11 +61,14 @@ interface AccountsPanelProps {
 // sur les défauts serveur (ACCOUNT_PURGE_AFTER − PURGE_WARN_BEFORE).
 const ACCOUNT_PURGE_WARN_MS = (5 * 365 - 30) * 24 * 60 * 60 * 1000
 
+type AccountFilter = 'all' | 'banned' | 'moderators' | 'admins'
+
 export function AccountsPanel({ canGovern }: AccountsPanelProps) {
   const { t, locale } = useLanguage()
   const { toast } = useToast()
   const session = useSession()
   const [query, setQuery] = useState('')
+  const [filter, setFilter] = useState<AccountFilter>('all')
   const [users, setUsers] = useState<AdminUser[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
@@ -143,9 +146,31 @@ export function AccountsPanel({ canGovern }: AccountsPanelProps) {
     }
   }
 
+  // Filtre par statut (cumulé à la recherche serveur, appliqué côté client sur
+  // la page chargée) : tous / bannis / modérateurs / administrateurs.
+  const visibleUsers = users.filter((u) => {
+    switch (filter) {
+      case 'banned':
+        return !u.isActive
+      case 'moderators':
+        return u.role === 'moderator'
+      case 'admins':
+        return u.role === 'administrator'
+      default:
+        return true
+    }
+  })
+
+  const filters: { key: AccountFilter; label: string }[] = [
+    { key: 'all', label: t('accounts.filter_all') },
+    { key: 'banned', label: t('accounts.filter_banned') },
+    { key: 'moderators', label: t('accounts.filter_moderators') },
+    { key: 'admins', label: t('accounts.filter_admins') },
+  ]
+
   return (
     <div className="px-4 py-4">
-      <div className="relative mb-4">
+      <div className="relative mb-3">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
         <Input
           value={query}
@@ -156,17 +181,36 @@ export function AccountsPanel({ canGovern }: AccountsPanelProps) {
         />
       </div>
 
+      {/* Filtres de statut */}
+      <div className="mb-4 flex flex-wrap gap-2">
+        {filters.map((f) => (
+          <button
+            key={f.key}
+            type="button"
+            onClick={() => setFilter(f.key)}
+            className={cn(
+              'rounded-full border px-3 py-1 text-xs font-semibold transition-colors',
+              filter === f.key
+                ? 'border-[#5B6CFF] bg-[#5B6CFF]/10 text-[#5B6CFF]'
+                : 'border-border text-muted-foreground hover:text-foreground',
+            )}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+
       {loading ? (
         <div className="flex items-center justify-center py-16 text-muted-foreground">
           <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
         </div>
       ) : error ? (
         <p className="py-16 text-center text-sm text-muted-foreground">{t('admin.error')}</p>
-      ) : users.length === 0 ? (
+      ) : visibleUsers.length === 0 ? (
         <p className="py-16 text-center text-sm text-muted-foreground">{t('admin.empty')}</p>
       ) : (
         <ul className="flex flex-col gap-2">
-          {users.map((user) => {
+          {visibleUsers.map((user) => {
             const isSelf = user.id === session?.userId
             const busy = busyId === user.id
             // Un modérateur ne peut bannir qu'un utilisateur simple (le back le

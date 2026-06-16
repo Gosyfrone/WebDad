@@ -15,6 +15,7 @@ import { ExplorerFilterProvider } from '@/components/explorer/explorer-filter-co
 import { FeedView } from '@/components/feed/feed-view'
 import { OverlayScrollLock } from '@/components/feed/overlay-scroll-lock'
 import { ActivityLifecycle } from '@/components/activity/activity-lifecycle'
+import { WarningsGate } from '@/components/moderation/warnings-gate'
 
 /**
  * Layout de l'espace authentifié, responsive (mobile-first).
@@ -78,6 +79,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <PasswordChangeGate />
               <UsernamePendingGate />
               <ActivityLifecycle />
+              {/* Avertissements de modération interceptés à la connexion/au focus. */}
+              <WarningsGate />
 
               {/* Gèle le défilement du feed quand un overlay est ouvert (≠ /feed). */}
               <OverlayScrollLock />

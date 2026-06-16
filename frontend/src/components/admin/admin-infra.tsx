@@ -21,7 +21,12 @@ const REFRESH_MS = 5000
  *
  * Perspective : métriques conteneur (CPU/mém/restarts) via l'API Docker.
  */
-export function AdminInfra() {
+/**
+ * `embedded` : rendu SANS en-tête ni garde d'accès, pour servir d'onglet dans
+ * `AdminView` (qui porte déjà le titre, le bouton de création de compte et la
+ * garde admin). Par défaut (false), le composant reste autonome.
+ */
+export function AdminInfra({ embedded = false }: { embedded?: boolean } = {}) {
   const { t, locale } = useLanguage()
   const session = useSession()
   const isAdmin = session?.role === 'administrator'
@@ -49,7 +54,7 @@ export function AdminInfra() {
     return () => clearInterval(handle)
   }, [isAdmin, refresh])
 
-  if (session && !isAdmin) {
+  if (!embedded && session && !isAdmin) {
     return (
       <div className="flex flex-col items-center justify-center gap-3 px-4 py-20 text-center">
         <ShieldAlert className="h-10 w-10 text-muted-foreground" aria-hidden />
@@ -63,15 +68,18 @@ export function AdminInfra() {
     <div className="flex flex-col">
       {/* En-tête interne (desktop) : sur mobile, le titre est porté par l'en-tête
           global type-feed → on le masque ici (le bouton « Créer un compte »
-          descend alors dans le body, cf. plus bas). */}
-      <header className="panel z-10 hidden items-start justify-between gap-3 border-b px-4 py-3 lg:sticky lg:top-0 lg:flex">
-        <div>
-          <h1 className="brand-text text-xl font-bold">{t('nav.admin')}</h1>
-          <p className="text-sm text-muted-foreground">{t('admin.infra_subtitle')}</p>
-        </div>
-        {/* Création de compte de force — réservée aux administrateurs. */}
-        <CreateAccountDialog />
-      </header>
+          descend alors dans le body, cf. plus bas). En mode `embedded` (onglet),
+          aucun en-tête interne n'est rendu. */}
+      {!embedded && (
+        <header className="panel z-10 hidden items-start justify-between gap-3 border-b px-4 py-3 lg:sticky lg:top-0 lg:flex">
+          <div>
+            <h1 className="brand-text text-xl font-bold">{t('nav.admin')}</h1>
+            <p className="text-sm text-muted-foreground">{t('admin.infra_subtitle')}</p>
+          </div>
+          {/* Création de compte de force — réservée aux administrateurs. */}
+          <CreateAccountDialog />
+        </header>
+      )}
 
       {/* Action « Créer un compte » (mobile) : en haut du body, au-dessus de la
           liste des services, sans bande dédiée (l'en-tête global porte le titre). */}

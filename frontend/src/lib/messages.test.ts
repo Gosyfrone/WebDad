@@ -23,6 +23,7 @@ function msg(id: string, mine = false): ChatMessage {
     createdAt: '2026-06-08T00:00:00Z',
     editedAt: '',
     deletedAt: '',
+    deletedByModeration: false,
     mine,
   }
 }

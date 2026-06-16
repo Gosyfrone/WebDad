@@ -10,6 +10,59 @@
 
 - **Structured logging — slog + X-Request-Id (user-service pilote, 13/06/2026).** `log/slog` stdlib (Go 1.21+, aucune dépendance externe). Format JSON en `release`, texte en `debug/test` (lisible humain). Niveau depuis `LOG_LEVEL`. Trois middlewares Gin dédiés : `RequestID` (lit ou génère un UUID hex 16 B, propagé dans la réponse), `Recovery` (panic → `slog.Error` + 500 sans stack exposée), `RequestLogger` (une ligne/requête avec method, path sans query, status, latency_ms, client_ip, request_id, user_id). `JWTAuth` pose `user_id` dans le contexte Gin pour que `RequestLogger` corrèle l'utilisateur. `gin.Default()` remplacé par `gin.New()` + chaîne explicite. Ce motif sera répliqué à l'identique sur les autres services.
 
+## Moderation & reporting
+
+- **Domaine « tickets de signalement » = nouveau `report-service` dédié (16/06/2026).** Un signalement
+  porte sur une entité possédée par un AUTRE service (post, message, profil) → il n'appartient à aucun
+  d'eux. Plutôt que de polluer post/message/profil (entorse à « une donnée = un service »), un service
+  autonome (Go+MongoDB, port 8090, préfixe gateway `/reports`) possède les tickets et avertissements.
+  Renforce la cohérence microservices (critère de notation « architecture cohérente »).
+- **Agrégation : un ticket parent par entité (modération), bug autonome.** Index Mongo **unique partiel**
+  `(entity_type, entity_id)` filtré sur `category=moderation` → les N signalements d'un même contenu sont
+  empilés dans `reports[]` d'un seul ticket (`report_count` + `reason_tags` dénormalisés via `$inc`,
+  upsert atomique). Les rapports de **bug** (motif « Bug technique ») sont des **tickets autonomes**
+  (`entity_type=app`, pas de clé d'entité à dédupliquer) — décision produit validée avec l'utilisateur.
+- **Réouverture automatique à seuil (16/06/2026).** Un ticket clôturé ne doit pas être rouvert par un unique
+  re-signalement (sinon la décision du modérateur est triviale à défaire), mais une récidive soutenue doit le
+  rouvrir. Compteur `reports_since_closed` (`$inc` à chaque signalement, remis à 0 à **chaque** changement de
+  statut) ; quand il atteint `ReopenThreshold` (=2) sur un ticket `closed`, réouverture auto (statut `reopened`,
+  action `auto_reopen` « Système »). Couplé à « un signalement par utilisateur », il faut **2 personnes
+  distinctes nouvelles** → un même compte ne peut pas rouvrir en spammant.
+- **Un seul signalement par (utilisateur, entité) (16/06/2026).** Le `$push` du signalement enfant est
+  conditionné par un filtre `reports.reporter_id $ne <moi>` ; si le rapporteur est déjà présent, l'upsert
+  tente un insert → rejeté par l'index unique partiel (E11000) → **409 `ErrAlreadyReported`**. Une E11000
+  peut aussi venir d'une course (deux 1ers signalements simultanés) → **retry unique** qui distingue course
+  (empile) et vrai doublon (409). Atomique, sans lecture-puis-écriture vulnérable aux races.
+- **Catégorie déduite du MOTIF, formulaire unique.** « Bug technique » est un motif du même `ReportDialog` :
+  le choisir bascule en catégorie `bug` (limite **500**, onglet Administration) ; les autres motifs →
+  `moderation` (limite **255**, onglet Modération). Un seul formulaire partout (posts/profils/messages),
+  conforme à l'énoncé. Motifs **bornés** (enum fermé) car `reason_tags.<motif>` est une clé Mongo
+  (anti-injection de champs arbitraires) ; longueur comptée en **runes** (caractères, pas octets).
+- **Le ticket conserve l'entité, même pour un bug (16/06/2026).** Un bug signalé SUR un post/profil garde
+  `entity_type`+`entity_id` (au lieu de retomber sur `app`) → le détail affiche le contenu réel (post embarqué,
+  carte profil cliquable) pour que mod/admin puissent juger et investiguer. `app` n'est utilisé que pour un bug
+  applicatif sans entité.
+- **Messages E2EE : divulgation par le signaleur, pas déchiffrement serveur (16/06/2026).** Le serveur de
+  messagerie reste **aveugle** (DM/groupes admin-proof). Pour modérer un message privé (ex. haine), le **signaleur,
+  qui en est destinataire**, joint **volontairement** la copie en clair (`disclosed_content`) de CE message au
+  signalement (avis de transmission affiché). Le serveur ne déchiffre jamais de lui-même et ne peut pas lire un
+  message arbitraire — seul un participant peut révéler un message précis, pour ce signalement. Conforme à l'E2EE
+  (analogue au « report » de WhatsApp/Signal) tout en permettant l'action de modération.
+- **Suppression d'un message signalé par la modération (16/06/2026).** Nouvel endpoint message-service
+  `DELETE /messages/moderation/:messageId` (mod/admin, garde de route), qui tombstone le message **par son seul
+  id** — la modération n'est pas membre de la conversation et le ticket ne stocke que l'id du message. Le message
+  porte `deleted_by_moderation=true` ; les participants reçoivent l'événement WS `message_updated` et voient
+  « Ce message a été supprimé par la modération ». **E2EE intact** : le serveur ne lit pas le contenu, il pose juste
+  le tombstone (vide `ciphertext`/`nonce`, comme la suppression « pour tous » existante).
+- **Réutilisation maximale de l'existant.** « Tweets supprimés » (soft-delete post-service `is_hidden`),
+  bannissement (auth `is_active` + visibilité user) et rôles/gating (mod ne peut bannir/supprimer un
+  admin) **préexistaient** — la modération s'y branche (retrait = soft-delete, transfert = changement de
+  `category`) au lieu de les réimplémenter.
+- **Avertissement asynchrone = pull (poll), pas push.** Un Warn est persisté côté `report-service` ;
+  `WarningsGate` (layout `(app)`) interroge `GET /reports/warnings/pending` au montage **et au retour de
+  focus**, et affiche une **modale bloquante** acquittée par `POST .../ack`. Simple, robuste (pas de WS
+  dédié), et « intercepte la prochaine requête/connexion » comme demandé.
+
 ## Platform & frontend
 
 - **Frontend = Next.js 14 (App Router) + TS + Tailwind/shadcn (slate).** Imposed stack.

@@ -54,6 +54,10 @@ func RegisterRoutes(
 		// Effacement RGPD : purge la participation d'un utilisateur (admin).
 		messages.DELETE("/users/:id", auth, middleware.AdminOnly(), convH.PurgeUser)
 
+		// Modération de plateforme : suppression « pour tous » d'un message signalé,
+		// par son seul id (mod/admin, hors appartenance à la conversation).
+		messages.DELETE("/moderation/:messageId", auth, middleware.ModeratorOnly(), convH.ModerateDeleteMessage)
+
 		// Conversations + messages.
 		conversations := messages.Group("/conversations", auth)
 		{

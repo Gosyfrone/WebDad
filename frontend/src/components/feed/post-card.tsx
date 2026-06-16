@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Bookmark,
+  Flag,
   Heart,
   Loader2,
   LockOpen,
@@ -67,6 +68,7 @@ import { ShareDialog } from '@/components/share/share-dialog'
 import { postHref } from '@/lib/routes'
 import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
 import { ProfilLink } from '@/components/profil/profil-link'
+import { ReportDialog } from '@/components/moderation/report-dialog'
 
 interface PostCardProps {
   post: FeedPost
@@ -112,8 +114,14 @@ export function PostCard({ post, showPinBadge = false, focusCommentId, embedded 
   const [likeBurst, setLikeBurst] = useState(0)
   const [showComments, setShowComments] = useState(Boolean(focusCommentId) || defaultShowComments)
   const [deleting, setDeleting] = useState(false)
+  const [reportOpen, setReportOpen] = useState(false)
   // Index du média ouvert en vue photo plein écran (null = fermé).
   const [photoIndex, setPhotoIndex] = useState<number | null>(null)
+
+  // Signalement : ouvert à tout utilisateur connecté (le visiteur passe par la
+  // modale de connexion). On l'affiche aussi sur ses propres posts pour que
+  // l'action soit toujours visible ; la sécurité réelle vit côté back.
+  const canReport = !isVisitor && Boolean(currentUserId())
   const [poll, setPoll] = useState(post.poll)
   const pollClosed = poll ? isPollClosed(poll) : false
 
@@ -407,7 +415,7 @@ export function PostCard({ post, showPinBadge = false, focusCommentId, embedded 
             <span className="shrink-0 text-muted-foreground">{timeAgo(post.createdAt, locale)}</span>
           </div>
 
-          {post.canDelete && (
+          {(post.canDelete || canReport) && (
             <DropdownMenu>
               <DropdownMenuTrigger
                 aria-label={t('post.more_options')}
@@ -431,15 +439,49 @@ export function PostCard({ post, showPinBadge = false, focusCommentId, embedded 
                     {isPinned ? 'Désépingler du profil' : 'Épingler sur le profil'}
                   </DropdownMenuItem>
                 )}
-                <DropdownMenuItem
-                  onClick={handleDelete}
-                  className="cursor-pointer text-red-500 focus:text-red-500"
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  {t('post.delete')}
-                </DropdownMenuItem>
+                {canReport && (
+                  <DropdownMenuItem
+                    onClick={(e) => {
+                      // Empêche le clic de remonter à la carte (qui navigue vers
+                      // le détail du post) : on ouvre juste la modale, on reste au feed.
+                      e.stopPropagation()
+                      setReportOpen(true)
+                    }}
+                    className="cursor-pointer"
+                  >
+                    <Flag className="mr-2 h-4 w-4" />
+                    {t('report.action')}
+                  </DropdownMenuItem>
+                )}
+                {post.canDelete && (
+                  <DropdownMenuItem
+                    onClick={handleDelete}
+                    className="cursor-pointer text-red-500 focus:text-red-500"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    {t('post.delete')}
+                  </DropdownMenuItem>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
+          )}
+
+          {canReport && (
+            // Le contenu de la modale est porté (portal) mais reste enfant de la
+            // carte dans l'arbre React → ses clics y remontent. On les arrête ici
+            // pour ne jamais déclencher la navigation vers le détail du post.
+            // `display:contents` (classe `contents`) → ce span ne génère AUCUNE
+            // boîte : il ne compte pas comme un item flex (sinon il décale le « … »).
+            <span className="contents" onClick={(e) => e.stopPropagation()}>
+              <ReportDialog
+                open={reportOpen}
+                onOpenChange={setReportOpen}
+                entityType="post"
+                entityId={post.id}
+                entityOwnerId={post.author.id}
+                targetLabel={post.author.username ? `@${post.author.username}` : undefined}
+              />
+            </span>
           )}
         </div>
 
