@@ -370,9 +370,11 @@
   `reply:<rootComment>`, `mention:<source>`, `repost:<post>`, `quote:<...>`, `follow`,
   `follow_request:<actor>`, `follow_request_accepted:<actor>`,
   `follow_request_accept_confirm:<actor>`,
-  `message_mention:<conv>`), `$inc count`, `retract` decrements/deletes. O(1), no actor array (slight cosmetic
-  `last_actor` blur after retract, assumed).
+  `message`, `message_mention:<conv>`). Most types use `$inc count` and `retract` decrements/deletes. `message`
+  is the exception: optional `actor_ids` stores unique senders and `count = len(actor_ids)`, so several messages
+  from one person keep a single notification while messages from different people render "X and N others".
 - **Rules by type:** like/comment/repost/quote → post (or quoted) author; reply → ROOT author; mention → each mentioned;
+  private DM/group message → all other members, globally grouped per recipient and never emitted for communities;
   follow_request → private-profile owner (actionable); accepted request → persisted notification + WS decision
   to the requester, plus persisted confirmation in the owner's notification list; rejected request → no
   requester notification. Never to self.

@@ -757,8 +757,10 @@ func (s *MessageService) ListMessages(ctx context.Context, conversationID, userI
 // SendMessage persiste un message chiffré (membre + droit d'écriture requis) et
 // renvoie le message créé ainsi que les ids des membres (pour la diffusion WS).
 //
+// Un événement `message` est envoyé aux autres membres des DM/groupes privés
+// (pas aux communautés), agrégé côté notification-service par expéditeur unique.
 // `mentionedIDs` (fournis par le client : ids des membres mentionnés @handle —
-// le serveur ne lit pas le contenu chiffré) déclenchent une notification
+// le serveur ne lit pas le contenu chiffré) déclenchent aussi une notification
 // `message_mention` par membre réellement présent (hors l'expéditeur).
 func (s *MessageService) SendMessage(ctx context.Context, conversationID, senderID, ciphertext, nonce string, mentionedIDs []string) (*models.Message, []string, error) {
 	member, err := s.requireMember(ctx, conversationID, senderID)
@@ -790,6 +792,19 @@ func (s *MessageService) SendMessage(ctx context.Context, conversationID, sender
 	if err != nil {
 		// Le message est persisté ; l'échec de diffusion n'est pas fatal.
 		memberIDs = nil
+	}
+
+	if oid, perr := parseID(conversationID); perr == nil {
+		if conv, cerr := s.repo.GetConversation(ctx, oid); cerr == nil && conv.Type != models.TypeCommunity {
+			for _, rid := range messageTargets(memberIDs, senderID) {
+				s.notifier.Emit(notifier.Event{
+					Type:           notifier.TypeMessage,
+					ActorID:        senderID,
+					RecipientID:    rid,
+					ConversationID: conversationID,
+				})
+			}
+		}
 	}
 
 	// Notifie les membres mentionnés (best-effort, fire-and-forget). On ne
@@ -922,6 +937,22 @@ func mentionedTargets(mentioned, memberIDs []string, senderID string) []string {
 	out := make([]string, 0, len(mentioned))
 	for _, id := range mentioned {
 		if id == "" || id == senderID || seen[id] || !members[id] {
+			continue
+		}
+		seen[id] = true
+		out = append(out, id)
+	}
+	return out
+}
+
+// messageTargets renvoie tous les membres à notifier pour un nouveau message,
+// hors expéditeur. Les doublons ne sont pas attendus dans `memberIDs`, mais on
+// déduplique par prudence.
+func messageTargets(memberIDs []string, senderID string) []string {
+	seen := make(map[string]bool, len(memberIDs))
+	out := make([]string, 0, len(memberIDs))
+	for _, id := range memberIDs {
+		if id == "" || id == senderID || seen[id] {
 			continue
 		}
 		seen[id] = true

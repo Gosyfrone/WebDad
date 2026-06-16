@@ -23,6 +23,7 @@ const TYPE_ICON: Record<NotificationType, { Icon: React.ElementType; className: 
   repost: { Icon: Repeat2, className: 'text-emerald-500' },
   quote: { Icon: Quote, className: 'text-[#8D3DFF]' },
   follow: { Icon: UserPlus, className: 'text-emerald-500' },
+  message: { Icon: Send, className: 'text-[#5B6CFF] dark:text-[#9aa6ff]' },
   message_mention: { Icon: Send, className: 'text-[#8D3DFF]' },
   follow_request: { Icon: UserPlus, className: 'text-emerald-500' },
   follow_request_accepted: { Icon: UserPlus, className: 'text-emerald-500' },
@@ -65,6 +66,10 @@ export function NotificationsView() {
         return t('notifications.mention', { name })
       case 'quote':
         return t('notifications.quote', { name })
+      case 'message':
+        return count > 0
+          ? t('notifications.message_other', { name, count })
+          : t('notifications.message_one', { name })
       case 'message_mention':
         return count > 0
           ? t('notifications.message_mention_other', { name, count })

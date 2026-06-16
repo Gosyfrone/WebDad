@@ -53,6 +53,60 @@ func (r *NotificationRepository) Upsert(ctx context.Context, n *models.Notificat
 	return &out, nil
 }
 
+// UpsertUniqueActor agrège un événement dans le groupe (recipient_id, group_key)
+// en ne comptant chaque acteur qu'une seule fois. Utilisé pour les notifications
+// de nouveau message : dix messages du même expéditeur gardent count=1, tandis
+// que trois expéditeurs distincts donnent count=3.
+func (r *NotificationRepository) UpsertUniqueActor(ctx context.Context, n *models.Notification) (*models.Notification, error) {
+	now := time.Now()
+	filter := bson.M{"recipient_id": n.RecipientID, "group_key": n.GroupKey}
+	update := bson.M{
+		"$set": bson.M{
+			"type":            n.Type,
+			"post_id":         n.PostID,
+			"comment_id":      n.CommentID,
+			"conversation_id": n.ConversationID,
+			"last_actor_id":   n.LastActorID,
+			"is_read":         false,
+			"updated_at":      now,
+		},
+		"$addToSet": bson.M{"actor_ids": n.LastActorID},
+		"$setOnInsert": bson.M{
+			"recipient_id": n.RecipientID,
+			"group_key":    n.GroupKey,
+			"count":        int32(0),
+			"created_at":   now,
+		},
+	}
+	opts := options.FindOneAndUpdate().SetUpsert(true).SetReturnDocument(options.After)
+
+	var out models.Notification
+	if err := r.notifications.FindOneAndUpdate(ctx, filter, update, opts).Decode(&out); err != nil {
+		return nil, err
+	}
+
+	count := int32(len(out.ActorIDs))
+	if count < 1 {
+		count = 1
+	}
+	if out.Count == count {
+		return &out, nil
+	}
+
+	updateCount := mongo.Pipeline{
+		{{Key: "$set", Value: bson.M{
+			"count": bson.M{"$max": bson.A{
+				int32(1),
+				bson.M{"$size": bson.M{"$ifNull": bson.A{"$actor_ids", bson.A{}}}},
+			}},
+		}}},
+	}
+	if err := r.notifications.FindOneAndUpdate(ctx, filter, updateCount, options.FindOneAndUpdate().SetReturnDocument(options.After)).Decode(&out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
 // Decrement défait un événement : décrémente le compteur du groupe. Si le
 // compteur tombe à zéro (ou moins), supprime la notification et renvoie
 // `deleted = true` avec le document supprimé (pour pousser une suppression temps

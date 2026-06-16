@@ -307,6 +307,8 @@ export const messages: Record<Locale, Messages> = {
       '{name} et {count} autres personnes ont reposté votre publication',
     'notifications.quote': '{name} a cité votre publication',
     'notifications.mention': '{name} vous a mentionné',
+    'notifications.message_one': '{name} vous a envoyé un message',
+    'notifications.message_other': '{name} et {count} autres personnes vous ont envoyé un message',
     'notifications.message_mention_one':
       '{name} vous a mentionné dans un message',
     'notifications.message_mention_other':
@@ -1274,6 +1276,8 @@ export const messages: Record<Locale, Messages> = {
       '{name} and {count} others reposted your post',
     'notifications.quote': '{name} quoted your post',
     'notifications.mention': '{name} mentioned you',
+    'notifications.message_one': '{name} sent you a message',
+    'notifications.message_other': '{name} and {count} others sent you a message',
     'notifications.message_mention_one': '{name} mentioned you in a message',
     'notifications.message_mention_other':
       '{name} mentioned you in {count} messages',

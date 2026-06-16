@@ -74,6 +74,12 @@ describe('notificationHref', () => {
     ).toBe('/messages?conv=cv1')
   })
 
+  it('pointe vers la conversation pour un nouveau message', () => {
+    expect(
+      notificationHref({ type: 'message', postId: '', commentId: '', conversationId: 'cv2' }),
+    ).toBe('/messages?conv=cv2')
+  })
+
   it('cible le commentaire pour un commentaire/réponse', () => {
     expect(
       notificationHref({ type: 'comment', postId: 'abc', commentId: 'c1', conversationId: '' }),

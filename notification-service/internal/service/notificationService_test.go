@@ -36,6 +36,8 @@ func TestGroupKeyFor(t *testing.T) {
 		{"follow agrège par destinataire", models.Event{Type: models.TypeFollow, ActorID: "u1", RecipientID: "u2"}, "follow", true},
 		{"acceptation follow privé agrège par propriétaire", models.Event{Type: models.TypeFollowRequestAccepted, ActorID: "u2", RecipientID: "u1"}, "follow_request_accepted:u2", true},
 		{"confirmation acceptation follow privé agrège par demandeur", models.Event{Type: models.TypeFollowRequestAcceptConfirm, ActorID: "u1", RecipientID: "u2"}, "follow_request_accept_confirm:u1", true},
+		{"message agrège globalement par destinataire", models.Event{Type: models.TypeMessage, ConversationID: "cv1"}, "message", true},
+		{"message sans conversation → invalide", models.Event{Type: models.TypeMessage}, "", false},
 		{"mention en message agrège par conversation", models.Event{Type: models.TypeMessageMention, ConversationID: "cv1"}, "message_mention:cv1", true},
 		{"mention en message sans conversation → invalide", models.Event{Type: models.TypeMessageMention}, "", false},
 		{"type inconnu → invalide", models.Event{Type: "bogus"}, "", false},
