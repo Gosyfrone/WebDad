@@ -425,8 +425,16 @@
   through the gateway"; presigned URLs would expose MinIO (public port, CORS, host unresolvable by the browser) and violate
   the principle defended at the oral. The stdlib proxy already streams → video is not a memory concern. MinIO = canonical
   microservices answer (ticks "containerization"), far better at defense than "blob in DB"/disk.
-- **Clear upload `POST /media`** (JWT, magic-byte MIME sniff, caps 5MB image / 50MB video) vs **`POST /media/encrypted`**
-  (opaque E2EE blob, no sniff). `GET /media/:id` is **public** (unguessable id), streamed with Range/seek + immutable cache + ETag.
+- **Clear upload `POST /media`** (JWT, magic-byte MIME sniff, caps **5MB image / 5MB video** for non-admins) vs **`POST /media/encrypted`**
+  (opaque E2EE blob, no sniff, own **5MB** cap `MEDIA_MAX_BLOB_BYTES`). `GET /media/:id` is **public** (unguessable id), streamed with Range/seek + immutable cache + ETag.
+- **Cap d'upload média (16/06/2026) :** plafond **uniforme 5 Mo** pour tous les types (image / vidéo / blob chiffré), aligné sur le
+  plus petit cap d'un service de référence (X.com photo = 5 Mo) → rien à descendre sous 5 Mo. **Administrateurs non plafonnés :**
+  `Upload`/`UploadEncrypted` bypassent tous les checks de taille quand `claims.Role == "admin"` (réutilise le claim déjà lu pour
+  `Delete`/purge RGPD). Choix « pas de cap admin » plutôt qu'un cap admin élevé configurable : un admin de confiance n'a pas besoin
+  d'un nombre arbitraire, et le streaming MinIO (buffer `MaxMultipartMemory`, reste sur disque temp) encaisse les gros fichiers.
+  Le défaut vidéo a été abaissé **50→5 Mo** (avant : asymétrie image/vidéo non justifiée par la demande). **La limite est appliquée
+  côté serveur** (§6) ; le front ne fait qu'une garde UX (`exceedsMediaLimit`, admin-aware) qui écarte les fichiers trop lourds **à la
+  sélection** pour un retour immédiat, sans jamais être l'autorité.
 - **Posts (Phase 2):** post-service carries `media []MediaRef`, stays agnostic (relative `/media/<id>` refs); `content`
   optional if ≥1 media. **Messages (Phase 3):** file encrypted client-side → opaque blob uploaded → id/nonce/mime in the
   **encrypted envelope** (`{v:1,text,media[]}`, else plain text → backward-compatible) → server blind, zero schema change.

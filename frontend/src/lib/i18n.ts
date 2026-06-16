@@ -94,6 +94,7 @@ export const messages: Record<Locale, Messages> = {
     'media.next': 'Image suivante',
     'media.speed': 'Vitesse de lecture',
     'media.speed_normal': 'Normal',
+    'media.too_large': 'Fichier trop volumineux (max {max} Mo).',
 
     // — Navigation —
     'nav.feed': 'Fil',
@@ -977,6 +978,7 @@ export const messages: Record<Locale, Messages> = {
     'media.next': 'Next image',
     'media.speed': 'Playback speed',
     'media.speed_normal': 'Normal',
+    'media.too_large': 'File too large (max {max} MB).',
 
     // — Navigation —
     'nav.feed': 'Feed',

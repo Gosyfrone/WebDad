@@ -27,6 +27,7 @@ import {
 import { extractMentionHandles, type MentionCandidate } from '@/lib/mentions'
 import { makeMemberFirstSearch } from '@/lib/mention-search'
 import { useMention } from '@/lib/use-mention'
+import { exceedsMediaLimit, MAX_MEDIA_MB } from '@/lib/media'
 import { resolveUsers } from '@/lib/user-cache'
 import { useResolvedUser } from '@/lib/use-resolved-user'
 import { useToast } from '@/hooks/use-toast'
@@ -332,7 +333,15 @@ export function ChatPane({
   function handlePickFiles(e: React.ChangeEvent<HTMLInputElement>) {
     const picked = Array.from(e.target.files ?? [])
     e.target.value = ''
-    if (picked.length > 0) setAttachments((prev) => [...prev, ...picked])
+    if (picked.length === 0) return
+
+    // Garde UX : pièces jointes trop lourdes écartées avant chiffrement/upload
+    // (le cap est aussi appliqué côté serveur). Les admins ne sont pas plafonnés.
+    const allowed = picked.filter((f) => !exceedsMediaLimit(f.size))
+    if (allowed.length < picked.length) {
+      toast({ title: t('media.too_large', { max: MAX_MEDIA_MB }), variant: 'brand' })
+    }
+    if (allowed.length > 0) setAttachments((prev) => [...prev, ...allowed])
   }
 
   return (
