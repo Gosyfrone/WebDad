@@ -11,7 +11,6 @@ import {
   LogOut,
   Mail,
   MoreHorizontal,
-  Palette,
   Search,
   Settings,
   Settings2,
@@ -272,17 +271,13 @@ export function SidebarLeft() {
               </span>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <ThemeToggle />
-            <DropdownMenuItem
-              onSelect={() => {
+            <ThemeToggle
+              onCustomize={() => {
                 // Laisse le menu se fermer, puis ouvre la popup au tick suivant
                 // (évite la course de focus Radix dropdown ↔ dialog).
                 setTimeout(() => setThemeDialogOpen(true), 0)
               }}
-            >
-              <Palette className="mr-2 h-4 w-4" />
-              {t('theme.customize')}
-            </DropdownMenuItem>
+            />
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
               <Link href={ROUTES.parametres} scroll={false}>

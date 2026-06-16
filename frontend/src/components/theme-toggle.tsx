@@ -1,40 +1,91 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Monitor, Moon, Sun } from 'lucide-react'
+import { Monitor, Moon, Palette, Power, Sun } from 'lucide-react'
 import { useTheme } from 'next-themes'
 
 import { cn } from '@/lib/utils'
+import {
+  hasCustomThemeValues,
+  readCustomTheme,
+  readCustomThemeEnabled,
+  setCustomThemeEnabled,
+} from '@/lib/custom-theme'
 import { useT } from '@/components/language-provider'
 
 /**
  * Sélecteur d'apparence :
  *   - un interrupteur façon iOS clair/sombre (curseur sur le Soleil ou la Lune) ;
+ *   - une ligne « Thème personnalisé » : bouton d'édition + switch d'activation ;
  *   - une ligne « Mode système » (icône écran) qui suit la préférence de l'OS.
  *
- * Quand le mode système est activé, l'interrupteur clair/sombre est grisé
- * (désactivé) et reflète l'apparence effective déduite de l'OS (`resolvedTheme`).
- * S'appuie sur next-themes ; persistance auto (localStorage). Le flag `mounted`
- * évite le mismatch d'hydratation (le serveur ignore le thème).
+ * Le personnalisé est une couche de variables CSS persistée localStorage. Son
+ * switch active/désactive cette couche sans supprimer les couleurs choisies.
+ * Basculer clair/sombre désactive aussi cette couche pour revenir au thème
+ * Breezy standard sur la base choisie.
+ * S'appuie sur next-themes ; le flag `mounted` évite le mismatch d'hydratation.
  */
-export function ThemeToggle() {
+interface ThemeToggleProps {
+  onCustomize?: () => void
+}
+
+function readCustomState() {
+  const custom = readCustomTheme()
+  return {
+    available: hasCustomThemeValues(custom),
+    enabled: readCustomThemeEnabled(),
+  }
+}
+
+export function ThemeToggle({ onCustomize }: ThemeToggleProps) {
   const t = useT()
   const { theme, resolvedTheme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
-  useEffect(() => setMounted(true), [])
-
+  const [customState, setCustomState] = useState({ available: false, enabled: false })
   // Sens du dernier basculement, pour jouer la bonne animation de slide.
   // `null` = aucun (montage initial → pas d'animation parasite).
   const [slide, setSlide] = useState<'left' | 'right' | null>(null)
 
+  useEffect(() => {
+    setMounted(true)
+    setCustomState(readCustomState())
+
+    function syncCustomState() {
+      setCustomState(readCustomState())
+    }
+
+    window.addEventListener('storage', syncCustomState)
+    window.addEventListener('breezy-custom-theme-change', syncCustomState)
+    return () => {
+      window.removeEventListener('storage', syncCustomState)
+      window.removeEventListener('breezy-custom-theme-change', syncCustomState)
+    }
+  }, [])
+
   const systemOn = mounted && theme === 'system'
   const isDark = mounted && (systemOn ? resolvedTheme === 'dark' : theme === 'dark')
+  const customOn = customState.enabled
 
   function toggleLightDark() {
     if (systemOn) return
     const goingDark = !isDark
     setSlide(goingDark ? 'right' : 'left')
     setTheme(goingDark ? 'dark' : 'light')
+    if (customOn) setCustomThemeEnabled(false)
+  }
+
+  function openCustomTheme() {
+    if (systemOn) setTheme(resolvedTheme === 'dark' ? 'dark' : 'light')
+    onCustomize?.()
+  }
+
+  function toggleCustomTheme() {
+    if (!customState.available) {
+      openCustomTheme()
+      return
+    }
+    if (systemOn) setTheme(resolvedTheme === 'dark' ? 'dark' : 'light')
+    setCustomThemeEnabled(!customOn)
   }
 
   function toggleSystem() {
@@ -85,6 +136,44 @@ export function ThemeToggle() {
               )}
               aria-hidden
             />
+          </button>
+        </div>
+
+        {/* Ligne Thème personnalisé : bouton d'édition + switch d'activation. */}
+        <div className="flex items-center justify-between gap-3 rounded-lg px-1 py-2 transition-colors hover:bg-accent">
+          <button
+            type="button"
+            onClick={openCustomTheme}
+            className="flex min-w-0 flex-1 items-center gap-2 text-left text-sm"
+          >
+            <Palette className="h-5 w-5" aria-hidden />
+            <span className="truncate">{t('theme.customize')}</span>
+          </button>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={customOn}
+            aria-label={t('theme.customize')}
+            onClick={toggleCustomTheme}
+            className={cn(
+              'relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors',
+              customOn ? 'bg-primary' : 'bg-muted',
+            )}
+          >
+            <span
+              className={cn(
+                'absolute left-1 grid h-5 w-5 place-items-center rounded-full bg-background shadow transition-transform',
+                customOn && 'translate-x-5',
+              )}
+            >
+              <Power
+                className={cn(
+                  'h-3 w-3 transition-colors',
+                  customOn ? 'text-primary' : 'text-muted-foreground',
+                )}
+                aria-hidden
+              />
+            </span>
           </button>
         </div>
 

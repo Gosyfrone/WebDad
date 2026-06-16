@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { ArrowLeft, Bell, LogIn, LogOut, Palette, Settings } from 'lucide-react'
+import { ArrowLeft, Bell, LogIn, LogOut, Settings } from 'lucide-react'
 
 import { cn, initialOf } from '@/lib/utils'
 import { getAccessToken, logout } from '@/lib/auth-client'
@@ -281,21 +281,15 @@ export function MobileHeader() {
           {/* Paramètres + déconnexion */}
           <div className="border-t p-2">
             <div className="mb-1 rounded-2xl px-2 py-2">
-              <ThemeToggle />
+              <ThemeToggle
+                onCustomize={() => {
+                  // Ferme le tiroir, puis ouvre la popup au tick suivant
+                  // (évite la course de focus Sheet ↔ Dialog).
+                  setOpen(false)
+                  setTimeout(() => setThemeDialogOpen(true), 0)
+                }}
+              />
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                // Ferme le tiroir, puis ouvre la popup au tick suivant
-                // (évite la course de focus Sheet ↔ Dialog).
-                setOpen(false)
-                setTimeout(() => setThemeDialogOpen(true), 0)
-              }}
-              className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-base transition-colors hover:bg-accent"
-            >
-              <Palette className="h-5 w-5" />
-              {t('theme.customize')}
-            </button>
             <SheetClose asChild>
               <Link
                 href={ROUTES.parametres}

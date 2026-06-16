@@ -502,8 +502,11 @@
   out, and an in-repo wheel is defense-friendlier. Color math is pure/tested (`lib/color.ts`); apply/persist logic pure where it
   matters (`buildCustomThemeVars` in `lib/custom-theme.ts`). **Persist both** source hexes (to reopen the editor) **and the
   pre-computed CSS-var map** in localStorage → a tiny inline `<head>` script applies the map before first paint (no FOUC, no color
-  math shipped in the blocking script). Palette button opens a `Dialog` held as a **sibling** of the dropdown/Sheet (not inside),
-  opened on a deferred `setTimeout(0)` to dodge the Radix close↔open focus race.
+  math shipped in the blocking script). `enabled:false` keeps the chosen colors but makes the inline script skip them. UX keeps
+  the light/dark switch and exposes custom as a separate appearance row: the label opens the existing `Dialog`, the small switch
+  toggles `enabled` without deleting colors, and the light/dark switch disables custom (`enabled:false`) while switching to the
+  selected Breezy base. The dialog is held as a **sibling** of the dropdown/Sheet (not inside), opened on a deferred
+  `setTimeout(0)` to dodge the Radix close↔open focus race.
 - **Responsive mobile-first, pivot `lg` (1024).** <lg: `MobileHeader` (left drawer Sheet) + bottom `MobileTabBar` + `ComposeFab`;
   ≥lg sidebar; ≥xl right column. Manual edge-swipe to open the drawer (Radix Sheet has no native swipe).
 - **Identity is clickable → profile everywhere** (`UserListItem` stretched link; the Follow button is raised `z-10`).
