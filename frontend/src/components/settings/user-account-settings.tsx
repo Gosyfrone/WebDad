@@ -1,6 +1,7 @@
 'use client'
 
 import * as React from 'react'
+import { usePathname, useRouter } from 'next/navigation'
 import { CircleCheck, Loader2, Mail, ShieldCheck } from 'lucide-react'
 
 import { useT } from '@/components/language-provider'
@@ -14,6 +15,8 @@ type Notice = { kind: 'error' | 'success'; text: string }
 export function UserAccountSettings() {
   const t = useT()
   const session = useSession()
+  const router = useRouter()
+  const pathname = usePathname()
   const [currentPassword, setCurrentPassword] = React.useState('')
   const [newPassword, setNewPassword] = React.useState('')
   const [confirmPassword, setConfirmPassword] = React.useState('')
@@ -34,8 +37,12 @@ export function UserAccountSettings() {
     setEmailNotice({ kind: 'success', text: t('settings.email.changed') })
     params.delete('email_changed')
     const query = params.toString()
-    window.history.replaceState(null, '', query ? `${window.location.pathname}?${query}` : window.location.pathname)
-  }, [t])
+    // Nettoyage de l'URL via le routeur Next, PAS `window.history.replaceState` :
+    // l'API brute écrase l'état interne du router App Router (stocké dans
+    // `history.state`) → `history.state` devient null et la navigation suivante
+    // plante avec « initialTree is not iterable ». Même précaution que messages-view.
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false })
+  }, [t, router, pathname])
 
   const changePassword = async (event: React.FormEvent) => {
     event.preventDefault()

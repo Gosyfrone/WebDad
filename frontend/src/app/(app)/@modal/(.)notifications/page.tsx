@@ -1,4 +1,5 @@
 import { FeedOverlay } from '@/components/feed/feed-overlay'
+import { OverlayWhenPath } from '@/components/feed/overlay-when-path'
 import { NotificationsView } from '@/components/notifications/notifications-view'
 
 // Intercepting route : Notifications en overlay au-dessus du feed (gardé monté).
@@ -6,8 +7,10 @@ import { NotificationsView } from '@/components/notifications/notifications-view
 // Accès direct/refresh → vraie page `(app)/notifications/page.tsx`.
 export default function InterceptedNotificationsPage() {
   return (
-    <FeedOverlay>
-      <NotificationsView />
-    </FeedOverlay>
+    <OverlayWhenPath path="/notifications">
+      <FeedOverlay>
+        <NotificationsView />
+      </FeedOverlay>
+    </OverlayWhenPath>
   )
 }

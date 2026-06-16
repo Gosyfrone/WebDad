@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { CircleAlert, Loader2 } from 'lucide-react'
 import * as React from 'react'
 
@@ -11,7 +11,6 @@ import { ROUTES } from '@/lib/routes'
 
 function CallbackContent({ provider }: { provider: string }) {
   const t = useT()
-  const router = useRouter()
   const searchParams = useSearchParams()
   const [error, setError] = React.useState<string | null>(null)
   // Le code OAuth est à usage unique : on garantit un seul échange même sous le
@@ -49,8 +48,9 @@ function CallbackContent({ provider }: { provider: string }) {
           setAccessToken(payload.accessToken)
         }
 
-        router.replace(ROUTES.feed)
-        router.refresh()
+        // Navigation DURE (cf. login) : entrée cross-groupe `(auth)` → `(app)`,
+        // la nav soft ne résout pas le slot parallèle `@modal` → 404.
+        window.location.assign(ROUTES.feed)
       } catch {
         setError(t('auth.oauth.error'))
       }
