@@ -35,12 +35,32 @@ var (
 type ProfilService struct {
 	repo                *repository.ProfilRepository
 	displayNameCooldown time.Duration
+	follows             FollowChecker
+}
+
+// FollowChecker vérifie la relation follower -> following dans user-service.
+type FollowChecker interface {
+	IsFollowing(ctx context.Context, followerID, followingID string) (bool, error)
+}
+
+// Option configure les dépendances optionnelles du service.
+type Option func(*ProfilService)
+
+// WithFollowChecker active les règles de lecture liées aux profils privés.
+func WithFollowChecker(checker FollowChecker) Option {
+	return func(s *ProfilService) {
+		s.follows = checker
+	}
 }
 
 // New construit le service. displayNameCooldown=0 désactive l'enforcement du
 // cooldown (le timestamp de changement reste enregistré dans tous les cas).
-func New(repo *repository.ProfilRepository, displayNameCooldown time.Duration) *ProfilService {
-	return &ProfilService{repo: repo, displayNameCooldown: displayNameCooldown}
+func New(repo *repository.ProfilRepository, displayNameCooldown time.Duration, opts ...Option) *ProfilService {
+	s := &ProfilService{repo: repo, displayNameCooldown: displayNameCooldown}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
 }
 
 // GetByUserID retourne le profil public d'un utilisateur (404 si absent).
@@ -69,13 +89,14 @@ func (s *ProfilService) Search(ctx context.Context, term string, limit int64) ([
 func (s *ProfilService) Create(ctx context.Context, userID string, req models.CreateProfilRequest) (*models.Profil, error) {
 	now := time.Now().UTC()
 	p := &models.Profil{
-		UserID:          userID,
-		DisplayName:     strings.TrimSpace(req.DisplayName),
-		BirthDate:       req.BirthDate,
-		CreatedAt:       now,
-		UpdatedAt:       now,
-		Visibility:      models.VisibilityPublic,
-		LikesVisibility: models.VisibilityPublic,
+		UserID:             userID,
+		DisplayName:        strings.TrimSpace(req.DisplayName),
+		BirthDate:          req.BirthDate,
+		CreatedAt:          now,
+		UpdatedAt:          now,
+		Visibility:         models.VisibilityPublic,
+		LikesVisibility:    models.VisibilityPublic,
+		ActivityVisibility: models.VisibilityPublic,
 	}
 	if req.Gender != nil {
 		p.Gender = *req.Gender
@@ -109,6 +130,37 @@ func (s *ProfilService) Update(ctx context.Context, userID string, req models.Up
 
 	p, err := s.repo.Update(ctx, userID, set)
 	return mapGet(p, err)
+}
+
+// TouchActivity enregistre une vraie entrée en session. Le champ peut rester
+// privé côté lecture publique selon ActivityVisibility / Visibility.
+func (s *ProfilService) TouchActivity(ctx context.Context, userID string, online bool) (*models.Profil, error) {
+	now := time.Now().UTC()
+	p, err := s.repo.Update(ctx, userID, bson.M{
+		"last_login_at": now,
+		"is_online":     online,
+		"updated_at":    now,
+	})
+	return mapGet(p, err)
+}
+
+// CanViewActivity applique la barrière de lecture de l'activité :
+// préférence publique + profil public, ou propriétaire, ou abonné accepté.
+func (s *ProfilService) CanViewActivity(ctx context.Context, viewerID string, profil *models.Profil) bool {
+	if profil == nil || profil.ActivityVisibility != models.VisibilityPublic {
+		return false
+	}
+	if viewerID != "" && viewerID == profil.UserID {
+		return true
+	}
+	if profil.Visibility != models.VisibilityPrivate {
+		return true
+	}
+	if viewerID == "" || s.follows == nil {
+		return false
+	}
+	ok, err := s.follows.IsFollowing(ctx, viewerID, profil.UserID)
+	return err == nil && ok
 }
 
 // Delete supprime le profil d'un utilisateur (réservé admin, vérifié en amont).
@@ -171,11 +223,16 @@ func planUpdate(current *models.Profil, req models.UpdateProfilRequest, now time
 	if req.Nationality != nil {
 		set["nationality"] = strings.ToUpper(strings.TrimSpace(*req.Nationality))
 	}
-	if req.Visibility != nil && *req.Visibility != current.Visibility {
-		set["visibility"] = *req.Visibility
+	if req.Visibility != nil {
+		if *req.Visibility != current.Visibility {
+			set["visibility"] = *req.Visibility
+		}
 	}
 	if req.LikesVisibility != nil && *req.LikesVisibility != current.LikesVisibility {
 		set["likes_visibility"] = *req.LikesVisibility
+	}
+	if req.ActivityVisibility != nil && *req.ActivityVisibility != current.ActivityVisibility {
+		set["activity_visibility"] = *req.ActivityVisibility
 	}
 
 	return set, nil

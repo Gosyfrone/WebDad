@@ -9,6 +9,7 @@ import { hashtagHref, profilHref } from '@/lib/routes'
 import type { SuggestionHistoryEntry } from '@/lib/search-suggestion-history'
 import type { RelationUser } from '@/types'
 import { useT } from '@/components/language-provider'
+import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 
 interface SearchSuggestionsDropdownProps {
@@ -97,6 +98,7 @@ export function SearchSuggestionsDropdown({
               <Avatar className="h-10 w-10 shrink-0">
                 {entry.avatarUrl && <AvatarImage src={entry.avatarUrl} alt={entry.label} />}
                 <AvatarFallback>{initialsFromText(entry.label, entry.subtitle)}</AvatarFallback>
+                <ActivityPresenceDot userId={userIdFromHistory(entry)} />
               </Avatar>
             ) : (
               <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-white">
@@ -183,6 +185,7 @@ export function SearchSuggestionsDropdown({
               <Avatar className="h-10 w-10 shrink-0">
                 {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user.displayName} />}
                 <AvatarFallback>{initials(user)}</AvatarFallback>
+                <ActivityPresenceDot userId={user.id} />
               </Avatar>
               <span className="min-w-0">
                 <span className="block truncate text-[15px] font-bold leading-5">
@@ -235,4 +238,8 @@ function initials(user: RelationUser): string {
 
 function initialsFromText(label: string, subtitle: string): string {
   return (label.charAt(0) || subtitle.charAt(0) || '?').toUpperCase()
+}
+
+function userIdFromHistory(entry: SuggestionHistoryEntry): string | undefined {
+  return entry.kind === 'profile' ? entry.id.replace(/^profile:/, '') : undefined
 }

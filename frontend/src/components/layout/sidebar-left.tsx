@@ -33,6 +33,7 @@ import { ThemeToggle } from '@/components/theme-toggle'
 import { CustomThemeDialog } from '@/components/custom-theme-dialog'
 import type { ProfilDetails, UserRole } from '@/types'
 import { CreatePostDialog } from '@/components/feed/create-post-dialog'
+import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import {
@@ -82,6 +83,7 @@ export function SidebarLeft() {
   const { unreadCount: msgUnread } = useMessages()
   const [themeDialogOpen, setThemeDialogOpen] = useState(false)
   const [account, setAccount] = useState({
+    userId: '',
     displayName: '',
     username: '',
     avatarUrl: '',
@@ -119,6 +121,7 @@ export function SidebarLeft() {
 
     function applyProfil(profil: ProfilDetails) {
       setAccount({
+        userId: profil.userId,
         displayName: profil.displayName,
         username: profil.username,
         avatarUrl: profil.avatarUrl,
@@ -250,6 +253,7 @@ export function SidebarLeft() {
                   <AvatarImage src={account.avatarUrl} alt={account.displayName} />
                 )}
                 <AvatarFallback>{fallbackInitial}</AvatarFallback>
+                <ActivityPresenceDot userId={account.userId} />
               </Avatar>
               <div className="flex min-w-0 flex-1 flex-col text-left">
                 <span className="truncate text-sm font-bold">{shownName}</span>

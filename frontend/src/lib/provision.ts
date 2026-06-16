@@ -21,7 +21,7 @@ async function provisionFromEmail(token: string): Promise<void> {
 /** POST /profils : pose le profil initial issu du formulaire register. */
 async function provisionProfil(
   token: string,
-  options: { displayName: string; birthDate?: string; gender?: string }
+  options: { displayName: string; birthDate?: string; gender?: string },
 ): Promise<void> {
   await fetch(apiUrl('/profils'), {
     method: 'POST',
@@ -57,7 +57,7 @@ async function provisionProfil(
  */
 export async function provisionUser(
   token: string,
-  options?: { username?: string; birthDate?: string; gender?: string }
+  options?: { username?: string; birthDate?: string; gender?: string },
 ): Promise<void> {
   const username = options?.username?.trim()
   if (!username) {
@@ -90,5 +90,31 @@ export async function provisionUser(
     })
   } catch {
     await provisionFromEmail(token)
+  }
+}
+
+/** Marque la dernière vraie connexion dans profil-service (best-effort). */
+export async function markLoginActivity(token: string): Promise<void> {
+  try {
+    await fetch(apiUrl('/profils/me/activity'), {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${token}` },
+      cache: 'no-store',
+    })
+  } catch {
+    // Silencieux : l'activité sera remise à jour à la prochaine connexion.
+  }
+}
+
+/** Marque la déconnexion dans profil-service (best-effort). */
+export async function markLogoutActivity(token: string): Promise<void> {
+  try {
+    await fetch(apiUrl('/profils/me/activity/offline'), {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${token}` },
+      cache: 'no-store',
+    })
+  } catch {
+    // Silencieux : la déconnexion locale prime.
   }
 }

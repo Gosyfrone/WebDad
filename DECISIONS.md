@@ -19,6 +19,16 @@
 - **`apiUrl()` client vs server base:** client = `NEXT_PUBLIC_API_URL` (published port);
   server (in-container route handlers) = `API_INTERNAL_URL` (Docker service name). In a container
   `localhost` is the container itself, so server fetches must target the Docker service name.
+- **Profile activity belongs to profil-service, not user-service.** The “online / last connection”
+  signal is a public profile decoration with a user-controlled privacy switch, so it lives beside
+  `visibility` and `likes_visibility` in Mongo. That lets profil-service enforce the public read
+  rule before returning a profile: `last_login_at`/`is_online` are omitted when
+  `activity_visibility=private`, and private profiles reveal activity only to the owner or accepted
+  followers. Private profile updates do **not** mutate the activity preference; privacy is enforced
+  at read time so the switch remains an independent choice. Login/OAuth/email-verification BFF
+  handlers mark activity best-effort via `PATCH /profils/me/activity` after a real session entry;
+  logout calls `PATCH /profils/me/activity/offline` before clearing the access token; refresh does
+  not count as a new connection.
 
 ## Auth
 

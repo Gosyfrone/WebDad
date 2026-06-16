@@ -2438,6 +2438,90 @@
         }
       }
     },
+    "/profils/me/activity": {
+      "patch": {
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "profils"
+        ],
+        "summary": "Marquer la dernière connexion du profil courant",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/models.Profil"
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/profils/me/activity/offline": {
+      "patch": {
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "profils"
+        ],
+        "summary": "Marquer le profil courant hors ligne",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/models.Profil"
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
     "/profils/search": {
       "get": {
         "produces": [
@@ -2562,6 +2646,44 @@
               "additionalProperties": {
                 "type": "string"
               }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/profils/{userId}/activity": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "profils"
+        ],
+        "summary": "Activité visible d'un profil",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "User ID",
+            "name": "userId",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "last_login_at, is_online",
+            "schema": {
+              "type": "object",
+              "additionalProperties": true
             }
           },
           "404": {
@@ -6257,6 +6379,10 @@
     "models.Profil": {
       "type": "object",
       "properties": {
+        "activity_visibility": {
+          "description": "ActivityVisibility contrôle l'affichage public de last_login_at. Un profil\nprivé ne l'expose qu'au propriétaire et aux abonnés acceptés.",
+          "type": "string"
+        },
         "avatar_url": {
           "type": "string"
         },
@@ -6281,6 +6407,12 @@
         },
         "gender": {
           "description": "\"male\" | \"female\"",
+          "type": "string"
+        },
+        "is_online": {
+          "type": "boolean"
+        },
+        "last_login_at": {
           "type": "string"
         },
         "likes_visibility": {
@@ -6310,6 +6442,13 @@
     "models.UpdateProfilRequest": {
       "type": "object",
       "properties": {
+        "activity_visibility": {
+          "type": "string",
+          "enum": [
+            "public",
+            "private"
+          ]
+        },
         "avatar_url": {
           "type": "string"
         },

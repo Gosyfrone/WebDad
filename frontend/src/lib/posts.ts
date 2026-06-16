@@ -92,6 +92,9 @@ interface ApiProfil {
   display_name?: string
   avatar_url?: string
   visibility?: 'public' | 'private'
+  activity_visibility?: 'public' | 'private'
+  last_login_at?: string
+  is_online?: boolean
 }
 
 // --- Types front -------------------------------------------------------------
@@ -103,6 +106,8 @@ export interface PostAuthor {
   displayName: string
   avatarUrl: string
   visibility: 'public' | 'private'
+  lastLoginAt: string
+  isOnline: boolean
 }
 
 /** Média attaché à un post (URL prête à l'affichage + nature). */
@@ -214,9 +219,10 @@ export interface PostComment {
 // --- Enveloppe ---------------------------------------------------------------
 
 async function unwrap<T>(res: Response): Promise<T> {
-  const body = (await res.json().catch(() => null)) as
-    | { data?: T; error?: string }
-    | null
+  const body = (await res.json().catch(() => null)) as {
+    data?: T
+    error?: string
+  } | null
   if (!res.ok) {
     throw new PostApiError(body?.error ?? `Erreur ${res.status}`, res.status)
   }
@@ -253,6 +259,8 @@ function authorFromProfil(profil: ProfilDetails): PostAuthor {
     displayName: profil.displayName || profil.username || 'Utilisateur',
     avatarUrl: profil.avatarUrl,
     visibility: profil.visibility,
+    lastLoginAt: profil.lastLoginAt,
+    isOnline: profil.isOnline,
   }
 }
 
@@ -289,14 +297,18 @@ export function applyProfilUpdateToPosts(
 async function fetchUser(userId: string): Promise<ApiUser | null> {
   const res = await apiFetch(`/users/${userId}`)
   if (!res.ok) return null
-  const body = (await res.json().catch(() => null)) as { data?: ApiUser } | null
+  const body = (await res.json().catch(() => null)) as {
+    data?: ApiUser
+  } | null
   return body?.data ?? null
 }
 
 async function fetchProfil(userId: string): Promise<ApiProfil | null> {
   const res = await apiFetch(`/profils/${userId}`)
   if (!res.ok) return null
-  const body = (await res.json().catch(() => null)) as { data?: ApiProfil } | null
+  const body = (await res.json().catch(() => null)) as {
+    data?: ApiProfil
+  } | null
   return body?.data ?? null
 }
 
@@ -306,13 +318,19 @@ function resolveAuthor(userId: string): Promise<PostAuthor> {
   if (cached) return cached
 
   const promise = (async (): Promise<PostAuthor> => {
-    const [user, profil] = await Promise.all([fetchUser(userId), fetchProfil(userId)])
+    const [user, profil] = await Promise.all([
+      fetchUser(userId),
+      fetchProfil(userId),
+    ])
     return {
       id: userId,
       username: user?.username ?? '',
-      displayName: profil?.display_name?.trim() || user?.username || 'Utilisateur',
+      displayName:
+        profil?.display_name?.trim() || user?.username || 'Utilisateur',
       avatarUrl: resolveMediaUrl(profil?.avatar_url),
       visibility: profil?.visibility === 'private' ? 'private' : 'public',
+      lastLoginAt: profil?.last_login_at ?? '',
+      isOnline: Boolean(profil?.is_online),
     }
   })()
 
@@ -331,14 +349,23 @@ async function toFeedPost(
 ): Promise<FeedPost> {
   const quotedPost =
     p.quote_post_id && depth < 1
-      ? await getPost(p.quote_post_id, likedIds, repostedIds, bookmarkedIds, depth + 1)
+      ? await getPost(
+          p.quote_post_id,
+          likedIds,
+          repostedIds,
+          bookmarkedIds,
+          depth + 1,
+        )
       : null
   return {
     id: p.id,
     author: await resolveAuthor(p.author_id),
     content: p.content,
     hashtags: p.hashtags ?? [],
-    media: (p.media ?? []).map((m) => ({ url: resolveMediaUrl(m.url), type: m.type })),
+    media: (p.media ?? []).map((m) => ({
+      url: resolveMediaUrl(m.url),
+      type: m.type,
+    })),
     poll: p.poll ? toPostPoll(p.poll) : null,
     quotePostId: p.quote_post_id ?? '',
     quotedPost,
@@ -387,7 +414,10 @@ async function toComment(c: ApiComment): Promise<PostComment> {
     parentId: c.parent_id ?? '',
     author: await resolveAuthor(c.author_id),
     content: c.content,
-    media: (c.media ?? []).map((m) => ({ url: resolveMediaUrl(m.url), type: m.type })),
+    media: (c.media ?? []).map((m) => ({
+      url: resolveMediaUrl(m.url),
+      type: m.type,
+    })),
     replyCount: c.reply_count ?? 0,
     createdAt: c.created_at,
     canDelete: canDelete(c.author_id),
@@ -459,7 +489,9 @@ export async function mapPosts(raw: ApiPost[]): Promise<FeedPost[]> {
     getRepostedIds(),
     getBookmarkedIds(),
   ])
-  return Promise.all((raw ?? []).map((p) => toFeedPost(p, likedIds, repostedIds, bookmarkedIds)))
+  return Promise.all(
+    (raw ?? []).map((p) => toFeedPost(p, likedIds, repostedIds, bookmarkedIds)),
+  )
 }
 
 /** Fil global (« Pour toi »), paginé. */
@@ -490,7 +522,11 @@ export async function listFollowingFeed(
 }
 
 /** Posts d'un auteur (onglet « Posts » d'un profil). */
-export async function listByAuthor(authorId: string, limit = 20, offset = 0): Promise<FeedPost[]> {
+export async function listByAuthor(
+  authorId: string,
+  limit = 20,
+  offset = 0,
+): Promise<FeedPost[]> {
   const params = feedParams(limit, offset)
   params.set('author_id', authorId)
   const raw = await unwrap<ApiPost[]>(await apiFetch(`/posts?${params}`))
@@ -508,12 +544,16 @@ export async function listLikedByUser(
   params.set('limit', String(limit))
   params.set('offset', String(offset))
   const res = await apiFetch(`/posts/liked?${params}`)
-  if (res.status === 403) throw Object.assign(new Error('likes_private'), { status: 403 })
+  if (res.status === 403)
+    throw Object.assign(new Error('likes_private'), { status: 403 })
   const raw = await unwrap<ApiPost[]>(res)
   return mapPosts(raw ?? [])
 }
 
-export async function listHashtagTrends(limit = 5, query = ''): Promise<HashtagTrend[]> {
+export async function listHashtagTrends(
+  limit = 5,
+  query = '',
+): Promise<HashtagTrend[]> {
   const params = new URLSearchParams()
   params.set('limit', String(limit))
   const q = query.trim().replace(/^#/, '')
@@ -525,7 +565,10 @@ export async function listHashtagTrends(limit = 5, query = ''): Promise<HashtagT
 }
 
 /** Posts contenant au moins un hashtag, utilisés par la page Explorer. */
-export async function listHashtaggedPosts(limit = 10, offset = 0): Promise<FeedPost[]> {
+export async function listHashtaggedPosts(
+  limit = 10,
+  offset = 0,
+): Promise<FeedPost[]> {
   const params = feedParams(limit, offset)
   params.set('hashtag_any', 'true')
   const raw = await unwrap<ApiPost[]>(await apiFetch(`/posts?${params}`))
@@ -563,7 +606,10 @@ export async function createPost(
   return toFeedPost(created, new Set(), new Set())
 }
 
-export async function votePoll(postId: string, choiceId: string): Promise<FeedPost> {
+export async function votePoll(
+  postId: string,
+  choiceId: string,
+): Promise<FeedPost> {
   const updated = await unwrap<ApiPost>(
     await apiFetch(`/posts/${postId}/poll/vote`, {
       method: 'POST',
@@ -593,7 +639,9 @@ export async function closePoll(postId: string): Promise<FeedPost> {
 
 /** Épingle un post sur le profil de l'auteur courant ; renvoie le post à jour. */
 export async function pinPost(id: string): Promise<FeedPost> {
-  const updated = await unwrap<ApiPost>(await apiFetch(`/posts/${id}/pin`, { method: 'PATCH' }))
+  const updated = await unwrap<ApiPost>(
+    await apiFetch(`/posts/${id}/pin`, { method: 'PATCH' }),
+  )
   const [likedIds, repostedIds, bookmarkedIds] = await Promise.all([
     getLikedIds(),
     getRepostedIds(),
@@ -604,7 +652,9 @@ export async function pinPost(id: string): Promise<FeedPost> {
 
 /** Désépingle un post ; renvoie le post à jour. */
 export async function unpinPost(id: string): Promise<FeedPost> {
-  const updated = await unwrap<ApiPost>(await apiFetch(`/posts/${id}/pin`, { method: 'DELETE' }))
+  const updated = await unwrap<ApiPost>(
+    await apiFetch(`/posts/${id}/pin`, { method: 'DELETE' }),
+  )
   const [likedIds, repostedIds, bookmarkedIds] = await Promise.all([
     getLikedIds(),
     getRepostedIds(),
@@ -615,7 +665,10 @@ export async function unpinPost(id: string): Promise<FeedPost> {
 
 /** Supprime un post (auteur ou mod/admin côté back). */
 export async function deletePost(id: string): Promise<void> {
-  await expectOk(await apiFetch(`/posts/${id}`, { method: 'DELETE' }), 'Suppression impossible')
+  await expectOk(
+    await apiFetch(`/posts/${id}`, { method: 'DELETE' }),
+    'Suppression impossible',
+  )
 }
 
 // --- Likes -------------------------------------------------------------------
@@ -640,7 +693,9 @@ export async function unlikePost(id: string): Promise<number> {
 
 /** Repost simple ; renvoie le post original annoté pour affichage profil. */
 export async function repostPost(id: string): Promise<FeedPost> {
-  const updated = await unwrap<ApiPost>(await apiFetch(`/posts/${id}/repost`, { method: 'POST' }))
+  const updated = await unwrap<ApiPost>(
+    await apiFetch(`/posts/${id}/repost`, { method: 'POST' }),
+  )
   const [likedIds, repostedIds, bookmarkedIds] = await Promise.all([
     getLikedIds(),
     getRepostedIds(),
@@ -660,7 +715,11 @@ export async function unrepostPost(id: string): Promise<number> {
 // --- Commentaires ------------------------------------------------------------
 
 /** Commentaires RACINE d'un post (chronologiques, paginés). */
-export async function listComments(postId: string, limit = 10, offset = 0): Promise<PostComment[]> {
+export async function listComments(
+  postId: string,
+  limit = 10,
+  offset = 0,
+): Promise<PostComment[]> {
   const raw = await unwrap<ApiComment[]>(
     await apiFetch(`/posts/${postId}/comments?limit=${limit}&offset=${offset}`),
   )
@@ -675,7 +734,9 @@ export async function listReplies(
   offset = 0,
 ): Promise<PostComment[]> {
   const raw = await unwrap<ApiComment[]>(
-    await apiFetch(`/posts/${postId}/comments/${commentId}/replies?limit=${limit}&offset=${offset}`),
+    await apiFetch(
+      `/posts/${postId}/comments/${commentId}/replies?limit=${limit}&offset=${offset}`,
+    ),
   )
   return Promise.all((raw ?? []).map(toComment))
 }
@@ -698,6 +759,8 @@ export async function listCommentsByAuthor(
     displayName: '...',
     avatarUrl: '',
     visibility: 'public',
+    lastLoginAt: '',
+    isOnline: false,
   }
   // États (liké/reposté/signé) de l'utilisateur courant, récupérés une seule
   // fois pour enrichir tous les posts parents.
@@ -710,13 +773,26 @@ export async function listCommentsByAuthor(
     raw.map(async (item) => {
       const comment = await toComment(item)
       const parentPost = item.parent_post
-        ? await toFeedPost(item.parent_post, likedIds, repostedIds, bookmarkedIds)
+        ? await toFeedPost(
+            item.parent_post,
+            likedIds,
+            repostedIds,
+            bookmarkedIds,
+          )
         : null
       const parentPostAuthor = item.parent_post
         ? await resolveAuthor(item.parent_post.author_id)
         : fallbackAuthor
-      const parentComment = item.parent_comment ? await toComment(item.parent_comment) : null
-      return { comment, parentPostId: item.post_id, parentPostAuthor, parentPost, parentComment }
+      const parentComment = item.parent_comment
+        ? await toComment(item.parent_comment)
+        : null
+      return {
+        comment,
+        parentPostId: item.post_id,
+        parentPostAuthor,
+        parentPost,
+        parentComment,
+      }
     }),
   )
 }
@@ -746,9 +822,14 @@ export async function createComment(
 }
 
 /** Supprime un commentaire (auteur ou mod/admin côté back). */
-export async function deleteComment(postId: string, commentId: string): Promise<void> {
+export async function deleteComment(
+  postId: string,
+  commentId: string,
+): Promise<void> {
   await expectOk(
-    await apiFetch(`/posts/${postId}/comments/${commentId}`, { method: 'DELETE' }),
+    await apiFetch(`/posts/${postId}/comments/${commentId}`, {
+      method: 'DELETE',
+    }),
     'Suppression impossible',
   )
 }
@@ -787,10 +868,14 @@ const POST_CREATED_EVENT = 'breezy:post-created'
 
 export function notifyPostCreated(post: FeedPost): void {
   if (typeof window === 'undefined') return
-  window.dispatchEvent(new CustomEvent<FeedPost>(POST_CREATED_EVENT, { detail: post }))
+  window.dispatchEvent(
+    new CustomEvent<FeedPost>(POST_CREATED_EVENT, { detail: post }),
+  )
 }
 
-export function subscribePostCreated(onCreate: (post: FeedPost) => void): () => void {
+export function subscribePostCreated(
+  onCreate: (post: FeedPost) => void,
+): () => void {
   function handle(event: Event) {
     onCreate((event as CustomEvent<FeedPost>).detail)
   }
@@ -839,12 +924,19 @@ interface ApiPostStat {
  * `id → compteurs` ; les posts invisibles/supprimés en sont absents. Le lot est
  * borné à `STATS_BATCH_MAX` ids.
  */
-export async function getPostsStats(ids: string[]): Promise<Map<string, PostStats>> {
+export async function getPostsStats(
+  ids: string[],
+): Promise<Map<string, PostStats>> {
   const out = new Map<string, PostStats>()
-  const wanted = Array.from(new Set(ids.filter(Boolean))).slice(0, STATS_BATCH_MAX)
+  const wanted = Array.from(new Set(ids.filter(Boolean))).slice(
+    0,
+    STATS_BATCH_MAX,
+  )
   if (wanted.length === 0) return out
   const params = new URLSearchParams({ ids: wanted.join(',') })
-  const stats = await unwrap<ApiPostStat[]>(await apiFetch(`/posts/stats?${params}`))
+  const stats = await unwrap<ApiPostStat[]>(
+    await apiFetch(`/posts/stats?${params}`),
+  )
   for (const s of stats ?? []) {
     out.set(s.id, {
       likesCount: s.likes_count ?? 0,
@@ -860,7 +952,10 @@ export async function getPostsStats(ids: string[]): Promise<Map<string, PostStat
  * (liked/reposted/bookmarked). Renvoie le post inchangé (même référence) si
  * aucun compteur n'a bougé — évite les re-rendus inutiles.
  */
-export function applyStatsToPost(post: FeedPost, stats: Map<string, PostStats>): FeedPost {
+export function applyStatsToPost(
+  post: FeedPost,
+  stats: Map<string, PostStats>,
+): FeedPost {
   const s = stats.get(post.id)
   if (!s) return post
   if (
@@ -883,7 +978,10 @@ export function applyStatsToPost(post: FeedPost, stats: Map<string, PostStats>):
  * (même référence) si aucun post n'a changé — un cycle de polling sans nouveauté
  * ne provoque alors aucun re-rendu.
  */
-export function applyStatsToPosts(posts: FeedPost[], stats: Map<string, PostStats>): FeedPost[] {
+export function applyStatsToPosts(
+  posts: FeedPost[],
+  stats: Map<string, PostStats>,
+): FeedPost[] {
   let changed = false
   const next = posts.map((p) => {
     const updated = applyStatsToPost(p, stats)
@@ -915,7 +1013,9 @@ export interface FeedRealtimeHandle {
  * avec backoff linéaire (calquée sur connectNotifications). Le token transite en
  * query param (le navigateur n'autorise pas d'en-tête sur un upgrade WS).
  */
-export function connectFeedRealtime(onNewPost: (ping: NewPostPing) => void): FeedRealtimeHandle {
+export function connectFeedRealtime(
+  onNewPost: (ping: NewPostPing) => void,
+): FeedRealtimeHandle {
   let socket: WebSocket | null = null
   let closedByUs = false
   let retry = 0
@@ -924,7 +1024,9 @@ export function connectFeedRealtime(onNewPost: (ping: NewPostPing) => void): Fee
     const token = getAccessToken()
     if (!token) return
     const wsBase = API_URL.replace(/^http/, 'ws').replace(/\/+$/, '')
-    socket = new WebSocket(`${wsBase}/posts/ws?access_token=${encodeURIComponent(token)}`)
+    socket = new WebSocket(
+      `${wsBase}/posts/ws?access_token=${encodeURIComponent(token)}`,
+    )
 
     socket.onmessage = (event) => {
       let payload: { type?: string; post_id?: string; author_id?: string }
@@ -933,7 +1035,11 @@ export function connectFeedRealtime(onNewPost: (ping: NewPostPing) => void): Fee
       } catch {
         return
       }
-      if (payload.type === 'post_created' && payload.post_id && payload.author_id) {
+      if (
+        payload.type === 'post_created' &&
+        payload.post_id &&
+        payload.author_id
+      ) {
         onNewPost({ postId: payload.post_id, authorId: payload.author_id })
       }
     }

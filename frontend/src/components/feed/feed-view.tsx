@@ -37,6 +37,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { useAuthGate } from '@/components/auth-prompt-provider'
 import { useT } from '@/components/language-provider'
 import { SearchSuggestionsDropdown } from '@/components/search/search-suggestions-dropdown'
+import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
 
 type FeedTab = 'for-you' | 'following'
 type HashtagTab = 'top' | 'recent' | 'media'
@@ -411,6 +412,12 @@ export function FeedView() {
               <AvatarFallback className="bg-gradient-to-br from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] text-[10px] font-bold text-white">
                 {initialOf(bannerAuthor.displayName)}
               </AvatarFallback>
+              <ActivityPresenceDot
+                userId={bannerAuthor.id}
+                initialLastLoginAt={bannerAuthor.lastLoginAt}
+                initialIsOnline={bannerAuthor.isOnline}
+                className="h-2 w-2 border"
+              />
             </Avatar>
             <span>{t('feed.new_posts')}</span>
           </button>

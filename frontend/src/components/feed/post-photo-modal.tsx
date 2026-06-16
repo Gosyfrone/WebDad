@@ -11,6 +11,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { CommentSection } from '@/components/feed/comment-section'
 import { PostActions } from '@/components/feed/post-actions'
 import { TranslatedContent } from '@/components/feed/translated-content'
+import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
 import { ProfilLink } from '@/components/profil/profil-link'
 
 interface PostPhotoModalProps {
@@ -118,6 +119,11 @@ export function PostPhotoModal({ post, index, onClose }: PostPhotoModalProps) {
               <AvatarFallback className="bg-gradient-to-br from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] font-bold text-white">
                 {(post.author.displayName.charAt(0) || '?').toUpperCase()}
               </AvatarFallback>
+              <ActivityPresenceDot
+                userId={post.author.id}
+                initialLastLoginAt={post.author.lastLoginAt}
+                initialIsOnline={post.author.isOnline}
+              />
             </Avatar>
           </ProfilLink>
           <div className="flex min-w-0 flex-1 flex-col">

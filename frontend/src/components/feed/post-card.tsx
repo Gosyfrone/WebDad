@@ -63,6 +63,7 @@ import { PostComposer } from '@/components/feed/post-composer'
 import { PostPhotoModal } from '@/components/feed/post-photo-modal'
 import { TranslatedContent } from '@/components/feed/translated-content'
 import { MentionText } from '@/components/mention/mention-text'
+import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
 import { ProfilLink } from '@/components/profil/profil-link'
 
 interface PostCardProps {
@@ -370,6 +371,11 @@ export function PostCard({ post, showPinBadge = false, focusCommentId, embedded 
           <AvatarFallback className="bg-gradient-to-br from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] font-bold text-white">
             {initialOf(post.author.displayName)}
           </AvatarFallback>
+          <ActivityPresenceDot
+            userId={post.author.id}
+            initialLastLoginAt={post.author.lastLoginAt}
+            initialIsOnline={post.author.isOnline}
+          />
         </Avatar>
       </ProfilLink>
 

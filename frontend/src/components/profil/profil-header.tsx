@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/dialog'
 import { EditProfilDialog } from '@/components/profil/edit-profil-dialog'
 import { RelationsDialog } from '@/components/profil/relations-dialog'
+import { ActivityStatus } from '@/components/profil/activity-status'
 
 interface ProfilHeaderProps {
   profil: ProfilDetails
@@ -54,10 +55,13 @@ export function ProfilHeader({
 
   // État de suivi (même hook que la recherche / les suggestions). Différé pour
   // le propriétaire (pas de bouton « Suivre » sur son propre profil).
-  const { currentUserId, isFollowing, isRequested, isPending, toggle } = useFollow(!isOwner)
-  const canFollow = !isOwner && currentUserId !== null && currentUserId !== profil.userId
+  const { currentUserId, isFollowing, isRequested, isPending, toggle } =
+    useFollow(!isOwner)
+  const canFollow =
+    !isOwner && currentUserId !== null && currentUserId !== profil.userId
   const followingProfile = isFollowing(profil.userId)
-  const relationsLocked = profil.visibility === 'private' && !isOwner && !followingProfile
+  const relationsLocked =
+    profil.visibility === 'private' && !isOwner && !followingProfile
 
   function openRelations(tab: RelationKind) {
     setRelationsTab(tab)
@@ -73,7 +77,11 @@ export function ProfilHeader({
           !profil.bannerUrl &&
             'bg-gradient-to-r from-[#8D3DFF]/35 via-[#EADCFF] to-[#47D9FF]/25 dark:from-[#8D3DFF]/45 dark:via-[#1c1338] dark:to-[#47D9FF]/35',
         )}
-        style={profil.bannerUrl ? { backgroundImage: `url(${profil.bannerUrl})` } : undefined}
+        style={
+          profil.bannerUrl
+            ? { backgroundImage: `url(${profil.bannerUrl})` }
+            : undefined
+        }
       />
 
       <div className="px-4 pb-3">
@@ -146,7 +154,9 @@ export function ProfilHeader({
         {/* Identité */}
         <div className="mt-3 flex flex-col gap-0.5">
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-xl font-extrabold text-foreground">{profil.displayName}</h1>
+            <h1 className="text-xl font-extrabold text-foreground">
+              {profil.displayName}
+            </h1>
             <Badge variant="secondary">{t(`role.${profil.role}`)}</Badge>
             {profil.gender && (
               <span
@@ -179,12 +189,22 @@ export function ProfilHeader({
               </span>
             )}
           </div>
-          <span className="text-sm text-muted-foreground">@{profil.username}</span>
+          <span className="text-sm text-muted-foreground">
+            @{profil.username}
+          </span>
+          <ActivityStatus
+            userId={profil.userId}
+            initialLastLoginAt={profil.lastLoginAt}
+            initialIsOnline={profil.isOnline}
+            className="text-xs"
+          />
         </div>
 
         {/* Bio */}
         {profil.bio && (
-          <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed">{profil.bio}</p>
+          <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed">
+            {profil.bio}
+          </p>
         )}
 
         <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm text-muted-foreground">
@@ -208,12 +228,16 @@ export function ProfilHeader({
           {profil.birthDate && (
             <span className="flex items-center gap-1.5">
               <CalendarDays className="h-4 w-4" aria-hidden />
-              {t('profil.born_on', { date: formatFullDate(profil.birthDate, locale) })}
+              {t('profil.born_on', {
+                date: formatFullDate(profil.birthDate, locale),
+              })}
             </span>
           )}
           <span className="flex items-center gap-1.5">
             <CalendarDays className="h-4 w-4" aria-hidden />
-            {t('profil.joined', { date: formatJoinedAt(profil.joinedAt, locale) })}
+            {t('profil.joined', {
+              date: formatJoinedAt(profil.joinedAt, locale),
+            })}
           </span>
         </div>
 
@@ -306,8 +330,12 @@ function FollowButton({
           t('follow.requested')
         ) : following ? (
           <>
-            <span className="group-hover/btn:hidden">{t('follow.followed')}</span>
-            <span className="hidden group-hover/btn:inline">{t('follow.unfollow')}</span>
+            <span className="group-hover/btn:hidden">
+              {t('follow.followed')}
+            </span>
+            <span className="hidden group-hover/btn:inline">
+              {t('follow.unfollow')}
+            </span>
           </>
         ) : (
           t('follow.follow')
@@ -318,13 +346,19 @@ function FollowButton({
         <DialogContent className="panel top-32 translate-y-0 border shadow-[0_28px_80px_rgba(91,108,255,0.24)] sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>{t('follow.private_unfollow_title')}</DialogTitle>
-            <DialogDescription>{t('follow.private_unfollow_desc')}</DialogDescription>
+            <DialogDescription>
+              {t('follow.private_unfollow_desc')}
+            </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setConfirmOpen(false)}>
               {t('common.cancel')}
             </Button>
-            <Button variant="destructive" disabled={pending} onClick={() => void confirmUnfollow()}>
+            <Button
+              variant="destructive"
+              disabled={pending}
+              onClick={() => void confirmUnfollow()}
+            >
               {t('follow.private_unfollow_confirm')}
             </Button>
           </DialogFooter>
@@ -367,7 +401,10 @@ function formatJoinedAt(iso: string, locale: string): string {
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) return '—'
   const intl = locale === 'en' ? 'en-US' : 'fr-FR'
-  return new Intl.DateTimeFormat(intl, { month: 'long', year: 'numeric' }).format(date)
+  return new Intl.DateTimeFormat(intl, {
+    month: 'long',
+    year: 'numeric',
+  }).format(date)
 }
 
 function formatFullDate(iso: string, locale: string): string {

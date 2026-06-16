@@ -10,6 +10,7 @@ import { acceptFollowRequest, rejectFollowRequest } from '@/lib/api'
 import { useLanguage } from '@/components/language-provider'
 import { useNotifications } from '@/components/notifications-provider'
 import { ProfilLink } from '@/components/profil/profil-link'
+import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 
@@ -133,6 +134,7 @@ export function NotificationsView() {
                             <AvatarImage src={n.actor.avatarUrl} alt={n.actor.displayName} />
                           )}
                           <AvatarFallback>{fallback}</AvatarFallback>
+                          <ActivityPresenceDot userId={n.actor.id} />
                         </Avatar>
                       </ProfilLink>
                       <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-background shadow">

@@ -13,6 +13,7 @@ import {
 import { useSession } from '@/lib/session'
 import { timeAgo } from '@/lib/utils'
 import { ProfilLink } from '@/components/profil/profil-link'
+import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
 import { useLanguage } from '@/components/language-provider'
 import { useToast } from '@/hooks/use-toast'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -181,6 +182,7 @@ export function AccountsPanel({ canGovern }: AccountsPanelProps) {
                   <Avatar className="h-10 w-10">
                     {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user.displayName} />}
                     <AvatarFallback>{initial}</AvatarFallback>
+                    <ActivityPresenceDot userId={user.id} />
                   </Avatar>
                 </ProfilLink>
 
