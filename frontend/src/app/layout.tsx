@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
+import localFont from 'next/font/local'
 import { ThemeProvider } from '@/components/theme-provider'
 import { LanguageProvider } from '@/components/language-provider'
 import { RouteOriginTracker } from '@/components/route-origin-tracker'
@@ -7,7 +7,14 @@ import { Toaster } from '@/components/ui/toaster'
 import { CUSTOM_THEME_INLINE_SCRIPT } from '@/lib/custom-theme'
 import './globals.css'
 
-const inter = Inter({ subsets: ['latin'] })
+// Police Inter auto-hébergée (next/font/local) : le woff2 variable (latin, axe de
+// graisse 100→900) est versionné dans le repo, donc le build ne dépend plus d'un
+// fetch réseau vers Google Fonts — builds Docker/CI reproductibles et hors-ligne.
+const inter = localFont({
+  src: './fonts/inter-latin-wght-normal.woff2',
+  weight: '100 900',
+  display: 'swap',
+})
 
 export const metadata: Metadata = {
   title: 'Breezy',

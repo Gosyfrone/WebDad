@@ -2,7 +2,6 @@
 
 import Image from 'next/image'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import {
   AtSign,
   Bell,
@@ -46,7 +45,6 @@ function getMessage(error: unknown, fallback: string): string {
 
 export default function LoginPage() {
   const t = useT()
-  const router = useRouter()
   const [identifier, setIdentifier] = React.useState('')
   const [password, setPassword] = React.useState('')
   const [showPassword, setShowPassword] = React.useState(false)
@@ -143,8 +141,13 @@ export default function LoginPage() {
         setAccessToken(payload.accessToken)
       }
 
-      router.replace(ROUTES.feed)
-      router.refresh()
+      // Navigation DURE vers le feed (et non `router.replace` soft) : l'entrée
+      // dans l'espace `(app)` depuis le groupe `(auth)` est une transition
+      // cross-groupe qui, en navigation soft, ne résout pas le slot parallèle
+      // `@modal` (routes interceptées sans `default` applicable) → 404. Un
+      // chargement complet se comporte comme un accès direct (qui marche) et
+      // repart sur un état d'app propre après connexion.
+      window.location.assign(ROUTES.feed)
     } catch (error) {
       setErrors({
         form: getMessage(error, t('auth.err.network')),

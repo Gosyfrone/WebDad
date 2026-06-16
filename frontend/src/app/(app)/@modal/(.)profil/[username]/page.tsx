@@ -1,4 +1,5 @@
 import { FeedOverlay } from '@/components/feed/feed-overlay'
+import { OverlayWhenPath } from '@/components/feed/overlay-when-path'
 import { ProfilView } from '@/components/profil/profil-view'
 
 interface InterceptedPublicProfilPageProps {
@@ -13,8 +14,10 @@ export default function InterceptedPublicProfilPage({
   params,
 }: InterceptedPublicProfilPageProps) {
   return (
-    <FeedOverlay>
-      <ProfilView username={params.username} />
-    </FeedOverlay>
+    <OverlayWhenPath path="/profil/" exact={false}>
+      <FeedOverlay>
+        <ProfilView username={params.username} />
+      </FeedOverlay>
+    </OverlayWhenPath>
   )
 }

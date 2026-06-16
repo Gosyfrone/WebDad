@@ -142,7 +142,9 @@ function VerifyEmailContent() {
       <CardContent className="relative space-y-4 px-6 pb-7 pt-2">
         {status === 'success' ? (
           <Button asChild className="h-11 w-full rounded-2xl bg-gradient-to-r from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] text-base font-semibold text-white">
-            <Link href={ROUTES.feed}>{t('auth.verify.go_to_app')}</Link>
+            {/* `<a>` (nav dure) et non `<Link>` : entrée cross-groupe (auth)→(app),
+                la nav soft ne résout pas le slot parallèle `@modal` → 404. */}
+            <a href={ROUTES.feed}>{t('auth.verify.go_to_app')}</a>
           </Button>
         ) : null}
 
