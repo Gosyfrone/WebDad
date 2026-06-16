@@ -32,7 +32,7 @@ func (c *UserClient) IsFollowing(ctx context.Context, followerID, followingID st
 	if err != nil {
 		return false, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return false, fmt.Errorf("user-service is-following status %d", resp.StatusCode)
 	}
