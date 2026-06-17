@@ -487,6 +487,56 @@ function ReplyAudiencePill({
   )
 }
 
+/**
+ * Pilule « Qui peut répondre » du sondage, même UX que {@link ReplyAudiencePill}.
+ * Menu Radix rendu dans le DOM (donc positionné correctement partout, y compris
+ * en émulation mobile DevTools) — le `<select>` natif précédent sortait du champ.
+ */
+function PollAudiencePill({
+  value,
+  onChange,
+}: {
+  value: PollAudience
+  onChange: (value: PollAudience) => void
+}) {
+  const t = useT()
+  const Icon = value === 'followers' ? Users : Globe
+  const label = value === 'followers' ? t('composer.poll_followers') : t('composer.poll_everyone')
+  const options: { value: PollAudience; label: string; icon: typeof Globe }[] = [
+    { value: 'everyone', label: t('composer.poll_everyone'), icon: Globe },
+    { value: 'followers', label: t('composer.poll_followers'), icon: Users },
+  ]
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          aria-label={t('composer.reply_audience')}
+          className="inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-sm font-semibold text-[#5B6CFF] transition-colors hover:bg-primary/10"
+        >
+          <Icon className="h-4 w-4" />
+          <span>{label}</span>
+          <ChevronDown className="h-4 w-4" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-72">
+        <p className="px-2 py-1.5 text-sm font-bold">{t('composer.reply_audience')}</p>
+        {options.map((opt) => (
+          <DropdownMenuItem
+            key={opt.value}
+            onClick={() => onChange(opt.value)}
+            className="flex items-center gap-2"
+          >
+            <opt.icon className="h-4 w-4 text-muted-foreground" />
+            <span className="flex-1">{opt.label}</span>
+            {value === opt.value && <Check className="h-4 w-4 text-[#5B6CFF]" />}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
 function buildPollPayload(
   open: boolean,
   choices: PollChoiceDraft[],
@@ -581,16 +631,7 @@ function PollPanel({
       </div>
 
       <div className="flex flex-col gap-3 border-t border-border p-3 sm:flex-row sm:items-center sm:justify-between">
-        <label className="flex items-center gap-2 text-sm font-semibold text-primary">
-          <select
-            value={audience}
-            onChange={(e) => onAudienceChange(e.target.value as PollAudience)}
-            className="rounded-md border border-border bg-background px-2 py-1 text-foreground outline-none focus:border-primary"
-          >
-            <option value="everyone">{t('composer.poll_everyone')}</option>
-            <option value="followers">{t('composer.poll_followers')}</option>
-          </select>
-        </label>
+        <PollAudiencePill value={audience} onChange={onAudienceChange} />
         <button
           type="button"
           onClick={onRemove}
@@ -704,20 +745,34 @@ function NumberSelect({
   max: number
   onChange: (value: number) => void
 }) {
+  // État texte local : autorise la saisie transitoire (champ vidé pour retaper)
+  // sans imposer le clamp à chaque frappe. Le clamp ne s'applique qu'à la valeur
+  // remontée au parent. Resync si le parent change la valeur (ex. clamp auto des
+  // minutes quand jours/heures repassent à 0).
+  const [text, setText] = useState(String(value))
+  useEffect(() => setText(String(value)), [value])
+
+  function handleChange(next: string) {
+    setText(next)
+    if (next === '') return
+    const n = Number(next)
+    if (Number.isNaN(n)) return
+    onChange(Math.min(max, Math.max(min, Math.trunc(n))))
+  }
+
   return (
     <label className="flex min-w-0 flex-col gap-1 rounded-md border border-border bg-background px-3 py-2 text-xs text-muted-foreground">
       {label}
-      <select
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
+      <input
+        type="number"
+        inputMode="numeric"
+        value={text}
+        min={min}
+        max={max}
+        onChange={(e) => handleChange(e.target.value)}
+        onBlur={() => setText(String(value))}
         className="bg-transparent text-base text-foreground outline-none"
-      >
-        {Array.from({ length: max - min + 1 }, (_, n) => n + min).map((n) => (
-          <option key={n} value={n}>
-            {n}
-          </option>
-        ))}
-      </select>
+      />
     </label>
   )
 }

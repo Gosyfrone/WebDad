@@ -69,6 +69,29 @@ function refreshAccessToken(): Promise<string | null> {
   return refreshPromise
 }
 
+/**
+ * Garde : le bootstrap de session ne tente qu'UN refresh par chargement de page,
+ * même pour les vrais visiteurs (cookie absent → 401 → on n'insiste pas).
+ */
+let bootstrapped = false
+
+/**
+ * Réhydrate la session au démarrage depuis le cookie httpOnly refresh (24 h).
+ *
+ * L'access token vit en localStorage (cache 15 min), mais iOS Safari (ITP)
+ * évince ce stockage bien plus vite que le cookie same-origin. Sans ce bootstrap,
+ * un localStorage purgé alors que le cookie reste valide afficherait l'utilisateur
+ * en visiteur jusqu'au prochain 401. On tente donc un refresh si aucun access
+ * token n'est présent : succès → `setAccessToken` émet `breezy:session-changed`,
+ * et `useSession` bascule visiteur → connecté sans rechargement.
+ */
+export async function bootstrapSession(): Promise<void> {
+  if (typeof window === 'undefined' || bootstrapped) return
+  bootstrapped = true
+  if (getAccessToken()) return
+  await refreshAccessToken()
+}
+
 function redirectToLogin(): void {
   if (typeof window === 'undefined') return
   if (window.location.pathname !== ROUTES.login) {
