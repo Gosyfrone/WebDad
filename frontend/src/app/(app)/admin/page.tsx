@@ -10,7 +10,7 @@ import { FeedOverlay } from '@/components/feed/feed-overlay'
  */
 export default function AdminPage() {
   return (
-    <FeedOverlay headerOffset={false}>
+    <FeedOverlay>
       <AdminInfra />
     </FeedOverlay>
   )

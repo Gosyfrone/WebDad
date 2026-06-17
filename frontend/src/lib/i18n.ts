@@ -532,6 +532,8 @@ export const messages: Record<Locale, Messages> = {
     'moderation.account_deleted_toast': 'Compte supprimé définitivement.',
     'moderation.account_delete_failed':
       'Échec de la suppression (effacement partiel possible).',
+    'moderation.role_label': 'Rôle',
+    'moderation.account_actions': 'Actions du compte',
     'admin.infra_subtitle': 'Supervision de l’infrastructure et des services.',
     'admin.infra_heading': 'État des services',
     'admin.infra_desc':
@@ -1497,6 +1499,8 @@ export const messages: Record<Locale, Messages> = {
     'moderation.account_deleted_toast': 'Account permanently deleted.',
     'moderation.account_delete_failed':
       'Deletion failed (partial erasure possible).',
+    'moderation.role_label': 'Role',
+    'moderation.account_actions': 'Account actions',
     'admin.infra_subtitle': 'Infrastructure and service monitoring.',
     'admin.infra_heading': 'Service status',
     'admin.infra_desc':

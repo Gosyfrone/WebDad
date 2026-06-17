@@ -61,7 +61,15 @@ export function MobileHeader() {
   const hidden = pathname?.startsWith(ROUTES.profil) ?? false
 
   // Section courante → pilote les 3 zones (gauche / centre / droite) du header.
-  const section: 'feed' | 'explorer' | 'messages' | 'notifications' | 'parametres' | 'other' =
+  const section:
+    | 'feed'
+    | 'explorer'
+    | 'messages'
+    | 'notifications'
+    | 'parametres'
+    | 'admin'
+    | 'moderation'
+    | 'other' =
     pathname === ROUTES.feed
       ? 'feed'
       : pathname?.startsWith(ROUTES.notifications)
@@ -72,7 +80,11 @@ export function MobileHeader() {
             ? 'messages'
             : pathname?.startsWith(ROUTES.parametres)
               ? 'parametres'
-              : 'other'
+              : pathname?.startsWith(ROUTES.moderation)
+                ? 'moderation'
+                : pathname?.startsWith(ROUTES.admin)
+                  ? 'admin'
+                  : 'other'
   // Titre centré (sections nommées) ; sinon le logo Breezy est affiché.
   const titleKey =
     section === 'explorer'
@@ -83,9 +95,19 @@ export function MobileHeader() {
           ? 'notifications.title'
           : section === 'parametres'
             ? 'settings.title'
-            : null
-  // Cloche à droite (vers les notifs) sur les sections de navigation principale.
-  const showBell = section === 'feed' || section === 'explorer' || section === 'messages'
+            : section === 'moderation'
+              ? 'nav.moderation'
+              : section === 'admin'
+                ? 'nav.admin'
+                : null
+  // Cloche à droite (vers les notifs) sur les sections de navigation principale
+  // et les pages admin / modération (header type-feed : avatar ← titre → cloche).
+  const showBell =
+    section === 'feed' ||
+    section === 'explorer' ||
+    section === 'messages' ||
+    section === 'admin' ||
+    section === 'moderation'
   // Flèche retour à gauche (au lieu de l'avatar) sur les pages « secondaires »
   // ouvertes au-dessus du menu normal (notifications, paramètres).
   const showBack = section === 'notifications' || section === 'parametres'
@@ -173,9 +195,10 @@ export function MobileHeader() {
   }, [hidden, isVisitor, section])
 
   // En-tête contextuel pour le feed, les sections de nav principale (explorer /
-  // messages / notifications) et les paramètres (variante flèche retour). Les
-  // autres pages (signets, admin, modération, profil) conservent leur propre
-  // en-tête → pas de header global ni de décalage `pt-14` (cf. `headerOffset={false}`).
+  // messages / notifications), les paramètres (variante flèche retour) et les
+  // pages admin / modération (header type-feed : avatar ← titre → cloche). Les
+  // autres pages (signets, profil) conservent leur propre en-tête → pas de header
+  // global ni de décalage `pt-14` (cf. `headerOffset={false}`).
   if (hidden || section === 'other') return null
   // Conversation ouverte (mobile) : le ChatPane affiche son propre en-tête (nom +
   // retour) → on efface l'en-tête global pour ne pas le recouvrir/dédoubler.

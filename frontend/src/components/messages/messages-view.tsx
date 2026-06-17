@@ -513,7 +513,10 @@ export function MessagesView() {
       {/* Volet liste */}
       <div
         className={cn(
-          'h-full w-full shrink-0 pt-14 lg:w-[360px] lg:border-r lg:pt-0',
+          // Pas de pt-14 ici : l'overlay « wide » démarre déjà à `top-14`
+          // (cf. FeedOverlay) → le header global est déjà dégagé. Un pt-14
+          // ajouterait un 2ᵉ décalage de 56px (vide sous le header).
+          'h-full w-full shrink-0 lg:w-[360px] lg:border-r',
           selectedId ? 'hidden lg:flex lg:flex-col' : 'flex flex-col',
           blurWhenGated,
         )}
