@@ -832,6 +832,11 @@ function PostPollCard({
           const percent = total > 0 ? Math.round((choice.votesCount / total) * 100) : 0
           const selected = poll.votedChoiceId === choice.id
           const winner = poll.winnerChoiceIds.includes(choice.id)
+          // Compte exact par choix visible seulement après avoir voté ou une fois le sondage terminé.
+          const showCounts = showResults && (Boolean(poll.votedChoiceId) || closed)
+          const resultText = showCounts
+            ? `${percent}% · ${t('post.poll_votes', { count: choice.votesCount })}`
+            : `${percent}%`
           return (
             <button
               key={choice.id}
@@ -861,9 +866,9 @@ function PostPollCard({
                 {voting === choice.id ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : selected ? (
-                  t('post.poll_voted')
+                  showResults ? `${t('post.poll_voted')} · ${resultText}` : t('post.poll_voted')
                 ) : showResults ? (
-                  `${percent}%`
+                  resultText
                 ) : (
                   t('post.poll_vote')
                 )}

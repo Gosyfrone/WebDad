@@ -114,6 +114,12 @@ export function PostComposer({
     search: hashtagSearchGlobal,
   })
   const remaining = MAX_CHARS - content.length
+  // Une question doit durer au moins 1 minute : si jours et heures sont à 0,
+  // les minutes ne peuvent pas descendre sous 1 (sinon durée totale nulle).
+  const minPollMinutes = pollDays === 0 && pollHours === 0 ? 1 : 0
+  useEffect(() => {
+    if (pollMinutes < minPollMinutes) setPollMinutes(minPollMinutes)
+  }, [minPollMinutes, pollMinutes])
   const pollPayload = buildPollPayload(pollOpen, pollChoices, pollDays, pollHours, pollMinutes, pollAudience)
   const isEmpty = content.trim().length === 0 && media.length === 0 && !pollPayload
   const isOver = remaining < 0
@@ -290,6 +296,7 @@ export function PostComposer({
             days={pollDays}
             hours={pollHours}
             minutes={pollMinutes}
+            minMinutes={minPollMinutes}
             audience={pollAudience}
             onChoiceChange={updatePollChoice}
             onAddChoice={addPollChoice}
@@ -471,6 +478,7 @@ function PollPanel({
   days,
   hours,
   minutes,
+  minMinutes,
   audience,
   onChoiceChange,
   onAddChoice,
@@ -485,6 +493,7 @@ function PollPanel({
   days: number
   hours: number
   minutes: number
+  minMinutes: number
   audience: PollAudience
   onChoiceChange: (index: number, value: string) => void
   onAddChoice: () => void
@@ -540,7 +549,7 @@ function PollPanel({
         <div className="grid grid-cols-3 gap-2">
           <NumberSelect label={t('composer.poll_days')} value={days} max={7} onChange={onDaysChange} />
           <NumberSelect label={t('composer.poll_hours')} value={hours} max={23} onChange={onHoursChange} />
-          <NumberSelect label={t('composer.poll_minutes')} value={minutes} max={59} onChange={onMinutesChange} />
+          <NumberSelect label={t('composer.poll_minutes')} value={minutes} min={minMinutes} max={59} onChange={onMinutesChange} />
         </div>
       </div>
 
@@ -571,11 +580,13 @@ function PollPanel({
 function NumberSelect({
   label,
   value,
+  min = 0,
   max,
   onChange,
 }: {
   label: string
   value: number
+  min?: number
   max: number
   onChange: (value: number) => void
 }) {
@@ -587,7 +598,7 @@ function NumberSelect({
         onChange={(e) => onChange(Number(e.target.value))}
         className="bg-transparent text-base text-foreground outline-none"
       >
-        {Array.from({ length: max + 1 }, (_, n) => (
+        {Array.from({ length: max - min + 1 }, (_, n) => n + min).map((n) => (
           <option key={n} value={n}>
             {n}
           </option>
