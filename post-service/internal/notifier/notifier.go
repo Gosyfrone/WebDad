@@ -19,6 +19,7 @@ import (
 // Types d'événement (alignés sur le notification-service).
 const (
 	TypeLike         = "like"
+	TypeCommentLike  = "comment_like"
 	TypeComment      = "comment"
 	TypeReply        = "reply"
 	TypeMention      = "mention"

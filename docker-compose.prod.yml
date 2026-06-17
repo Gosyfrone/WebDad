@@ -200,6 +200,9 @@ services:
       GIN_MODE: release
       MONGO_HOST: mongo-profil
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET requis}
+      # Lecture du graphe social (is-following pour l'activité) + acceptation en
+      # masse des demandes au passage public — appels serveur-à-serveur directs.
+      USER_SERVICE_URL: http://user-service:8082
     networks:
       - webdad-net
     depends_on:

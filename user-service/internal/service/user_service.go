@@ -10,6 +10,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log/slog"
 	"regexp"
 	"strings"
 	"time"
@@ -368,6 +369,33 @@ func (s *UserService) AcceptFollowRequest(ownerID, followerID string) error {
 	s.emitFollowRequest(followerID, ownerID, true)
 	s.emitFollowRequestAcceptConfirm(followerID, ownerID)
 	s.emitFollowRequestDecision(ownerID, followerID, client.TypeFollowRequestAccepted)
+	return nil
+}
+
+// AcceptAllFollowRequests accepte en masse toutes les demandes d'abonnement
+// entrantes de `ownerID`. Appelé par profil-service quand un compte privé
+// repasse public : toute demande en attente est convertie en abonnement (les
+// notifications d'acceptation sont émises par demandeur, comme une acceptation
+// manuelle). Tolérant : une erreur sur une demande n'interrompt pas les autres.
+func (s *UserService) AcceptAllFollowRequests(ownerID string) error {
+	requesters, err := s.repo.IncomingFollowRequestFollowerIDs(ownerID)
+	if err != nil {
+		return fmt.Errorf("demandes follow entrantes : %w", err)
+	}
+	accepted := 0
+	for _, followerID := range requesters {
+		if err := s.AcceptFollowRequest(ownerID, followerID); err != nil &&
+			!errors.Is(err, ErrFollowRequestNotFound) {
+			// Best-effort : on log et on continue (course possible avec une
+			// acceptation/rejet manuel concurrent).
+			slog.Warn("acceptation en masse : demande ignorée",
+				"owner_id", ownerID, "follower_id", followerID, "error", err)
+		} else if err == nil {
+			accepted++
+		}
+	}
+	slog.Info("acceptation en masse des demandes de suivi",
+		"owner_id", ownerID, "pending", len(requesters), "accepted", accepted)
 	return nil
 }
 

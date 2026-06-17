@@ -299,6 +299,9 @@ export const messages: Record<Locale, Messages> = {
     'notifications.comment_one': '{name} a commenté votre publication',
     'notifications.comment_other':
       '{name} et {count} autres personnes ont commenté votre publication',
+    'notifications.comment_like_one': '{name} a aimé votre commentaire',
+    'notifications.comment_like_other':
+      '{name} et {count} autres personnes ont aimé votre commentaire',
     'notifications.reply_one': '{name} a répondu à votre commentaire',
     'notifications.reply_other':
       '{name} et {count} autres personnes ont répondu à votre commentaire',
@@ -1270,6 +1273,9 @@ export const messages: Record<Locale, Messages> = {
     'notifications.comment_one': '{name} commented on your post',
     'notifications.comment_other':
       '{name} and {count} others commented on your post',
+    'notifications.comment_like_one': '{name} liked your comment',
+    'notifications.comment_like_other':
+      '{name} and {count} others liked your comment',
     'notifications.reply_one': '{name} replied to your comment',
     'notifications.reply_other':
       '{name} and {count} others replied to your comment',

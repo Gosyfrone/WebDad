@@ -964,6 +964,15 @@ func (s *PostService) LikeComment(ctx context.Context, postID, commentID, actorI
 	if err != nil {
 		return 0, err
 	}
+	// Notifie l'auteur du commentaire (agrégé par commentaire ; auto-like filtré
+	// côté notification-service via recipient == actor).
+	s.notif.Emit(notifier.Event{
+		Type:        notifier.TypeCommentLike,
+		ActorID:     actorID,
+		RecipientID: comment.AuthorID,
+		PostID:      postID,
+		CommentID:   commentID,
+	})
 	return updated.LikesCount, nil
 }
 
@@ -995,6 +1004,15 @@ func (s *PostService) UnlikeComment(ctx context.Context, postID, commentID, acto
 	if err != nil {
 		return 0, err
 	}
+	// Défait la notification de like de commentaire correspondante.
+	s.notif.Emit(notifier.Event{
+		Type:        notifier.TypeCommentLike,
+		ActorID:     actorID,
+		RecipientID: comment.AuthorID,
+		PostID:      postID,
+		CommentID:   commentID,
+		Retract:     true,
+	})
 	return updated.LikesCount, nil
 }
 

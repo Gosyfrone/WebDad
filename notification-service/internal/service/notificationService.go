@@ -81,7 +81,7 @@ func (s *NotificationService) HandleEvent(ctx context.Context, ev models.Event) 
 		}
 		return s.applyToGroup(ctx, ev.RecipientID, gk, ev)
 
-	case models.TypeLike, models.TypeComment, models.TypeReply, models.TypeRepost, models.TypeQuote, models.TypeFollow, models.TypeFollowRequest, models.TypeFollowRequestAcceptConfirm, models.TypePostPurgeWarning:
+	case models.TypeLike, models.TypeCommentLike, models.TypeComment, models.TypeReply, models.TypeRepost, models.TypeQuote, models.TypeFollow, models.TypeFollowRequest, models.TypeFollowRequestAcceptConfirm, models.TypePostPurgeWarning:
 		recipient := ev.RecipientID
 		if recipient == "" || recipient == ev.ActorID {
 			return nil // pas de notification à soi-même
@@ -291,6 +291,12 @@ func groupKeyFor(ev models.Event) (string, bool) {
 			return "", false
 		}
 		return "like:" + ev.PostID, true
+	case models.TypeCommentLike:
+		// Tous les likes d'un même commentaire s'agrègent.
+		if ev.CommentID == "" {
+			return "", false
+		}
+		return "comment_like:" + ev.CommentID, true
 	case models.TypeComment:
 		if ev.PostID == "" {
 			return "", false

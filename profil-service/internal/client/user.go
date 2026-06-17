@@ -22,6 +22,26 @@ func NewUserClient(baseURL string) *UserClient {
 	}
 }
 
+// AcceptAllFollowRequests demande à user-service d'accepter toutes les demandes
+// d'abonnement en attente d'un owner (appelé quand son profil repasse public).
+// Server-to-server via le groupe /internal (non routé par la gateway).
+func (c *UserClient) AcceptAllFollowRequests(ctx context.Context, ownerID string) error {
+	url := fmt.Sprintf("%s/internal/users/%s/accept-all-follow-requests", c.baseURL, ownerID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, nil)
+	if err != nil {
+		return err
+	}
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("user-service accept-all status %d", resp.StatusCode)
+	}
+	return nil
+}
+
 func (c *UserClient) IsFollowing(ctx context.Context, followerID, followingID string) (bool, error) {
 	url := fmt.Sprintf("%s/internal/follows/%s/is-following/%s", c.baseURL, followerID, followingID)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
