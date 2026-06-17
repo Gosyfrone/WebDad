@@ -724,7 +724,7 @@ export function CommentRow({
         <Avatar className="h-8 w-8">
           {comment.author.avatarUrl && <AvatarImage src={comment.author.avatarUrl} alt="" />}
           <AvatarFallback className="bg-gradient-to-br from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] text-xs font-bold text-white">
-            {initialOf(comment.author.displayName)}
+            {initialOf(comment.author.displayName, comment.author.username)}
           </AvatarFallback>
           <ActivityPresenceDot
             userId={comment.author.id}

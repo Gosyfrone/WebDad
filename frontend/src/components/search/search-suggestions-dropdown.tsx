@@ -8,6 +8,7 @@ import { listHashtagTrends, type HashtagTrend } from '@/lib/posts'
 import { hashtagHref, profilHref } from '@/lib/routes'
 import type { SuggestionHistoryEntry } from '@/lib/search-suggestion-history'
 import type { RelationUser } from '@/types'
+import { initialOf } from '@/lib/utils'
 import { useT } from '@/components/language-provider'
 import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -233,11 +234,11 @@ function SuggestionButton({
 }
 
 function initials(user: RelationUser): string {
-  return initialsFromText(user.displayName, user.username)
+  return initialOf(user.displayName, user.username)
 }
 
 function initialsFromText(label: string, subtitle: string): string {
-  return (label.charAt(0) || subtitle.charAt(0) || '?').toUpperCase()
+  return initialOf(label, subtitle)
 }
 
 function userIdFromHistory(entry: SuggestionHistoryEntry): string | undefined {

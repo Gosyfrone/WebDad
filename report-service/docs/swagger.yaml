@@ -1,0 +1,367 @@
+definitions:
+  handler.createReportRequest:
+    properties:
+      attachment_id:
+        type: string
+      category:
+        type: string
+      disclosed_content:
+        type: string
+      entity_id:
+        type: string
+      entity_owner_id:
+        type: string
+      entity_type:
+        type: string
+      reason:
+        type: string
+      text:
+        type: string
+    required:
+    - category
+    - reason
+    type: object
+  handler.replyRequest:
+    properties:
+      text:
+        type: string
+    required:
+    - text
+    type: object
+  handler.statusRequest:
+    properties:
+      status:
+        type: string
+    required:
+    - status
+    type: object
+  handler.warningRequest:
+    properties:
+      message:
+        type: string
+      target_user_id:
+        type: string
+      ticket_id:
+        type: string
+    required:
+    - message
+    - target_user_id
+    type: object
+info:
+  contact: {}
+paths:
+  /reports:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Signalement
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handler.createReportRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: 'data: ticket'
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: déjà signalé par cet utilisateur
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Déposer un signalement
+      tags:
+      - reports
+  /reports/tickets:
+    get:
+      parameters:
+      - description: moderation|bug
+        in: query
+        name: category
+        type: string
+      - description: open|closed|reopened
+        in: query
+        name: status
+        type: string
+      - description: Nb minimal de signalements
+        in: query
+        name: min_reports
+        type: integer
+      - description: RFC3339 — borne basse du dernier signalement
+        in: query
+        name: since
+        type: string
+      - description: RFC3339 — borne haute du dernier signalement
+        in: query
+        name: until
+        type: string
+      - description: Nb résultats
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 'data: [tickets]'
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Lister les tickets (filtres cumulables)
+      tags:
+      - reports
+  /reports/tickets/{id}:
+    get:
+      parameters:
+      - description: Ticket ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 'data: ticket'
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Détail d'un ticket
+      tags:
+      - reports
+  /reports/tickets/{id}/removal:
+    post:
+      parameters:
+      - description: Ticket ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 'data: ticket'
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Journaliser le retrait du contenu
+      tags:
+      - reports
+  /reports/tickets/{id}/replies:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Ticket ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Réponse
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handler.replyRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 'data: ticket'
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Réponse interne d'un modérateur
+      tags:
+      - reports
+  /reports/tickets/{id}/status:
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Ticket ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Nouveau statut
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handler.statusRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 'data: ticket'
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Changer le statut d'un ticket
+      tags:
+      - reports
+  /reports/tickets/{id}/transfer:
+    post:
+      parameters:
+      - description: Ticket ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 'data: ticket'
+          schema:
+            additionalProperties: true
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Transférer un ticket bug vers la modération
+      tags:
+      - reports
+  /reports/warnings:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Avertissement
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handler.warningRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: 'data: warning'
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Émettre un avertissement
+      tags:
+      - reports
+  /reports/warnings/{id}/ack:
+    post:
+      parameters:
+      - description: Warning ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Acquitter un avertissement
+      tags:
+      - reports
+  /reports/warnings/pending:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 'data: [warnings]'
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Mes avertissements en attente
+      tags:
+      - reports
+swagger: "2.0"

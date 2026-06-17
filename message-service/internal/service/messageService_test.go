@@ -201,3 +201,32 @@ func TestMentionedTargets(t *testing.T) {
 		})
 	}
 }
+
+func TestMessageTargets(t *testing.T) {
+	cases := []struct {
+		name    string
+		members []string
+		sender  string
+		want    []string
+	}{
+		{"notifie tous les autres membres", []string{"u1", "u2", "u3"}, "u1", []string{"u2", "u3"}},
+		{"ignore l'expéditeur", []string{"u1", "u2"}, "u1", []string{"u2"}},
+		{"déduplique par prudence", []string{"u1", "u2", "u2"}, "u1", []string{"u2"}},
+		{"ignore les vides", []string{"", "u2"}, "u1", []string{"u2"}},
+		{"aucun destinataire → nil", []string{"u1"}, "u1", nil},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := messageTargets(tc.members, tc.sender)
+			if len(got) != len(tc.want) {
+				t.Fatalf("messageTargets = %v ; attendu %v", got, tc.want)
+			}
+			for i := range got {
+				if got[i] != tc.want[i] {
+					t.Fatalf("messageTargets = %v ; attendu %v", got, tc.want)
+				}
+			}
+		})
+	}
+}

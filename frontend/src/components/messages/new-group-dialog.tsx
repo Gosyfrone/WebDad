@@ -5,6 +5,7 @@ import { Loader2, X } from 'lucide-react'
 
 import { createGroup, PeerKeyMissingError, type Conversation } from '@/lib/messages'
 import type { RelationUser } from '@/types'
+import { initialOf } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { useLanguage } from '@/components/language-provider'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -102,7 +103,7 @@ export function NewGroupDialog({ open, onOpenChange, myId, onCreated }: NewGroup
                   <Avatar className="h-5 w-5">
                     {m.avatarUrl && <AvatarImage src={m.avatarUrl} alt={m.displayName} />}
                     <AvatarFallback className="text-[10px]">
-                      {(m.displayName.charAt(0) || '?').toUpperCase()}
+                      {initialOf(m.displayName, m.username)}
                     </AvatarFallback>
                     <ActivityPresenceDot userId={m.id} className="h-2 w-2 border" />
                   </Avatar>

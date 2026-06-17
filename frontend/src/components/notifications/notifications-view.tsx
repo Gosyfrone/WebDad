@@ -4,7 +4,7 @@ import { useEffect } from 'react'
 import Link from 'next/link'
 import { AtSign, Bell, Heart, MessageCircle, Quote, Repeat2, Reply, Send, Trash2, UserPlus } from 'lucide-react'
 
-import { cn, timeAgo } from '@/lib/utils'
+import { cn, initialOf, timeAgo } from '@/lib/utils'
 import { type AppNotification, type NotificationType, notificationHref } from '@/lib/notifications'
 import { acceptFollowRequest, rejectFollowRequest } from '@/lib/api'
 import { useLanguage } from '@/components/language-provider'
@@ -23,6 +23,7 @@ const TYPE_ICON: Record<NotificationType, { Icon: React.ElementType; className: 
   repost: { Icon: Repeat2, className: 'text-emerald-500' },
   quote: { Icon: Quote, className: 'text-[#8D3DFF]' },
   follow: { Icon: UserPlus, className: 'text-emerald-500' },
+  message: { Icon: Send, className: 'text-[#5B6CFF] dark:text-[#9aa6ff]' },
   message_mention: { Icon: Send, className: 'text-[#8D3DFF]' },
   follow_request: { Icon: UserPlus, className: 'text-emerald-500' },
   follow_request_accepted: { Icon: UserPlus, className: 'text-emerald-500' },
@@ -65,6 +66,10 @@ export function NotificationsView() {
         return t('notifications.mention', { name })
       case 'quote':
         return t('notifications.quote', { name })
+      case 'message':
+        return count > 0
+          ? t('notifications.message_other', { name, count })
+          : t('notifications.message_one', { name })
       case 'message_mention':
         return count > 0
           ? t('notifications.message_mention_other', { name, count })
@@ -110,7 +115,7 @@ export function NotificationsView() {
               Icon: Bell,
               className: 'text-muted-foreground',
             }
-            const fallback = (n.actor.displayName || 'U').charAt(0).toUpperCase()
+            const fallback = initialOf(n.actor.displayName, n.actor.username)
             // Notification SYSTÈME (sans acteur) : préavis de purge RGPD. Pas de
             // lien profil, pas de navigation (le tweet masqué n'est pas visible).
             const isSystem = n.type === 'post_purge_warning'

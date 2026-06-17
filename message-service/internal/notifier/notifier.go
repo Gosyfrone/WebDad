@@ -1,5 +1,5 @@
 // Package notifier émet des événements vers le notification-service après une
-// action de messagerie (pour l'instant : mention d'un membre dans un message).
+// action de messagerie (nouveau message, mention d'un membre dans un message).
 // Communication serveur-à-serveur sur le réseau Docker : best-effort et
 // fire-and-forget (un échec n'impacte JAMAIS l'envoi du message).
 //
@@ -20,8 +20,11 @@ import (
 	"time"
 )
 
-// TypeMessageMention — type d'événement (aligné sur le notification-service).
-const TypeMessageMention = "message_mention"
+// Types d'événements (alignés sur le notification-service).
+const (
+	TypeMessage        = "message"
+	TypeMessageMention = "message_mention"
+)
 
 // Event — charge utile envoyée au notification-service.
 type Event struct {

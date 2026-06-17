@@ -369,7 +369,7 @@ function ProfilePreview({
             <AvatarImage src={profil.avatarUrl} alt={profil.displayName} />
           )}
           <AvatarFallback className="bg-gradient-to-br from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] text-xl font-bold text-white">
-            {initialOf(profil.displayName)}
+            {initialOf(profil.displayName, profil.username)}
           </AvatarFallback>
           <ActivityPresenceDot
             userId={profil.userId}
@@ -449,7 +449,7 @@ function ProfilePreview({
                   <AvatarImage src={user.avatarUrl} alt={user.displayName} />
                 )}
                 <AvatarFallback className="bg-gradient-to-br from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] text-[11px] font-bold text-white">
-                  {initialOf(user.displayName)}
+                  {initialOf(user.displayName, user.username)}
                 </AvatarFallback>
                 <ActivityPresenceDot userId={user.id} className="h-2.5 w-2.5" />
               </Avatar>

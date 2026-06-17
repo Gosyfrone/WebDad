@@ -193,6 +193,11 @@
   Counters are **calculated (COUNT)** on detail reads; denormalization deferred until load requires it.
 - **Identity cooldown architecture posed now, enforcement off by default.** `display_name_changed_at` /
   `username_changed_at` recorded only on real change; refusal (429) gated by env (`*_CHANGE_COOLDOWN`, default 0 = off).
+- **Profile display names use a restricted Unicode character set.** A newly created or genuinely changed
+  `display_name` accepts Unicode letters/combining marks, digits, ASCII spaces, `-` and `_` only. The same pure rule is
+  applied in the edit UI and profil-service (`POST /profils`, admin create and `PATCH /profils/me`), so bypassing the
+  browser cannot persist punctuation, `@`, `#` or emoji. Existing legacy names are not migrated or rejected when unchanged:
+  users can still edit their bio/avatar and must choose a compliant value only when they actually rename themselves.
   Capturing the baseline today avoids a contournable cooldown later; the timestamp is free, only refusal is config-driven.
 
 ## Posts
@@ -365,9 +370,11 @@
   `reply:<rootComment>`, `mention:<source>`, `repost:<post>`, `quote:<...>`, `follow`,
   `follow_request:<actor>`, `follow_request_accepted:<actor>`,
   `follow_request_accept_confirm:<actor>`,
-  `message_mention:<conv>`), `$inc count`, `retract` decrements/deletes. O(1), no actor array (slight cosmetic
-  `last_actor` blur after retract, assumed).
+  `message`, `message_mention:<conv>`). Most types use `$inc count` and `retract` decrements/deletes. `message`
+  is the exception: optional `actor_ids` stores unique senders and `count = len(actor_ids)`, so several messages
+  from one person keep a single notification while messages from different people render "X and N others".
 - **Rules by type:** like/comment/repost/quote → post (or quoted) author; reply → ROOT author; mention → each mentioned;
+  private DM/group message → all other members, globally grouped per recipient and never emitted for communities;
   follow_request → private-profile owner (actionable); accepted request → persisted notification + WS decision
   to the requester, plus persisted confirmation in the owner's notification list; rejected request → no
   requester notification. Never to self.
@@ -497,12 +504,22 @@
   out, and an in-repo wheel is defense-friendlier. Color math is pure/tested (`lib/color.ts`); apply/persist logic pure where it
   matters (`buildCustomThemeVars` in `lib/custom-theme.ts`). **Persist both** source hexes (to reopen the editor) **and the
   pre-computed CSS-var map** in localStorage → a tiny inline `<head>` script applies the map before first paint (no FOUC, no color
-  math shipped in the blocking script). Palette button opens a `Dialog` held as a **sibling** of the dropdown/Sheet (not inside),
-  opened on a deferred `setTimeout(0)` to dodge the Radix close↔open focus race.
+  math shipped in the blocking script). `enabled:false` keeps the chosen colors but makes the inline script skip them. UX keeps
+  the light/dark switch and exposes custom as a separate appearance row: the label opens the existing `Dialog`, the small switch
+  toggles `enabled` without deleting colors, and the light/dark switch disables custom (`enabled:false`) while switching to the
+  selected Breezy base. The dialog is held as a **sibling** of the dropdown/Sheet (not inside), opened on a deferred
+  `setTimeout(0)` to dodge the Radix close↔open focus race.
 - **Responsive mobile-first, pivot `lg` (1024).** <lg: `MobileHeader` (left drawer Sheet) + bottom `MobileTabBar` + `ComposeFab`;
   ≥lg sidebar; ≥xl right column. Manual edge-swipe to open the drawer (Radix Sheet has no native swipe).
 - **Identity is clickable → profile everywhere** (`UserListItem` stretched link; the Follow button is raised `z-10`).
   Convention posed now so DM/notifications respect it (profile photo = minimal guaranteed anchor).
+- **Avatar fallback uses the first actual Unicode letter, globally.** Shared `initialOf(displayName, username)` skips
+  spaces, digits, separators and legacy punctuation, then falls back to the first letter of the username and finally `?`.
+  Feed, profile, navigation, search, moderation, notifications and messaging all use this helper, avoiding `_`/`-`/digits
+  as pseudo-initials. In profile editing, clearing avatar/banner stores an empty media reference and restores the existing
+  generated initial avatar or gradient banner; the old MinIO object is deliberately not deleted, matching media replacement.
+  The shared Avatar wrapper keys its Radix root by image identity because Radix otherwise retains `loaded` after a conditional
+  `AvatarImage` unmount and keeps the fallback hidden when an avatar URL is cleared.
 
 ## CI/CD
 

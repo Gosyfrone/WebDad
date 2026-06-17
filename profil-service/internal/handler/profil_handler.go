@@ -366,6 +366,9 @@ func respondProfilError(c *gin.Context, err error) {
 	case errors.Is(err, service.ErrDisplayNameCooldown):
 		logging.FromGin(c).Warn("changement de display_name refusé", "reason", "cooldown")
 		c.JSON(http.StatusTooManyRequests, gin.H{"error": err.Error()})
+	case errors.Is(err, service.ErrInvalidDisplayName):
+		logging.FromGin(c).Warn("changement de display_name refusé", "reason", "invalid_characters")
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "code": "invalid_display_name"})
 	default:
 		logging.FromGin(c).Error("erreur profil inattendue", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "erreur interne"})

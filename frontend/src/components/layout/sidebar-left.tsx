@@ -11,7 +11,6 @@ import {
   LogOut,
   Mail,
   MoreHorizontal,
-  Palette,
   Search,
   Settings,
   Settings2,
@@ -19,7 +18,7 @@ import {
   User,
 } from 'lucide-react'
 
-import { cn } from '@/lib/utils'
+import { cn, initialOf } from '@/lib/utils'
 import { getAccessToken, logout } from '@/lib/auth-client'
 import { getMyProfil, subscribeProfilUpdated } from '@/lib/profil-client'
 import { useSession } from '@/lib/session'
@@ -108,9 +107,7 @@ export function SidebarLeft() {
     setSearchHref(isSearchSectionPath(pathname) ? ROUTES.explorer : getSearchPath())
   }, [pathname])
 
-  const fallbackInitial = (account.displayName || account.username || 'U')
-    .charAt(0)
-    .toUpperCase()
+  const fallbackInitial = initialOf(account.displayName, account.username)
   // Avant le chargement du profil (username vide) on affiche un libellé traduit.
   const shownName = account.username ? account.displayName : t('common.user')
   const handle = account.username ? `@${account.username}` : `@${t('common.username_fallback')}`
@@ -274,17 +271,13 @@ export function SidebarLeft() {
               </span>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <ThemeToggle />
-            <DropdownMenuItem
-              onSelect={() => {
+            <ThemeToggle
+              onCustomize={() => {
                 // Laisse le menu se fermer, puis ouvre la popup au tick suivant
                 // (évite la course de focus Radix dropdown ↔ dialog).
                 setTimeout(() => setThemeDialogOpen(true), 0)
               }}
-            >
-              <Palette className="mr-2 h-4 w-4" />
-              {t('theme.customize')}
-            </DropdownMenuItem>
+            />
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
               <Link href={ROUTES.parametres} scroll={false}>

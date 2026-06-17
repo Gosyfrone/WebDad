@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"unicode"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
@@ -29,6 +30,9 @@ var (
 	// ErrDisplayNameCooldown : changement de display_name trop rapproché du
 	// précédent (cooldown actif) → 429.
 	ErrDisplayNameCooldown = errors.New("nom d'affichage modifié trop récemment")
+	// ErrInvalidDisplayName : le nom contient un caractère autre qu'une lettre,
+	// un chiffre, un espace, un tiret, un underscore ou un point → 400.
+	ErrInvalidDisplayName = errors.New("le nom ne peut contenir que des lettres, chiffres, espaces, tirets, underscores et points")
 )
 
 // ProfilService regroupe les dépendances et la config métier.
@@ -87,10 +91,14 @@ func (s *ProfilService) Search(ctx context.Context, term string, limit int64) ([
 // n'existe que parce qu'il a été explicitement créé ici (ou par le seed admin).
 // 409 si le profil existe déjà.
 func (s *ProfilService) Create(ctx context.Context, userID string, req models.CreateProfilRequest) (*models.Profil, error) {
+	displayName := strings.TrimSpace(req.DisplayName)
+	if !validDisplayName(displayName) {
+		return nil, ErrInvalidDisplayName
+	}
 	now := time.Now().UTC()
 	p := &models.Profil{
 		UserID:             userID,
-		DisplayName:        strings.TrimSpace(req.DisplayName),
+		DisplayName:        displayName,
 		BirthDate:          req.BirthDate,
 		CreatedAt:          now,
 		UpdatedAt:          now,
@@ -184,13 +192,19 @@ func (s *ProfilService) Delete(ctx context.Context, userID string) error {
 func planUpdate(current *models.Profil, req models.UpdateProfilRequest, now time.Time, cooldown time.Duration) (bson.M, error) {
 	set := bson.M{"updated_at": now}
 
-	if req.DisplayName != nil && *req.DisplayName != current.DisplayName {
-		if cooldown > 0 && current.DisplayNameChangedAt != nil &&
-			now.Sub(*current.DisplayNameChangedAt) < cooldown {
-			return nil, ErrDisplayNameCooldown
+	if req.DisplayName != nil {
+		displayName := strings.TrimSpace(*req.DisplayName)
+		if displayName != current.DisplayName {
+			if !validDisplayName(displayName) {
+				return nil, ErrInvalidDisplayName
+			}
+			if cooldown > 0 && current.DisplayNameChangedAt != nil &&
+				now.Sub(*current.DisplayNameChangedAt) < cooldown {
+				return nil, ErrDisplayNameCooldown
+			}
+			set["display_name"] = displayName
+			set["display_name_changed_at"] = now
 		}
-		set["display_name"] = *req.DisplayName
-		set["display_name_changed_at"] = now
 	}
 
 	if req.BirthDate != nil {
@@ -236,6 +250,19 @@ func planUpdate(current *models.Profil, req models.UpdateProfilRequest, now time
 	}
 
 	return set, nil
+}
+
+func validDisplayName(value string) bool {
+	if value == "" {
+		return false
+	}
+	for _, r := range value {
+		if unicode.IsLetter(r) || unicode.IsMark(r) || unicode.IsNumber(r) || r == ' ' || r == '-' || r == '_' || r == '.' {
+			continue
+		}
+		return false
+	}
+	return true
 }
 
 // mapGet mappe mongo.ErrNoDocuments vers ErrProfilNotFound.

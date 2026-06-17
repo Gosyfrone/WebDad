@@ -16,7 +16,7 @@ import {
   X,
 } from 'lucide-react'
 
-import { cn } from '@/lib/utils'
+import { cn, initialOf } from '@/lib/utils'
 import { getAccessToken } from '@/lib/auth-client'
 import { getMyProfil, subscribeProfilUpdated } from '@/lib/profil-client'
 import { exceedsMediaLimit, MAX_MEDIA_MB, resolveMediaUrl, uploadMedia } from '@/lib/media'
@@ -136,7 +136,7 @@ export function PostComposer({
       if (cancelled) return
       setUserId(profil.userId)
       setAvatarUrl(profil.avatarUrl)
-      setInitial((profil.displayName || profil.username || 'U').charAt(0).toUpperCase())
+      setInitial(initialOf(profil.displayName, profil.username))
     }
     // Sans token (visiteur, ou course d'hydratation avant que `isVisitor` ne
     // bascule) : pas de profil à charger. `/profils/me` renverrait 401 →

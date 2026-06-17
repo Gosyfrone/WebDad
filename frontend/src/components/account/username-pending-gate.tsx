@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input'
 import { useT } from '@/components/language-provider'
 
 // Parité de validation username avec le register / l'onboarding.
-const usernamePattern = /^[a-zA-Z0-9_]{3,24}$/
+const usernamePattern = /^(?=.{3,24}$)[a-zA-Z0-9_]+(?:\.[a-zA-Z0-9_]+)*$/
 const reservedUsernames = new Set([
   'me',
   'admin',

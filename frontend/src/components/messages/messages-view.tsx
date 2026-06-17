@@ -399,6 +399,8 @@ export function MessagesView() {
         // Le destinataire n'a pas activé sa messagerie → message dédié (pas rouge).
         if (err instanceof PeerKeyMissingError) {
           toast({ title: t('messages.peer_not_activated'), variant: 'brand' })
+        } else {
+          toast({ title: t('messages.dm_failed'), variant: 'destructive' })
         }
         cleanUrl()
       })
@@ -507,11 +509,8 @@ export function MessagesView() {
   const blurWhenGated = gated && 'pointer-events-none select-none blur-md'
 
   return (
-    /* Hauteur = viewport − tab bar (3.5rem). L'en-tête global mobile (fixe, 3.5rem)
-       n'est dégagé que par le volet LISTE (`pt-14`) : sur une conversation ouverte
-       il est masqué (cf. MobileHeader), le ChatPane affiche son propre en-tête. */
-    <div className="relative flex h-[calc(100dvh-3.5rem)] overflow-hidden lg:h-screen">
-      {/* Volet liste (pt-14 : dégage l'en-tête global mobile fixe). */}
+    <div className="relative flex min-h-0 flex-1 overflow-hidden">
+      {/* Volet liste */}
       <div
         className={cn(
           'h-full w-full shrink-0 pt-14 lg:w-[360px] lg:border-r lg:pt-0',

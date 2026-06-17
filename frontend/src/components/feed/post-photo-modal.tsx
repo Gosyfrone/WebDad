@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ChevronLeft, ChevronRight, LockOpen, X } from 'lucide-react'
 
-import { cn, timeAgo } from '@/lib/utils'
+import { cn, initialOf, timeAgo } from '@/lib/utils'
 import { currentUserId, type FeedPost } from '@/lib/posts'
 import { useLanguage } from '@/components/language-provider'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -117,7 +117,7 @@ export function PostPhotoModal({ post, index, onClose }: PostPhotoModalProps) {
             <Avatar className="h-10 w-10">
               {post.author.avatarUrl && <AvatarImage src={post.author.avatarUrl} alt="" />}
               <AvatarFallback className="bg-gradient-to-br from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] font-bold text-white">
-                {(post.author.displayName.charAt(0) || '?').toUpperCase()}
+                {initialOf(post.author.displayName, post.author.username)}
               </AvatarFallback>
               <ActivityPresenceDot
                 userId={post.author.id}

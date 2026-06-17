@@ -24,6 +24,7 @@ import {
   type FeedPost,
   type ReplyContext,
 } from '@/lib/posts'
+import { updateMyUsername, type UsernameUpdateResult } from '@/lib/api'
 import { usePostStatsPolling } from '@/lib/use-post-stats-polling'
 import { FOLLOW_CHANGE_EVENT, type FollowChangeDetail } from '@/lib/use-follow'
 import { useToast } from '@/hooks/use-toast'
@@ -330,6 +331,17 @@ export function ProfilView({ username }: ProfilViewProps) {
     }
   }
 
+  /**
+   * Change le username (user-service). Sur succès → reload complet pour
+   * réhydrater header, sidebar `@username` et caches mentions partout. Sur échec,
+   * renvoie le résultat typé : la modale affiche l'erreur et reste ouverte.
+   */
+  async function handleEditUsername(nextUsername: string): Promise<UsernameUpdateResult> {
+    const result = await updateMyUsername(nextUsername)
+    if (result.ok) window.location.reload()
+    return result
+  }
+
   function handleFollowChanged(following: boolean) {
     if (profil?.visibility !== 'private') return
     setFollowOverride(following)
@@ -407,6 +419,7 @@ export function ProfilView({ username }: ProfilViewProps) {
         isOwner={isOwner}
         saving={saving}
         onEdit={handleEdit}
+        onEditUsername={handleEditUsername}
         onFollowChanged={handleFollowChanged}
       />
 

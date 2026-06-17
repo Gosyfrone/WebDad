@@ -370,7 +370,7 @@ export function PostCard({ post, showPinBadge = false, focusCommentId, embedded 
         <Avatar className="h-10 w-10">
           {post.author.avatarUrl && <AvatarImage src={post.author.avatarUrl} alt="" />}
           <AvatarFallback className="bg-gradient-to-br from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] font-bold text-white">
-            {initialOf(post.author.displayName)}
+            {initialOf(post.author.displayName, post.author.username)}
           </AvatarFallback>
           <ActivityPresenceDot
             userId={post.author.id}
