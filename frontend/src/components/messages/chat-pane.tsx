@@ -64,6 +64,9 @@ import {
 } from '@/components/messages/conversation-meta'
 import { ActivityStatus } from '@/components/profil/activity-status'
 import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
+import { VoiceRecorder } from '@/components/media/voice-recorder'
+import { VoiceMessage } from '@/components/media/voice-message'
+import type { RecordedVoice } from '@/lib/voice'
 
 const PAGE = 30
 
@@ -356,6 +359,38 @@ export function ChatPane({
     }
   }
 
+  /**
+   * Vocal validé dans le composer : en DM l'envoi est DIRECT (chiffré + uploadé
+   * comme une pièce jointe audio, puis ajouté au fil). Pas de brouillon, à la
+   * différence des posts.
+   */
+  async function handleVoiceRecorded(rec: RecordedVoice) {
+    if (!canSend || sending) {
+      URL.revokeObjectURL(rec.url)
+      return
+    }
+    // Garde UX taille (le vrai cap est serveur). Admins non plafonnés.
+    if (exceedsMediaLimit(rec.blob.size)) {
+      toast({ title: t('media.too_large', { max: MAX_MEDIA_MB }), variant: 'brand' })
+      URL.revokeObjectURL(rec.url)
+      return
+    }
+    const ext = rec.mime.includes('ogg') ? 'ogg' : rec.mime.includes('mp4') ? 'm4a' : 'webm'
+    const file = new File([rec.blob], `voice-${Date.now()}.${ext}`, { type: rec.mime })
+    setSending(true)
+    try {
+      const msg = await sendMessage(convRef.current, '', [file])
+      setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]))
+      onLocalMessage(msg, false)
+      requestAnimationFrame(() => scrollToBottom('smooth'))
+    } catch {
+      toast({ title: t('messages.send_failed'), variant: 'destructive' })
+    } finally {
+      setSending(false)
+      URL.revokeObjectURL(rec.url)
+    }
+  }
+
   function startEdit(message: ChatMessage) {
     if (!message.mine || !message.decrypted || sending || !canSend) return
     setEditingMessage(message)
@@ -503,7 +538,7 @@ export function ChatPane({
                 removeLabel={t('composer.media_remove')}
               />
             )}
-            <div className="flex items-end gap-2">
+            <div className="relative flex items-end gap-2">
               <input
                 ref={fileInputRef}
                 type="file"
@@ -523,6 +558,15 @@ export function ChatPane({
               >
                 <Paperclip className="h-5 w-5" />
               </Button>
+              {!isEditing && (
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center">
+                  <VoiceRecorder
+                    onRecorded={handleVoiceRecorded}
+                    onError={() => toast({ title: t('voice.permission_denied'), variant: 'destructive' })}
+                    disabled={!canSend || sending}
+                  />
+                </div>
+              )}
               <div className="relative flex-1">
                 <textarea
                   ref={composerRef}
@@ -1038,6 +1082,13 @@ function AttachmentView({
     return (
       <div className="glass flex h-40 w-40 items-center justify-center rounded-2xl border">
         <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+  if (att.type === 'audio') {
+    return (
+      <div className="glass rounded-2xl border border-border px-3 py-2">
+        <VoiceMessage src={url} />
       </div>
     )
   }

@@ -19,6 +19,7 @@ import (
 const (
 	defaultMaxImageBytes = 5 * 1024 * 1024 // 5 Mo
 	defaultMaxVideoBytes = 5 * 1024 * 1024 // 5 Mo
+	defaultMaxAudioBytes = 5 * 1024 * 1024 // 5 Mo (messages vocaux)
 	defaultMaxBlobBytes  = 5 * 1024 * 1024 // 5 Mo (pièces jointes E2EE chiffrées)
 )
 
@@ -41,6 +42,7 @@ type Config struct {
 	// Les administrateurs bypassent ces caps (cf. handler.Upload).
 	MaxImageBytes int64
 	MaxVideoBytes int64
+	MaxAudioBytes int64 // messages vocaux
 	MaxBlobBytes  int64 // pièces jointes chiffrées E2EE (POST /media/encrypted)
 }
 
@@ -66,6 +68,7 @@ func Load() *Config {
 		MinioBucket:    getEnv("MINIO_BUCKET", "breezy-media"),
 		MaxImageBytes:  getInt64("MEDIA_MAX_IMAGE_BYTES", defaultMaxImageBytes),
 		MaxVideoBytes:  getInt64("MEDIA_MAX_VIDEO_BYTES", defaultMaxVideoBytes),
+		MaxAudioBytes:  getInt64("MEDIA_MAX_AUDIO_BYTES", defaultMaxAudioBytes),
 		MaxBlobBytes:   getInt64("MEDIA_MAX_BLOB_BYTES", defaultMaxBlobBytes),
 	}
 

@@ -5824,11 +5824,11 @@
         "tags": [
           "media"
         ],
-        "summary": "Uploader un média (image ou vidéo)",
+        "summary": "Uploader un média (image, vidéo ou audio)",
         "parameters": [
           {
             "type": "file",
-            "description": "Fichier image (JPEG/PNG/GIF/WebP) ou vidéo (MP4/WebM)",
+            "description": "Fichier image (JPEG/PNG/GIF/WebP), vidéo (MP4/WebM) ou audio (WebM/Ogg/MP3/MP4/AAC/M4A — message vocal)",
             "name": "file",
             "in": "formData",
             "required": true
@@ -6719,7 +6719,8 @@
           "type": "string",
           "enum": [
             "image",
-            "video"
+            "video",
+            "audio"
           ]
         },
         "url": {

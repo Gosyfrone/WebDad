@@ -197,8 +197,8 @@ export interface ChatAttachment {
   mime: string
   name: string
   size: number
-  /** Nature dérivée du MIME (pour choisir `<img>`/`<video>`). */
-  type: 'image' | 'video' | 'file'
+  /** Nature dérivée du MIME (pour choisir `<img>`/`<video>`/lecteur vocal). */
+  type: 'image' | 'video' | 'audio' | 'file'
 }
 
 /** Forme « fil » (dans l'enveloppe JSON chiffrée) d'une pièce jointe. */
@@ -233,6 +233,7 @@ export interface ChatMessage {
 export function mediaKind(mime: string): ChatAttachment['type'] {
   if (mime.startsWith('image/')) return 'image'
   if (mime.startsWith('video/')) return 'video'
+  if (mime.startsWith('audio/')) return 'audio'
   return 'file'
 }
 

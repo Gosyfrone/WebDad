@@ -133,7 +133,7 @@ var validators = map[string]bson.M{
 						"required": bson.A{"url", "type"},
 						"properties": bson.M{
 							"url":  bson.M{"bsonType": "string"},
-							"type": bson.M{"enum": bson.A{"image", "video"}},
+							"type": bson.M{"enum": bson.A{"image", "video", "audio"}},
 						},
 					},
 				},
@@ -194,7 +194,7 @@ var validators = map[string]bson.M{
 						"required": bson.A{"url", "type"},
 						"properties": bson.M{
 							"url":  bson.M{"bsonType": "string"},
-							"type": bson.M{"enum": bson.A{"image", "video"}},
+							"type": bson.M{"enum": bson.A{"image", "video", "audio"}},
 						},
 					},
 				},

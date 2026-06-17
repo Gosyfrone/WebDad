@@ -31,6 +31,7 @@ type MediaHandler struct {
 	store         *storage.Store
 	maxImageBytes int64
 	maxVideoBytes int64
+	maxAudioBytes int64
 	maxBlobBytes  int64
 }
 
@@ -41,8 +42,22 @@ func NewMediaHandler(store *storage.Store, cfg *config.Config) *MediaHandler {
 		store:         store,
 		maxImageBytes: cfg.MaxImageBytes,
 		maxVideoBytes: cfg.MaxVideoBytes,
+		maxAudioBytes: cfg.MaxAudioBytes,
 		maxBlobBytes:  cfg.MaxBlobBytes,
 	}
+}
+
+// maxUploadBytes renvoie le plus grand cap parmi image/vidéo/audio, utilisé
+// pour le rejet précoce avant détection du type réel.
+func (h *MediaHandler) maxUploadBytes() int64 {
+	m := h.maxImageBytes
+	if h.maxVideoBytes > m {
+		m = h.maxVideoBytes
+	}
+	if h.maxAudioBytes > m {
+		m = h.maxAudioBytes
+	}
+	return m
 }
 
 // uploadResponse : corps renvoyé après un upload réussi. `url` est RELATIVE à
@@ -57,12 +72,12 @@ type uploadResponse struct {
 
 // Upload : POST /media (multipart, champ `file`). Valide le type réel (magic
 // bytes) + la taille, range dans MinIO sous un id aléatoire, renvoie 201.
-// @Summary     Uploader un média (image ou vidéo)
+// @Summary     Uploader un média (image, vidéo ou audio)
 // @Tags        media
 // @Accept      multipart/form-data
 // @Produce     json
 // @Security    BearerAuth
-// @Param       file formData file true "Fichier image (JPEG/PNG/GIF/WebP) ou vidéo (MP4/WebM)"
+// @Param       file formData file true "Fichier image (JPEG/PNG/GIF/WebP), vidéo (MP4/WebM) ou audio (WebM/Ogg/MP3/MP4/AAC/M4A — message vocal)"
 // @Success     201 {object} handler.uploadResponse
 // @Failure     400 {object} map[string]string
 // @Failure     401 {object} map[string]string
@@ -86,9 +101,10 @@ func (h *MediaHandler) Upload(c *gin.Context) {
 		return
 	}
 
-	// Rejet précoce si la taille dépasse même le plus grand cap (vidéo), avant
-	// de lire le moindre octet. Ignoré pour les admins (non plafonnés).
-	if !isAdmin && fileHeader.Size > h.maxVideoBytes {
+	// Rejet précoce si la taille dépasse même le plus grand cap (image/vidéo/
+	// audio), avant de lire le moindre octet. Ignoré pour les admins (non
+	// plafonnés).
+	if !isAdmin && fileHeader.Size > h.maxUploadBytes() {
 		c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": validate.ErrTooLarge.Error()})
 		return
 	}
@@ -118,7 +134,7 @@ func (h *MediaHandler) Upload(c *gin.Context) {
 		return
 	}
 	if !isAdmin {
-		if err := validate.CheckSize(kind, fileHeader.Size, h.maxImageBytes, h.maxVideoBytes); err != nil {
+		if err := validate.CheckSize(kind, fileHeader.Size, h.maxImageBytes, h.maxVideoBytes, h.maxAudioBytes); err != nil {
 			logging.FromGin(c).Warn("upload refusé : fichier trop volumineux", "kind", string(kind), "size", fileHeader.Size)
 			c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": err.Error()})
 			return

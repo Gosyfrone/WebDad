@@ -168,14 +168,15 @@ type CommentWithPost struct {
 	ParentComment *Comment `bson:"-" json:"parent_comment,omitempty"`
 }
 
-// MediaRef : pièce jointe d'un post (image ou vidéo). Le post-service est
-// agnostique du contenu : il ne stocke que l'URL (chemin relatif `/media/<id>`
-// servi par le media-service via la gateway) et la nature (image/vidéo, pour
-// que le front choisisse `<img>` ou `<video>`). Sert à la fois de modèle DB et
-// de payload de requête (tags `binding` ignorés hors ShouldBindJSON).
+// MediaRef : pièce jointe d'un post (image, vidéo ou audio). Le post-service
+// est agnostique du contenu : il ne stocke que l'URL (chemin relatif
+// `/media/<id>` servi par le media-service via la gateway) et la nature
+// (image/vidéo/audio, pour que le front choisisse `<img>`, `<video>` ou un
+// lecteur audio). Sert à la fois de modèle DB et de payload de requête (tags
+// `binding` ignorés hors ShouldBindJSON).
 type MediaRef struct {
 	URL  string `bson:"url" json:"url" binding:"required"`
-	Type string `bson:"type" json:"type" binding:"oneof=image video"`
+	Type string `bson:"type" json:"type" binding:"oneof=image video audio"`
 }
 
 // CreatePostRequest : corps de POST /posts. L'auteur n'est PAS dans le corps —

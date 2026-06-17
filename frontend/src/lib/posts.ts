@@ -34,7 +34,7 @@ export interface ApiPost {
   author_id: string
   content: string
   hashtags?: string[]
-  media?: { url: string; type: 'image' | 'video' }[]
+  media?: { url: string; type: 'image' | 'video' | 'audio' }[]
   poll?: ApiPoll
   quote_post_id?: string
   reply_audience?: ReplyAudience
@@ -72,7 +72,7 @@ interface ApiComment {
   parent_id?: string
   author_id: string
   content: string
-  media?: { url: string; type: 'image' | 'video' }[]
+  media?: { url: string; type: 'image' | 'video' | 'audio' }[]
   reply_count?: number
   created_at: string
 }
@@ -114,7 +114,7 @@ export interface PostAuthor {
 export interface PostMedia {
   /** URL absolue (gateway) en lecture ; chemin relatif `/media/<id>` à la création. */
   url: string
-  type: 'image' | 'video'
+  type: 'image' | 'video' | 'audio'
 }
 
 /** Post enrichi pour l'affichage. */

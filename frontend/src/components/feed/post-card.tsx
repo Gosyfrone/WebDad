@@ -59,6 +59,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { AnimatedCount } from '@/components/feed/animated-count'
 import { CommentSection } from '@/components/feed/comment-section'
 import { FeedVideo } from '@/components/feed/feed-video'
+import { VoiceMessage } from '@/components/media/voice-message'
 import { PostComposer } from '@/components/feed/post-composer'
 import { PostPhotoModal } from '@/components/feed/post-photo-modal'
 import { TranslatedContent } from '@/components/feed/translated-content'
@@ -679,6 +680,14 @@ function MediaGallery({
         )
         // Vidéo : lecture auto en muet + boucle + vitesse (cf. FeedVideo), pas
         // d'ouverture en vue photo. L'image s'ouvre en grand au clic.
+        if (m.type === 'audio') {
+          return (
+            <div key={m.url} className="col-span-full bg-muted/20 px-3 py-3">
+              <VoiceMessage src={m.url} />
+            </div>
+          )
+        }
+
         if (m.type === 'video') {
           return <FeedVideo key={m.url} src={m.url} className={videoCell} />
         }

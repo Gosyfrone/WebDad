@@ -16,6 +16,7 @@ type Kind string
 const (
 	KindImage Kind = "image"
 	KindVideo Kind = "video"
+	KindAudio Kind = "audio"
 )
 
 // Erreurs métier (traduites en codes HTTP par le handler).
@@ -27,13 +28,24 @@ var (
 )
 
 // allowed : MIME détecté → nature. Source de vérité unique de l'allowlist.
+//
+// Audio : couvre les formats produits par MediaRecorder selon le navigateur
+// (messages vocaux) — Chrome/Firefox → audio/webm ou audio/ogg, Safari →
+// audio/mp4 ou audio/x-m4a. Toutes les variantes doivent être présentes sinon
+// Safari échoue avec un 415.
 var allowed = map[string]Kind{
-	"image/jpeg": KindImage,
-	"image/png":  KindImage,
-	"image/webp": KindImage,
-	"image/gif":  KindImage,
-	"video/mp4":  KindVideo,
-	"video/webm": KindVideo,
+	"image/jpeg":  KindImage,
+	"image/png":   KindImage,
+	"image/webp":  KindImage,
+	"image/gif":   KindImage,
+	"video/mp4":   KindVideo,
+	"video/webm":  KindVideo,
+	"audio/webm":  KindAudio,
+	"audio/ogg":   KindAudio,
+	"audio/mpeg":  KindAudio,
+	"audio/mp4":   KindAudio,
+	"audio/aac":   KindAudio,
+	"audio/x-m4a": KindAudio,
 }
 
 // Detect renvoie le MIME réel des octets (suffit d'en passer les premiers,
@@ -50,16 +62,20 @@ func Detect(head []byte) (mime string, kind Kind, err error) {
 }
 
 // MaxForKind renvoie le cap de taille (octets) applicable à une nature.
-func MaxForKind(kind Kind, maxImage, maxVideo int64) int64 {
-	if kind == KindVideo {
+func MaxForKind(kind Kind, maxImage, maxVideo, maxAudio int64) int64 {
+	switch kind {
+	case KindVideo:
 		return maxVideo
+	case KindAudio:
+		return maxAudio
+	default:
+		return maxImage
 	}
-	return maxImage
 }
 
 // CheckSize valide la taille déclarée contre le cap de la nature.
-func CheckSize(kind Kind, size, maxImage, maxVideo int64) error {
-	if size > MaxForKind(kind, maxImage, maxVideo) {
+func CheckSize(kind Kind, size, maxImage, maxVideo, maxAudio int64) error {
+	if size > MaxForKind(kind, maxImage, maxVideo, maxAudio) {
 		return ErrTooLarge
 	}
 	return nil

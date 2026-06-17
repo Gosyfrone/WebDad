@@ -51,6 +51,9 @@ import { MentionAutocomplete } from '@/components/mention/mention-autocomplete'
 import { HashtagAutocomplete } from '@/components/hashtag/hashtag-autocomplete'
 import { ComposerHighlight } from '@/components/hashtag/composer-highlight'
 import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
+import { VoiceRecorder } from '@/components/media/voice-recorder'
+import { VoiceMessage } from '@/components/media/voice-message'
+import type { RecordedVoice } from '@/lib/voice'
 
 const MAX_CHARS = 280
 /** Nombre maximal de médias par post (aligné sur le validateur post-service). */
@@ -199,6 +202,34 @@ export function PostComposer({
     setMedia((prev) => prev.filter((_, i) => i !== index))
   }
 
+  /**
+   * Vocal validé : à la différence du DM, on l'ajoute au BROUILLON (média
+   * supprimable) ; il n'est publié qu'au submit. Le FRONT impose `type:'audio'`
+   * car la détection magic-bytes du WebM côté serveur est ambiguë (cf. DECISIONS).
+   */
+  async function handleVoiceRecorded(rec: RecordedVoice) {
+    try {
+      if (media.length >= MAX_MEDIA) {
+        toast({ title: t('composer.media_max', { count: MAX_MEDIA }), variant: 'destructive' })
+        return
+      }
+      if (exceedsMediaLimit(rec.blob.size)) {
+        toast({ title: t('media.too_large', { max: MAX_MEDIA_MB }), variant: 'brand' })
+        return
+      }
+      const ext = rec.mime.includes('ogg') ? 'ogg' : rec.mime.includes('mp4') ? 'm4a' : 'webm'
+      const file = new File([rec.blob], `voice-${Date.now()}.${ext}`, { type: rec.mime })
+      setUploadingMedia(true)
+      const { url } = await uploadMedia(file)
+      setMedia((prev) => [...prev, { url, type: 'audio' }])
+    } catch {
+      toast({ title: t('composer.media_failed'), variant: 'destructive' })
+    } finally {
+      setUploadingMedia(false)
+      URL.revokeObjectURL(rec.url)
+    }
+  }
+
   /** Insère l'emoji à la position du curseur (ou à la fin) et restaure le focus. */
   function insertEmoji(emoji: string) {
     const el = textareaRef.current
@@ -311,7 +342,7 @@ export function PostComposer({
         <Separator className="bg-border" />
 
         {/* Toolbar */}
-        <div className="flex items-center justify-between">
+        <div className="relative flex items-center justify-between">
           <div className="flex items-center gap-1 text-[#5B6CFF]">
             <button
               type="button"
@@ -333,6 +364,11 @@ export function PostComposer({
               multiple
               onChange={handleFiles}
               className="sr-only"
+            />
+            <VoiceRecorder
+              onRecorded={handleVoiceRecorded}
+              onError={() => toast({ title: t('voice.permission_denied'), variant: 'destructive' })}
+              disabled={uploadingMedia || media.length >= MAX_MEDIA}
             />
             <button
               type="button"
@@ -613,7 +649,11 @@ function MediaPreviews({
           key={m.url}
           className="group relative overflow-hidden rounded-xl border border-border bg-background/45"
         >
-          {m.type === 'video' ? (
+          {m.type === 'audio' ? (
+            <div className="px-3 py-4">
+              <VoiceMessage src={resolveMediaUrl(m.url)} />
+            </div>
+          ) : m.type === 'video' ? (
             <video
               src={resolveMediaUrl(m.url)}
               className="max-h-72 w-full object-cover"
