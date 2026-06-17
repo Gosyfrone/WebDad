@@ -206,6 +206,19 @@
   visible; private → owner or accepted follower only. Security must not depend on the front.
 - **Denormalized `likes_count`/`comments_count` as `int32`** (`$inc`), idempotent likes via unique index.
   `int32` because the `$jsonSchema` validator declares `bsonType:"int"`.
+- **Comment likes reuse the same domain pattern as post likes (17/06/2026).**
+  A dedicated collection `comment_likes` stores the edges (`comment_id+user_id`
+  unique) while `comments.likes_count` remains denormalized on the comment
+  document itself (`int32`, `$inc`). Reads of comments/replies/profile-responses
+  accept optional auth and hydrate a transient `liked` flag directly, avoiding
+  a second “liked ids” endpoint just for comments. Counter refresh follows the
+  same project-scale trade-off as posts: batch polling via
+  `GET /posts/comments/stats?ids=...`, not WebSocket push. The new constrained
+  field is backfilled idempotently at boot (`EnsureSchema`) to stay compatible
+  with Mongo strict validation on legacy documents. Comment-like notifications
+  are intentionally deferred: the requested value was the action + animation +
+  auto-refresh, while a new notification type would widen the cross-service
+  contract with notification-service and the front.
 - **Pin:** `pinned_at` on the post, owner-only, one pin per profile; profile read sorts by it, but feeds return a
   copy **without** `pinned_at` so another's pin never personalizes the global feed (front exception `canPin` keeps
   instant visual feedback for the author).

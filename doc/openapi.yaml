@@ -2119,6 +2119,32 @@ paths:
             type: object
             additionalProperties:
               type: string
+  /posts/comments/stats:
+    get:
+      produces:
+      - application/json
+      tags:
+      - comments
+      summary: Compteurs de commentaires (rafraîchissement)
+      parameters:
+      - type: string
+        description: IDs de commentaires séparés par des virgules (max 100)
+        name: ids
+        in: query
+        required: true
+      responses:
+        '200':
+          description: OK
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/models.CommentStat'
+        '500':
+          description: Internal Server Error
+          schema:
+            type: object
+            additionalProperties:
+              type: string
   /posts/liked:
     get:
       produces:
@@ -2627,6 +2653,83 @@ paths:
               type: string
         '403':
           description: Forbidden
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '404':
+          description: Not Found
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /posts/{id}/comments/{commentId}/like:
+    post:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - comments
+      summary: Liker un commentaire
+      parameters:
+      - type: string
+        description: Post ID
+        name: id
+        in: path
+        required: true
+      - type: string
+        description: Comment ID
+        name: commentId
+        in: path
+        required: true
+      responses:
+        '200':
+          description: likes_count
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '404':
+          description: Not Found
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+    delete:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - comments
+      summary: Retirer son like d'un commentaire
+      parameters:
+      - type: string
+        description: Post ID
+        name: id
+        in: path
+        required: true
+      - type: string
+        description: Comment ID
+        name: commentId
+        in: path
+        required: true
+      responses:
+        '200':
+          description: likes_count
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '401':
+          description: Unauthorized
           schema:
             type: object
             additionalProperties:
@@ -4252,6 +4355,10 @@ definitions:
         type: string
       id:
         type: string
+      liked:
+        type: boolean
+      likes_count:
+        type: integer
       media:
         type: array
         items:
@@ -4264,6 +4371,13 @@ definitions:
         type: integer
       updated_at:
         type: string
+  models.CommentStat:
+    type: object
+    properties:
+      id:
+        type: string
+      likes_count:
+        type: integer
   models.CommentWithPost:
     type: object
     properties:
@@ -4275,6 +4389,10 @@ definitions:
         type: string
       id:
         type: string
+      liked:
+        type: boolean
+      likes_count:
+        type: integer
       media:
         type: array
         items:

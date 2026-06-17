@@ -74,6 +74,8 @@ interface ApiComment {
   author_id: string
   content: string
   media?: { url: string; type: 'image' | 'video' }[]
+  likes_count?: number
+  liked?: boolean
   reply_count?: number
   created_at: string
 }
@@ -219,6 +221,8 @@ export interface PostComment {
   author: PostAuthor
   content: string
   media: PostMedia[]
+  likesCount: number
+  liked: boolean
   /** Nombre de réponses (pertinent pour un commentaire racine). */
   replyCount: number
   createdAt: string
@@ -428,6 +432,8 @@ async function toComment(c: ApiComment): Promise<PostComment> {
       url: resolveMediaUrl(m.url),
       type: m.type,
     })),
+    likesCount: c.likes_count ?? 0,
+    liked: Boolean(c.liked),
     replyCount: c.reply_count ?? 0,
     createdAt: c.created_at,
     canDelete: canDelete(c.author_id),
@@ -848,6 +854,32 @@ export async function deleteComment(
   )
 }
 
+/** Like un commentaire ; renvoie le nombre de likes à jour. */
+export async function likeComment(
+  postId: string,
+  commentId: string,
+): Promise<number> {
+  const data = await unwrap<{ likes_count: number }>(
+    await apiFetch(`/posts/${postId}/comments/${commentId}/like`, {
+      method: 'POST',
+    }),
+  )
+  return data.likes_count
+}
+
+/** Retire le like d'un commentaire ; renvoie le nombre de likes à jour. */
+export async function unlikeComment(
+  postId: string,
+  commentId: string,
+): Promise<number> {
+  const data = await unwrap<{ likes_count: number }>(
+    await apiFetch(`/posts/${postId}/comments/${commentId}/like`, {
+      method: 'DELETE',
+    }),
+  )
+  return data.likes_count
+}
+
 // --- Graphe social (ids suivis pour le fil « Abonnements ») ------------------
 
 async function followingIds(): Promise<string[]> {
@@ -926,11 +958,21 @@ export interface PostStats {
   repostsCount: number
 }
 
+/** Compteurs dénormalisés d'un commentaire (likes uniquement). */
+export interface CommentStats {
+  likesCount: number
+}
+
 interface ApiPostStat {
   id: string
   likes_count: number
   comments_count: number
   reposts_count: number
+}
+
+interface ApiCommentStat {
+  id: string
+  likes_count: number
 }
 
 /**
@@ -957,6 +999,29 @@ export async function getPostsStats(
       commentsCount: s.comments_count ?? 0,
       repostsCount: s.reposts_count ?? 0,
     })
+  }
+  return out
+}
+
+/**
+ * Récupère les compteurs des commentaires demandés en un seul lot.
+ * Renvoie une map `id → likes`.
+ */
+export async function getCommentsStats(
+  ids: string[],
+): Promise<Map<string, CommentStats>> {
+  const out = new Map<string, CommentStats>()
+  const wanted = Array.from(new Set(ids.filter(Boolean))).slice(
+    0,
+    STATS_BATCH_MAX,
+  )
+  if (wanted.length === 0) return out
+  const params = new URLSearchParams({ ids: wanted.join(',') })
+  const stats = await unwrap<ApiCommentStat[]>(
+    await apiFetch(`/posts/comments/stats?${params}`),
+  )
+  for (const s of stats ?? []) {
+    out.set(s.id, { likesCount: s.likes_count ?? 0 })
   }
   return out
 }

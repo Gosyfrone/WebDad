@@ -11,7 +11,7 @@ import (
 )
 
 // collectionOrder fige l'ordre de création (déterministe pour les logs/tests).
-var collectionOrder = []string{"posts", "comments", "likes", "reposts", "poll_votes", "reports", "bookmark_collections", "bookmarks", "bookmark_prefs"}
+var collectionOrder = []string{"posts", "comments", "likes", "comment_likes", "reposts", "poll_votes", "reports", "bookmark_collections", "bookmarks", "bookmark_prefs"}
 
 // EnsureSchema crée les collections (avec validateurs $jsonSchema) et les
 // index du post-service, de façon idempotente. Le service possède ainsi son
@@ -22,6 +22,9 @@ func EnsureSchema(ctx context.Context, db *mongo.Database) error {
 		return err
 	}
 	if err := backfillReplyAudience(ctx, db); err != nil {
+		return err
+	}
+	if err := backfillCommentLikesCount(ctx, db); err != nil {
 		return err
 	}
 	return ensureIndexes(ctx, db)
@@ -47,6 +50,25 @@ func backfillReplyAudience(ctx context.Context, db *mongo.Database) error {
 	}
 	if res.ModifiedCount > 0 {
 		slog.Info("migration: posts legacy normalisés", "field", "reply_audience", "count", res.ModifiedCount)
+	}
+	return nil
+}
+
+// backfillCommentLikesCount pose `likes_count: 0` sur les commentaires hérités
+// d'avant l'introduction des likes de commentaire. Idempotent : une fois les
+// documents corrigés, le filtre (champ absent OU vide) ne rematche plus rien.
+func backfillCommentLikesCount(ctx context.Context, db *mongo.Database) error {
+	coll := db.Collection("comments")
+	filter := bson.M{"$or": bson.A{
+		bson.M{"likes_count": bson.M{"$exists": false}},
+		bson.M{"likes_count": nil},
+	}}
+	res, err := coll.UpdateMany(ctx, filter, bson.M{"$set": bson.M{"likes_count": 0}})
+	if err != nil {
+		return fmt.Errorf("backfill comments.likes_count : %w", err)
+	}
+	if res.ModifiedCount > 0 {
+		slog.Info("migration: comments legacy normalisés", "field", "likes_count", "count", res.ModifiedCount)
 	}
 	return nil
 }
@@ -201,6 +223,7 @@ var validators = map[string]bson.M{
 						},
 					},
 				},
+				"likes_count": bson.M{"bsonType": "int", "minimum": 0},
 				"reply_count": bson.M{"bsonType": "int", "minimum": 0},
 				"is_hidden":   bson.M{"bsonType": "bool"},
 				"created_at":  bson.M{"bsonType": "date"},
@@ -225,6 +248,17 @@ var validators = map[string]bson.M{
 			"required": bson.A{"post_id", "user_id", "created_at"},
 			"properties": bson.M{
 				"post_id":    bson.M{"bsonType": "string"},
+				"user_id":    bson.M{"bsonType": "string"},
+				"created_at": bson.M{"bsonType": "date"},
+			},
+		},
+	},
+	"comment_likes": {
+		"$jsonSchema": bson.M{
+			"bsonType": "object",
+			"required": bson.A{"comment_id", "user_id", "created_at"},
+			"properties": bson.M{
+				"comment_id": bson.M{"bsonType": "string"},
 				"user_id":    bson.M{"bsonType": "string"},
 				"created_at": bson.M{"bsonType": "date"},
 			},
@@ -316,6 +350,10 @@ var indexes = map[string][]mongo.IndexModel{
 	"likes": {
 		{Keys: bson.D{{Key: "post_id", Value: 1}, {Key: "user_id", Value: 1}}, Options: options.Index().SetUnique(true)},
 		{Keys: bson.D{{Key: "user_id", Value: 1}}},
+	},
+	"comment_likes": {
+		{Keys: bson.D{{Key: "comment_id", Value: 1}, {Key: "user_id", Value: 1}}, Options: options.Index().SetUnique(true)},
+		{Keys: bson.D{{Key: "user_id", Value: 1}, {Key: "comment_id", Value: 1}}},
 	},
 	"reposts": {
 		{Keys: bson.D{{Key: "post_id", Value: 1}, {Key: "user_id", Value: 1}}, Options: options.Index().SetUnique(true)},

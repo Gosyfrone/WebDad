@@ -156,9 +156,19 @@ type Comment struct {
 	AuthorID   string        `bson:"author_id" json:"author_id"`
 	Content    string        `bson:"content" json:"content"`
 	Media      []MediaRef    `bson:"media,omitempty" json:"media,omitempty"`
+	LikesCount int32         `bson:"likes_count" json:"likes_count"`
 	ReplyCount int32         `bson:"reply_count" json:"reply_count"`
+	Liked      bool          `bson:"-" json:"liked"`
 	CreatedAt  time.Time     `bson:"created_at" json:"created_at"`
 	UpdatedAt  time.Time     `bson:"updated_at" json:"updated_at"`
+}
+
+// CommentStat — compteur dénormalisé d'un commentaire (likes uniquement) sans
+// le contenu. Sert au polling batch léger côté front pour rafraîchir les cœurs
+// des commentaires visibles sans recharger le thread.
+type CommentStat struct {
+	ID         string `json:"id"`
+	LikesCount int32  `json:"likes_count"`
 }
 
 // CommentWithPost enrichit un Comment du post parent visible (hydraté par la

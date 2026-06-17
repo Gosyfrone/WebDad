@@ -897,6 +897,7 @@ export const messages: Record<Locale, Messages> = {
     'post.private_account_tooltip': 'Ce compte est privé',
 
     // — Commentaires —
+    'comment.like': 'J’aime',
     'comment.reply': 'Répondre',
     'comment.placeholder': 'Écrire un commentaire…',
     'comment.reply_placeholder': 'Écrire une réponse…',
@@ -1846,6 +1847,7 @@ export const messages: Record<Locale, Messages> = {
     'post.private_account_tooltip': 'This account is private',
 
     // — Comments —
+    'comment.like': 'Like',
     'comment.reply': 'Reply',
     'comment.placeholder': 'Write a comment…',
     'comment.reply_placeholder': 'Write a reply…',
