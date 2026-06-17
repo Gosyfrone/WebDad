@@ -4095,6 +4095,50 @@ paths:
             type: object
             additionalProperties:
               type: string
+  /reports/settings:
+    get:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - reports
+      summary: Configuration de la modération
+      responses:
+        '200':
+          description: 'data: settings'
+          schema:
+            type: object
+            additionalProperties: true
+    patch:
+      security:
+      - BearerAuth: []
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      tags:
+      - reports
+      summary: Régler le seuil d'auto-masquage
+      parameters:
+      - description: Configuration
+        name: body
+        in: body
+        required: true
+        schema:
+          $ref: '#/definitions/handler.settingsRequest'
+      responses:
+        '200':
+          description: 'data: settings'
+          schema:
+            type: object
+            additionalProperties: true
+        '400':
+          description: Bad Request
+          schema:
+            type: object
+            additionalProperties:
+              type: string
   /reports/tickets:
     get:
       security:
@@ -4150,6 +4194,33 @@ paths:
       tags:
       - reports
       summary: Détail d'un ticket
+      parameters:
+      - type: string
+        description: Ticket ID
+        name: id
+        in: path
+        required: true
+      responses:
+        '200':
+          description: 'data: ticket'
+          schema:
+            type: object
+            additionalProperties: true
+        '404':
+          description: Not Found
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /reports/tickets/{id}/approve:
+    post:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - reports
+      summary: Valider une entité signalée (conforme)
       parameters:
       - type: string
         description: Ticket ID
@@ -5140,6 +5211,23 @@ definitions:
     properties:
       author_id:
         type: string
+      auto_hidden:
+        description: 'AutoHidden : masquage AUTOMATIQUE déclenché par le report-service
+          quand le
+
+          post dépasse le seuil de signalements (en attente d''une décision de
+
+          modération). Distinct de is_hidden (retrait manuel → corbeille) : il sort
+
+          des fils publics mais N''apparaît PAS dans la corbeille de modération ;
+          un
+
+          modérateur le rétablit (validation « conforme ») ou le retire (is_hidden).
+
+          `omitempty` ⇒ jamais de `false` persité ; absent sur un vieux doc = visible
+
+          (pas de migration de données nécessaire).'
+        type: boolean
       can_reply:
         description: 'CanReply : transient, hydraté par viewer — `true` si le lecteur
           courant peut
@@ -5451,6 +5539,15 @@ definitions:
     properties:
       text:
         type: string
+  handler.settingsRequest:
+    type: object
+    required:
+    - auto_hide_threshold
+    properties:
+      auto_hide_threshold:
+        description: 'AutoHideThreshold : seuil de signalements pour l''auto-masquage
+          (0 = désactivé).'
+        type: integer
   handler.statusRequest:
     type: object
     required:

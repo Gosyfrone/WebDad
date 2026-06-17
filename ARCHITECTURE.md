@@ -64,6 +64,11 @@ composed by the **caller** (front/BFF).
   user-service (follow status) to filter post visibility; clients have no-op fallbacks for autonomy.
 - **Notifications (server→server):** post/message/user-service POST best-effort fire-and-forget
   events to notification-service `/internal/events` (secret `INTERNAL_EVENT_SECRET`, off the gateway).
+- **Auto-moderation (server→server):** when a post crosses the admin-set report threshold, report-service
+  POSTs best-effort to post-service `/internal/posts/:id/auto-hide` (and `…/auto-unhide` on approval),
+  off the gateway, authenticated by `X-Internal-Secret` (same shared secret). Post-service owns the
+  `auto_hidden` visibility flag (server-side barrier); report-service owns the count and the validation
+  lock (terminal `approved` status). Bug tickets are exempt.
 - **Realtime:** WebSocket hubs per user for messages (`/messages/ws`) and notifications
   (`/notifications/ws`), plus a **broadcast** hub on post-service (`/posts/ws`) that pings all
   connected clients on each new public root post (id + author only → "X a posté" banner, content

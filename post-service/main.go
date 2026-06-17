@@ -75,7 +75,7 @@ func main() {
 
 	r := gin.New()
 	r.Use(middleware.RequestID(), middleware.Recovery(), middleware.RequestLogger())
-	handler.RegisterRoutes(r, serviceName, postService, cfg.JWTSecret, hub, cfg.AllowedOrigins)
+	handler.RegisterRoutes(r, serviceName, postService, cfg.JWTSecret, hub, cfg.AllowedOrigins, cfg.InternalSecret)
 
 	slog.Info("en écoute", "port", cfg.Port)
 	if err := r.Run(":" + cfg.Port); err != nil {

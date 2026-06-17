@@ -232,6 +232,73 @@ func (h *ReportHandler) Transfer(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": ticket})
 }
 
+// Approve : POST /reports/tickets/:id/approve — juge l'entité conforme (terminal).
+// Démasque le post si auto-masqué et verrouille tout nouveau signalement.
+// @Summary  Valider une entité signalée (conforme)
+// @Tags     reports
+// @Produce  json
+// @Security BearerAuth
+// @Param    id path string true "Ticket ID"
+// @Success  200 {object} map[string]interface{} "data: ticket"
+// @Failure  404 {object} map[string]string
+// @Router   /reports/tickets/{id}/approve [post]
+func (h *ReportHandler) Approve(c *gin.Context) {
+	claims, _ := middleware.ClaimsFrom(c)
+	ticket, err := h.service.Approve(c.Request.Context(), c.Param("id"), claims.UserID)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": ticket})
+}
+
+// ── Configuration de la modération (seuil d'auto-masquage) ───────────────────
+
+// GetSettings : GET /reports/settings — configuration runtime (mod/admin).
+// @Summary  Configuration de la modération
+// @Tags     reports
+// @Produce  json
+// @Security BearerAuth
+// @Success  200 {object} map[string]interface{} "data: settings"
+// @Router   /reports/settings [get]
+func (h *ReportHandler) GetSettings(c *gin.Context) {
+	settings, err := h.service.Settings(c.Request.Context())
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": settings})
+}
+
+type settingsRequest struct {
+	// AutoHideThreshold : seuil de signalements pour l'auto-masquage (0 = désactivé).
+	AutoHideThreshold *int32 `json:"auto_hide_threshold" binding:"required"`
+}
+
+// UpdateSettings : PATCH /reports/settings — règle le seuil d'auto-masquage (admin).
+// @Summary  Régler le seuil d'auto-masquage
+// @Tags     reports
+// @Accept   json
+// @Produce  json
+// @Security BearerAuth
+// @Param    body body settingsRequest true "Configuration"
+// @Success  200 {object} map[string]interface{} "data: settings"
+// @Failure  400 {object} map[string]string
+// @Router   /reports/settings [patch]
+func (h *ReportHandler) UpdateSettings(c *gin.Context) {
+	var req settingsRequest
+	if err := c.ShouldBindJSON(&req); err != nil || req.AutoHideThreshold == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "corps invalide"})
+		return
+	}
+	settings, err := h.service.UpdateThreshold(c.Request.Context(), *req.AutoHideThreshold)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": settings})
+}
+
 // ── Avertissements (warns) ───────────────────────────────────────────────────
 
 type warningRequest struct {

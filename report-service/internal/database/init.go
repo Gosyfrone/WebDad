@@ -7,10 +7,12 @@ import (
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
+
+	"github.com/webdad/report-service/internal/models"
 )
 
 // collectionOrder fige l'ordre de création (déterministe pour les logs/tests).
-var collectionOrder = []string{"tickets", "warnings"}
+var collectionOrder = []string{"tickets", "warnings", "settings"}
 
 // EnsureSchema crée les collections `tickets` et `warnings` (avec validateur
 // $jsonSchema) et leurs index, de façon idempotente. Le service possède ainsi
@@ -25,7 +27,26 @@ func EnsureSchema(ctx context.Context, db *mongo.Database) error {
 	if err := ensureCollections(ctx, db); err != nil {
 		return err
 	}
-	return ensureIndexes(ctx, db)
+	if err := ensureIndexes(ctx, db); err != nil {
+		return err
+	}
+	return ensureSettings(ctx, db)
+}
+
+// ensureSettings garantit l'existence du document SINGLETON de configuration
+// (`_id="global"`) avec le seuil d'auto-masquage par défaut. Idempotent :
+// `$setOnInsert` ne pose la valeur QUE si le document n'existe pas encore — un
+// seuil déjà réglé par l'administrateur n'est jamais écrasé au redémarrage.
+func ensureSettings(ctx context.Context, db *mongo.Database) error {
+	opts := options.UpdateOne().SetUpsert(true)
+	_, err := db.Collection("settings").UpdateByID(ctx, models.SettingsSingletonID,
+		bson.M{"$setOnInsert": bson.M{"auto_hide_threshold": models.DefaultAutoHideThreshold}},
+		opts,
+	)
+	if err != nil {
+		return fmt.Errorf("seed settings : %w", err)
+	}
+	return nil
 }
 
 // ensureCollections crée/maintient les collections + leur validateur. Le
@@ -91,7 +112,8 @@ var validators = map[string]bson.M{
 				// Vide pour un bug (entity_type=app) → autonome, pas d'agrégation.
 				"entity_id":       bson.M{"bsonType": bson.A{"string", "null"}},
 				"entity_owner_id": bson.M{"bsonType": bson.A{"string", "null"}},
-				"status":          bson.M{"bsonType": "string", "enum": bson.A{"open", "closed", "reopened"}},
+				// `approved` = entité jugée conforme (terminal, verrou de re-signalement).
+				"status": bson.M{"bsonType": "string", "enum": bson.A{"open", "closed", "reopened", "approved"}},
 				// report_count = nombre de signalements empilés. int32 (bsonType
 				// "int" pour le validateur Mongo), maintenu par $inc.
 				"report_count": bson.M{"bsonType": "int"},
@@ -104,6 +126,16 @@ var validators = map[string]bson.M{
 				"last_reported_at": bson.M{"bsonType": "date"},
 				"created_at":       bson.M{"bsonType": "date"},
 				"updated_at":       bson.M{"bsonType": "date"},
+			},
+		},
+	},
+	"settings": {
+		"$jsonSchema": bson.M{
+			"bsonType": "object",
+			"required": bson.A{"auto_hide_threshold"},
+			"properties": bson.M{
+				// Seuil d'auto-masquage d'un post (int32). 0 = désactivé.
+				"auto_hide_threshold": bson.M{"bsonType": "int"},
 			},
 		},
 	},

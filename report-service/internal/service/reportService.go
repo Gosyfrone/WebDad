@@ -12,6 +12,7 @@ import (
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 
+	"github.com/webdad/report-service/internal/client"
 	"github.com/webdad/report-service/internal/models"
 	"github.com/webdad/report-service/internal/repository"
 )
@@ -24,6 +25,9 @@ var (
 	ErrNotBug     = errors.New("seuls les tickets de bug peuvent être transférés")
 	// ErrAlreadyReported : un utilisateur ne peut signaler une entité qu'une fois → 409.
 	ErrAlreadyReported = errors.New("vous avez déjà signalé cet élément")
+	// ErrReportingLocked : l'entité a été jugée conforme par la modération
+	// (ticket `approved`) → tout nouveau signalement est refusé (verrou définitif) → 409.
+	ErrReportingLocked = errors.New("cet élément a été validé par la modération et ne peut plus être signalé")
 )
 
 // Bornes de la liste de tickets.
@@ -63,11 +67,17 @@ var validStatuses = map[string]bool{
 
 // ReportService orchestre le dépôt et les règles métier.
 type ReportService struct {
-	repo *repository.ReportRepository
+	repo  *repository.ReportRepository
+	posts client.PostModerator
 }
 
-func NewReportService(r *repository.ReportRepository) *ReportService {
-	return &ReportService{repo: r}
+// NewReportService construit le service. `posts` pilote l'auto-masquage côté
+// post-service (passer client.NoopPostModerator{} si non configuré / en test).
+func NewReportService(r *repository.ReportRepository, posts client.PostModerator) *ReportService {
+	if posts == nil {
+		posts = client.NoopPostModerator{}
+	}
+	return &ReportService{repo: r, posts: posts}
 }
 
 // CreateReportInput : charge utile d'un nouveau signalement (déposé par tout
@@ -123,10 +133,16 @@ func (s *ReportService) CreateReport(ctx context.Context, reporterID string, in 
 		if len([]rune(in.Text)) > models.MaxModerationText {
 			return nil, ErrValidation
 		}
-		if !validEntityTypes[in.EntityType] || strings.TrimSpace(in.EntityID) == "" {
+		entityID := strings.TrimSpace(in.EntityID)
+		if !validEntityTypes[in.EntityType] || entityID == "" {
 			return nil, ErrValidation
 		}
-		t, err := s.repo.UpsertModerationReport(ctx, in.EntityType, strings.TrimSpace(in.EntityID), strings.TrimSpace(in.EntityOwnerID), report)
+		// Verrou : une entité jugée conforme par la modération (`approved`) ne
+		// peut plus être signalée (décision terminale).
+		if existing, gerr := s.repo.GetModerationByEntity(ctx, in.EntityType, entityID); gerr == nil && existing.Status == models.StatusApproved {
+			return nil, ErrReportingLocked
+		}
+		t, err := s.repo.UpsertModerationReport(ctx, in.EntityType, entityID, strings.TrimSpace(in.EntityOwnerID), report)
 		if errors.Is(err, repository.ErrAlreadyReported) {
 			return nil, ErrAlreadyReported
 		}
@@ -138,15 +154,88 @@ func (s *ReportService) CreateReport(ctx context.Context, reporterID string, in 
 		// reste clôturé (le signalement est quand même empilé).
 		if t.Status == models.StatusClosed && t.ReportsSinceClosed >= ReopenThreshold {
 			if reopened, rerr := s.repo.AutoReopen(ctx, t.ID, report.CreatedAt); rerr == nil {
-				return reopened, nil
+				t = reopened
 			}
 			// best-effort : si la réouverture échoue, le signalement reste enregistré.
 		}
+		// Auto-masquage : un POST de modération qui atteint le seuil configuré est
+		// masqué (best-effort) en attendant la décision d'un modérateur. Ne
+		// s'applique JAMAIS aux bugs (catégorie admin) ni à un ticket déjà
+		// terminal/clôturé. Journalise l'action sur le ticket (une seule fois).
+		s.maybeAutoHide(ctx, t)
 		return t, nil
 
 	default:
 		return nil, ErrValidation
 	}
+}
+
+// maybeAutoHide masque un POST (best-effort) quand son ticket de modération
+// atteint le seuil configuré et qu'il n'a pas DÉJÀ été auto-masqué. Le masquage
+// effectif est posé côté post-service (barrière de visibilité serveur) ; on
+// journalise l'action sur le ticket pour la traçabilité et l'idempotence.
+func (s *ReportService) maybeAutoHide(ctx context.Context, t *models.Ticket) {
+	if t == nil || t.EntityType != models.EntityPost || t.EntityID == "" {
+		return
+	}
+	// Pas d'auto-masquage sur une décision déjà terminale (approuvé/clôturé).
+	if t.Status == models.StatusApproved || t.Status == models.StatusClosed {
+		return
+	}
+	settings, err := s.repo.GetSettings(ctx)
+	if err != nil {
+		return // best-effort : pas de réglage lisible → on s'abstient
+	}
+	if settings.AutoHideThreshold <= 0 || t.ReportCount < settings.AutoHideThreshold {
+		return
+	}
+	// Idempotence : ne masquer (et journaliser) qu'une fois.
+	for _, a := range t.Actions {
+		if a.Type == models.ActionAutoHidden {
+			return
+		}
+	}
+	action := models.Action{Type: models.ActionAutoHidden, CreatedAt: time.Now()}
+	if updated, aerr := s.repo.AddAction(ctx, t.ID, action, nil); aerr == nil {
+		*t = *updated
+	}
+	s.posts.AutoHide(t.EntityID)
+}
+
+// Approve marque une entité comme CONFORME (décision terminale du modérateur) :
+// statut → approved, action tracée, démasquage du post si auto-masqué, et verrou
+// de re-signalement (toute tentative ultérieure est refusée, cf. CreateReport).
+func (s *ReportService) Approve(ctx context.Context, id, moderatorID string) (*models.Ticket, error) {
+	oid, err := bson.ObjectIDFromHex(id)
+	if err != nil {
+		return nil, ErrInvalidID
+	}
+	action := models.Action{ModeratorID: moderatorID, Type: models.ActionApproved, CreatedAt: time.Now()}
+	t, err := s.repo.AddAction(ctx, oid, action, bson.M{"status": models.StatusApproved, "reports_since_closed": int32(0)})
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	if t.EntityType == models.EntityPost && t.EntityID != "" {
+		s.posts.AutoUnhide(t.EntityID)
+	}
+	return t, nil
+}
+
+// Settings renvoie la configuration runtime de la modération (seuil d'auto-masquage).
+func (s *ReportService) Settings(ctx context.Context) (*models.Settings, error) {
+	return s.repo.GetSettings(ctx)
+}
+
+// UpdateThreshold fixe le seuil d'auto-masquage (≥ 0 ; 0 = désactivé). Réservé
+// à l'administrateur (gating au niveau route).
+func (s *ReportService) UpdateThreshold(ctx context.Context, threshold int32) (*models.Settings, error) {
+	if threshold < 0 {
+		return nil, ErrValidation
+	}
+	return s.repo.UpdateThreshold(ctx, threshold)
 }
 
 // ListTickets renvoie les tickets filtrés (tri décroissant par volume côté repo).

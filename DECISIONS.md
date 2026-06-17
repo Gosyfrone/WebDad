@@ -22,6 +22,27 @@
   empilés dans `reports[]` d'un seul ticket (`report_count` + `reason_tags` dénormalisés via `$inc`,
   upsert atomique). Les rapports de **bug** (motif « Bug technique ») sont des **tickets autonomes**
   (`entity_type=app`, pas de clé d'entité à dédupliquer) — décision produit validée avec l'utilisateur.
+- **Auto-masquage des posts trop signalés (17/06/2026).** Un POST de modération qui atteint un **seuil** de
+  signalements est automatiquement masqué (sort des fils, en attente d'une décision de modérateur) ; les
+  **bugs** (onglet admin) en sont **exemptés** (déjà des tickets autonomes). Le report-service détient le
+  compteur mais la visibilité est la responsabilité du post-service → **appel serveur-à-serveur off-gateway**
+  `POST /internal/posts/:id/auto-hide` authentifié par `X-Internal-Secret` (même secret partagé et même esprit
+  best-effort fire-and-forget que l'émission de notifications ; échecs **loggés** car la visibilité est
+  sécurité-sensible). Nouveau champ post `auto_hidden` **distinct de `is_hidden`** (retrait manuel → corbeille) :
+  un post auto-masqué n'apparaît PAS dans la corbeille de modération. Idempotent (action `auto_hidden` journalisée
+  une fois). Le masquage réel s'applique côté post-service (barrière serveur), jamais sur la foi du front (§6).
+- **Verrou de validation : statut terminal `approved` (17/06/2026).** Quand le modérateur juge l'entité
+  **conforme** (« ne doit pas être signalée »), le ticket passe au statut **terminal `approved`** : le post est
+  démasqué (`auto-unhide`) ET tout nouveau signalement est **refusé** (`ErrReportingLocked` → 409). Distinct de
+  `closed` (qui peut se rouvrir au seuil) : `approved` est **définitif** (choix produit validé). Le verrou vit
+  **dans report-service** (vérif `GetModerationByEntity` avant l'upsert) → pas de dépendance cross-service pour
+  bloquer. Action front « Valider (conforme) » séparée de « Clôturer »/« Retirer ».
+- **Seuil d'auto-masquage réglable par l'admin (17/06/2026).** Le seuil n'est pas une constante mais une
+  **config runtime** : collection **singleton `settings`** du report-service (`_id="global"`,
+  `auto_hide_threshold` int32, **0 = désactivé**, défaut **5**), seedée au boot par `$setOnInsert` idempotent
+  (ne **réécrase jamais** un seuil déjà réglé au redémarrage — règle 5b). Lecture mod+admin, écriture **admin
+  seul** (`PATCH /reports/settings`), réglée dans **Admin › Paramètres**. Le service propriétaire de la logique
+  de signalement reste la seule source de vérité du seuil (pas de duplication).
 - **Réouverture automatique à seuil (16/06/2026).** Un ticket clôturé ne doit pas être rouvert par un unique
   re-signalement (sinon la décision du modérateur est triviale à défaire), mais une récidive soutenue doit le
   rouvrir. Compteur `reports_since_closed` (`$inc` à chaque signalement, remis à 0 à **chaque** changement de

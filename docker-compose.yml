@@ -367,6 +367,11 @@ services:
     environment:
       MONGO_HOST: mongo-report        # override : nom du conteneur dans le réseau
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET requis}
+      # Auto-masquage des posts trop signalés : appel serveur-à-serveur vers le
+      # post-service, authentifié par le secret interne partagé (même que les
+      # notifications). Vide → auto-masquage désactivé (service autonome).
+      POST_SERVICE_URL: http://post-service:8084
+      INTERNAL_EVENT_SECRET: ${INTERNAL_EVENT_SECRET:?INTERNAL_EVENT_SECRET requis}
     ports:
       - "8090:8090"
     networks:

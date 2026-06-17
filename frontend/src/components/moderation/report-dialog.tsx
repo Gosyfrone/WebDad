@@ -122,10 +122,14 @@ export function ReportDialog({ open, onOpenChange, entityType, entityId, entityO
       toast({ title: t('report.success') })
       handleClose(false)
     } catch (err) {
-      // 409 = l'utilisateur a déjà signalé cet élément (un seul signalement par entité).
-      const already = err instanceof ReportApiError && err.status === 409
-      toast({ title: already ? t('report.already') : t('report.error'), variant: 'brand' })
-      if (already) handleClose(false)
+      // 409 a deux causes : (a) entité VALIDÉE par la modération → re-signalement
+      // verrouillé (message serveur contient « validé ») ; (b) l'utilisateur a déjà
+      // signalé cet élément (un seul signalement par entité).
+      const conflict = err instanceof ReportApiError && err.status === 409
+      const locked = conflict && err.message.includes('validé')
+      const titleKey = locked ? 'report.locked' : conflict ? 'report.already' : 'report.error'
+      toast({ title: t(titleKey), variant: 'brand' })
+      if (conflict) handleClose(false)
     } finally {
       setSubmitting(false)
     }

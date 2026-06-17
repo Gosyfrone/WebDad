@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	postclient "github.com/webdad/report-service/internal/client"
 	"github.com/webdad/report-service/internal/config"
 	"github.com/webdad/report-service/internal/database"
 	"github.com/webdad/report-service/internal/handler"
@@ -48,7 +49,17 @@ func main() {
 	}
 
 	repo := repository.NewReportRepository(db)
-	svc := service.NewReportService(repo)
+
+	// Client d'auto-modération des posts (serveur-à-serveur, secret partagé). Si
+	// le post-service ou le secret ne sont pas configurés, on reste autonome
+	// (no-op) : l'auto-masquage est alors désactivé sans casser les signalements.
+	var posts postclient.PostModerator = postclient.NoopPostModerator{}
+	if cfg.PostServiceURL != "" && cfg.InternalSecret != "" {
+		posts = postclient.NewPostClient(cfg.PostServiceURL, cfg.InternalSecret)
+	} else {
+		slog.Warn("auto-masquage désactivé : POST_SERVICE_URL ou INTERNAL_SECRET manquant")
+	}
+	svc := service.NewReportService(repo, posts)
 
 	r := gin.New()
 	r.Use(middleware.RequestID(), middleware.Recovery(), middleware.RequestLogger())

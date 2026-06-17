@@ -37,12 +37,18 @@ func RegisterRoutes(r *gin.Engine, serviceName string, svc *service.ReportServic
 		// Émission d'un avertissement — modération.
 		reports.POST("/warnings", mod, h.IssueWarning)
 
+		// Configuration de la modération : lecture mod/admin, écriture admin seul.
+		reports.GET("/settings", mod, h.GetSettings)
+		reports.PATCH("/settings", admin, h.UpdateSettings)
+
 		// Tickets — modération.
 		reports.GET("/tickets", mod, h.ListTickets)
 		reports.GET("/tickets/:id", mod, h.GetTicket)
 		reports.POST("/tickets/:id/replies", mod, h.Reply)
 		reports.PATCH("/tickets/:id/status", mod, h.ChangeStatus)
 		reports.POST("/tickets/:id/removal", mod, h.RecordRemoval)
+		// Validation « entité conforme » (terminal : démasque + verrouille).
+		reports.POST("/tickets/:id/approve", mod, h.Approve)
 
 		// Transfert bug → modération — gouvernance admin.
 		reports.POST("/tickets/:id/transfer", admin, h.Transfer)

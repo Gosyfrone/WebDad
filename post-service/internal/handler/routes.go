@@ -14,11 +14,21 @@ import (
 // pour être atteignable par le front. jwtSecret protège les routes mutables
 // (validation locale du token émis par auth-service, secret partagé) ; la
 // lecture reste publique.
-func RegisterRoutes(r *gin.Engine, serviceName string, postService *service.PostService, jwtSecret string, hub *realtime.Hub, allowedOrigins []string) {
+func RegisterRoutes(r *gin.Engine, serviceName string, postService *service.PostService, jwtSecret string, hub *realtime.Hub, allowedOrigins []string, internalSecret string) {
 	auth := middleware.JWTAuth(jwtSecret)
 	optionalAuth := middleware.OptionalJWTAuth(jwtSecret)
 
 	r.GET("/health", Health(serviceName))
+
+	// Auto-modération serveur-à-serveur (report-service) : masque/démasque un
+	// post trop signalé. Hors `/posts` (donc hors gateway) et authentifié par
+	// secret partagé (X-Internal-Secret), pas de JWT.
+	internalH := NewInternalHandler(postService, internalSecret)
+	internal := r.Group("/internal/posts/:id")
+	{
+		internal.POST("/auto-hide", internalH.AutoHide)
+		internal.POST("/auto-unhide", internalH.AutoUnhide)
+	}
 	PostHandler := NewPostHandler(postService, serviceName)
 	LikeHandler := NewLikeHandler(postService, serviceName)
 	CommentHandler := NewCommentHandler(postService, serviceName)

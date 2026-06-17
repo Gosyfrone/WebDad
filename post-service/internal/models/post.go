@@ -46,6 +46,14 @@ type Post struct {
 	IsHidden bool       `bson:"is_hidden,omitempty" json:"is_hidden,omitempty"`
 	HiddenBy string     `bson:"hidden_by,omitempty" json:"hidden_by,omitempty"`
 	HiddenAt *time.Time `bson:"hidden_at,omitempty" json:"hidden_at,omitempty"`
+	// AutoHidden : masquage AUTOMATIQUE déclenché par le report-service quand le
+	// post dépasse le seuil de signalements (en attente d'une décision de
+	// modération). Distinct de is_hidden (retrait manuel → corbeille) : il sort
+	// des fils publics mais N'apparaît PAS dans la corbeille de modération ; un
+	// modérateur le rétablit (validation « conforme ») ou le retire (is_hidden).
+	// `omitempty` ⇒ jamais de `false` persité ; absent sur un vieux doc = visible
+	// (pas de migration de données nécessaire).
+	AutoHidden bool `bson:"auto_hidden,omitempty" json:"auto_hidden,omitempty"`
 	// PurgeWarnedAt : date d'envoi du préavis de purge RGPD (évite de re-notifier).
 	PurgeWarnedAt *time.Time `bson:"purge_warned_at,omitempty" json:"-"`
 	// PurgeAt : date prévue de purge définitive (transient = hidden_at + rétention),

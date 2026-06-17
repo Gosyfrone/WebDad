@@ -24,9 +24,10 @@ const STATUS_VARIANT: Record<TicketStatus, 'secondary' | 'destructive'> = {
   open: 'destructive',
   reopened: 'destructive',
   closed: 'secondary',
+  approved: 'secondary',
 }
 
-const STATUSES: (TicketStatus | '')[] = ['', 'open', 'reopened', 'closed']
+const STATUSES: (TicketStatus | '')[] = ['', 'open', 'reopened', 'closed', 'approved']
 
 /**
  * Liste des tickets d'une catégorie, triés par volume de signalements

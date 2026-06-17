@@ -8,12 +8,13 @@ import { useT } from '@/components/language-provider'
 import { cn } from '@/lib/utils'
 import { AdminInfra } from '@/components/admin/admin-infra'
 import { CreateAccountDialog } from '@/components/admin/create-account-dialog'
+import { ModerationSettings } from '@/components/admin/moderation-settings'
 import { TicketsPanel } from '@/components/moderation/tickets-panel'
 
-type AdminTab = 'reports' | 'infra'
+type AdminTab = 'reports' | 'settings' | 'infra'
 
 const TAB_STORAGE_KEY = 'breezy-admin-tab'
-const ADMIN_TABS: AdminTab[] = ['reports', 'infra']
+const ADMIN_TABS: AdminTab[] = ['reports', 'settings', 'infra']
 
 /**
  * Espace d'administration (rôle administrator). Deux onglets :
@@ -53,6 +54,7 @@ export function AdminView() {
 
   const tabs: { key: AdminTab; label: string }[] = [
     { key: 'reports', label: t('admin.tab_reports') },
+    { key: 'settings', label: t('admin.tab_settings') },
     { key: 'infra', label: t('admin.tab_infra') },
   ]
 
@@ -86,7 +88,13 @@ export function AdminView() {
         ))}
       </div>
 
-      {tab === 'reports' ? <TicketsPanel category="bug" canTransfer /> : <AdminInfra embedded />}
+      {tab === 'reports' ? (
+        <TicketsPanel category="bug" canTransfer />
+      ) : tab === 'settings' ? (
+        <ModerationSettings />
+      ) : (
+        <AdminInfra embedded />
+      )}
     </div>
   )
 }

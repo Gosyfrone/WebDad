@@ -302,7 +302,10 @@ func (s *PostService) GetPost(ctx context.Context, id, viewerID, viewerRole stri
 	if err != nil {
 		return nil, translateNotFound(err)
 	}
-	if post.IsHidden && !isModerator(viewerRole) {
+	// Masqué (retrait manuel) OU auto-masqué (seuil de signalements) : invisible
+	// au public, mais consultable par un modérateur (pour juger sur pièce dans le
+	// détail du ticket).
+	if (post.IsHidden || post.AutoHidden) && !isModerator(viewerRole) {
 		return nil, ErrPostNotFound
 	}
 	allowed, err := s.canReadAuthor(ctx, viewerID, post.AuthorID)
@@ -571,6 +574,28 @@ func (s *PostService) RestorePost(ctx context.Context, id, actorRole string) (*m
 		return nil, err
 	}
 	post, err := s.repo.RestoreHidden(ctx, oid)
+	return post, translateNotFound(err)
+}
+
+// AutoHide / AutoUnhide pilotent l'auto-masquage d'un post déclenché par le
+// report-service (seuil de signalements). Appelés en serveur-à-serveur via les
+// endpoints internes (authentifiés par secret partagé) — PAS de contrôle de rôle
+// ici : la garde est le secret interne. mongo.ErrNoDocuments → 404 plus haut.
+func (s *PostService) AutoHide(ctx context.Context, id string) (*models.Post, error) {
+	oid, err := parseID(id)
+	if err != nil {
+		return nil, err
+	}
+	post, err := s.repo.SetAutoHidden(ctx, oid, true)
+	return post, translateNotFound(err)
+}
+
+func (s *PostService) AutoUnhide(ctx context.Context, id string) (*models.Post, error) {
+	oid, err := parseID(id)
+	if err != nil {
+		return nil, err
+	}
+	post, err := s.repo.SetAutoHidden(ctx, oid, false)
 	return post, translateNotFound(err)
 }
 

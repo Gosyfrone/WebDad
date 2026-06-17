@@ -20,6 +20,12 @@ type Config struct {
 	MongoDB        string
 	JWTSecret      string   // secret partagé (validation des tokens émis par auth)
 	AllowedOrigins []string // origines acceptées (CORS, alignées sur la gateway)
+	// PostServiceURL : base du post-service, appelé en serveur-à-serveur pour
+	// l'auto-masquage/démasquage des posts trop signalés. Vide → auto-masquage
+	// désactivé (report-service reste autonome). InternalSecret authentifie ces
+	// appels (en-tête X-Internal-Secret, même secret partagé que les notifications).
+	PostServiceURL string
+	InternalSecret string
 }
 
 // Load construit la config. Charge les .env best-effort (ignorés s'ils
@@ -35,6 +41,8 @@ func Load() *Config {
 		MongoDB:        getEnv("MONGO_INITDB_DATABASE", "webdad_report"),
 		JWTSecret:      os.Getenv("JWT_SECRET"),
 		AllowedOrigins: splitCSV(getEnv("CORS_ALLOWED_ORIGINS", "http://localhost:3000")),
+		PostServiceURL: getEnv("POST_SERVICE_URL", defaultServiceURL("post-service", "8084")),
+		InternalSecret: getEnv("INTERNAL_SECRET", os.Getenv("INTERNAL_EVENT_SECRET")),
 	}
 
 	if cfg.JWTSecret == "" {
@@ -64,6 +72,15 @@ func getEnv(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+// defaultServiceURL construit l'URL par défaut d'un service interne : nom de
+// conteneur sur le réseau Docker, localhost sinon (dev hors conteneur).
+func defaultServiceURL(serviceName, port string) string {
+	if _, err := os.Stat("/.dockerenv"); err == nil {
+		return fmt.Sprintf("http://%s:%s", serviceName, port)
+	}
+	return fmt.Sprintf("http://localhost:%s", port)
 }
 
 // splitCSV découpe une liste séparée par des virgules en éléments nettoyés.

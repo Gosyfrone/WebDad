@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, ArrowRightLeft, ExternalLink, Loader2, ShieldAlert, Trash2 } from 'lucide-react'
+import { ArrowLeft, ArrowRightLeft, CheckCircle2, ExternalLink, Loader2, Lock, ShieldAlert, Trash2 } from 'lucide-react'
 
 import {
+  approveTicket,
   changeTicketStatus,
   getTicket,
   recordTicketRemoval,
@@ -42,6 +43,7 @@ const STATUS_VARIANT: Record<TicketStatus, 'secondary' | 'destructive' | 'outlin
   open: 'destructive',
   reopened: 'destructive',
   closed: 'secondary',
+  approved: 'outline',
 }
 
 /**
@@ -152,6 +154,22 @@ export function TicketDetail({ ticketId, canTransfer, onBack, onChanged }: Ticke
     try {
       setTicket(await transferTicket(ticket.id))
       toast({ title: t('tickets.transferred') })
+      onChanged?.()
+    } catch {
+      toast({ title: t('tickets.action_failed'), variant: 'brand' })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // Validation « conforme » : décision TERMINALE. Démasque le post s'il avait été
+  // auto-masqué et verrouille tout nouveau signalement de l'entité.
+  async function onApprove() {
+    if (!ticket) return
+    setBusy(true)
+    try {
+      setTicket(await approveTicket(ticket.id))
+      toast({ title: t('tickets.approved') })
       onChanged?.()
     } catch {
       toast({ title: t('tickets.action_failed'), variant: 'brand' })
@@ -372,7 +390,7 @@ export function TicketDetail({ ticketId, canTransfer, onBack, onChanged }: Ticke
                 <div key={i} className="rounded-lg bg-muted/40 p-2 text-sm">
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <span className="font-medium text-foreground">
-                      {a.type === 'auto_reopen' ? t('tickets.system') : nameOf(a.moderatorId)}
+                      {a.type === 'auto_reopen' || a.type === 'auto_hidden' ? t('tickets.system') : nameOf(a.moderatorId)}
                     </span>
                     <span>{timeAgo(a.createdAt, locale)}</span>
                   </div>
@@ -386,6 +404,10 @@ export function TicketDetail({ ticketId, canTransfer, onBack, onChanged }: Ticke
                     <p className="text-muted-foreground">{t('tickets.action.auto_reopen')}</p>
                   ) : a.type === 'content_removed' ? (
                     <p className="text-muted-foreground">{t('tickets.action.content_removed')}</p>
+                  ) : a.type === 'auto_hidden' ? (
+                    <p className="text-muted-foreground">{t('tickets.action.auto_hidden')}</p>
+                  ) : a.type === 'approved' ? (
+                    <p className="text-muted-foreground">{t('tickets.action.approved')}</p>
                   ) : (
                     <p className="text-muted-foreground">{t('tickets.action.transfer')}</p>
                   )}
@@ -407,7 +429,14 @@ export function TicketDetail({ ticketId, canTransfer, onBack, onChanged }: Ticke
             </Button>
           </div>
 
-          {/* Actions de cycle de vie + modération */}
+          {/* Décision terminale : entité jugée conforme → re-signalement verrouillé. */}
+          {ticket.status === 'approved' ? (
+            <div className="flex items-center gap-2 rounded-xl border border-dashed bg-muted/40 p-3 text-sm text-muted-foreground">
+              <Lock className="h-4 w-4 shrink-0" aria-hidden />
+              {t('tickets.approved_locked')}
+            </div>
+          ) : (
+          /* Actions de cycle de vie + modération */
           <div className="flex flex-wrap gap-2 border-t pt-3">
             {ticket.status === 'closed' ? (
               <Button variant="outline" size="sm" disabled={busy} onClick={() => void onStatus('reopened')}>
@@ -416,6 +445,14 @@ export function TicketDetail({ ticketId, canTransfer, onBack, onChanged }: Ticke
             ) : (
               <Button variant="outline" size="sm" disabled={busy} onClick={() => void onStatus('closed')}>
                 {t('tickets.set_closed')}
+              </Button>
+            )}
+
+            {/* Valider : l'entité est conforme (ne doit pas être signalée). */}
+            {ticket.category === 'moderation' && (
+              <Button variant="outline" size="sm" disabled={busy} onClick={() => void onApprove()} className="text-emerald-600">
+                <CheckCircle2 className="mr-1.5 h-4 w-4" />
+                {t('tickets.approve')}
               </Button>
             )}
 
@@ -447,6 +484,7 @@ export function TicketDetail({ ticketId, canTransfer, onBack, onChanged }: Ticke
               </Button>
             )}
           </div>
+          )}
         </div>
       )}
 

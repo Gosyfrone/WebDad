@@ -17,7 +17,7 @@ func respondError(c *gin.Context, err error) {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 	case errors.Is(err, service.ErrInvalidID), errors.Is(err, service.ErrValidation):
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-	case errors.Is(err, service.ErrNotBug), errors.Is(err, service.ErrAlreadyReported):
+	case errors.Is(err, service.ErrNotBug), errors.Is(err, service.ErrAlreadyReported), errors.Is(err, service.ErrReportingLocked):
 		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
 	default:
 		logging.FromGin(c).Error("erreur report inattendue", "error", err)

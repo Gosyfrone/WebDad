@@ -549,6 +549,7 @@ export const messages: Record<Locale, Messages> = {
     'report.success': 'Merci, votre signalement a été envoyé.',
     'report.error': "Impossible d'envoyer le signalement.",
     'report.already': 'Vous avez déjà signalé cet élément.',
+    'report.locked': 'Cet élément a été validé par la modération : il ne peut plus être signalé.',
     'report.disclose_notice':
       'Ce message est chiffré : en le signalant, vous transmettez cette copie à la modération (le serveur ne peut pas la lire seul).',
     'report.disclose_empty': '(message vide ou non déchiffrable)',
@@ -556,7 +557,16 @@ export const messages: Record<Locale, Messages> = {
     // ── Onglets Signalements (modération + admin) ──
     'moderation.tab_reports': 'Signalements',
     'admin.tab_reports': 'Signalements (bugs)',
+    'admin.tab_settings': 'Paramètres',
     'admin.tab_infra': 'Infrastructure',
+    'admin.settings.auto_hide_title': 'Auto-masquage des publications signalées',
+    'admin.settings.auto_hide_desc':
+      "Au-delà de ce nombre de signalements, une publication est automatiquement masquée et mise en attente d'une décision de modérateur. 0 désactive l'auto-masquage.",
+    'admin.settings.auto_hide_label': 'Seuil de signalements',
+    'admin.settings.saved': 'Paramètres enregistrés.',
+    'admin.settings.save_failed': "Impossible d'enregistrer les paramètres.",
+    'admin.settings.invalid': 'Valeur invalide (entier ≥ 0 attendu).',
+    'admin.settings.error': 'Impossible de charger les paramètres.',
 
     // ── Tickets ──
     'tickets.empty': 'Aucun ticket de signalement.',
@@ -568,6 +578,7 @@ export const messages: Record<Locale, Messages> = {
     'tickets.status.open': 'Ouvert',
     'tickets.status.closed': 'Clôturé',
     'tickets.status.reopened': 'Rouvert',
+    'tickets.status.approved': 'Validé',
     'tickets.entity.post': 'Publication',
     'tickets.entity.message': 'Message privé',
     'tickets.entity.group_message': 'Message de groupe',
@@ -591,9 +602,15 @@ export const messages: Record<Locale, Messages> = {
     'tickets.action.transfer': 'Transféré vers la modération',
     'tickets.action.auto_reopen': 'Rouvert automatiquement (seuil de re-signalements atteint)',
     'tickets.action.content_removed': 'Contenu signalé retiré par la modération',
+    'tickets.action.auto_hidden': 'Publication masquée automatiquement (seuil de signalements atteint)',
+    'tickets.action.approved': 'Élément jugé conforme par la modération (signalements verrouillés)',
     'tickets.system': 'Système',
     'tickets.set_open': 'Rouvrir',
     'tickets.set_closed': 'Clôturer',
+    'tickets.approve': 'Valider (conforme)',
+    'tickets.approved': 'Élément validé : il est de nouveau visible et ne peut plus être signalé.',
+    'tickets.approved_locked':
+      'Élément validé par la modération : de nouveau visible, il ne peut plus être signalé (décision définitive).',
     'tickets.transfer': 'Transférer vers la modération',
     'tickets.transferred': 'Ticket transféré vers la modération.',
     'tickets.post_removed': 'Publication retirée et déplacée dans « Tweets supprimés ».',
@@ -1675,6 +1692,7 @@ export const messages: Record<Locale, Messages> = {
     'report.success': 'Thank you, your report has been sent.',
     'report.error': 'Could not send the report.',
     'report.already': 'You have already reported this item.',
+    'report.locked': 'This item was approved by moderation: it can no longer be reported.',
     'report.disclose_notice':
       'This message is encrypted: by reporting it, you share this copy with moderation (the server cannot read it on its own).',
     'report.disclose_empty': '(empty or undecryptable message)',
@@ -1682,7 +1700,16 @@ export const messages: Record<Locale, Messages> = {
     // ── Report tabs (moderation + admin) ──
     'moderation.tab_reports': 'Reports',
     'admin.tab_reports': 'Reports (bugs)',
+    'admin.tab_settings': 'Settings',
     'admin.tab_infra': 'Infrastructure',
+    'admin.settings.auto_hide_title': 'Auto-hide reported posts',
+    'admin.settings.auto_hide_desc':
+      'Beyond this number of reports, a post is automatically hidden and held pending a moderator decision. 0 disables auto-hiding.',
+    'admin.settings.auto_hide_label': 'Report threshold',
+    'admin.settings.saved': 'Settings saved.',
+    'admin.settings.save_failed': 'Could not save settings.',
+    'admin.settings.invalid': 'Invalid value (integer ≥ 0 expected).',
+    'admin.settings.error': 'Could not load settings.',
 
     // ── Tickets ──
     'tickets.empty': 'No report tickets.',
@@ -1694,6 +1721,7 @@ export const messages: Record<Locale, Messages> = {
     'tickets.status.open': 'Open',
     'tickets.status.closed': 'Closed',
     'tickets.status.reopened': 'Reopened',
+    'tickets.status.approved': 'Approved',
     'tickets.entity.post': 'Post',
     'tickets.entity.message': 'Direct message',
     'tickets.entity.group_message': 'Group message',
@@ -1717,9 +1745,15 @@ export const messages: Record<Locale, Messages> = {
     'tickets.action.transfer': 'Transferred to moderation',
     'tickets.action.auto_reopen': 'Automatically reopened (re-report threshold reached)',
     'tickets.action.content_removed': 'Reported content removed by moderation',
+    'tickets.action.auto_hidden': 'Post automatically hidden (report threshold reached)',
+    'tickets.action.approved': 'Item deemed compliant by moderation (reporting locked)',
     'tickets.system': 'System',
     'tickets.set_open': 'Reopen',
     'tickets.set_closed': 'Close',
+    'tickets.approve': 'Approve (compliant)',
+    'tickets.approved': 'Item approved: it is visible again and can no longer be reported.',
+    'tickets.approved_locked':
+      'Item approved by moderation: visible again, it can no longer be reported (final decision).',
     'tickets.transfer': 'Transfer to moderation',
     'tickets.transferred': 'Ticket transferred to moderation.',
     'tickets.post_removed': 'Post removed and moved to “Deleted tweets”.',

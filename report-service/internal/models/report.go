@@ -27,6 +27,11 @@ const (
 	StatusOpen     = "open"
 	StatusClosed   = "closed"
 	StatusReopened = "reopened"
+	// StatusApproved : état TERMINAL. Un modérateur a jugé l'entité conforme
+	// (« ne doit pas être signalée »). Conséquences : l'entité est démasquée si
+	// elle avait été auto-masquée, et tout NOUVEAU signalement est refusé
+	// (verrou définitif). Distinct de `closed`, qui peut se rouvrir au seuil.
+	StatusApproved = "approved"
 )
 
 // Types d'action posée par un modérateur sur un ticket.
@@ -36,6 +41,8 @@ const (
 	ActionTransfer       = "transfer"        // transfert bug → modération (admin)
 	ActionAutoReopen     = "auto_reopen"     // réouverture automatique (seuil de re-signalements)
 	ActionContentRemoved = "content_removed" // contenu signalé retiré par la modération
+	ActionAutoHidden     = "auto_hidden"     // entité auto-masquée (seuil de signalements atteint)
+	ActionApproved       = "approved"        // entité jugée conforme par la modération (terminal)
 )
 
 // Motifs de signalement (enum fermé : `reason_tags.<reason>` est une clé Mongo,
@@ -109,6 +116,23 @@ type Ticket struct {
 	LastReportedAt     time.Time        `bson:"last_reported_at" json:"last_reported_at"`
 	CreatedAt          time.Time        `bson:"created_at" json:"created_at"`
 	UpdatedAt          time.Time        `bson:"updated_at" json:"updated_at"`
+}
+
+// Identifiant du document singleton de configuration (collection `settings`).
+const SettingsSingletonID = "global"
+
+// DefaultAutoHideThreshold : seuil par défaut d'auto-masquage d'un post. Un post
+// de modération atteignant ce nombre de signalements est masqué en attendant la
+// décision d'un modérateur. Réglable par l'administrateur (cf. Settings).
+const DefaultAutoHideThreshold int32 = 5
+
+// Settings — document SINGLETON (`_id="global"`) de configuration runtime de la
+// modération, éditable par l'administrateur. AutoHideThreshold = nombre de
+// signalements à partir duquel un post est auto-masqué (0 = auto-masquage
+// désactivé).
+type Settings struct {
+	ID                string `bson:"_id" json:"-"`
+	AutoHideThreshold int32  `bson:"auto_hide_threshold" json:"auto_hide_threshold"`
 }
 
 // Warning — avertissement asynchrone émis par un modérateur vers un utilisateur.

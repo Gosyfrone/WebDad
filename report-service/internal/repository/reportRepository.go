@@ -19,16 +19,18 @@ import (
 // signalement par (utilisateur, entité) en modération). Traduit en 409 plus haut.
 var ErrAlreadyReported = errors.New("entité déjà signalée par cet utilisateur")
 
-// ReportRepository encapsule les collections `tickets` et `warnings`.
+// ReportRepository encapsule les collections `tickets`, `warnings` et `settings`.
 type ReportRepository struct {
 	tickets  *mongo.Collection
 	warnings *mongo.Collection
+	settings *mongo.Collection
 }
 
 func NewReportRepository(db *mongo.Database) *ReportRepository {
 	return &ReportRepository{
 		tickets:  db.Collection("tickets"),
 		warnings: db.Collection("warnings"),
+		settings: db.Collection("settings"),
 	}
 }
 
@@ -197,6 +199,19 @@ func (r *ReportRepository) GetTicket(ctx context.Context, id bson.ObjectID) (*mo
 	return &out, nil
 }
 
+// GetModerationByEntity renvoie le ticket parent de modération d'une entité
+// (clé (entity_type, entity_id)), s'il existe. Sert au verrou de re-signalement :
+// un ticket `approved` interdit tout nouveau signalement de l'entité.
+// mongo.ErrNoDocuments si aucun ticket n'existe encore pour l'entité.
+func (r *ReportRepository) GetModerationByEntity(ctx context.Context, entityType, entityID string) (*models.Ticket, error) {
+	var out models.Ticket
+	filter := bson.M{"category": models.CategoryModeration, "entity_type": entityType, "entity_id": entityID}
+	if err := r.tickets.FindOne(ctx, filter).Decode(&out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
 // AddAction empile une action de modération et rafraîchit `updated_at`. Les
 // mutations optionnelles (statut, catégorie) sont fusionnées dans `$set`.
 // Renvoie le ticket à jour. mongo.ErrNoDocuments si le ticket est absent.
@@ -224,6 +239,37 @@ func (r *ReportRepository) AutoReopen(ctx context.Context, id bson.ObjectID, now
 		"status":               models.StatusReopened,
 		"reports_since_closed": int32(0),
 	})
+}
+
+// GetSettings renvoie le document singleton de configuration (`_id="global"`).
+// Le seed au boot (EnsureSchema) garantit sa présence ; en repli défensif, un
+// document absent renvoie le défaut plutôt qu'une erreur.
+func (r *ReportRepository) GetSettings(ctx context.Context) (*models.Settings, error) {
+	var out models.Settings
+	err := r.settings.FindOne(ctx, bson.M{"_id": models.SettingsSingletonID}).Decode(&out)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return &models.Settings{ID: models.SettingsSingletonID, AutoHideThreshold: models.DefaultAutoHideThreshold}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// UpdateThreshold fixe le seuil d'auto-masquage (upsert idempotent). Renvoie la
+// configuration à jour.
+func (r *ReportRepository) UpdateThreshold(ctx context.Context, threshold int32) (*models.Settings, error) {
+	opts := options.FindOneAndUpdate().SetUpsert(true).SetReturnDocument(options.After)
+	var out models.Settings
+	err := r.settings.FindOneAndUpdate(ctx,
+		bson.M{"_id": models.SettingsSingletonID},
+		bson.M{"$set": bson.M{"auto_hide_threshold": threshold}},
+		opts,
+	).Decode(&out)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
 }
 
 // CreateWarning insère un avertissement (non acquitté).

@@ -21,7 +21,7 @@ import { mediaUrl } from '@/lib/media'
 
 export type ReportCategory = 'moderation' | 'bug'
 export type ReportEntityType = 'post' | 'message' | 'group_message' | 'profile' | 'app'
-export type TicketStatus = 'open' | 'closed' | 'reopened'
+export type TicketStatus = 'open' | 'closed' | 'reopened' | 'approved'
 export type ReportReason = 'inappropriate' | 'offensive' | 'bug' | 'spam' | 'other'
 
 /** Bornes de texte par catégorie (mêmes valeurs que le validateur back). */
@@ -69,7 +69,7 @@ export interface ChildReport {
 
 export interface TicketAction {
   moderatorId: string
-  type: 'reply' | 'status_change' | 'transfer' | 'auto_reopen' | 'content_removed'
+  type: 'reply' | 'status_change' | 'transfer' | 'auto_reopen' | 'content_removed' | 'auto_hidden' | 'approved'
   text: string
   status?: TicketStatus
   createdAt: string
@@ -267,6 +267,41 @@ export async function recordTicketRemoval(id: string): Promise<Ticket> {
 /** Transfère un ticket de bug vers la modération (admin uniquement). */
 export async function transferTicket(id: string): Promise<Ticket> {
   return toTicket(await unwrap<ApiTicket>(await apiFetch(`/reports/tickets/${id}/transfer`, { method: 'POST' })))
+}
+
+/**
+ * Valide l'entité signalée (« conforme » : ne doit pas être signalée). Décision
+ * TERMINALE : démasque le post s'il avait été auto-masqué et VERROUILLE tout
+ * nouveau signalement (un dépôt ultérieur renverra une erreur 409).
+ */
+export async function approveTicket(id: string): Promise<Ticket> {
+  return toTicket(await unwrap<ApiTicket>(await apiFetch(`/reports/tickets/${id}/approve`, { method: 'POST' })))
+}
+
+// ── Configuration de la modération (seuil d'auto-masquage) ───────────────────
+
+/** Configuration runtime de la modération (réglable par l'administrateur). */
+export interface ReportSettings {
+  /** Nb de signalements à partir duquel un post est auto-masqué (0 = désactivé). */
+  autoHideThreshold: number
+}
+
+/** Lit la configuration de la modération (mod + admin). */
+export async function getReportSettings(): Promise<ReportSettings> {
+  const s = await unwrap<{ auto_hide_threshold: number }>(await apiFetch('/reports/settings'))
+  return { autoHideThreshold: s?.auto_hide_threshold ?? 0 }
+}
+
+/** Règle le seuil d'auto-masquage (admin uniquement). */
+export async function updateReportSettings(autoHideThreshold: number): Promise<ReportSettings> {
+  const s = await unwrap<{ auto_hide_threshold: number }>(
+    await apiFetch('/reports/settings', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ auto_hide_threshold: autoHideThreshold }),
+    }),
+  )
+  return { autoHideThreshold: s?.auto_hide_threshold ?? 0 }
 }
 
 // ── Avertissements (warns) ────────────────────────────────────────────────────
