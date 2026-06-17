@@ -1,4 +1,4 @@
-.PHONY: help env env-sync sync-one up dev dev-down dev-logs down build logs ps clean reset db-only \
+.PHONY: help env env-sync sync-one up dev dev-lan dev-down dev-logs down build logs ps clean reset db-only \
         logs-gateway logs-auth logs-user logs-profil logs-post logs-message logs-notification logs-media logs-mail logs-front logs-db \
         sh-auth sh-user sh-profil sh-post sh-message sh-notification sh-media sh-mail sh-gateway \
         psql-auth psql-user mongo-profil-cli mongo-post-cli mongo-message-cli mongo-notification-cli \
@@ -103,6 +103,28 @@ dev:
 	@echo "    Gateway  → http://localhost:8080"
 	@echo "    Logs     → make dev-logs (front + Go)  |  make logs-front | logs-post ..."
 	@echo "    Arrêt    → make dev-down"
+	@echo ""
+
+# Accès LAN (téléphone, même Wi-Fi) : auto-détecte l'IP locale et injecte les
+# 3 vars réseau (front rebuild avec la nouvelle URL API). Override : make dev-lan IP=192.168.1.42
+IP ?= $(shell hostname -I 2>/dev/null | awk '{print $$1}')
+dev-lan:
+	@test -f .env || { echo " .env racine manquant — exécute : make env"; exit 1; }
+	@for s in $(SERVICES); do \
+		test -f $$s/.env || { echo " $$s/.env manquant (requis par compose) — exécute : make env"; exit 1; }; \
+	done
+	@test -n "$(IP)" || { echo " IP LAN introuvable — passe-la : make dev-lan IP=192.168.1.42"; exit 1; }
+	@echo "  ▶ Accès LAN configuré pour l'IP $(IP)"
+	NEXT_PUBLIC_API_URL=http://$(IP):8080 \
+	CORS_ALLOWED_ORIGINS=http://localhost:3000,http://$(IP):3000 \
+	APP_BASE_URL=http://$(IP):3000 \
+	$(DEV) up --build -d
+	@echo ""
+	@echo "  ▶ Mode DEV LAN démarré (hot-reload front + Go)"
+	@echo "    Sur ce PC  → http://localhost:3000"
+	@echo "    Sur le tel → http://$(IP):3000   (même Wi-Fi que le PC)"
+	@echo "    Si bloqué  → sudo ufw allow 3000,8080/tcp   (pare-feu)"
+	@echo "    Arrêt      → make dev-down"
 	@echo ""
 
 # Logs des services applicatifs (front + Go), sans le bruit des BDD.
