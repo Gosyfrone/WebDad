@@ -61,7 +61,10 @@ export function AdminInfra() {
 
   return (
     <div className="flex flex-col">
-      <header className="panel z-10 flex items-start justify-between gap-3 border-b px-4 py-3 lg:sticky lg:top-0">
+      {/* En-tête interne (desktop) : sur mobile, le titre est porté par l'en-tête
+          global type-feed → on le masque ici (le bouton « Créer un compte »
+          descend alors dans le body, cf. plus bas). */}
+      <header className="panel z-10 hidden items-start justify-between gap-3 border-b px-4 py-3 lg:sticky lg:top-0 lg:flex">
         <div>
           <h1 className="brand-text text-xl font-bold">{t('nav.admin')}</h1>
           <p className="text-sm text-muted-foreground">{t('admin.infra_subtitle')}</p>
@@ -69,6 +72,12 @@ export function AdminInfra() {
         {/* Création de compte de force — réservée aux administrateurs. */}
         <CreateAccountDialog />
       </header>
+
+      {/* Action « Créer un compte » (mobile) : en haut du body, au-dessus de la
+          liste des services, sans bande dédiée (l'en-tête global porte le titre). */}
+      <div className="px-4 pt-3 lg:hidden">
+        <CreateAccountDialog />
+      </div>
 
       {loading ? (
         <div className="flex items-center justify-center py-16 text-muted-foreground">

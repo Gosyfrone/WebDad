@@ -129,21 +129,22 @@ export function ConversationList({
         )}
       </div>
 
-      {/* Action « Nouveau message » (mobile) : en haut à droite du body. */}
-      <div className="flex justify-end border-b px-4 py-2 lg:hidden">
-        {newConversationMenu(
-          <Button
-            size="sm"
-            className="rounded-full bg-gradient-to-r from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] text-white"
-          >
-            <MessageSquarePlus className="mr-2 h-4 w-4" />
-            {t('messages.new_message')}
-          </Button>,
-        )}
-      </div>
-
       {/* Liste */}
       <div className="flex-1 overflow-y-auto">
+        {/* Action « Nouveau message » (mobile) : au-dessus de la 1ère conversation,
+            sans bande dédiée (l'en-tête global porte le titre « Messages »). */}
+        <div className="px-4 pt-3 lg:hidden">
+          {newConversationMenu(
+            <Button
+              size="sm"
+              className="rounded-full bg-gradient-to-r from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] text-white"
+            >
+              <MessageSquarePlus className="mr-2 h-4 w-4" />
+              {t('messages.new_message')}
+            </Button>,
+          )}
+        </div>
+
         {loading ? (
           <div className="flex justify-center py-16">
             <Loader2 className="h-6 w-6 animate-spin text-[#5B6CFF] dark:text-[#9aa6ff]" />

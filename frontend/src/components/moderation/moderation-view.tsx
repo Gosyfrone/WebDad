@@ -49,7 +49,9 @@ export function ModerationView() {
 
   return (
     <div className="flex flex-col">
-      <header className="panel z-10 border-b px-4 py-3 lg:sticky lg:top-0">
+      {/* En-tête interne (desktop) : sur mobile, le titre est porté par l'en-tête
+          global type-feed → on le masque ici pour ne pas dédoubler le titre. */}
+      <header className="panel z-10 hidden border-b px-4 py-3 lg:sticky lg:top-0 lg:block">
         <h1 className="brand-text text-xl font-bold">{t('nav.moderation')}</h1>
         <p className="text-sm text-muted-foreground">{t('moderation.subtitle')}</p>
       </header>
