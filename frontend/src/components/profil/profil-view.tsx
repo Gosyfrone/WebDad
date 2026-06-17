@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { ArrowLeft, FileText, Loader2, Lock, MessageCircle, ShieldAlert } from 'lucide-react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
 import { cn } from '@/lib/utils'
@@ -74,6 +73,18 @@ function applyPostUpdate(current: FeedPost[], updated: FeedPost): FeedPost[] {
 export function ProfilView({ username }: ProfilViewProps) {
   const { toast } = useToast()
   const t = useT()
+  const router = useRouter()
+
+  // Retour intelligent : on revient à la vue d'où l'on vient (Explorer, feed,
+  // notifs…) via l'historique. Fallback feed si accès direct par URL (pas
+  // d'historique in-app à dépiler).
+  const handleBack = useCallback(() => {
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      router.back()
+    } else {
+      router.push(ROUTES.feed)
+    }
+  }, [router])
   const [profil, setProfil] = useState<ProfilDetails | null>(null)
   const [posts, setPosts] = useState<FeedPost[]>([])
   const [replies, setReplies] = useState<ReplyContext[]>([])
@@ -350,14 +361,14 @@ export function ProfilView({ username }: ProfilViewProps) {
     return (
       <div className="flex flex-col">
         <div className="panel sticky top-0 z-10 flex items-center gap-6 border-b px-4 py-2">
-          <Link
-            href={ROUTES.feed}
-            scroll={false}
+          <button
+            type="button"
+            onClick={handleBack}
             aria-label={t('profil.back_aria')}
             className="rounded-full p-2 transition-colors hover:bg-accent hover:text-[#5B6CFF] dark:hover:text-[#9aa6ff]"
           >
             <ArrowLeft className="h-5 w-5" />
-          </Link>
+          </button>
           <span className="font-bold leading-tight text-foreground">@{profil.username}</span>
         </div>
         <div className="glass mx-4 mt-6 flex flex-col items-center gap-2 rounded-[26px] border px-8 py-16 text-center backdrop-blur-xl">
@@ -373,14 +384,14 @@ export function ProfilView({ username }: ProfilViewProps) {
     <div className="flex flex-col">
       {/* En-tête sticky */}
       <div className="panel sticky top-0 z-10 flex items-center gap-6 border-b px-4 py-2">
-        <Link
-          href={ROUTES.feed}
-          scroll={false}
+        <button
+          type="button"
+          onClick={handleBack}
           aria-label={t('profil.back_aria')}
           className="rounded-full p-2 transition-colors hover:bg-accent hover:text-[#5B6CFF] dark:hover:text-[#9aa6ff]"
         >
           <ArrowLeft className="h-5 w-5" />
-        </Link>
+        </button>
         <div className="flex flex-col">
           <span className="font-bold leading-tight text-foreground">{profil.displayName}</span>
           <span className="text-xs text-muted-foreground">
