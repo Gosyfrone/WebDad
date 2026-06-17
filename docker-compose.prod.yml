@@ -155,6 +155,10 @@ services:
       # Logo des e-mails : URL publique découplée d'APP_BASE_URL (retombe sur
       # APP_BASE_URL/logo_breezy.png si non défini).
       MAIL_LOGO_URL: ${MAIL_LOGO_URL:-}
+      # OAuth : base du redirect URI front (<base>/auth/callback/<provider>).
+      # Retombe sur APP_BASE_URL (domaine public). Les CLIENT_ID/SECRET des
+      # providers viennent d'auth-service/.env (env_file).
+      OAUTH_REDIRECT_BASE_URL: ${OAUTH_REDIRECT_BASE_URL:-${APP_BASE_URL}}
     networks:
       - webdad-net
     depends_on:

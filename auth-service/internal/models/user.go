@@ -16,7 +16,7 @@ type User struct {
 	ID            string `json:"id"`
 	Email         string `json:"email"`
 	PasswordHash  string `json:"-"`        // colonne `password` (hash bcrypt, NULL si compte OAuth)
-	Provider      string `json:"provider"` // 'local' | 'google'
+	Provider      string `json:"provider"` // 'local' | 'google' | 'github' | 'facebook' | 'spotify'
 	Role          string `json:"role"`
 	IsActive      bool   `json:"is_active"`
 	EmailVerified bool   `json:"email_verified"`
