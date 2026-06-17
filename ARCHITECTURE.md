@@ -52,11 +52,15 @@ composed by the **caller** (front/BFF).
 
 - **Client → Gateway → Service.** Gateway forwards method/path/body/headers and returns the
   response intact; prefix is preserved (`/auth/...` → auth-service `/auth/...`).
-- **Auth:** access token (15m, localStorage, sent as `Authorization: Bearer` by the client
+- **Auth:** access token (5m, localStorage, sent as `Authorization: Bearer` by the client
   directly to the gateway) + refresh token (24h, httpOnly cookie `breezy-refresh`, managed by
   the Next BFF same-origin). Login accepts email directly; username login is resolved by the
   BFF through `GET /users/by-username/:username`, then auth-service checks credentials by
   `user_id`. Refresh is single-flight on 401.
+- **Registration gate:** local registration requires `acceptedTerms=true` in the Next BFF. Google
+  sign-up exchanges/verifies the provider code, then returns a short `pending_token` when no
+  account exists yet; the public callback form collects username/date/CGU and only then creates
+  the auth credential, user row, profile and session.
 - **Credential settings:** password changes reuse the authenticated BFF route and rotate the session.
   Email changes use `pending_email` plus a one-use 24h token sent to the new address; confirmation
   atomically promotes it, revokes prior refresh tokens, and opens a session carrying the new email.

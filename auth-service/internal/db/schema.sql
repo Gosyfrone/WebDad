@@ -119,6 +119,26 @@ CREATE INDEX IF NOT EXISTS idx_refresh_tokens_token ON refresh_tokens(token);
 -- précédents d'un même usage pour un utilisateur.
 CREATE INDEX IF NOT EXISTS idx_account_tokens_user_purpose ON account_tokens(user_id, purpose);
 
+-- Inscription OAuth en attente : après validation de l'identité Google, aucun
+-- compte n'est créé tant que l'utilisateur n'a pas finalisé l'inscription côté
+-- front (username/date/CGU). Token opaque haché, usage unique, TTL court.
+CREATE TABLE IF NOT EXISTS oauth_signup_tokens (
+    id               UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    provider         auth_provider NOT NULL,
+    provider_subject TEXT NOT NULL,
+    email            VARCHAR(255) NOT NULL,
+    token_hash       TEXT NOT NULL UNIQUE,
+    expires_at       TIMESTAMPTZ NOT NULL,
+    used_at          TIMESTAMPTZ,
+    created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_oauth_signup_tokens_hash
+    ON oauth_signup_tokens(token_hash);
+CREATE INDEX IF NOT EXISTS idx_oauth_signup_tokens_provider_subject
+    ON oauth_signup_tokens(provider, provider_subject)
+    WHERE used_at IS NULL;
+
 -- Trigger updated_at automatique (CREATE OR REPLACE → idempotent, PG ≥ 14).
 CREATE OR REPLACE FUNCTION update_updated_at()
 RETURNS TRIGGER AS $$

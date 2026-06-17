@@ -843,6 +843,12 @@ export const messages: Record<Locale, Messages> = {
       'Masquer la confirmation du mot de passe',
     'auth.register.password_help':
       '8 caractères min., majuscule, minuscule, chiffre et caractère spécial.',
+    'auth.register.terms_prefix': "J'accepte les",
+    'auth.register.terms_link': 'Conditions Générales d’Utilisation',
+    'auth.register.terms_locked':
+      'Lis les CGU jusqu’en bas pour déverrouiller cette case.',
+    'auth.register.terms_unlocked':
+      'Tu peux maintenant cocher cette case pour continuer.',
     'auth.register.submit': 'Créer mon compte',
     'auth.register.submitting': 'Création du compte…',
     'auth.register.or': 'Ou créer mon compte avec',
@@ -871,6 +877,10 @@ export const messages: Record<Locale, Messages> = {
       'La confirmation est limitée à 250 caractères.',
     'auth.register.err.confirm_mismatch':
       'Les mots de passe ne correspondent pas.',
+    'auth.register.err.terms_required':
+      'Tu dois accepter les CGU pour créer ton compte.',
+    'auth.register.err.terms_read_required':
+      'Lis les CGU jusqu’au bout avant de les accepter.',
     'auth.register.err.failed':
       "L'inscription a échoué. Vérifie les informations saisies.",
 
@@ -878,6 +888,8 @@ export const messages: Record<Locale, Messages> = {
     'onboarding.title': 'Bienvenue sur Breezy 👋',
     'onboarding.subtitle':
       "Choisis ton nom d'utilisateur et indique ta date de naissance pour finaliser ton compte.",
+    'onboarding.oauth_subtitle':
+      "Finalise ton inscription Google avec {email}. Aucun compte Breezy n'est créé avant cette étape.",
     'onboarding.username_label': "Nom d'utilisateur",
     'onboarding.username_placeholder': 'ex. felipe',
     'onboarding.username_hint': '3 à 24 caractères : lettres, chiffres, tiret bas (_) et point (.).',
@@ -888,6 +900,8 @@ export const messages: Record<Locale, Messages> = {
       "En dessous de 18 ans, les contenus sensibles (NSFW) seront masqués. La date de naissance n'est pas modifiable après validation.",
     'onboarding.submit': 'Valider et continuer',
     'onboarding.submitting': 'Enregistrement…',
+    'onboarding.accept_terms': 'Accepter les CGU',
+    'onboarding.terms_accepted': 'CGU acceptées',
     'onboarding.err.generic':
       'Une erreur est survenue. Réessaie dans un instant.',
 
@@ -2007,6 +2021,12 @@ export const messages: Record<Locale, Messages> = {
     'auth.register.hide_password_confirm': 'Hide password confirmation',
     'auth.register.password_help':
       '8 chars min., uppercase, lowercase, number and special character.',
+    'auth.register.terms_prefix': 'I accept the',
+    'auth.register.terms_link': 'Terms of Use',
+    'auth.register.terms_locked':
+      'Read the Terms of Use to the bottom to unlock this checkbox.',
+    'auth.register.terms_unlocked':
+      'You can now check this box to continue.',
     'auth.register.submit': 'Create my account',
     'auth.register.submitting': 'Creating account…',
     'auth.register.or': 'Or create my account with',
@@ -2032,6 +2052,10 @@ export const messages: Record<Locale, Messages> = {
     'auth.register.err.confirm_max':
       'The confirmation is limited to 250 characters.',
     'auth.register.err.confirm_mismatch': "Passwords don't match.",
+    'auth.register.err.terms_required':
+      'You must accept the Terms of Use to create your account.',
+    'auth.register.err.terms_read_required':
+      'Read the Terms of Use all the way through before accepting them.',
     'auth.register.err.failed':
       'Sign-up failed. Check the information entered.',
 
@@ -2039,6 +2063,8 @@ export const messages: Record<Locale, Messages> = {
     'onboarding.title': 'Welcome to Breezy 👋',
     'onboarding.subtitle':
       'Pick your username and enter your date of birth to finish setting up your account.',
+    'onboarding.oauth_subtitle':
+      'Finish your Google sign-up with {email}. No Breezy account is created before this step.',
     'onboarding.username_label': 'Username',
     'onboarding.username_placeholder': 'e.g. felipe',
     'onboarding.username_hint': '3 to 24 characters: letters, numbers, underscore (_) and dot (.).',
@@ -2049,6 +2075,8 @@ export const messages: Record<Locale, Messages> = {
       "Under 18, sensitive (NSFW) content will be hidden. Your date of birth can't be changed after confirmation.",
     'onboarding.submit': 'Confirm and continue',
     'onboarding.submitting': 'Saving…',
+    'onboarding.accept_terms': 'Accept the Terms',
+    'onboarding.terms_accepted': 'Terms accepted',
     'onboarding.err.generic': 'Something went wrong. Try again in a moment.',
 
     // — Admin account creation —

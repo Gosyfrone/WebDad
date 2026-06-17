@@ -110,7 +110,7 @@
 
 ## Auth
 
-- **Access (15m) localStorage + refresh (24h) httpOnly cookie via BFF.** Assumed trade-off:
+- **Access (5m) localStorage + refresh (24h) httpOnly cookie via BFF.** Assumed trade-off:
   access is XSS-exposed but short-lived; refresh is non-stealable. BFF-managed cookie (same-origin)
   avoids cross-origin CORS/SameSite complexity. Refresh is **single-flight** to avoid refresh storms on simultaneous 401s.
 - **Admin-created accounts = temporary password + provisional username (forced fixups via JWT/`/users/me`).**
@@ -162,6 +162,15 @@
   the provider authenticated the user and returns a confirmed address (for GitHub we explicitly pick a *verified*
   one), `EmailVerified=true` is set for them (the handler still rejects an **absent** email). OIDC providers keep the
   strict `email_verified` check (added/explicit-`true`).
+- **CGU acceptance gate lives in the BFF/front, and new Google sign-up is pending until final submit.**
+  The legal read marker is local UX (`/cgu` scrolled to bottom → checkbox/button unlock) while the
+  Next BFF enforces `acceptedTerms=true` for classic `/api/auth/register`. For Google sign-up,
+  `/auth/oauth/:provider/exchange` verifies the provider identity but, when no account exists, writes only
+  a short `oauth_signup_tokens` row and returns `onboarding_required + pending_token + email` — **no
+  credential, no user/profile, no JWT**. The public callback form then collects username/date/CGU and
+  `POST /auth/oauth/:provider/complete` consumes the pending token in a transaction to create the
+  credential and issue the first session; the BFF provisions user-service/profil-service immediately
+  after. Existing Google logins still issue tokens directly.
 - **Account reconciliation by email:** existing account → connect + fill `provider_subject` (only if unset, no
   hijack); absent → create with `password NULL`. Classic login on a password-less account is refused with a clear
   409 (`ErrNoLocalPassword`) steering the user to the external provider. Schema migrated via idempotent `ALTER`

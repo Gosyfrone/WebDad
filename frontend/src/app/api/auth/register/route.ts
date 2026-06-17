@@ -20,6 +20,7 @@ export async function POST(request: NextRequest) {
     gender?: string
     email?: string
     password?: string
+    acceptedTerms?: boolean
   }
 
   try {
@@ -36,6 +37,13 @@ export async function POST(request: NextRequest) {
       {
         error: 'Le nom d’utilisateur, l’adresse e-mail et le mot de passe sont requis.',
       },
+      { status: 400 }
+    )
+  }
+
+  if (body.acceptedTerms !== true) {
+    return NextResponse.json(
+      { error: 'Les CGU doivent être acceptées pour créer un compte.' },
       { status: 400 }
     )
   }

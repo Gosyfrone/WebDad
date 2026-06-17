@@ -100,6 +100,25 @@ type OAuthExchangeRequest struct {
 	State string `json:"state"`
 }
 
+// OAuthCompleteRequest finalise une inscription OAuth en attente. Le token est
+// celui renvoyé par /exchange quand aucun compte n'existe encore.
+type OAuthCompleteRequest struct {
+	PendingToken  string `json:"pending_token" binding:"required"`
+	AcceptedTerms *bool  `json:"accepted_terms" binding:"required"`
+}
+
+// OAuthExchangeData : réponse de POST /auth/oauth/:provider/exchange.
+// Si onboarding_required=true, aucun compte/JWT n'a été créé : le front doit
+// finaliser l'inscription avec pending_token.
+type OAuthExchangeData struct {
+	Token              string   `json:"token,omitempty"`
+	RefreshToken       string   `json:"refresh_token,omitempty"`
+	User               AuthUser `json:"user,omitempty"`
+	OnboardingRequired bool     `json:"onboarding_required,omitempty"`
+	PendingToken       string   `json:"pending_token,omitempty"`
+	Email              string   `json:"email,omitempty"`
+}
+
 // RefreshRequest : payload de POST /auth/refresh et /auth/logout. Le refresh
 // token transite dans le corps (transmis par le BFF Next depuis le cookie
 // httpOnly) — pas de binding `required` pour que /logout reste best-effort.

@@ -90,6 +90,7 @@ func New(auth *services.AuthService, oauthReg *oauth.Registry) *gin.Engine {
 		{
 			oauthGroup.GET("/url", h.OAuthURL)
 			oauthGroup.POST("/exchange", h.OAuthExchange)
+			oauthGroup.POST("/complete", h.OAuthComplete)
 		}
 	}
 
