@@ -231,6 +231,9 @@ services:
     environment:
       MONGO_HOST: mongo-profil       # override : nom du conteneur dans le réseau
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET requis}
+      # Lecture du graphe social (is-following pour l'activité) + acceptation en
+      # masse des demandes au passage public — appels serveur-à-serveur directs.
+      USER_SERVICE_URL: http://user-service:8082
     ports:
       - "8083:8083"
     networks:

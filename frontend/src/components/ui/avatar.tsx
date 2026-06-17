@@ -33,7 +33,11 @@ const Avatar = React.forwardRef<
       key={imageIdentity}
       ref={ref}
       className={cn(
-        'relative flex h-10 w-10 shrink-0 overflow-hidden rounded-full',
+        // Pas d'`overflow-hidden` ici : l'image et le fallback portent déjà
+        // `rounded-full` (donc restent circulaires), et le clip racine rognait
+        // la pastille de présence (`ActivityPresenceDot`, enfant en position
+        // absolue débordant volontairement le cercle) en un mince croissant.
+        'relative flex h-10 w-10 shrink-0 rounded-full',
         className,
       )}
       {...props}

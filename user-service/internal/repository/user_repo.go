@@ -239,6 +239,32 @@ func (r *UserRepository) PendingFollowRequestIDs(followerID string) ([]string, e
 	return ids, rows.Err()
 }
 
+// IncomingFollowRequestFollowerIDs renvoie les ids des demandeurs en attente
+// d'acceptation par `ownerID` (demandes entrantes). Utilisé pour l'acceptation
+// en masse lorsqu'un compte privé repasse public.
+func (r *UserRepository) IncomingFollowRequestFollowerIDs(ownerID string) ([]string, error) {
+	rows, err := r.db.Query(`
+		SELECT follower_id::text
+		FROM follow_requests
+		WHERE following_id = $1
+		ORDER BY created_at ASC`,
+		ownerID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	ids := make([]string, 0)
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
 func (r *UserRepository) AcceptFollowRequest(followerID, followingID string) (bool, error) {
 	tx, err := r.db.Begin()
 	if err != nil {

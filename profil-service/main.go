@@ -49,6 +49,10 @@ func main() {
 		os.Exit(1)
 	}
 
+	// On logue l'URL user-service résolue : un `http://localhost:...` ici en
+	// conteneur = USER_SERVICE_URL absent de l'environnement (conteneur à recréer)
+	// → les appels inter-services (is-following, accept-all) échoueraient.
+	slog.Info("user-service", "url", cfg.UserURL)
 	profils := service.New(
 		repository.NewProfilRepository(db),
 		cfg.DisplayNameCooldown,

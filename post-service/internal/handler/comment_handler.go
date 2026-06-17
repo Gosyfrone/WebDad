@@ -54,6 +54,30 @@ func (h *CommentHandler) ListCommentsByAuthor(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": results})
 }
 
+// CommentStats : GET /posts/comments/stats?ids=a,b,c — compteurs de likes des
+// commentaires demandés, pour le rafraîchissement périodique des cœurs côté
+// front sans recharger tout le thread.
+// @Summary     Compteurs de commentaires (rafraîchissement)
+// @Tags        comments
+// @Produce     json
+// @Param       ids query string true "IDs de commentaires séparés par des virgules (max 100)"
+// @Success     200 {array} models.CommentStat
+// @Failure     500 {object} map[string]string
+// @Router      /posts/comments/stats [get]
+func (h *CommentHandler) CommentStats(c *gin.Context) {
+	ids := splitIDs(c.Query("ids"))
+	if len(ids) == 0 {
+		c.JSON(http.StatusOK, gin.H{"data": []models.CommentStat{}})
+		return
+	}
+	stats, err := h.service.CommentStats(c.Request.Context(), ids)
+	if err != nil {
+		respondPostError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": stats})
+}
+
 // ListPostComments : GET /posts/:id/comments (public) — commentaires RACINE,
 // chronologiques, paginés (les réponses sont chargées via ListCommentReplies).
 // @Summary     Commentaires d'un post
@@ -66,7 +90,11 @@ func (h *CommentHandler) ListCommentsByAuthor(c *gin.Context) {
 // @Failure     404 {object} map[string]string
 // @Router      /posts/{id}/comments [get]
 func (h *CommentHandler) ListPostComments(c *gin.Context) {
-	comments, err := h.service.ListComments(c.Request.Context(), c.Param("id"), pageLimit(c), pageOffset(c))
+	viewerID := ""
+	if claims, ok := middleware.ClaimsFrom(c); ok {
+		viewerID = claims.UserID
+	}
+	comments, err := h.service.ListComments(c.Request.Context(), c.Param("id"), viewerID, pageLimit(c), pageOffset(c))
 	if err != nil {
 		respondPostError(c, err)
 		return
@@ -87,7 +115,11 @@ func (h *CommentHandler) ListPostComments(c *gin.Context) {
 // @Failure     404 {object} map[string]string
 // @Router      /posts/{id}/comments/{commentId}/replies [get]
 func (h *CommentHandler) ListCommentReplies(c *gin.Context) {
-	replies, err := h.service.ListReplies(c.Request.Context(), c.Param("commentId"), pageLimit(c), pageOffset(c))
+	viewerID := ""
+	if claims, ok := middleware.ClaimsFrom(c); ok {
+		viewerID = claims.UserID
+	}
+	replies, err := h.service.ListReplies(c.Request.Context(), c.Param("commentId"), viewerID, pageLimit(c), pageOffset(c))
 	if err != nil {
 		respondPostError(c, err)
 		return
@@ -160,4 +192,56 @@ func (h *CommentHandler) DeletePostComment(c *gin.Context) {
 	}
 	logging.FromGin(c).Info("commentaire supprimé", "comment_id", c.Param("commentId"))
 	c.Status(http.StatusNoContent)
+}
+
+// LikeComment : POST /posts/:id/comments/:commentId/like — like du commentaire
+// courant par l'utilisateur authentifié (idempotent).
+// @Summary     Liker un commentaire
+// @Tags        comments
+// @Produce     json
+// @Security    BearerAuth
+// @Param       id path string true "Post ID"
+// @Param       commentId path string true "Comment ID"
+// @Success     200 {object} map[string]string "likes_count"
+// @Failure     401 {object} map[string]string
+// @Failure     404 {object} map[string]string
+// @Router      /posts/{id}/comments/{commentId}/like [post]
+func (h *CommentHandler) LikeComment(c *gin.Context) {
+	claims, ok := middleware.ClaimsFrom(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "claims absents"})
+		return
+	}
+	count, err := h.service.LikeComment(c.Request.Context(), c.Param("id"), c.Param("commentId"), claims.UserID)
+	if err != nil {
+		respondPostError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": gin.H{"liked": true, "likes_count": count}})
+}
+
+// UnlikeComment : DELETE /posts/:id/comments/:commentId/like — retrait du like
+// du commentaire courant (idempotent).
+// @Summary     Retirer son like d'un commentaire
+// @Tags        comments
+// @Produce     json
+// @Security    BearerAuth
+// @Param       id path string true "Post ID"
+// @Param       commentId path string true "Comment ID"
+// @Success     200 {object} map[string]string "likes_count"
+// @Failure     401 {object} map[string]string
+// @Failure     404 {object} map[string]string
+// @Router      /posts/{id}/comments/{commentId}/like [delete]
+func (h *CommentHandler) UnlikeComment(c *gin.Context) {
+	claims, ok := middleware.ClaimsFrom(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "claims absents"})
+		return
+	}
+	count, err := h.service.UnlikeComment(c.Request.Context(), c.Param("id"), c.Param("commentId"), claims.UserID)
+	if err != nil {
+		respondPostError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": gin.H{"liked": false, "likes_count": count}})
 }

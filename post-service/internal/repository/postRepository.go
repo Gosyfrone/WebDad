@@ -20,11 +20,12 @@ import (
 // hexadécimal (`post_id`, string) ; les compteurs dénormalisés vivent sur le
 // document `posts` et sont maintenus par `$inc`.
 type PostRepository struct {
-	posts     *mongo.Collection
-	likes     *mongo.Collection
-	comments  *mongo.Collection
-	reposts   *mongo.Collection
-	pollVotes *mongo.Collection
+	posts        *mongo.Collection
+	likes        *mongo.Collection
+	comments     *mongo.Collection
+	commentLikes *mongo.Collection
+	reposts      *mongo.Collection
+	pollVotes    *mongo.Collection
 	// Signets : collections + appartenances + préférences de rafale.
 	bookmarkCollections *mongo.Collection
 	bookmarks           *mongo.Collection
@@ -36,6 +37,7 @@ func NewPostRepository(db *mongo.Database) *PostRepository {
 		posts:               db.Collection("posts"),
 		likes:               db.Collection("likes"),
 		comments:            db.Collection("comments"),
+		commentLikes:        db.Collection("comment_likes"),
 		reposts:             db.Collection("reposts"),
 		pollVotes:           db.Collection("poll_votes"),
 		bookmarkCollections: db.Collection("bookmark_collections"),
@@ -403,6 +405,7 @@ func (r *PostRepository) PurgeByAuthor(ctx context.Context, userID string) (int6
 	}
 	_, _ = r.comments.DeleteMany(ctx, bson.M{"author_id": userID})
 	_, _ = r.likes.DeleteMany(ctx, bson.M{"user_id": userID})
+	_, _ = r.commentLikes.DeleteMany(ctx, bson.M{"user_id": userID})
 	_, _ = r.reposts.DeleteMany(ctx, bson.M{"user_id": userID})
 	_, _ = r.bookmarks.DeleteMany(ctx, bson.M{"user_id": userID})
 	_, _ = r.bookmarkCollections.DeleteMany(ctx, bson.M{"user_id": userID})
@@ -735,6 +738,28 @@ func (r *PostRepository) AddComment(ctx context.Context, comment *models.Comment
 	return nil
 }
 
+// CommentStatsByIDs renvoie les compteurs de likes des commentaires demandés en
+// projection légère, sans leur contenu.
+func (r *PostRepository) CommentStatsByIDs(ctx context.Context, oids []bson.ObjectID) ([]models.Comment, error) {
+	if len(oids) == 0 {
+		return []models.Comment{}, nil
+	}
+	opts := options.Find().SetProjection(bson.M{
+		"likes_count": 1,
+	})
+	cursor, err := r.comments.Find(ctx, bson.M{"_id": bson.M{"$in": oids}}, opts)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = cursor.Close(ctx) }()
+
+	comments := []models.Comment{}
+	if err := cursor.All(ctx, &comments); err != nil {
+		return nil, err
+	}
+	return comments, nil
+}
+
 // ListComments renvoie les commentaires RACINE d'un post (parent_id absent/null),
 // du plus ancien au plus récent, paginés. Les réponses sont chargées à part
 // (ListReplies).
@@ -773,6 +798,19 @@ func (r *PostRepository) IncReplyCount(ctx context.Context, id bson.ObjectID, de
 	return err
 }
 
+// IncCommentCounter applique `$inc` sur un compteur dénormalisé d'un
+// commentaire (likes_count) et renvoie le document à jour.
+func (r *PostRepository) IncCommentCounter(ctx context.Context, id bson.ObjectID, field string, delta int32) (*models.Comment, error) {
+	update := bson.M{"$inc": bson.M{field: delta}}
+	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
+
+	var comment models.Comment
+	if err := r.comments.FindOneAndUpdate(ctx, bson.M{"_id": id}, update, opts).Decode(&comment); err != nil {
+		return nil, err
+	}
+	return &comment, nil
+}
+
 // DeleteRepliesByParent supprime toutes les réponses d'un commentaire racine
 // (cascade à la suppression). Renvoie le nombre de réponses supprimées.
 func (r *PostRepository) DeleteRepliesByParent(ctx context.Context, parentID string) (int64, error) {
@@ -781,6 +819,12 @@ func (r *PostRepository) DeleteRepliesByParent(ctx context.Context, parentID str
 		return 0, err
 	}
 	return res.DeletedCount, nil
+}
+
+// CommentIDsByParent renvoie tous les ids hexadécimaux des réponses d'un
+// commentaire racine. Sert au nettoyage en cascade des likes de réponses.
+func (r *PostRepository) CommentIDsByParent(ctx context.Context, parentID string) ([]string, error) {
+	return r.distinctStrings(ctx, r.comments, bson.M{"parent_id": parentID}, "_id")
 }
 
 // ListCommentsByAuthor renvoie tous les commentaires d'un auteur, du plus
@@ -825,6 +869,59 @@ func (r *PostRepository) DeleteComment(ctx context.Context, id bson.ObjectID) er
 	return nil
 }
 
+// AddCommentLike enregistre un like de commentaire, idempotent via l'index
+// unique comment_id+user_id.
+func (r *PostRepository) AddCommentLike(ctx context.Context, commentID, userID string) (bool, error) {
+	_, err := r.commentLikes.InsertOne(ctx, bson.M{
+		"comment_id": commentID,
+		"user_id":    userID,
+		"created_at": time.Now(),
+	})
+	if err != nil {
+		if mongo.IsDuplicateKeyError(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+
+// RemoveCommentLike supprime un like de commentaire.
+func (r *PostRepository) RemoveCommentLike(ctx context.Context, commentID, userID string) (bool, error) {
+	res, err := r.commentLikes.DeleteOne(ctx, bson.M{"comment_id": commentID, "user_id": userID})
+	if err != nil {
+		return false, err
+	}
+	return res.DeletedCount > 0, nil
+}
+
+// LikedCommentIDsByUser renvoie l'intersection entre les commentaires demandés
+// et les likes détenus par userID. Sert à hydrater l'état initial des cœurs.
+func (r *PostRepository) LikedCommentIDsByUser(ctx context.Context, userID string, commentIDs []string) ([]string, error) {
+	if userID == "" || len(commentIDs) == 0 {
+		return []string{}, nil
+	}
+	return r.distinctStrings(ctx, r.commentLikes, bson.M{
+		"user_id":    userID,
+		"comment_id": bson.M{"$in": commentIDs},
+	}, "comment_id")
+}
+
+// DeleteCommentLikesByComment purge les likes d'un commentaire supprimé.
+func (r *PostRepository) DeleteCommentLikesByComment(ctx context.Context, commentID string) error {
+	_, err := r.commentLikes.DeleteMany(ctx, bson.M{"comment_id": commentID})
+	return err
+}
+
+// DeleteCommentLikesByComments purge les likes d'un lot de commentaires.
+func (r *PostRepository) DeleteCommentLikesByComments(ctx context.Context, commentIDs []string) error {
+	if len(commentIDs) == 0 {
+		return nil
+	}
+	_, err := r.commentLikes.DeleteMany(ctx, bson.M{"comment_id": bson.M{"$in": commentIDs}})
+	return err
+}
+
 // DeleteCommentsByPost purge les commentaires d'un post (nettoyage à la suppression).
 func (r *PostRepository) DeleteCommentsByPost(ctx context.Context, postID string) error {
 	_, err := r.comments.DeleteMany(ctx, bson.M{"post_id": postID})
@@ -847,6 +944,10 @@ func (r *PostRepository) distinctStrings(ctx context.Context, coll *mongo.Collec
 	for _, d := range docs {
 		if v, ok := d[field].(string); ok {
 			ids = append(ids, v)
+			continue
+		}
+		if oid, ok := d[field].(bson.ObjectID); ok {
+			ids = append(ids, oid.Hex())
 		}
 	}
 	return ids, nil

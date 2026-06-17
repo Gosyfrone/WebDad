@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button'
 /** Icône (et couleur) par type de notification. */
 const TYPE_ICON: Record<NotificationType, { Icon: React.ElementType; className: string }> = {
   like: { Icon: Heart, className: 'text-rose-500' },
+  comment_like: { Icon: Heart, className: 'text-rose-500' },
   comment: { Icon: MessageCircle, className: 'text-[#5B6CFF] dark:text-[#9aa6ff]' },
   reply: { Icon: Reply, className: 'text-[#5B6CFF] dark:text-[#9aa6ff]' },
   mention: { Icon: AtSign, className: 'text-[#47D9FF]' },
@@ -50,6 +51,10 @@ export function NotificationsView() {
         return count > 0
           ? t('notifications.like_other', { name, count })
           : t('notifications.like_one', { name })
+      case 'comment_like':
+        return count > 0
+          ? t('notifications.comment_like_other', { name, count })
+          : t('notifications.comment_like_one', { name })
       case 'comment':
         return count > 0
           ? t('notifications.comment_other', { name, count })

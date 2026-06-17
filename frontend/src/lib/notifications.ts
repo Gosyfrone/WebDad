@@ -23,6 +23,7 @@ import { resolveMediaUrl } from '@/lib/media'
 
 export type NotificationType =
   | 'like'
+  | 'comment_like'
   | 'comment'
   | 'reply'
   | 'mention'
@@ -194,8 +195,9 @@ export function notificationHref(n: {
     return n.conversationId ? `/messages?conv=${encodeURIComponent(n.conversationId)}` : '/messages'
   }
   if (!n.postId) return '/feed'
-  // Commentaire/réponse : on cible directement le commentaire dans le thread.
-  if ((n.type === 'comment' || n.type === 'reply') && n.commentId) {
+  // Commentaire/réponse/like de commentaire : on cible directement le
+  // commentaire dans le thread.
+  if ((n.type === 'comment' || n.type === 'reply' || n.type === 'comment_like') && n.commentId) {
     return `/posts/${n.postId}?comment=${encodeURIComponent(n.commentId)}`
   }
   return `/posts/${n.postId}`

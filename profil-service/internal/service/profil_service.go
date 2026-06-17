@@ -6,6 +6,7 @@ package service
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"regexp"
 	"strings"
 	"time"
@@ -42,9 +43,12 @@ type ProfilService struct {
 	follows             FollowChecker
 }
 
-// FollowChecker vérifie la relation follower -> following dans user-service.
+// FollowChecker interroge le graphe social dans user-service : vérifie la
+// relation follower -> following et accepte en masse les demandes en attente
+// (quand un profil privé repasse public).
 type FollowChecker interface {
 	IsFollowing(ctx context.Context, followerID, followingID string) (bool, error)
+	AcceptAllFollowRequests(ctx context.Context, ownerID string) error
 }
 
 // Option configure les dépendances optionnelles du service.
@@ -137,6 +141,19 @@ func (s *ProfilService) Update(ctx context.Context, userID string, req models.Up
 	}
 
 	p, err := s.repo.Update(ctx, userID, set)
+	if err == nil && p != nil &&
+		current.Visibility == models.VisibilityPrivate &&
+		p.Visibility == models.VisibilityPublic &&
+		s.follows != nil {
+		// Privé → public : on accepte d'un coup les demandes d'abonnement en
+		// attente. Best-effort (le changement de visibilité, lui, a réussi) :
+		// une panne user-service ne doit pas faire échouer le PATCH.
+		slog.Info("profil privé → public : acceptation des demandes en attente", "user_id", userID)
+		if aerr := s.follows.AcceptAllFollowRequests(ctx, userID); aerr != nil {
+			slog.Warn("acceptation en masse des demandes échouée",
+				"user_id", userID, "error", aerr)
+		}
+	}
 	return mapGet(p, err)
 }
 

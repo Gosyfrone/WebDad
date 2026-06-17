@@ -9,7 +9,11 @@ import (
 
 // Types de notification (alignés sur l'enum du validateur Mongo).
 const (
-	TypeLike                       = "like"
+	TypeLike = "like"
+	// TypeCommentLike : like sur un commentaire / une réponse. Émis par
+	// post-service vers l'auteur du commentaire, agrégé par commentaire
+	// (`comment_like:<comment_id>`). Navigue vers le post + commentaire visé.
+	TypeCommentLike                = "comment_like"
 	TypeComment                    = "comment"
 	TypeReply                      = "reply"
 	TypeMention                    = "mention"

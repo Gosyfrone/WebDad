@@ -30,6 +30,8 @@ These govern *how* Claude works on this repo. They override default behavior.
 9. **Keep responses concise** — update the docs rather than re-explaining context.
 10. **No self-commit / no self-push** — only propose the commit message; the user commits.
 11. **graphify-first for codebase questions:** when `graphify-out/graph.json` exists, run `graphify query "<question>"` (scoped subgraph, far smaller than grep/GRAPH_REPORT.md). Use `graphify path "<A>" "<B>"`, `graphify explain "<concept>"`, `graphify-out/wiki/index.md` for navigation, `GRAPH_REPORT.md` only for broad architecture review. Read raw source only to modify/debug or when the graph lacks detail. **After modifying code, run `graphify update .`** (AST-only, no API cost).
+12. **Session workflow (17/06/2026):** before each assistant reply, re-read `CLAUDE.md`; after each reply, keep it up to date if a new working rule or constraint was introduced during the exchange.
+13. **Swagger discipline reinforced (17/06/2026):** if a task adds or changes routes, add/update swaggo annotations in the handlers and run `make swagger` before handing off.
 
 ---
 

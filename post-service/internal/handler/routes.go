@@ -53,6 +53,7 @@ func RegisterRoutes(r *gin.Engine, serviceName string, postService *service.Post
 		posts.GET("/stats", optionalAuth, PostHandler.PostStats)
 		// Réponses d'un auteur — route STATIQUE avant `/:id`.
 		posts.GET("/comments", optionalAuth, CommentHandler.ListCommentsByAuthor)
+		posts.GET("/comments/stats", CommentHandler.CommentStats)
 
 		// Modération — routes STATIQUES (`/posts/moderation/…`) placées avant le
 		// groupe `/:id`. Corbeille partagée mod/admin (tweets retirés en
@@ -111,10 +112,12 @@ func RegisterRoutes(r *gin.Engine, serviceName string, postService *service.Post
 
 			comment := post.Group("/comments")
 			{
-				comment.GET("", CommentHandler.ListPostComments)
+				comment.GET("", optionalAuth, CommentHandler.ListPostComments)
 				comment.POST("", auth, CommentHandler.CreatPostComment)
-				comment.GET("/:commentId/replies", CommentHandler.ListCommentReplies)
+				comment.GET("/:commentId/replies", optionalAuth, CommentHandler.ListCommentReplies)
 				comment.DELETE("/:commentId", auth, CommentHandler.DeletePostComment)
+				comment.POST("/:commentId/like", auth, CommentHandler.LikeComment)
+				comment.DELETE("/:commentId/like", auth, CommentHandler.UnlikeComment)
 			}
 		}
 	}

@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Image as ImageIcon, Loader2, Smile, Trash2, Users, X } from 'lucide-react'
+import { Heart, Image as ImageIcon, Loader2, Smile, Trash2, Users, X } from 'lucide-react'
 
 import { cn, initialOf, timeAgo } from '@/lib/utils'
 import { getAccessToken } from '@/lib/auth-client'
@@ -10,10 +10,13 @@ import { exceedsMediaLimit, MAX_MEDIA_MB, resolveMediaUrl, uploadMedia } from '@
 import {
   createComment,
   deleteComment,
+  getCommentsStats,
+  likeComment,
   listComments,
   listReplies,
   type PostComment,
   type PostMedia,
+  unlikeComment,
 } from '@/lib/posts'
 import { useToast } from '@/hooks/use-toast'
 import { useMention } from '@/lib/use-mention'
@@ -22,6 +25,7 @@ import { useAuthGate } from '@/components/auth-prompt-provider'
 import { useLanguage } from '@/components/language-provider'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
+import { AnimatedCount } from '@/components/feed/animated-count'
 import { EmojiPicker } from '@/components/feed/emoji-picker'
 import { MentionAutocomplete } from '@/components/mention/mention-autocomplete'
 import { TranslatedContent } from '@/components/feed/translated-content'
@@ -37,6 +41,34 @@ const REPLIES_PAGE = 6
 function mergeUnique(current: PostComment[], incoming: PostComment[]): PostComment[] {
   const seen = new Set(current.map((c) => c.id))
   return [...current, ...incoming.filter((c) => !seen.has(c.id))]
+}
+
+function patchCommentById(
+  current: PostComment[],
+  id: string,
+  patch: Partial<PostComment>,
+): PostComment[] {
+  let changed = false
+  const next = current.map((comment) => {
+    if (comment.id !== id) return comment
+    changed = true
+    return { ...comment, ...patch }
+  })
+  return changed ? next : current
+}
+
+function applyCommentStats(
+  current: PostComment[],
+  stats: Map<string, { likesCount: number }>,
+): PostComment[] {
+  let changed = false
+  const next = current.map((comment) => {
+    const stat = stats.get(comment.id)
+    if (!stat || stat.likesCount === comment.likesCount) return comment
+    changed = true
+    return { ...comment, likesCount: stat.likesCount }
+  })
+  return changed ? next : current
 }
 
 interface CommentSectionProps {
@@ -105,6 +137,38 @@ export function CommentSection({ postId, focusCommentId, onCountChange, canReply
       cancelled = true
     }
   }, [postId, t])
+
+  useEffect(() => {
+    let cancelled = false
+    let inFlight = false
+
+    const tick = async () => {
+      if (cancelled || inFlight || document.hidden || comments.length === 0) return
+      inFlight = true
+      try {
+        const stats = await getCommentsStats(comments.map((comment) => comment.id))
+        if (!cancelled && stats.size > 0) {
+          setComments((prev) => applyCommentStats(prev, stats))
+        }
+      } catch {
+        // best-effort
+      } finally {
+        inFlight = false
+      }
+    }
+
+    const interval = setInterval(tick, 7000)
+    const onVisible = () => {
+      if (!document.hidden) void tick()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [comments])
 
   const loadMore = useCallback(async () => {
     setLoadingMore(true)
@@ -224,6 +288,10 @@ export function CommentSection({ postId, focusCommentId, onCountChange, canReply
     setComments((prev) => prev.filter((c) => c.id !== id))
   }
 
+  const handleUpdateRoot = useCallback((id: string, patch: Partial<PostComment>) => {
+    setComments((prev) => patchCommentById(prev, id, patch))
+  }, [])
+
   return (
     <div className="mt-2 border-t border-border pt-3">
       {/* Composer racine — invite de connexion pour le visiteur ; message
@@ -339,6 +407,7 @@ export function CommentSection({ postId, focusCommentId, onCountChange, canReply
                 focusCommentId={focusCommentId}
                 highlightId={highlightId}
                 onRemove={handleRemoveRoot}
+                onUpdate={handleUpdateRoot}
                 onCountChange={onCountChange}
                 canReply={canReply}
               />
@@ -366,6 +435,7 @@ interface CommentThreadProps {
   /** Commentaire actuellement surligné. */
   highlightId?: string
   onRemove: (id: string) => void
+  onUpdate: (id: string, patch: Partial<PostComment>) => void
   onCountChange?: (delta: number) => void
   /** L'audience du post autorise-t-elle le lecteur à répondre ? Masque les
    *  boutons « Répondre » sinon (le serveur reste autoritaire). */
@@ -376,12 +446,24 @@ interface CommentThreadProps {
  * Un commentaire racine + ses réponses (repliées par défaut, indentées).
  * Réponses paginées (« Voir plus de réponses ») ; composer de réponse inline.
  */
-function CommentThread({ postId, comment, focusCommentId, highlightId, onRemove, onCountChange, canReply = true }: CommentThreadProps) {
+function CommentThread({
+  postId,
+  comment,
+  focusCommentId,
+  highlightId,
+  onRemove,
+  onUpdate,
+  onCountChange,
+  canReply = true,
+}: CommentThreadProps) {
   const { toast } = useToast()
   const { t } = useLanguage()
   const { promptLogin } = useAuthGate()
   const [replies, setReplies] = useState<PostComment[]>([])
   const [replyCount, setReplyCount] = useState(comment.replyCount)
+  const [liked, setLiked] = useState(comment.liked)
+  const [likeCount, setLikeCount] = useState(comment.likesCount)
+  const [likeBurst, setLikeBurst] = useState(0)
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
 
@@ -406,6 +488,15 @@ function CommentThread({ postId, comment, focusCommentId, highlightId, onRemove,
   const remaining = MAX_CHARS - content.length
   const canSubmit = (content.trim().length > 0 || media.length > 0) && remaining >= 0 && !submitting && !uploadingMedia
 
+  useEffect(() => {
+    setReplyCount(comment.replyCount)
+  }, [comment.replyCount])
+
+  useEffect(() => {
+    setLiked(comment.liked)
+    setLikeCount(comment.likesCount)
+  }, [comment.liked, comment.likesCount])
+
   // Deep-link notification : si le commentaire ciblé est une réponse de CE
   // thread, on charge ses réponses en silence et on le déplie (le scroll +
   // surbrillance sont gérés par le parent une fois la réponse dans le DOM).
@@ -425,6 +516,44 @@ function CommentThread({ postId, comment, focusCommentId, highlightId, onRemove,
       cancelled = true
     }
   }, [focusCommentId, comment.id, open, replyCount, postId])
+
+  useEffect(() => {
+    let cancelled = false
+    let inFlight = false
+
+    const tick = async () => {
+      if (cancelled || inFlight || document.hidden) return
+      const ids = [comment.id, ...replies.map((reply) => reply.id)]
+      if (ids.length === 0) return
+      inFlight = true
+      try {
+        const stats = await getCommentsStats(ids)
+        if (!cancelled && stats.size > 0) {
+          const root = stats.get(comment.id)
+          if (root) {
+            setLikeCount(root.likesCount)
+            onUpdate(comment.id, { likesCount: root.likesCount })
+          }
+          setReplies((prev) => applyCommentStats(prev, stats))
+        }
+      } catch {
+        // best-effort
+      } finally {
+        inFlight = false
+      }
+    }
+
+    const interval = setInterval(tick, 7000)
+    const onVisible = () => {
+      if (!document.hidden) void tick()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [comment.id, onUpdate, replies])
 
   async function loadReplies(offset: number) {
     setLoading(true)
@@ -473,6 +602,70 @@ function CommentThread({ postId, comment, focusCommentId, highlightId, onRemove,
       toast({ title: t('comment.reply_failed'), variant: 'destructive' })
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  async function toggleRootLike() {
+    if (!getAccessToken()) {
+      promptLogin()
+      return
+    }
+    const previousLiked = liked
+    const previousCount = likeCount
+    const next = !liked
+    const optimisticCount = Math.max(0, previousCount + (next ? 1 : -1))
+    setLiked(next)
+    if (next) setLikeBurst((value) => value + 1)
+    setLikeCount(optimisticCount)
+    onUpdate(comment.id, {
+      liked: next,
+      likesCount: optimisticCount,
+    })
+    try {
+      const count = next
+        ? await likeComment(postId, comment.id)
+        : await unlikeComment(postId, comment.id)
+      setLikeCount(count)
+      onUpdate(comment.id, { liked: next, likesCount: count })
+    } catch {
+      setLiked(previousLiked)
+      setLikeCount(previousCount)
+      onUpdate(comment.id, {
+        liked: previousLiked,
+        likesCount: previousCount,
+      })
+      toast({ title: t('common.action_failed'), variant: 'destructive' })
+    }
+  }
+
+  async function toggleReplyLike(reply: PostComment) {
+    if (!getAccessToken()) {
+      promptLogin()
+      return
+    }
+    const next = !reply.liked
+    const optimisticCount = Math.max(0, reply.likesCount + (next ? 1 : -1))
+    setReplies((prev) =>
+      patchCommentById(prev, reply.id, {
+        liked: next,
+        likesCount: optimisticCount,
+      }),
+    )
+    try {
+      const count = next
+        ? await likeComment(postId, reply.id)
+        : await unlikeComment(postId, reply.id)
+      setReplies((prev) =>
+        patchCommentById(prev, reply.id, { liked: next, likesCount: count }),
+      )
+    } catch {
+      setReplies((prev) =>
+        patchCommentById(prev, reply.id, {
+          liked: reply.liked,
+          likesCount: reply.likesCount,
+        }),
+      )
+      toast({ title: t('common.action_failed'), variant: 'destructive' })
     }
   }
 
@@ -559,6 +752,13 @@ function CommentThread({ postId, comment, focusCommentId, highlightId, onRemove,
         onDelete={deleteRoot}
         footer={
           <div className="mt-1 flex items-center gap-3 text-xs font-semibold text-muted-foreground">
+            <CommentLikeButton
+              liked={liked}
+              likeCount={likeCount}
+              likeBurst={likeBurst}
+              label={t('comment.like')}
+              onClick={toggleRootLike}
+            />
             {canReply && (
               <button
                 className="transition-colors hover:text-[#5B6CFF]"
@@ -668,16 +868,23 @@ function CommentThread({ postId, comment, focusCommentId, highlightId, onRemove,
                 highlighted={highlightId === r.id}
                 onDelete={() => deleteReply(r)}
                 footer={
-                  canReply ? (
-                    <div className="mt-1 text-xs font-semibold text-muted-foreground">
+                  <div className="mt-1 flex items-center gap-3 text-xs font-semibold text-muted-foreground">
+                    <CommentLikeButton
+                      liked={r.liked}
+                      likeCount={r.likesCount}
+                      likeBurst={0}
+                      label={t('comment.like')}
+                      onClick={() => void toggleReplyLike(r)}
+                    />
+                    {canReply ? (
                       <button
                         className="transition-colors hover:text-[#5B6CFF]"
                         onClick={() => openReplyTo({ id: r.id, username: r.author.username })}
                       >
                         {t('comment.reply')}
                       </button>
-                    </div>
-                  ) : undefined
+                    ) : null}
+                  </div>
                 }
               />
             ))}
@@ -781,6 +988,49 @@ export function CommentRow({
         </button>
       )}
     </div>
+  )
+}
+
+function CommentLikeButton({
+  liked,
+  likeCount,
+  likeBurst,
+  label,
+  onClick,
+}: {
+  liked: boolean
+  likeCount: number
+  likeBurst: number
+  label: string
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      onClick={onClick}
+      className={cn(
+        'flex items-center gap-1 rounded-full p-1 text-xs transition-colors hover:bg-red-500/10 hover:text-red-500',
+        liked && 'text-red-500',
+      )}
+    >
+      <span className="relative grid h-4 w-4 place-items-center">
+        {likeBurst > 0 ? (
+          <span
+            key={likeBurst}
+            aria-hidden
+            className="pointer-events-none absolute inset-[-8px] rounded-full border border-red-400/70 animate-like-burst"
+          />
+        ) : null}
+        <Heart
+          className={cn(
+            'h-4 w-4 transition-transform',
+            liked && 'fill-red-500 animate-heart-pop',
+          )}
+        />
+      </span>
+      <AnimatedCount value={likeCount} />
+    </button>
   )
 }
 

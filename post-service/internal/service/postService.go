@@ -936,6 +936,112 @@ func (s *PostService) LikedPostIDs(ctx context.Context, actorID string) ([]strin
 	return s.repo.LikedPostIDs(ctx, actorID)
 }
 
+// LikeComment enregistre un like de actorID sur un commentaire et renvoie le
+// nombre de likes à jour. Idempotent : reliker ne double pas le compteur.
+func (s *PostService) LikeComment(ctx context.Context, postID, commentID, actorID string) (int32, error) {
+	if _, err := parseID(postID); err != nil {
+		return 0, err
+	}
+	coid, err := parseID(commentID)
+	if err != nil {
+		return 0, err
+	}
+	comment, err := s.repo.GetComment(ctx, coid)
+	if err != nil {
+		return 0, translateNotFound(err)
+	}
+	if comment.PostID != postID {
+		return 0, ErrPostNotFound
+	}
+	created, err := s.repo.AddCommentLike(ctx, commentID, actorID)
+	if err != nil {
+		return 0, err
+	}
+	if !created {
+		return comment.LikesCount, nil
+	}
+	updated, err := s.repo.IncCommentCounter(ctx, coid, "likes_count", 1)
+	if err != nil {
+		return 0, err
+	}
+	// Notifie l'auteur du commentaire (agrégé par commentaire ; auto-like filtré
+	// côté notification-service via recipient == actor).
+	s.notif.Emit(notifier.Event{
+		Type:        notifier.TypeCommentLike,
+		ActorID:     actorID,
+		RecipientID: comment.AuthorID,
+		PostID:      postID,
+		CommentID:   commentID,
+	})
+	return updated.LikesCount, nil
+}
+
+// UnlikeComment retire le like de actorID sur un commentaire. Idempotent :
+// déliker un commentaire non liké ne décrémente pas.
+func (s *PostService) UnlikeComment(ctx context.Context, postID, commentID, actorID string) (int32, error) {
+	if _, err := parseID(postID); err != nil {
+		return 0, err
+	}
+	coid, err := parseID(commentID)
+	if err != nil {
+		return 0, err
+	}
+	comment, err := s.repo.GetComment(ctx, coid)
+	if err != nil {
+		return 0, translateNotFound(err)
+	}
+	if comment.PostID != postID {
+		return 0, ErrPostNotFound
+	}
+	removed, err := s.repo.RemoveCommentLike(ctx, commentID, actorID)
+	if err != nil {
+		return 0, err
+	}
+	if !removed {
+		return comment.LikesCount, nil
+	}
+	updated, err := s.repo.IncCommentCounter(ctx, coid, "likes_count", -1)
+	if err != nil {
+		return 0, err
+	}
+	// Défait la notification de like de commentaire correspondante.
+	s.notif.Emit(notifier.Event{
+		Type:        notifier.TypeCommentLike,
+		ActorID:     actorID,
+		RecipientID: comment.AuthorID,
+		PostID:      postID,
+		CommentID:   commentID,
+		Retract:     true,
+	})
+	return updated.LikesCount, nil
+}
+
+// CommentStats renvoie les compteurs de likes des commentaires demandés. Les
+// ids invalides/introuvables sont simplement ignorés.
+func (s *PostService) CommentStats(ctx context.Context, ids []string) ([]models.CommentStat, error) {
+	if len(ids) > MaxStatsIDs {
+		ids = ids[:MaxStatsIDs]
+	}
+	oids := make([]bson.ObjectID, 0, len(ids))
+	for _, id := range ids {
+		if oid, err := parseID(id); err == nil {
+			oids = append(oids, oid)
+		}
+	}
+	comments, err := s.repo.CommentStatsByIDs(ctx, oids)
+	if err != nil {
+		return nil, err
+	}
+	stats := make([]models.CommentStat, 0, len(comments))
+	for _, comment := range comments {
+		stats = append(stats, models.CommentStat{
+			ID:         comment.ID.Hex(),
+			LikesCount: comment.LikesCount,
+		})
+	}
+	return stats, nil
+}
+
 // PostLikers renvoie les ids des utilisateurs ayant liké un post.
 func (s *PostService) PostLikers(ctx context.Context, id string) ([]string, error) {
 	if _, err := parseID(id); err != nil {
@@ -1082,13 +1188,14 @@ func (s *PostService) CreateComment(ctx context.Context, postID, authorID, autho
 
 	now := time.Now()
 	comment := &models.Comment{
-		PostID:    postID,
-		ParentID:  rootID,
-		AuthorID:  authorID,
-		Content:   content,
-		Media:     media,
-		CreatedAt: now,
-		UpdatedAt: now,
+		PostID:     postID,
+		ParentID:   rootID,
+		AuthorID:   authorID,
+		Content:    content,
+		Media:      media,
+		LikesCount: 0,
+		CreatedAt:  now,
+		UpdatedAt:  now,
 	}
 	if err := s.repo.AddComment(ctx, comment); err != nil {
 		return nil, err
@@ -1267,23 +1374,34 @@ func (s *PostService) ListCommentsByAuthor(ctx context.Context, authorID, viewer
 		sourceOffset += MaxLimit
 	}
 
+	s.hydrateCommentWithPostLikes(ctx, visible, viewerID)
 	return visible, nil
 }
 
 // ListComments renvoie les commentaires RACINE d'un post (chronologiques, paginés).
-func (s *PostService) ListComments(ctx context.Context, postID string, limit, offset int64) ([]models.Comment, error) {
+func (s *PostService) ListComments(ctx context.Context, postID, viewerID string, limit, offset int64) ([]models.Comment, error) {
 	if _, err := parseID(postID); err != nil {
 		return nil, err
 	}
-	return s.repo.ListComments(ctx, postID, clampLimit(limit), clampOffset(offset))
+	comments, err := s.repo.ListComments(ctx, postID, clampLimit(limit), clampOffset(offset))
+	if err != nil {
+		return nil, err
+	}
+	s.hydrateCommentLikes(ctx, comments, viewerID)
+	return comments, nil
 }
 
 // ListReplies renvoie les réponses d'un commentaire (chronologiques, paginées).
-func (s *PostService) ListReplies(ctx context.Context, commentID string, limit, offset int64) ([]models.Comment, error) {
+func (s *PostService) ListReplies(ctx context.Context, commentID, viewerID string, limit, offset int64) ([]models.Comment, error) {
 	if _, err := parseID(commentID); err != nil {
 		return nil, err
 	}
-	return s.repo.ListReplies(ctx, commentID, clampLimit(limit), clampOffset(offset))
+	comments, err := s.repo.ListReplies(ctx, commentID, clampLimit(limit), clampOffset(offset))
+	if err != nil {
+		return nil, err
+	}
+	s.hydrateCommentLikes(ctx, comments, viewerID)
+	return comments, nil
 }
 
 // DeleteComment supprime un commentaire si l'acteur en a le droit (auteur du
@@ -1308,12 +1426,15 @@ func (s *PostService) DeleteComment(ctx context.Context, commentID, actorID, act
 	removed := int32(1)
 	if comment.ParentID == "" {
 		// Commentaire racine : cascade des réponses.
+		replyIDs, _ := s.repo.CommentIDsByParent(ctx, commentID)
 		n, _ := s.repo.DeleteRepliesByParent(ctx, commentID)
+		_ = s.repo.DeleteCommentLikesByComments(ctx, replyIDs)
 		removed += int32(n)
 	} else if rcoid, err := parseID(comment.ParentID); err == nil {
 		// Réponse : décrémente le compteur de réponses de la racine.
 		_ = s.repo.IncReplyCount(ctx, rcoid, -1)
 	}
+	_ = s.repo.DeleteCommentLikesByComment(ctx, commentID)
 
 	// Décrémente le compteur du post (id pris sur le commentaire, source de
 	// vérité). Best-effort : un post déjà supprimé n'a plus de compteur.
@@ -1331,6 +1452,48 @@ func (s *PostService) DeleteComment(ctx context.Context, commentID, actorID, act
 	}
 	s.emitCommentEvents(postAuthorID, comment.ParentID, rootAuthorID, comment.AuthorID, comment.PostID, commentID, comment.Content, true)
 	return nil
+}
+
+func (s *PostService) hydrateCommentLikes(ctx context.Context, comments []models.Comment, viewerID string) {
+	if viewerID == "" || len(comments) == 0 {
+		return
+	}
+	ids := make([]string, 0, len(comments))
+	for _, comment := range comments {
+		ids = append(ids, comment.ID.Hex())
+	}
+	likedIDs, err := s.repo.LikedCommentIDsByUser(ctx, viewerID, ids)
+	if err != nil {
+		return
+	}
+	likedSet := make(map[string]bool, len(likedIDs))
+	for _, id := range likedIDs {
+		likedSet[id] = true
+	}
+	for i := range comments {
+		comments[i].Liked = likedSet[comments[i].ID.Hex()]
+	}
+}
+
+func (s *PostService) hydrateCommentWithPostLikes(ctx context.Context, items []models.CommentWithPost, viewerID string) {
+	if viewerID == "" || len(items) == 0 {
+		return
+	}
+	ids := make([]string, 0, len(items))
+	for _, item := range items {
+		ids = append(ids, item.ID.Hex())
+	}
+	likedIDs, err := s.repo.LikedCommentIDsByUser(ctx, viewerID, ids)
+	if err != nil {
+		return
+	}
+	likedSet := make(map[string]bool, len(likedIDs))
+	for _, id := range likedIDs {
+		likedSet[id] = true
+	}
+	for i := range items {
+		items[i].Liked = likedSet[items[i].ID.Hex()]
+	}
 }
 
 // resolveParentID : threading à 2 niveaux — répondre à une réponse rattache la

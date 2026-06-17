@@ -74,6 +74,8 @@ func New(users *service.UserService, jwtSecret string) *gin.Engine {
 	{
 		internal.GET("/:userId/is-following/:followingId", h.IsFollowing)
 		internal.GET("/follows/:userId/is-following/:followingId", h.IsFollowing)
+		// Acceptation en masse (privé → public), émise par profil-service.
+		internal.POST("/users/:ownerId/accept-all-follow-requests", h.AcceptAllFollowRequests)
 	}
 
 	return r
