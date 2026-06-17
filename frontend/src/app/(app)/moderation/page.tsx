@@ -10,7 +10,7 @@ import { ModerationView } from '@/components/moderation/moderation-view'
  */
 export default function ModerationPage() {
   return (
-    <FeedOverlay>
+    <FeedOverlay headerOffset={false}>
       <ModerationView />
     </FeedOverlay>
   )

@@ -237,7 +237,8 @@ export function ExplorerView() {
   return (
     <div className="flex flex-col">
       <div className="panel z-10 border-b px-4 py-3 lg:sticky lg:top-0">
-        <h1 className="brand-text mb-3 text-xl font-bold">{t('nav.explore')}</h1>
+        {/* Titre masqué sur mobile : porté par l'en-tête global. La recherche reste. */}
+        <h1 className="brand-text mb-3 hidden text-xl font-bold lg:block">{t('nav.explore')}</h1>
         <form onSubmit={handleSearchSubmit} className="relative">
           <div className="relative">
             <Search

@@ -18,13 +18,19 @@ import { cn } from '@/lib/utils'
  * `wide` : pour les vues qui occupent aussi la zone de la sidebar droite (ex.
  * Messages, où `SidebarRight` se masque) → pas d'espaceur droit et c'est la vue
  * qui gère sa propre hauteur/défilement (pas de scroll ni `pb` imposés).
+ *
+ * `headerOffset` : réserve l'espace de l'en-tête mobile fixe (`pt-14`). À mettre
+ * à `false` pour les vues qui n'affichent pas cet en-tête (ex. profil, qui a son
+ * propre en-tête) afin d'éviter un vide de 56px en haut sur mobile.
  */
 export function FeedOverlay({
   children,
   wide = false,
+  headerOffset = true,
 }: {
   children: React.ReactNode
   wide?: boolean
+  headerOffset?: boolean
 }) {
   return (
     <div className="pointer-events-none fixed inset-0 z-40 flex justify-center">
@@ -32,10 +38,12 @@ export function FeedOverlay({
         {/* Espaceur = SidebarLeft (w-[275px], visible ≥ lg) */}
         <div className="hidden w-[275px] shrink-0 lg:block" />
 
-        {/* Panneau central, opaque, aligné sur la colonne du feed */}
+        {/* Panneau central, opaque, aligné sur la colonne du feed.
+            pt-14 : dégage l'en-tête mobile fixe (masqué ≥ lg) rendu par-dessus. */}
         <div
           className={cn(
-            'bg-page pointer-events-auto flex min-w-0 flex-1 flex-col lg:border-x',
+            'bg-page pointer-events-auto flex min-w-0 flex-1 flex-col lg:border-x lg:pt-0',
+            headerOffset && 'pt-14',
             !wide && 'overflow-y-auto pb-16 lg:pb-0',
           )}
         >

@@ -90,7 +90,8 @@ export function NotificationsView() {
 
   return (
     <div className="flex flex-col">
-      <header className="panel sticky top-0 z-10 border-b px-4 py-3 backdrop-blur-2xl">
+      {/* En-tête desktop : sur mobile, le titre est porté par l'en-tête global. */}
+      <header className="panel sticky top-0 z-10 hidden border-b px-4 py-3 backdrop-blur-2xl lg:block">
         <h1 className="text-xl font-bold">{t('notifications.title')}</h1>
       </header>
 
