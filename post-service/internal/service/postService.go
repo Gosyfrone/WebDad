@@ -1412,7 +1412,7 @@ func buildPoll(req *models.CreatePollRequest, now time.Time) (*models.Poll, erro
 	seen := make(map[string]bool, len(req.Choices))
 	choices := make([]models.PollChoice, 0, len(req.Choices))
 	for _, raw := range req.Choices {
-		label := strings.TrimSpace(raw)
+		label := strings.TrimSpace(raw.Label)
 		if label == "" || len([]rune(label)) > 80 {
 			return nil, ErrInvalidPoll
 		}
@@ -1421,10 +1421,15 @@ func buildPoll(req *models.CreatePollRequest, now time.Time) (*models.Poll, erro
 			return nil, ErrInvalidPoll
 		}
 		seen[key] = true
+		image := strings.TrimSpace(raw.ImageURL)
+		if len(image) > 512 {
+			return nil, ErrInvalidPoll
+		}
 		choices = append(choices, models.PollChoice{
 			ID:         bson.NewObjectID().Hex(),
 			Label:      label,
 			VotesCount: 0,
+			ImageURL:   image,
 		})
 	}
 	if len(choices) < 2 || len(choices) > 4 {

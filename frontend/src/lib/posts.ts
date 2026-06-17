@@ -64,6 +64,7 @@ export interface ApiPollChoice {
   id: string
   label: string
   votes_count: number
+  image_url?: string
 }
 
 interface ApiComment {
@@ -160,6 +161,8 @@ export interface PostPollChoice {
   id: string
   label: string
   votesCount: number
+  /** Illustration optionnelle du choix (chemin relatif `/media/<id>`). */
+  imageUrl?: string
 }
 
 export interface PostPoll {
@@ -174,8 +177,14 @@ export interface PostPoll {
   canClose: boolean
 }
 
+export interface CreatePollChoiceInput {
+  label: string
+  /** Chemin relatif `/media/<id>` d'une image déjà uploadée (optionnel). */
+  imageUrl?: string
+}
+
 export interface CreatePollPayload {
-  choices: string[]
+  choices: CreatePollChoiceInput[]
   durationMinutes: number
   audience: PollAudience
 }
@@ -395,6 +404,7 @@ function toPostPoll(poll: ApiPoll): PostPoll {
       id: choice.id,
       label: choice.label,
       votesCount: choice.votes_count ?? 0,
+      imageUrl: choice.image_url || undefined,
     })),
     endsAt: poll.ends_at,
     closedAt: poll.closed_at ?? '',
@@ -590,7 +600,11 @@ export async function createPost(
   if (replyAudience === 'followers') payload.reply_audience = replyAudience
   if (poll) {
     payload.poll = {
-      choices: poll.choices,
+      choices: poll.choices.map((c) => ({
+        label: c.label,
+        // N'envoyer image_url que si défini (choix texte seul = champ absent).
+        ...(c.imageUrl ? { image_url: c.imageUrl } : {}),
+      })),
       duration_minutes: poll.durationMinutes,
       audience: poll.audience,
     }

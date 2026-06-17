@@ -35,6 +35,7 @@ import {
   type PostMedia,
   type PostPoll,
 } from '@/lib/posts'
+import { resolveMediaUrl } from '@/lib/media'
 import { quickBookmark, removeBookmarkEverywhere } from '@/lib/bookmarks'
 import { BookmarkDialog } from '@/components/feed/bookmark-dialog'
 import { ToastAction } from '@/components/ui/toast'
@@ -832,6 +833,11 @@ function PostPollCard({
           const percent = total > 0 ? Math.round((choice.votesCount / total) * 100) : 0
           const selected = poll.votedChoiceId === choice.id
           const winner = poll.winnerChoiceIds.includes(choice.id)
+          // Compte exact par choix visible seulement après avoir voté ou une fois le sondage terminé.
+          const showCounts = showResults && (Boolean(poll.votedChoiceId) || closed)
+          const resultText = showCounts
+            ? `${percent}% · ${t('post.poll_votes', { count: choice.votesCount })}`
+            : `${percent}%`
           return (
             <button
               key={choice.id}
@@ -855,15 +861,24 @@ function PostPollCard({
                   style={{ width: `${percent}%` }}
                 />
               )}
-              <span className="relative z-10 min-w-0 truncate font-medium">{choice.label}</span>
+              <span className="relative z-10 flex min-w-0 items-center gap-2">
+                {choice.imageUrl && (
+                  <img
+                    src={resolveMediaUrl(choice.imageUrl)}
+                    alt=""
+                    className="h-8 w-8 shrink-0 rounded object-cover"
+                  />
+                )}
+                <span className="min-w-0 truncate font-medium">{choice.label}</span>
+              </span>
               <span className="relative z-10 ml-3 flex shrink-0 items-center gap-2 font-semibold">
                 {winner && <span className="text-xs text-primary">{t('post.poll_winner')}</span>}
                 {voting === choice.id ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : selected ? (
-                  t('post.poll_voted')
+                  showResults ? `${t('post.poll_voted')} · ${resultText}` : t('post.poll_voted')
                 ) : showResults ? (
-                  `${percent}%`
+                  resultText
                 ) : (
                   t('post.poll_vote')
                 )}

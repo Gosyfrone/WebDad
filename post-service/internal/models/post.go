@@ -100,6 +100,10 @@ type PollChoice struct {
 	ID         string `bson:"id" json:"id"`
 	Label      string `bson:"label" json:"label"`
 	VotesCount int32  `bson:"votes_count" json:"votes_count"`
+	// ImageURL (optionnel) : illustration du choix, chemin relatif `/media/<id>`
+	// servi par le media-service via la gateway (le post-service reste agnostique
+	// du contenu). Vide = choix texte seul (les choix mixtes sont autorisés).
+	ImageURL string `bson:"image_url,omitempty" json:"image_url,omitempty"`
 }
 
 type PollVote struct {
@@ -193,9 +197,17 @@ type CreatePostRequest struct {
 }
 
 type CreatePollRequest struct {
-	Choices         []string `json:"choices" binding:"min=2,max=4,dive,min=1,max=80"`
-	DurationMinutes int64    `json:"duration_minutes" binding:"required,min=1,max=10080"`
-	Audience        string   `json:"audience" binding:"omitempty,oneof=everyone followers"`
+	Choices         []CreatePollChoiceRequest `json:"choices" binding:"min=2,max=4,dive"`
+	DurationMinutes int64                     `json:"duration_minutes" binding:"required,min=1,max=10080"`
+	Audience        string                    `json:"audience" binding:"omitempty,oneof=everyone followers"`
+}
+
+// CreatePollChoiceRequest : un choix de sondage à la création. `image_url`
+// (optionnel) référence un média déjà uploadé (chemin relatif `/media/<id>`) ;
+// les choix mixtes (certains avec image, d'autres non) sont autorisés.
+type CreatePollChoiceRequest struct {
+	Label    string `json:"label" binding:"required,min=1,max=80"`
+	ImageURL string `json:"image_url" binding:"omitempty,max=512"`
 }
 
 type VotePollRequest struct {
