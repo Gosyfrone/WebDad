@@ -12,6 +12,8 @@ interface UserListItemProps {
   user: RelationUser
   /** Vrai si l'utilisateur courant suit déjà cette personne. */
   isFollowing: boolean
+  /** Vrai si une demande de suivi est en attente (compte privé) → bouton « En attente ». */
+  isRequested?: boolean
   /** Vrai si cette ligne est l'utilisateur courant lui-même (pas de bouton). */
   isSelf?: boolean
   /** Désactive le bouton (action en cours). */
@@ -48,6 +50,7 @@ interface UserListItemProps {
 export function UserListItem({
   user,
   isFollowing,
+  isRequested = false,
   isSelf = false,
   pending = false,
   showBio = true,
@@ -141,7 +144,7 @@ export function UserListItem({
         <Button
           size="sm"
           variant={isFollowing ? 'outline' : 'default'}
-          disabled={pending}
+          disabled={pending || isRequested}
           onClick={(e) => {
             // Empêche le clic du bouton de déclencher la navigation du lien étiré.
             e.preventDefault()
@@ -157,7 +160,9 @@ export function UserListItem({
               : 'bg-gradient-to-r from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] text-white',
           )}
         >
-          {isFollowing && !compact ? (
+          {isRequested ? (
+            t('follow.requested')
+          ) : isFollowing && !compact ? (
             <>
               <span className="group-hover/btn:hidden">{t('follow.followed')}</span>
               <span className="hidden group-hover/btn:inline">{t('follow.unfollow')}</span>

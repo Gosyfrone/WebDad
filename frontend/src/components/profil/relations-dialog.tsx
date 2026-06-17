@@ -56,7 +56,7 @@ export function RelationsDialog({
   const [error, setError] = useState<string | null>(null)
   const [removing, setRemoving] = useState<Set<string>>(new Set())
 
-  const { currentUserId, isFollowing, isPending, toggle } = useFollow(open)
+  const { currentUserId, isFollowing, isRequested, isPending, toggle } = useFollow(open)
 
   // Garde-fou contre les fetchs concurrents périmés (changement d'onglet rapide).
   const requestId = useRef(0)
@@ -183,6 +183,7 @@ export function RelationsDialog({
                   key={user.id}
                   user={user}
                   isFollowing={isFollowing(user.id)}
+                  isRequested={isRequested(user.id)}
                   isSelf={user.id === currentUserId}
                   pending={isPending(user.id) || removing.has(user.id)}
                   onToggleFollow={toggle}

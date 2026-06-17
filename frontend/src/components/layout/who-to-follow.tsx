@@ -23,7 +23,7 @@ export function WhoToFollow() {
   const [visibleUsers, setVisibleUsers] = useState<RelationUser[] | null>(null)
   const [loading, setLoading] = useState(true)
 
-  const { currentUserId, loaded: followLoaded, isFollowing, isPending, toggle } = useFollow()
+  const { currentUserId, loaded: followLoaded, isFollowing, isRequested, isPending, toggle } = useFollow()
 
   useEffect(() => {
     let cancelled = false
@@ -46,10 +46,10 @@ export function WhoToFollow() {
     if (loading || !followLoaded || visibleUsers !== null) return
     setVisibleUsers(
       users
-        .filter((u) => u.id !== currentUserId && !isFollowing(u.id))
+        .filter((u) => u.id !== currentUserId && !isFollowing(u.id) && !isRequested(u.id))
         .slice(0, VISIBLE),
     )
-  }, [currentUserId, followLoaded, isFollowing, loading, users, visibleUsers])
+  }, [currentUserId, followLoaded, isFollowing, isRequested, loading, users, visibleUsers])
 
   const visible = visibleUsers ?? []
 
@@ -72,6 +72,7 @@ export function WhoToFollow() {
               <UserListItem
                 user={user}
                 isFollowing={isFollowing(user.id)}
+                isRequested={isRequested(user.id)}
                 isSelf={user.id === currentUserId}
                 pending={isPending(user.id)}
                 showBio={false}
