@@ -48,7 +48,7 @@ type Gender = 'male' | 'female' | ''
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const passwordPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/
-const usernamePattern = /^[a-zA-Z0-9_]{3,24}$/
+const usernamePattern = /^(?=.{3,24}$)[a-zA-Z0-9_]+(?:\.[a-zA-Z0-9_]+)*$/
 const maxUsernameLength = 24
 const maxEmailLength = 50
 const maxPasswordLength = 250

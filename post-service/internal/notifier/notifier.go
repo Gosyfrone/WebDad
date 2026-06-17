@@ -98,11 +98,14 @@ func (n *HTTPNotifier) Emit(ev Event) {
 }
 
 // mentionRe capture les @handles (mêmes règles que les usernames :
-// alphanumérique + underscore, 3 à 50 caractères). Le `@` doit être en début de
+// alphanumérique + underscore, plus un point INTERNE). Le premier et le dernier
+// caractère du handle sont des « \w » : un point final (ponctuation, ex.
+// `salut @jean.`) est donc exclu de la capture. Le `@` doit être en début de
 // texte ou précédé d'un caractère non-mot : on évite ainsi de capturer la partie
 // domaine d'une adresse e-mail (`jean@exemple.com`). RE2 n'a pas de lookbehind →
-// on consomme la frontière dans un groupe non capturant.
-var mentionRe = regexp.MustCompile(`(?:^|[^\w@])@(\w{3,50})`)
+// on consomme la frontière dans un groupe non capturant. Un handle inexistant
+// (ex. `jean..x`) est simplement non résolu en aval.
+var mentionRe = regexp.MustCompile(`(?:^|[^\w@])@(\w[\w.]+\w)`)
 
 // ParseMentions extrait les handles mentionnés dans un texte, dédupliqués
 // (insensible à la casse pour la déduplication, handle d'origine conservé).

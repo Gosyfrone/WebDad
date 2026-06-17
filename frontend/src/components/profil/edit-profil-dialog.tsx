@@ -1,7 +1,7 @@
 'use client'
 
-import { useMemo, useRef, useState } from 'react'
-import { Camera, Check, ChevronDown, Loader2, Search, X } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { AtSign, Camera, Check, ChevronDown, CircleAlert, Loader2, Search, X } from 'lucide-react'
 
 import {
   buildCountryOptions,
@@ -12,6 +12,7 @@ import {
 import { cn, initialOf } from '@/lib/utils'
 import { exceedsMediaLimit, MAX_MEDIA_MB, mediaUrl, uploadMedia } from '@/lib/media'
 import { isValidDisplayName } from '@/lib/display-name'
+import type { UsernameUpdateResult } from '@/lib/api'
 import type { ProfilEditableFields } from '@/types'
 import { useToast } from '@/hooks/use-toast'
 import { useLanguage } from '@/components/language-provider'
@@ -33,17 +34,40 @@ const MAX_BIO = 160
 /** Longueur maximale du nom affiché. */
 const MAX_NAME = 50
 
+// Parité de validation username avec register / onboarding / la gate de handle.
+const usernamePattern = /^(?=.{3,24}$)[a-zA-Z0-9_]+(?:\.[a-zA-Z0-9_]+)*$/
+const reservedUsernames = new Set([
+  'me',
+  'admin',
+  'root',
+  'users',
+  'by-username',
+  'null',
+  'undefined',
+  'search',
+  'suggestions',
+])
+
+type UsernameAvailability = 'idle' | 'checking' | 'available' | 'taken'
+
 interface EditProfilDialogProps {
   /** Élément déclencheur (ex. bouton « Éditer le profil »), rendu via `asChild`. */
   children: React.ReactNode
   /** Valeurs initiales du formulaire. */
   initial: ProfilEditableFields
+  /** Username courant (service distinct du profil). */
+  initialUsername: string
   birthDateLocked: boolean
   genderLocked: boolean
   displayNameChangedAt: string
   saving?: boolean
   /** Appelé avec les valeurs validées après enregistrement. */
   onSave: (fields: ProfilEditableFields) => Promise<void>
+  /**
+   * Persiste un nouveau username (`PATCH /users/me`). Renvoie un résultat typé :
+   * sur succès le parent recharge la page, sinon la modale affiche l'erreur.
+   */
+  onSaveUsername: (username: string) => Promise<UsernameUpdateResult>
 }
 
 /**
@@ -57,15 +81,21 @@ interface EditProfilDialogProps {
 export function EditProfilDialog({
   children,
   initial,
+  initialUsername,
   birthDateLocked,
   genderLocked,
   displayNameChangedAt,
   saving = false,
   onSave,
+  onSaveUsername,
 }: EditProfilDialogProps) {
   const { t, locale } = useLanguage()
   const { toast } = useToast()
   const [open, setOpen] = useState(false)
+  const [username, setUsername] = useState(initialUsername)
+  const [usernameAvailability, setUsernameAvailability] = useState<UsernameAvailability>('idle')
+  const [usernameError, setUsernameError] = useState<string>()
+  const [savingUsername, setSavingUsername] = useState(false)
   const [displayName, setDisplayName] = useState(initial.displayName)
   const [bio, setBio] = useState(initial.bio)
   const [avatarUrl, setAvatarUrl] = useState(initial.avatarUrl)
@@ -79,6 +109,9 @@ export function EditProfilDialog({
   /** Recharge le formulaire avec les valeurs courantes à chaque ouverture. */
   function handleOpenChange(next: boolean) {
     if (next) {
+      setUsername(initialUsername)
+      setUsernameAvailability('idle')
+      setUsernameError(undefined)
       setDisplayName(initial.displayName)
       setBio(initial.bio)
       setAvatarUrl(initial.avatarUrl)
@@ -100,15 +133,60 @@ export function EditProfilDialog({
   const displayNameInvalid = displayNameChanged && !isValidDisplayName(trimmedName)
   const nextDisplayNameDate = getNextDisplayNameDate(displayNameChangedAt)
   const displayNameLocked = displayNameChanged && nextDisplayNameDate > new Date()
+
+  // Username (service distinct) : changé / format / mot réservé.
+  const trimmedUsername = username.trim()
+  const usernameChanged = trimmedUsername !== initialUsername
+  const usernameReserved = reservedUsernames.has(trimmedUsername.toLowerCase())
+  const usernameInvalid =
+    usernameChanged && (!usernamePattern.test(trimmedUsername) || usernameReserved)
+  const usernameBlocking =
+    usernameChanged &&
+    (usernameInvalid ||
+      usernameAvailability === 'checking' ||
+      usernameAvailability === 'taken')
+
+  // Vérif de disponibilité débouncée (uniquement si changé et bien formé),
+  // calquée sur la gate de handle (`/api/users/check-username`).
+  useEffect(() => {
+    if (!open) return
+    if (!usernameChanged || usernameInvalid) {
+      setUsernameAvailability('idle')
+      return
+    }
+    setUsernameAvailability('checking')
+    const handle = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `/api/users/check-username?username=${encodeURIComponent(trimmedUsername)}`,
+        )
+        const data = (await res.json().catch(() => null)) as { available?: boolean } | null
+        if (!res.ok) {
+          setUsernameAvailability('idle')
+          return
+        }
+        setUsernameAvailability(data?.available ? 'available' : 'taken')
+      } catch {
+        setUsernameAvailability('idle')
+      }
+    }, 400)
+    return () => clearTimeout(handle)
+  }, [open, trimmedUsername, usernameChanged, usernameInvalid])
+
   const canSave =
     trimmedName.length > 0 &&
     !nameTooLong &&
     !displayNameInvalid &&
     !bioTooLong &&
-    !displayNameLocked
+    !displayNameLocked &&
+    !usernameBlocking &&
+    !savingUsername
 
   async function handleSubmit() {
     if (!canSave) return
+    setUsernameError(undefined)
+
+    // 1. Champs profil (profil-service). Le parent toaste en cas d'échec.
     try {
       await onSave({
         displayName: trimmedName,
@@ -121,9 +199,45 @@ export function EditProfilDialog({
         gender: genderLocked ? '' : gender,
         nationality,
       })
-      setOpen(false)
     } catch {
       // Le parent affiche déjà le toast d'erreur ; on garde la popup ouverte.
+      return
+    }
+
+    // 2. Username (user-service), seulement s'il a changé. Sur succès le parent
+    // recharge la page (rehydrate header / sidebar / caches mentions).
+    if (usernameChanged) {
+      setSavingUsername(true)
+      try {
+        const result = await onSaveUsername(trimmedUsername)
+        if (!result.ok) {
+          setUsernameError(usernameErrorMessage(result.reason))
+          setSavingUsername(false)
+          return
+        }
+        // result.ok → le parent a déclenché un reload ; rien d'autre à faire.
+        return
+      } catch {
+        setUsernameError(t('editprofil.username_error'))
+        setSavingUsername(false)
+        return
+      }
+    }
+
+    setOpen(false)
+  }
+
+  /** Traduit le motif d'échec d'un changement de username. */
+  function usernameErrorMessage(reason: Exclude<UsernameUpdateResult, { ok: true }>['reason']): string {
+    switch (reason) {
+      case 'taken':
+        return t('auth.register.err.username_taken')
+      case 'cooldown':
+        return t('editprofil.username_cooldown')
+      case 'invalid':
+        return t('auth.register.err.username_format')
+      default:
+        return t('editprofil.username_error')
     }
   }
 
@@ -191,6 +305,52 @@ export function EditProfilDialog({
 
           {/* Champs texte */}
           <div className="flex flex-col gap-4 p-4 pt-2">
+            <Field label={t('editprofil.username_label')} htmlFor="profil-username">
+              <div className="relative">
+                <AtSign className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  id="profil-username"
+                  value={username}
+                  onChange={(e) => {
+                    setUsername(e.target.value)
+                    setUsernameError(undefined)
+                  }}
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  placeholder={t('onboarding.username_placeholder')}
+                  aria-invalid={usernameInvalid || usernameAvailability === 'taken' || Boolean(usernameError)}
+                  className="rounded-2xl border-white/70 bg-white/82 pl-9 pr-9 shadow-sm shadow-slate-200/50 transition-all placeholder:text-slate-400 hover:border-[#47D9FF]/70 focus-visible:border-[#5B6CFF] focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15 dark:border-white/15 dark:bg-white/5 dark:placeholder:text-muted-foreground"
+                />
+                {usernameChanged && !usernameInvalid && (
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2">
+                    {usernameAvailability === 'checking' && (
+                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" aria-hidden />
+                    )}
+                    {usernameAvailability === 'available' && (
+                      <Check className="h-4 w-4 text-emerald-500" aria-hidden />
+                    )}
+                    {usernameAvailability === 'taken' && (
+                      <CircleAlert className="h-4 w-4 text-destructive" aria-hidden />
+                    )}
+                  </span>
+                )}
+              </div>
+              {usernameError ? (
+                <p className="text-xs text-destructive">{usernameError}</p>
+              ) : usernameInvalid ? (
+                <p className="text-xs text-destructive">
+                  {usernameReserved
+                    ? t('auth.register.err.username_reserved')
+                    : t('auth.register.err.username_format')}
+                </p>
+              ) : usernameChanged && usernameAvailability === 'taken' ? (
+                <p className="text-xs text-destructive">{t('auth.register.err.username_taken')}</p>
+              ) : (
+                <p className="text-xs text-muted-foreground">{t('editprofil.username_hint')}</p>
+              )}
+            </Field>
+
             <Field label={t('editprofil.name_label')} htmlFor="profil-name">
               <Input
                 id="profil-name"
@@ -302,10 +462,10 @@ export function EditProfilDialog({
         <DialogFooter className="shrink-0 border-t p-4">
           <Button
             className="w-full rounded-full bg-gradient-to-r from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] font-bold text-white shadow-[0_18px_44px_rgba(91,108,255,0.3)] transition hover:scale-[1.01] sm:w-auto"
-            disabled={!canSave || saving}
+            disabled={!canSave || saving || savingUsername}
             onClick={handleSubmit}
           >
-            {saving ? t('editprofil.saving') : t('common.save')}
+            {saving || savingUsername ? t('editprofil.saving') : t('common.save')}
           </Button>
         </DialogFooter>
       </DialogContent>

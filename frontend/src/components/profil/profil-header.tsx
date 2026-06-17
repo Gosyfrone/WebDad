@@ -7,7 +7,7 @@ import { CalendarDays, LinkIcon, Mail, MapPin } from 'lucide-react'
 import { cn, initialOf } from '@/lib/utils'
 import { countryFlag, countryName } from '@/lib/countries'
 import { ROUTES } from '@/lib/routes'
-import type { RelationKind } from '@/lib/api'
+import type { RelationKind, UsernameUpdateResult } from '@/lib/api'
 import { useFollow } from '@/lib/use-follow'
 import type { ProfilDetails, ProfilEditableFields, RelationUser } from '@/types'
 import { useLanguage } from '@/components/language-provider'
@@ -33,6 +33,8 @@ interface ProfilHeaderProps {
   saving?: boolean
   /** Remontée des champs édités (consommée par le parent pour l'affichage live). */
   onEdit: (fields: ProfilEditableFields) => Promise<void>
+  /** Changement de username (service distinct) ; le parent recharge sur succès. */
+  onEditUsername: (username: string) => Promise<UsernameUpdateResult>
   onFollowChanged?: (following: boolean) => void
 }
 
@@ -46,6 +48,7 @@ export function ProfilHeader({
   isOwner,
   saving = false,
   onEdit,
+  onEditUsername,
   onFollowChanged,
 }: ProfilHeaderProps) {
   const { t, locale } = useLanguage()
@@ -108,11 +111,13 @@ export function ProfilHeader({
                   gender: profil.gender,
                   nationality: profil.nationality,
                 }}
+                initialUsername={profil.username}
                 birthDateLocked={Boolean(profil.birthDate)}
                 genderLocked={Boolean(profil.gender)}
                 displayNameChangedAt={profil.displayNameChangedAt}
                 saving={saving}
                 onSave={onEdit}
+                onSaveUsername={onEditUsername}
               >
                 <Button
                   variant="outline"

@@ -31,8 +31,8 @@ var (
 	// précédent (cooldown actif) → 429.
 	ErrDisplayNameCooldown = errors.New("nom d'affichage modifié trop récemment")
 	// ErrInvalidDisplayName : le nom contient un caractère autre qu'une lettre,
-	// un chiffre, un espace, un tiret ou un underscore → 400.
-	ErrInvalidDisplayName = errors.New("le nom ne peut contenir que des lettres, chiffres, espaces, tirets et underscores")
+	// un chiffre, un espace, un tiret, un underscore ou un point → 400.
+	ErrInvalidDisplayName = errors.New("le nom ne peut contenir que des lettres, chiffres, espaces, tirets, underscores et points")
 )
 
 // ProfilService regroupe les dépendances et la config métier.
@@ -257,7 +257,7 @@ func validDisplayName(value string) bool {
 		return false
 	}
 	for _, r := range value {
-		if unicode.IsLetter(r) || unicode.IsMark(r) || unicode.IsNumber(r) || r == ' ' || r == '-' || r == '_' {
+		if unicode.IsLetter(r) || unicode.IsMark(r) || unicode.IsNumber(r) || r == ' ' || r == '-' || r == '_' || r == '.' {
 			continue
 		}
 		return false

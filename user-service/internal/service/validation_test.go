@@ -13,12 +13,18 @@ func TestValidateUsername(t *testing.T) {
 	}{
 		{"valide simple", "alice", false},
 		{"valide avec chiffres et underscore", "alice_42", false},
+		{"valide avec point interne", "jean.dupont", false},
+		{"valide points multiples internes", "a.b.c", false},
 		{"valide max", "a234567890123456789012345678901234567890123456789", false}, // 49
 		{"trop court", "ab", true},
 		{"trop long", "a2345678901234567890123456789012345678901234567890x", true}, // 51
 		{"caractère interdit (tiret)", "alice-b", true},
 		{"caractère interdit (espace)", "alice b", true},
 		{"caractère interdit (accent)", "alicé", true},
+		{"point en début", ".alice", true},
+		{"point en fin", "alice.", true},
+		{"point doublé", "jean..dupont", true},
+		{"point seul", "...", true},
 		{"vide", "", true},
 		{"réservé me", "me", true},
 		{"réservé admin (insensible à la casse)", "Admin", true},

@@ -41,14 +41,14 @@ func TestPlanUpdate_DisplayNameChange(t *testing.T) {
 }
 
 func TestValidDisplayName(t *testing.T) {
-	valid := []string{"Jean Dupont", "Élodie_75", "Anne-Marie", "山田 太郎", "Мария-2"}
+	valid := []string{"Jean Dupont", "Élodie_75", "Anne-Marie", "山田 太郎", "Мария-2", "Jean.Dupont", "J.R.R. Tolkien", "Jr."}
 	for _, name := range valid {
 		if !validDisplayName(name) {
 			t.Errorf("nom valide refusé : %q", name)
 		}
 	}
 
-	invalid := []string{"", "Jean@Dupont", "#Jean", "O'Connor", "Jean.Dupont", "Jean 😊", "Jean\tDupont"}
+	invalid := []string{"", "Jean@Dupont", "#Jean", "O'Connor", "Jean 😊", "Jean\tDupont"}
 	for _, name := range invalid {
 		if validDisplayName(name) {
 			t.Errorf("nom invalide accepté : %q", name)
