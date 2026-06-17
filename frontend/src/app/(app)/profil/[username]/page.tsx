@@ -10,7 +10,7 @@ interface PublicProfilPageProps {
 // Profil public, en overlay au-dessus du feed persistant du layout.
 export default function PublicProfilPage({ params }: PublicProfilPageProps) {
   return (
-    <FeedOverlay>
+    <FeedOverlay headerOffset={false}>
       <ProfilView username={params.username} />
     </FeedOverlay>
   )

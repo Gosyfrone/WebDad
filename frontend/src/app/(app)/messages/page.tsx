@@ -10,7 +10,7 @@ import { MessagesView } from '@/components/messages/messages-view'
 // du feed persistant du layout.
 export default function MessagesPage() {
   return (
-    <FeedOverlay wide>
+    <FeedOverlay wide headerOffset={false}>
       <Suspense fallback={null}>
         <MessagesView />
       </Suspense>

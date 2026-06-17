@@ -507,11 +507,14 @@ export function MessagesView() {
   const blurWhenGated = gated && 'pointer-events-none select-none blur-md'
 
   return (
-    <div className="relative flex h-[calc(100dvh-7.5rem)] overflow-hidden lg:h-screen">
-      {/* Volet liste */}
+    /* Hauteur = viewport − tab bar (3.5rem). L'en-tête global mobile (fixe, 3.5rem)
+       n'est dégagé que par le volet LISTE (`pt-14`) : sur une conversation ouverte
+       il est masqué (cf. MobileHeader), le ChatPane affiche son propre en-tête. */
+    <div className="relative flex h-[calc(100dvh-3.5rem)] overflow-hidden lg:h-screen">
+      {/* Volet liste (pt-14 : dégage l'en-tête global mobile fixe). */}
       <div
         className={cn(
-          'h-full w-full shrink-0 lg:w-[360px] lg:border-r',
+          'h-full w-full shrink-0 pt-14 lg:w-[360px] lg:border-r lg:pt-0',
           selectedId ? 'hidden lg:flex lg:flex-col' : 'flex flex-col',
           blurWhenGated,
         )}
@@ -534,7 +537,8 @@ export function MessagesView() {
         />
       </div>
 
-      {/* Volet chat */}
+      {/* Volet chat (mobile : occupe la vue dès le haut — l'en-tête global est
+          masqué sur une conversation ouverte, le ChatPane porte le sien). */}
       <div
         className={cn(
           'h-full min-w-0 flex-1',

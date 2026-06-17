@@ -108,6 +108,7 @@ export const messages: Record<Locale, Messages> = {
     'nav.home': 'Accueil',
     'nav.bookmarks': 'Signets',
     'nav.open_menu': 'Ouvrir le menu de navigation',
+    'nav.back': 'Retour',
     'nav.post': 'Breezer',
     'nav.compose': 'Composer une publication',
     'nav.search': 'Recherche',
@@ -341,6 +342,7 @@ export const messages: Record<Locale, Messages> = {
     'messages.heading': 'Aucune conversation',
     'messages.empty_desc': 'Démarrez une discussion avec le bouton +.',
     'messages.new': 'Nouveau',
+    'messages.new_message': 'Nouveau message',
     'messages.new_dm': 'Nouveau message',
     'messages.new_dm_desc':
       'Recherchez une personne pour démarrer une conversation chiffrée de bout en bout.',
@@ -1078,6 +1080,7 @@ export const messages: Record<Locale, Messages> = {
     'nav.home': 'Home',
     'nav.bookmarks': 'Bookmarks',
     'nav.open_menu': 'Open navigation menu',
+    'nav.back': 'Back',
     'nav.post': 'Breeze',
     'nav.compose': 'Compose a post',
 
@@ -1299,6 +1302,7 @@ export const messages: Record<Locale, Messages> = {
     'messages.heading': 'No conversations',
     'messages.empty_desc': 'Start a chat with the + button.',
     'messages.new': 'New',
+    'messages.new_message': 'New message',
     'messages.new_dm': 'New message',
     'messages.new_dm_desc':
       'Search for someone to start an end-to-end encrypted conversation.',

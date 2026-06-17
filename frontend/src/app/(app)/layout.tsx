@@ -52,10 +52,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     parasite sur mobile (sans créer de conteneur de scroll, donc sans
                     casser les en-têtes sticky, contrairement à overflow-x-hidden). */}
                 <div className="glass-column flex min-h-screen w-full min-w-0 flex-1 flex-col overflow-x-clip backdrop-blur-2xl lg:border-x">
-                  <MobileHeader />
-                  {/* pb-16 : dégage la barre d'onglets fixe (masquée ≥ lg).
+                  {/* pt-14 : dégage l'en-tête mobile fixe (rendu au niveau racine,
+                      au-dessus des overlays — masqué ≥ lg).
+                      pb-16 : dégage la barre d'onglets fixe (masquée ≥ lg).
                       Feed persistant : reste monté derrière les overlays. */}
-                  <main className="flex-1 pb-16 lg:pb-0">
+                  <main className="flex-1 pb-16 pt-14 lg:pb-0 lg:pt-0">
                     <Suspense fallback={null}>
                       <FeedView />
                     </Suspense>
@@ -84,6 +85,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   le `backdrop-blur` de la colonne créerait sinon un bloc conteneur
                   qui rognerait l'overlay. `/feed` se rend en `null` → fond visible. */}
               {children}
+
+              {/* En-tête mobile (masqué ≥ lg). Rendu APRÈS les overlays, au niveau
+                  racine et en `fixed z-[60]`, pour rester visible au-dessus d'eux
+                  (sinon l'overlay `z-40` le recouvrirait) → header unique présent
+                  sur toutes les pages. */}
+              <MobileHeader />
             </div>
           </ExplorerFilterProvider>
         </MessagesProvider>

@@ -5,7 +5,7 @@ import { FeedOverlay } from '@/components/feed/feed-overlay'
  *  Rendu en overlay au-dessus du feed persistant du layout. */
 export default function SignetsPage() {
   return (
-    <FeedOverlay>
+    <FeedOverlay headerOffset={false}>
       <BookmarksView />
     </FeedOverlay>
   )

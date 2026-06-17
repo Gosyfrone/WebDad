@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import { LogIn, LogOut, Palette, Settings } from 'lucide-react'
+import { usePathname, useRouter } from 'next/navigation'
+import { ArrowLeft, Bell, LogIn, LogOut, Palette, Settings } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import { getAccessToken, logout } from '@/lib/auth-client'
@@ -13,6 +13,8 @@ import { useSession } from '@/lib/session'
 import { ROUTES, navItemsForRole } from '@/lib/routes'
 import type { ProfilDetails } from '@/types'
 import { useAuthGate } from '@/components/auth-prompt-provider'
+import { useNotifications } from '@/components/notifications-provider'
+import { useMessages } from '@/components/messages-provider'
 import { useT } from '@/components/language-provider'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { CustomThemeDialog } from '@/components/custom-theme-dialog'
@@ -34,9 +36,13 @@ const EDGE_ZONE = 24
 const SWIPE_THRESHOLD = 60
 
 /**
- * En-tête mobile (masqué ≥ lg) : photo de profil cliquable à gauche ouvrant un
- * tiroir latéral de navigation (Fil / Profil / Modération / Admin selon rôle),
- * logo Breezy centré.
+ * En-tête mobile contextuel (masqué ≥ lg). Selon la section courante :
+ *   - gauche : photo de profil → tiroir de navigation, OU flèche ← (page Notifs)
+ *     pour revenir au « menu normal » (page précédente, repli /feed) ;
+ *   - centre : logo Breezy (feed / autres pages) ou titre de la section
+ *     (« Explorer », « Messages », « Notifications ») ;
+ *   - droite : bouton 🔔 vers /notifications (avec pastille non-lus) sur le
+ *     feed / explorer / messages ; vide ailleurs.
  *
  * Le tiroir s'ouvre au clic sur l'avatar OU par un swipe depuis le bord gauche
  * de l'écran vers la droite (geste natif façon X.com).
@@ -47,9 +53,43 @@ const SWIPE_THRESHOLD = 60
 export function MobileHeader() {
   const t = useT()
   const pathname = usePathname()
+  const router = useRouter()
   const session = useSession()
   const { isVisitor } = useAuthGate()
+  const { unreadCount } = useNotifications()
+  const { activeConversationId } = useMessages()
   const hidden = pathname?.startsWith(ROUTES.profil) ?? false
+
+  // Section courante → pilote les 3 zones (gauche / centre / droite) du header.
+  const section: 'feed' | 'explorer' | 'messages' | 'notifications' | 'parametres' | 'other' =
+    pathname === ROUTES.feed
+      ? 'feed'
+      : pathname?.startsWith(ROUTES.notifications)
+        ? 'notifications'
+        : pathname?.startsWith(ROUTES.explorer)
+          ? 'explorer'
+          : pathname?.startsWith(ROUTES.messages)
+            ? 'messages'
+            : pathname?.startsWith(ROUTES.parametres)
+              ? 'parametres'
+              : 'other'
+  // Titre centré (sections nommées) ; sinon le logo Breezy est affiché.
+  const titleKey =
+    section === 'explorer'
+      ? 'nav.explore'
+      : section === 'messages'
+        ? 'messages.title'
+        : section === 'notifications'
+          ? 'notifications.title'
+          : section === 'parametres'
+            ? 'settings.title'
+            : null
+  // Cloche à droite (vers les notifs) sur les sections de navigation principale.
+  const showBell = section === 'feed' || section === 'explorer' || section === 'messages'
+  // Flèche retour à gauche (au lieu de l'avatar) sur les pages « secondaires »
+  // ouvertes au-dessus du menu normal (notifications, paramètres).
+  const showBack = section === 'notifications' || section === 'parametres'
+
   const [open, setOpen] = useState(false)
   const [themeDialogOpen, setThemeDialogOpen] = useState(false)
   const [account, setAccount] = useState({
@@ -101,9 +141,9 @@ export function MobileHeader() {
   }, [])
 
   // Ouverture par swipe depuis le bord gauche (→ droite). Désactivée pour le
-  // visiteur (pas de tiroir de navigation).
+  // visiteur (pas de tiroir) et sur les pages à flèche retour (gauche ≠ avatar).
   useEffect(() => {
-    if (hidden || isVisitor) return
+    if (hidden || isVisitor || showBack) return
 
     let startX = 0
     let startY = 0
@@ -132,14 +172,35 @@ export function MobileHeader() {
       window.removeEventListener('touchstart', onTouchStart)
       window.removeEventListener('touchend', onTouchEnd)
     }
-  }, [hidden, isVisitor])
+  }, [hidden, isVisitor, section])
 
-  if (hidden) return null
+  // En-tête contextuel pour le feed, les sections de nav principale (explorer /
+  // messages / notifications) et les paramètres (variante flèche retour). Les
+  // autres pages (signets, admin, modération, profil) conservent leur propre
+  // en-tête → pas de header global ni de décalage `pt-14` (cf. `headerOffset={false}`).
+  if (hidden || section === 'other') return null
+  // Conversation ouverte (mobile) : le ChatPane affiche son propre en-tête (nom +
+  // retour) → on efface l'en-tête global pour ne pas le recouvrir/dédoubler.
+  if (section === 'messages' && activeConversationId) return null
 
   const navItems = navItemsForRole(role)
 
+  // « Menu normal » : revient à la page précédente, repli sur le feed s'il n'y
+  // a pas d'historique de navigation (ouverture directe / deep-link).
+  function goBack() {
+    if (typeof window !== 'undefined' && window.history.length > 1) router.back()
+    else router.push(ROUTES.feed)
+  }
+
   return (
-    <header className="panel sticky top-0 z-[60] isolate flex h-14 items-center border-b px-3 shadow-sm backdrop-blur-2xl lg:hidden">
+    <header
+      className={cn(
+        'panel fixed inset-x-0 top-0 isolate flex h-14 items-center border-b px-3 shadow-sm backdrop-blur-2xl lg:hidden',
+        // Tiroir ouvert → header sous l'overlay du Sheet (z-50) pour ne pas masquer
+        // l'identité affichée en haut du tiroir ; sinon au-dessus des overlays (z-40).
+        open ? 'z-30' : 'z-[60]',
+      )}
+    >
       {/* Visiteur : pas de tiroir → lien direct vers la connexion. */}
       {isVisitor ? (
         <Link
@@ -150,6 +211,17 @@ export function MobileHeader() {
           <LogIn className="h-5 w-5" aria-hidden />
           <span>{t('visitor.login')}</span>
         </Link>
+      ) : showBack ? (
+        /* Pages secondaires (notifs / paramètres) : flèche retour vers le
+           « menu normal » (page précédente). */
+        <button
+          type="button"
+          onClick={goBack}
+          aria-label={t('nav.back')}
+          className="-ml-1 flex h-9 w-9 items-center justify-center rounded-full text-foreground transition-colors hover:bg-accent"
+        >
+          <ArrowLeft className="h-5 w-5" />
+        </button>
       ) : (
       /* Photo de profil -> tiroir de navigation latéral gauche */
       <Sheet open={open} onOpenChange={setOpen}>
@@ -248,24 +320,51 @@ export function MobileHeader() {
       </Sheet>
       )}
 
-      {/* Logo Breezy centré */}
-      <Link
-        href={ROUTES.feed}
-        aria-label={t('nav.home')}
-        className="absolute left-1/2 -translate-x-1/2"
-      >
-        <Image
-          src="/logo_only.png"
-          alt="Breezy"
-          width={512}
-          height={512}
-          className="h-8 w-8 object-contain"
-          priority
-        />
-      </Link>
+      {/* Centre : titre de la section nommée, sinon logo Breezy (lien vers le feed). */}
+      {titleKey ? (
+        <h1 className="absolute left-1/2 -translate-x-1/2 text-lg font-bold">
+          {t(titleKey)}
+        </h1>
+      ) : (
+        <Link
+          href={ROUTES.feed}
+          aria-label={t('nav.home')}
+          className="absolute left-1/2 -translate-x-1/2"
+        >
+          <Image
+            src="/logo_only.png"
+            alt="Breezy"
+            width={512}
+            height={512}
+            className="h-8 w-8 object-contain"
+            priority
+          />
+        </Link>
+      )}
 
-      {/* Contrepoids pour équilibrer le logo centré */}
-      <span className="ml-auto h-8 w-8" aria-hidden />
+      {/* Droite : cloche vers les notifications (avec pastille), sinon contrepoids. */}
+      {showBell ? (
+        <Link
+          href={ROUTES.notifications}
+          scroll={false}
+          aria-label={t('nav.notifications')}
+          className="ml-auto flex h-9 w-9 items-center justify-center rounded-full text-foreground transition-colors hover:bg-accent"
+        >
+          <span className="relative">
+            <Bell className="h-6 w-6" aria-hidden />
+            {unreadCount > 0 && (
+              <span
+                aria-label={t('notifications.unread_aria', { count: unreadCount })}
+                className="absolute -right-2 -top-1.5 flex h-[16px] min-w-[16px] items-center justify-center rounded-full bg-gradient-to-r from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] px-1 text-[10px] font-bold leading-none text-white shadow"
+              >
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
+          </span>
+        </Link>
+      ) : (
+        <span className="ml-auto h-9 w-9" aria-hidden />
+      )}
 
       {/* Popup de thème personnalisé (frère du tiroir : ne se démonte pas
           quand le Sheet se ferme). */}
