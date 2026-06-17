@@ -392,6 +392,9 @@ services:
       NOTIFICATION_SERVICE_URL: http://notification-service:8086
       MEDIA_SERVICE_URL: http://media-service:8087
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET requis}
+      # CORS : surchargeable par le shell (cf. `make dev-lan`) pour autoriser
+      # l'origine du front servi sur l'IP LAN. Défaut = localhost (dev solo).
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000}
     ports:
       - "8080:8080"
     networks:
