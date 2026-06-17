@@ -4312,6 +4312,18 @@ definitions:
           $ref: '#/definitions/models.MediaRef'
       parent_id:
         type: string
+  models.CreatePollChoiceRequest:
+    type: object
+    required:
+    - label
+    properties:
+      image_url:
+        type: string
+        maxLength: 512
+      label:
+        type: string
+        maxLength: 80
+        minLength: 1
   models.CreatePollRequest:
     type: object
     required:
@@ -4327,7 +4339,7 @@ definitions:
         maxItems: 4
         minItems: 2
         items:
-          type: string
+          $ref: '#/definitions/models.CreatePollChoiceRequest'
       duration_minutes:
         type: integer
         maximum: 10080
@@ -4404,6 +4416,14 @@ definitions:
     type: object
     properties:
       id:
+        type: string
+      image_url:
+        description: 'ImageURL (optionnel) : illustration du choix, chemin relatif
+          `/media/<id>`
+
+          servi par le media-service via la gateway (le post-service reste agnostique
+
+          du contenu). Vide = choix texte seul (les choix mixtes sont autorisés).'
         type: string
       label:
         type: string

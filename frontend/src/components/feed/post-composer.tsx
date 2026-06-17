@@ -56,6 +56,9 @@ const MAX_CHARS = 280
 /** Nombre maximal de médias par post (aligné sur le validateur post-service). */
 const MAX_MEDIA = 4
 
+/** Brouillon d'un choix de sondage : libellé + image optionnelle (chemin `/media/<id>`). */
+type PollChoiceDraft = { label: string; imageUrl?: string }
+
 interface PostComposerProps {
   /** Classes du conteneur externe (padding/bordure gérés par le parent). */
   className?: string
@@ -95,7 +98,8 @@ export function PostComposer({
   const [submitting, setSubmitting] = useState(false)
   const [pinOnProfile, setPinOnProfile] = useState(false)
   const [pollOpen, setPollOpen] = useState(false)
-  const [pollChoices, setPollChoices] = useState(['', ''])
+  const [pollChoices, setPollChoices] = useState<PollChoiceDraft[]>([{ label: '' }, { label: '' }])
+  const [uploadingChoice, setUploadingChoice] = useState<number | null>(null)
   const [pollDays, setPollDays] = useState(0)
   const [pollHours, setPollHours] = useState(0)
   const [pollMinutes, setPollMinutes] = useState(10)
@@ -222,7 +226,8 @@ export function PostComposer({
 
   function resetPoll() {
     setPollOpen(false)
-    setPollChoices(['', ''])
+    setPollChoices([{ label: '' }, { label: '' }])
+    setUploadingChoice(null)
     setPollDays(0)
     setPollHours(0)
     setPollMinutes(10)
@@ -230,15 +235,36 @@ export function PostComposer({
   }
 
   function updatePollChoice(index: number, value: string) {
-    setPollChoices((prev) => prev.map((choice, i) => (i === index ? value : choice)))
+    setPollChoices((prev) => prev.map((choice, i) => (i === index ? { ...choice, label: value } : choice)))
   }
 
   function addPollChoice() {
-    setPollChoices((prev) => (prev.length >= 4 ? prev : [...prev, '']))
+    setPollChoices((prev) => (prev.length >= 4 ? prev : [...prev, { label: '' }]))
   }
 
   function removePollChoice(index: number) {
     setPollChoices((prev) => (prev.length <= 2 ? prev : prev.filter((_, i) => i !== index)))
+  }
+
+  /** Upload d'une image de choix (cap 5 Mo, admins exemptés) puis association au choix. */
+  async function pickPollChoiceImage(index: number, file: File) {
+    if (exceedsMediaLimit(file.size)) {
+      toast({ title: t('media.too_large', { max: MAX_MEDIA_MB }), variant: 'brand' })
+      return
+    }
+    setUploadingChoice(index)
+    try {
+      const { url } = await uploadMedia(file)
+      setPollChoices((prev) => prev.map((choice, i) => (i === index ? { ...choice, imageUrl: url } : choice)))
+    } catch {
+      toast({ title: t('composer.media_failed'), variant: 'destructive' })
+    } finally {
+      setUploadingChoice(null)
+    }
+  }
+
+  function removePollChoiceImage(index: number) {
+    setPollChoices((prev) => prev.map((choice, i) => (i === index ? { ...choice, imageUrl: undefined } : choice)))
   }
 
   return (
@@ -298,7 +324,10 @@ export function PostComposer({
             minutes={pollMinutes}
             minMinutes={minPollMinutes}
             audience={pollAudience}
+            uploadingChoice={uploadingChoice}
             onChoiceChange={updatePollChoice}
+            onChoiceImage={pickPollChoiceImage}
+            onRemoveChoiceImage={removePollChoiceImage}
             onAddChoice={addPollChoice}
             onRemoveChoice={removePollChoice}
             onDaysChange={setPollDays}
@@ -460,14 +489,17 @@ function ReplyAudiencePill({
 
 function buildPollPayload(
   open: boolean,
-  choices: string[],
+  choices: PollChoiceDraft[],
   days: number,
   hours: number,
   minutes: number,
   audience: PollAudience,
 ): CreatePollPayload | undefined {
   if (!open) return undefined
-  const cleaned = choices.map((choice) => choice.trim()).filter(Boolean)
+  // Un choix est retenu s'il a un libellé (l'image seule ne suffit pas).
+  const cleaned = choices
+    .map((choice) => ({ label: choice.label.trim(), imageUrl: choice.imageUrl }))
+    .filter((choice) => choice.label.length > 0)
   const durationMinutes = days * 24 * 60 + hours * 60 + minutes
   if (cleaned.length < 2 || durationMinutes < 1) return undefined
   return { choices: cleaned, durationMinutes, audience }
@@ -480,7 +512,10 @@ function PollPanel({
   minutes,
   minMinutes,
   audience,
+  uploadingChoice,
   onChoiceChange,
+  onChoiceImage,
+  onRemoveChoiceImage,
   onAddChoice,
   onRemoveChoice,
   onDaysChange,
@@ -489,13 +524,16 @@ function PollPanel({
   onAudienceChange,
   onRemove,
 }: {
-  choices: string[]
+  choices: PollChoiceDraft[]
   days: number
   hours: number
   minutes: number
   minMinutes: number
   audience: PollAudience
+  uploadingChoice: number | null
   onChoiceChange: (index: number, value: string) => void
+  onChoiceImage: (index: number, file: File) => void
+  onRemoveChoiceImage: (index: number) => void
   onAddChoice: () => void
   onRemoveChoice: (index: number) => void
   onDaysChange: (value: number) => void
@@ -509,28 +547,17 @@ function PollPanel({
     <div className="overflow-hidden rounded-2xl border border-border bg-background/35">
       <div className="space-y-3 p-3">
         {choices.map((choice, index) => (
-          <div key={index} className="flex items-center gap-2">
-            <div className="grid h-12 w-12 shrink-0 place-items-center rounded-lg border border-dashed border-border bg-muted/60 text-muted-foreground">
-              <ImageIcon className="h-5 w-5" />
-            </div>
-            <input
-              value={choice}
-              onChange={(e) => onChoiceChange(index, e.target.value)}
-              placeholder={t('composer.poll_choice', { number: index + 1 })}
-              maxLength={80}
-              className="h-12 min-w-0 flex-1 rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-primary"
-            />
-            {choices.length > 2 && (
-              <button
-                type="button"
-                aria-label={t('composer.poll_remove_choice')}
-                onClick={() => onRemoveChoice(index)}
-                className="rounded-full p-2 text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            )}
-          </div>
+          <PollChoiceRow
+            key={index}
+            choice={choice}
+            index={index}
+            uploading={uploadingChoice === index}
+            canRemove={choices.length > 2}
+            onChoiceChange={onChoiceChange}
+            onChoiceImage={onChoiceImage}
+            onRemoveChoiceImage={onRemoveChoiceImage}
+            onRemoveChoice={onRemoveChoice}
+          />
         ))}
         {choices.length < 4 && (
           <button
@@ -573,6 +600,93 @@ function PollPanel({
           {t('composer.poll_remove')}
         </button>
       </div>
+    </div>
+  )
+}
+
+/**
+ * Une ligne de choix de sondage : encadré image cliquable (upload via media-service,
+ * cap 5 Mo géré par le parent) + champ libellé + bouton retirer le choix. L'image est
+ * optionnelle ; un sondage peut mélanger choix illustrés et choix texte seul.
+ */
+function PollChoiceRow({
+  choice,
+  index,
+  uploading,
+  canRemove,
+  onChoiceChange,
+  onChoiceImage,
+  onRemoveChoiceImage,
+  onRemoveChoice,
+}: {
+  choice: PollChoiceDraft
+  index: number
+  uploading: boolean
+  canRemove: boolean
+  onChoiceChange: (index: number, value: string) => void
+  onChoiceImage: (index: number, file: File) => void
+  onRemoveChoiceImage: (index: number) => void
+  onRemoveChoice: (index: number) => void
+}) {
+  const t = useT()
+  const inputRef = useRef<HTMLInputElement>(null)
+  return (
+    <div className="flex items-center gap-2">
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0]
+          e.target.value = '' // permet de re-sélectionner le même fichier
+          if (file) onChoiceImage(index, file)
+        }}
+      />
+      <div className="relative h-12 w-12 shrink-0">
+        <button
+          type="button"
+          aria-label={t('composer.poll_choice_image', { number: index + 1 })}
+          onClick={() => inputRef.current?.click()}
+          disabled={uploading}
+          className="grid h-12 w-12 place-items-center overflow-hidden rounded-lg border border-dashed border-border bg-muted/60 text-muted-foreground transition hover:border-primary hover:text-primary disabled:opacity-60"
+        >
+          {uploading ? (
+            <Loader2 className="h-5 w-5 animate-spin" />
+          ) : choice.imageUrl ? (
+            <img src={resolveMediaUrl(choice.imageUrl)} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <ImageIcon className="h-5 w-5" />
+          )}
+        </button>
+        {choice.imageUrl && !uploading && (
+          <button
+            type="button"
+            aria-label={t('composer.poll_choice_image_remove')}
+            onClick={() => onRemoveChoiceImage(index)}
+            className="absolute -right-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-full bg-background text-muted-foreground shadow ring-1 ring-border transition hover:text-destructive"
+          >
+            <X className="h-3 w-3" />
+          </button>
+        )}
+      </div>
+      <input
+        value={choice.label}
+        onChange={(e) => onChoiceChange(index, e.target.value)}
+        placeholder={t('composer.poll_choice', { number: index + 1 })}
+        maxLength={80}
+        className="h-12 min-w-0 flex-1 rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-primary"
+      />
+      {canRemove && (
+        <button
+          type="button"
+          aria-label={t('composer.poll_remove_choice')}
+          onClick={() => onRemoveChoice(index)}
+          className="rounded-full p-2 text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      )}
     </div>
   )
 }

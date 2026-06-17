@@ -35,6 +35,7 @@ import {
   type PostMedia,
   type PostPoll,
 } from '@/lib/posts'
+import { resolveMediaUrl } from '@/lib/media'
 import { quickBookmark, removeBookmarkEverywhere } from '@/lib/bookmarks'
 import { BookmarkDialog } from '@/components/feed/bookmark-dialog'
 import { ToastAction } from '@/components/ui/toast'
@@ -860,7 +861,16 @@ function PostPollCard({
                   style={{ width: `${percent}%` }}
                 />
               )}
-              <span className="relative z-10 min-w-0 truncate font-medium">{choice.label}</span>
+              <span className="relative z-10 flex min-w-0 items-center gap-2">
+                {choice.imageUrl && (
+                  <img
+                    src={resolveMediaUrl(choice.imageUrl)}
+                    alt=""
+                    className="h-8 w-8 shrink-0 rounded object-cover"
+                  />
+                )}
+                <span className="min-w-0 truncate font-medium">{choice.label}</span>
+              </span>
               <span className="relative z-10 ml-3 flex shrink-0 items-center gap-2 font-semibold">
                 {winner && <span className="text-xs text-primary">{t('post.poll_winner')}</span>}
                 {voting === choice.id ? (

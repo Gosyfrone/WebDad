@@ -152,6 +152,9 @@ var validators = map[string]bson.M{
 									"id":          bson.M{"bsonType": "string"},
 									"label":       bson.M{"bsonType": "string", "maxLength": 80},
 									"votes_count": bson.M{"bsonType": "int", "minimum": 0},
+									// Optionnel : illustration du choix (chemin relatif /media/<id>).
+									// Champ non requis → aucun backfill nécessaire (cf. Règle 5b).
+									"image_url": bson.M{"bsonType": "string", "maxLength": 512},
 								},
 							},
 						},
