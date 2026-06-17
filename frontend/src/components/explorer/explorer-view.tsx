@@ -9,6 +9,7 @@ import { ArrowRight, Hash, Loader2, Search, Sparkles, UserX } from 'lucide-react
 import {
   getCommonFollowers,
   getFollowingIds,
+  getPendingFollowRequestIds,
   getSuggestions,
   searchUsers,
 } from '@/lib/api'
@@ -57,7 +58,7 @@ export function ExplorerView() {
   const [loadingSearch, setLoadingSearch] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const { currentUserId, isFollowing, isPending, toggle } = useFollow()
+  const { currentUserId, isFollowing, isRequested, isPending, toggle } = useFollow()
   const {
     setFilters,
     setSubmittedSearchActive,
@@ -95,11 +96,17 @@ export function ExplorerView() {
       viewerId
         ? getFollowingIds(viewerId).catch(() => new Set<string>())
         : Promise.resolve(new Set<string>()),
+      viewerId
+        ? getPendingFollowRequestIds().catch(() => new Set<string>())
+        : Promise.resolve(new Set<string>()),
     ])
-      .then(([nextTrends, nextSuggestions, nextPosts, followingIds]) => {
+      .then(([nextTrends, nextSuggestions, nextPosts, followingIds, requestedIds]) => {
         if (cancelled) return
         const visibleSuggestions = nextSuggestions
-          .filter((user) => user.id !== viewerId && !followingIds.has(user.id))
+          .filter(
+            (user) =>
+              user.id !== viewerId && !followingIds.has(user.id) && !requestedIds.has(user.id),
+          )
           .slice(0, 6)
         setTrends(nextTrends)
         setSuggestions(visibleSuggestions)
@@ -292,6 +299,7 @@ export function ExplorerView() {
           showPublications={showPublications}
           showUsers={showUsers}
           isFollowing={isFollowing}
+          isRequested={isRequested}
           isPending={isPending}
           onToggleFollow={toggle}
           onDeleted={handlePostDeleted}
@@ -313,6 +321,7 @@ export function ExplorerView() {
             currentUserId={viewerId}
             commonFollowers={commonFollowers}
             isFollowing={isFollowing}
+            isRequested={isRequested}
             isPending={isPending}
             onToggleFollow={toggle}
           />
@@ -456,6 +465,7 @@ function SubmittedSearchResults({
   showPublications,
   showUsers,
   isFollowing,
+  isRequested,
   isPending,
   onToggleFollow,
   onDeleted,
@@ -471,6 +481,7 @@ function SubmittedSearchResults({
   showPublications: boolean
   showUsers: boolean
   isFollowing: (id: string) => boolean
+  isRequested: (id: string) => boolean
   isPending: (id: string) => boolean
   onToggleFollow: (user: RelationUser, next: boolean) => void
   onDeleted: (id: string) => void
@@ -525,6 +536,7 @@ function SubmittedSearchResults({
                 user={user}
                 isSelf={user.id === currentUserId}
                 isFollowing={isFollowing(user.id)}
+                isRequested={isRequested(user.id)}
                 pending={isPending(user.id)}
                 onToggleFollow={onToggleFollow}
               />
@@ -612,6 +624,7 @@ function SuggestionsSection({
   currentUserId,
   commonFollowers,
   isFollowing,
+  isRequested,
   isPending,
   onToggleFollow,
 }: {
@@ -619,6 +632,7 @@ function SuggestionsSection({
   currentUserId: string | null
   commonFollowers: Record<string, RelationUser[]>
   isFollowing: (id: string) => boolean
+  isRequested: (id: string) => boolean
   isPending: (id: string) => boolean
   onToggleFollow: (user: RelationUser, next: boolean) => void
 }) {
@@ -636,6 +650,7 @@ function SuggestionsSection({
               common={commonFollowers[user.id] ?? []}
               isSelf={user.id === currentUserId}
               isFollowing={isFollowing(user.id)}
+              isRequested={isRequested(user.id)}
               pending={isPending(user.id)}
               onToggleFollow={onToggleFollow}
             />
@@ -651,6 +666,7 @@ function SuggestionCard({
   common,
   isSelf,
   isFollowing,
+  isRequested,
   pending,
   onToggleFollow,
 }: {
@@ -658,6 +674,7 @@ function SuggestionCard({
   common: RelationUser[]
   isSelf: boolean
   isFollowing: boolean
+  isRequested: boolean
   pending: boolean
   onToggleFollow: (user: RelationUser, next: boolean) => void
 }) {
@@ -697,14 +714,18 @@ function SuggestionCard({
           <Button
             size="sm"
             variant={isFollowing ? 'outline' : 'default'}
-            disabled={pending}
+            disabled={pending || isRequested}
             onClick={() => onToggleFollow(user, !isFollowing)}
             className={cn(
               'shrink-0 rounded-full font-bold',
               !isFollowing && 'bg-gradient-to-r from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] text-white',
             )}
           >
-            {isFollowing ? t('follow.followed') : t('follow.follow')}
+            {isRequested
+              ? t('follow.requested')
+              : isFollowing
+                ? t('follow.followed')
+                : t('follow.follow')}
           </Button>
         )}
       </div>
@@ -741,12 +762,14 @@ function ExplorerUserRow({
   user,
   isSelf,
   isFollowing,
+  isRequested,
   pending,
   onToggleFollow,
 }: {
   user: RelationUser
   isSelf: boolean
   isFollowing: boolean
+  isRequested: boolean
   pending: boolean
   onToggleFollow: (user: RelationUser, next: boolean) => void
 }) {
@@ -778,14 +801,18 @@ function ExplorerUserRow({
         <Button
           size="sm"
           variant={isFollowing ? 'outline' : 'default'}
-          disabled={pending}
+          disabled={pending || isRequested}
           onClick={() => onToggleFollow(user, !isFollowing)}
           className={cn(
             'shrink-0 rounded-full font-bold',
             !isFollowing && 'bg-gradient-to-r from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] text-white',
           )}
         >
-          {isFollowing ? t('follow.followed') : t('follow.follow')}
+          {isRequested
+            ? t('follow.requested')
+            : isFollowing
+              ? t('follow.followed')
+              : t('follow.follow')}
         </Button>
       )}
     </div>
