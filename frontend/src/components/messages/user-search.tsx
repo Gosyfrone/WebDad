@@ -73,7 +73,7 @@ export function UserSearch({ excludeIds = [], onPick, autoFocus = true }: UserSe
           onChange={(e) => setQuery(e.target.value)}
           placeholder={t('messages.search_user_placeholder')}
           autoFocus={autoFocus}
-          className="glass w-full rounded-full border py-2.5 pl-10 pr-4 text-sm backdrop-blur placeholder:text-muted-foreground focus:border-[#5B6CFF] focus:outline-none"
+          className="w-full rounded-full border border-input bg-background/60 py-2.5 pl-10 pr-4 text-sm backdrop-blur placeholder:text-muted-foreground focus:border-[#5B6CFF] focus:outline-none"
         />
       </div>
 
