@@ -16,6 +16,13 @@ interface UserSearchProps {
   /** Appelé quand une personne est choisie dans les résultats. */
   onPick: (user: RelationUser) => void
   autoFocus?: boolean
+  /**
+   * Personnes prioritaires (ex. partages récents) : affichées quand le champ
+   * est vide, et remontées en tête des résultats correspondants à la recherche.
+   */
+  recentUsers?: RelationUser[]
+  /** Titre affiché au-dessus de la liste des récents (champ vide). */
+  recentLabel?: string
 }
 
 /**
@@ -23,7 +30,13 @@ interface UserSearchProps {
  * DM et l'ajout de membres. Réutilise `searchUsers` (user-service +
  * profil-service, bascule `@` = identifiant) ; chaque résultat est cliquable.
  */
-export function UserSearch({ excludeIds = [], onPick, autoFocus = true }: UserSearchProps) {
+export function UserSearch({
+  excludeIds = [],
+  onPick,
+  autoFocus = true,
+  recentUsers = [],
+  recentLabel,
+}: UserSearchProps) {
   const { t } = useLanguage()
   const [query, setQuery] = useState('')
   const [debounced, setDebounced] = useState('')
@@ -59,7 +72,16 @@ export function UserSearch({ excludeIds = [], onPick, autoFocus = true }: UserSe
   }, [debounced])
 
   const exclude = new Set(excludeIds)
-  const visible = results.filter((u) => !exclude.has(u.id))
+  // Rang d'un id parmi les récents (Infinity si absent) → tri stable « récents d'abord ».
+  const recentRank = new Map(recentUsers.map((u, i) => [u.id, i]))
+  const rankOf = (id: string) => recentRank.get(id) ?? Number.POSITIVE_INFINITY
+  const visible = results
+    .filter((u) => !exclude.has(u.id))
+    .sort((a, b) => rankOf(a.id) - rankOf(b.id))
+
+  // Champ vide : on propose les destinataires récents (filtrés) plutôt que rien.
+  const recents = recentUsers.filter((u) => !exclude.has(u.id))
+  const showRecents = !debounced && recents.length > 0
 
   return (
     <div className="flex flex-col">
@@ -88,31 +110,36 @@ export function UserSearch({ excludeIds = [], onPick, autoFocus = true }: UserSe
             {t('messages.no_users')}
           </p>
         ) : (
-          <ul className="divide-y divide-border">
-            {visible.map((user) => (
-              <li key={user.id}>
-                <button
-                  type="button"
-                  onClick={() => onPick(user)}
-                  className="flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left transition-colors hover:bg-accent"
-                >
-                  <Avatar className="h-9 w-9 shrink-0">
-                    {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user.displayName} />}
-                    <AvatarFallback>
-                      {initialOf(user.displayName, user.username)}
-                    </AvatarFallback>
-                    <ActivityPresenceDot userId={user.id} />
-                  </Avatar>
-                  <div className="flex min-w-0 flex-col">
-                    <span className="truncate text-sm font-bold text-foreground">
-                      {user.displayName}
-                    </span>
-                    <span className="truncate text-xs text-muted-foreground">@{user.username}</span>
-                  </div>
-                </button>
-              </li>
-            ))}
-          </ul>
+          <>
+            {showRecents && recentLabel && (
+              <p className="px-2 pb-1 text-xs font-semibold text-muted-foreground">{recentLabel}</p>
+            )}
+            <ul className="divide-y divide-border">
+              {(showRecents ? recents : visible).map((user) => (
+                <li key={user.id}>
+                  <button
+                    type="button"
+                    onClick={() => onPick(user)}
+                    className="flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left transition-colors hover:bg-accent"
+                  >
+                    <Avatar className="h-9 w-9 shrink-0">
+                      {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user.displayName} />}
+                      <AvatarFallback>
+                        {initialOf(user.displayName, user.username)}
+                      </AvatarFallback>
+                      <ActivityPresenceDot userId={user.id} />
+                    </Avatar>
+                    <div className="flex min-w-0 flex-col">
+                      <span className="truncate text-sm font-bold text-foreground">
+                        {user.displayName}
+                      </span>
+                      <span className="truncate text-xs text-muted-foreground">@{user.username}</span>
+                    </div>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </>
         )}
       </div>
     </div>

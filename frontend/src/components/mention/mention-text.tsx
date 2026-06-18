@@ -72,6 +72,54 @@ function renderHashtags(text: string, keyPrefix: string): ReactNode[] {
 }
 
 /**
+ * Transforme les URLs http(s) d'un texte en liens cliquables. Un lien vers
+ * notre propre origine (post/profil partagé) reste une navigation SPA (`Link`) ;
+ * tout autre lien s'ouvre dans un nouvel onglet. Fonction de rendu PURE.
+ */
+function renderLinks(text: string, linkClass: string, keyPrefix: string): ReactNode[] {
+  const nodes: ReactNode[] = []
+  const re = /(https?:\/\/[^\s]+)/g
+  const origin = typeof window !== 'undefined' ? window.location.origin : ''
+  let last = 0
+  let match: RegExpExecArray | null
+  let key = 0
+
+  while ((match = re.exec(text)) !== null) {
+    if (match.index > last) nodes.push(text.slice(last, match.index))
+    let url = match[0]
+    // Ponctuation finale collée au lien (« …/abc. ») → rejetée hors du lien.
+    const trailingMatch = url.match(/[).,;!?]+$/)
+    const trailing = trailingMatch ? trailingMatch[0] : ''
+    if (trailing) url = url.slice(0, -trailing.length)
+
+    if (origin && url.startsWith(origin)) {
+      const path = url.slice(origin.length) || '/'
+      nodes.push(
+        <Link key={`${keyPrefix}-${key++}`} href={path} className={linkClass}>
+          {url}
+        </Link>,
+      )
+    } else {
+      nodes.push(
+        <a
+          key={`${keyPrefix}-${key++}`}
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={linkClass}
+        >
+          {url}
+        </a>,
+      )
+    }
+    if (trailing) nodes.push(trailing)
+    last = re.lastIndex
+  }
+  if (last < text.length) nodes.push(text.slice(last))
+  return nodes
+}
+
+/**
  * Variante messagerie : un @handle d'un MEMBRE de la conversation mène à son
  * profil (décision produit) ; un @handle d'un NON-membre ouvre une carte d'aperçu
  * (avatar / nom / @handle) dont le clic renvoie vers la recherche (loupe).
@@ -95,7 +143,7 @@ export function MentionMessageText({
   return (
     <span className={className}>
       {segments.map((seg, i) => {
-        if (seg.type === 'text') return <Fragment key={i}>{seg.text}</Fragment>
+        if (seg.type === 'text') return <Fragment key={i}>{renderLinks(seg.text, mentionClass, `lnk-${i}`)}</Fragment>
         if (memberUsernames.has(seg.handle.toLowerCase())) {
           return (
             <Link key={i} href={profilHref(seg.handle)} className={mentionClass}>

@@ -25,6 +25,8 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { AnimatedCount } from '@/components/feed/animated-count'
 import { PostComposer } from '@/components/feed/post-composer'
+import { ShareDialog } from '@/components/share/share-dialog'
+import { postHref } from '@/lib/routes'
 
 interface PostActionsProps {
   post: FeedPost
@@ -57,6 +59,7 @@ export function PostActions({ post, commentCount, commentActive = false, onComme
   const [reposting, setReposting] = useState(false)
   const [repostMenuOpen, setRepostMenuOpen] = useState(false)
   const [quoteOpen, setQuoteOpen] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
 
   useEffect(() => {
     setReposted(post.reposted)
@@ -185,11 +188,20 @@ export function PostActions({ post, commentCount, commentActive = false, onComme
         />
         <button
           aria-label={t('post.share')}
+          onClick={() => setShareOpen(true)}
           className="rounded-full p-1.5 transition-colors hover:bg-primary/10 hover:text-primary"
         >
           <Share className="h-4 w-4" />
         </button>
       </div>
+
+      <ShareDialog
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        url={postHref(post.id)}
+        kind="post"
+        title={t('post.share')}
+      />
 
       <Dialog open={quoteOpen} onOpenChange={setQuoteOpen}>
         <DialogContent className="panel top-24 translate-y-0 border p-4 shadow-[0_28px_80px_rgba(91,108,255,0.24)] sm:max-h-[calc(100vh-8rem)] sm:max-w-xl sm:overflow-y-auto">

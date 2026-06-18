@@ -2,11 +2,11 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { CalendarDays, LinkIcon, Mail, MapPin } from 'lucide-react'
+import { CalendarDays, LinkIcon, Mail, MapPin, Share } from 'lucide-react'
 
 import { cn, initialOf } from '@/lib/utils'
 import { countryFlag, countryName } from '@/lib/countries'
-import { ROUTES } from '@/lib/routes'
+import { ROUTES, profilHref } from '@/lib/routes'
 import type { RelationKind, UsernameUpdateResult } from '@/lib/api'
 import { useFollow } from '@/lib/use-follow'
 import type { ProfilDetails, ProfilEditableFields, RelationUser } from '@/types'
@@ -25,6 +25,7 @@ import {
 import { EditProfilDialog } from '@/components/profil/edit-profil-dialog'
 import { RelationsDialog } from '@/components/profil/relations-dialog'
 import { ActivityStatus } from '@/components/profil/activity-status'
+import { ShareDialog } from '@/components/share/share-dialog'
 
 interface ProfilHeaderProps {
   profil: ProfilDetails
@@ -55,6 +56,7 @@ export function ProfilHeader({
   const initials = initialOf(profil.displayName, profil.username)
   const [relationsOpen, setRelationsOpen] = useState(false)
   const [relationsTab, setRelationsTab] = useState<RelationKind>('followers')
+  const [shareOpen, setShareOpen] = useState(false)
 
   // État de suivi (même hook que la recherche / les suggestions). Différé pour
   // le propriétaire (pas de bouton « Suivre » sur son propre profil).
@@ -128,6 +130,16 @@ export function ProfilHeader({
               </EditProfilDialog>
             ) : canFollow ? (
               <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  aria-label={t('share.title')}
+                  title={t('share.title')}
+                  onClick={() => setShareOpen(true)}
+                  className="rounded-full border-white/70 bg-white/80 shadow-sm backdrop-blur hover:bg-white dark:border-white/15 dark:bg-white/10 dark:hover:bg-white/20"
+                >
+                  <Share className="h-4 w-4" />
+                </Button>
                 <Button
                   asChild
                   variant="outline"
@@ -269,6 +281,14 @@ export function ProfilHeader({
         followersCount={profil.followersCount}
         followingCount={profil.followingCount}
         locked={relationsLocked}
+      />
+
+      <ShareDialog
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        url={profilHref(profil.username)}
+        kind="profile"
+        title={profil.displayName}
       />
     </header>
   )

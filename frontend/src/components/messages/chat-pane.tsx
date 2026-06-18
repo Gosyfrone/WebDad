@@ -57,6 +57,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { MentionAutocomplete } from '@/components/mention/mention-autocomplete'
 import { MentionMessageText } from '@/components/mention/mention-text'
+import { SharedLinkPreview } from '@/components/share/shared-link-preview'
+import { extractSharedRef } from '@/lib/share'
 import { MediaLightbox } from '@/components/ui/media-lightbox'
 import {
   ConversationAvatar,
@@ -819,6 +821,10 @@ function MessageBubble({
                 </p>
               )}
             </div>
+            {message.decrypted && (() => {
+              const ref = extractSharedRef(message.text)
+              return ref ? <SharedLinkPreview target={ref} /> : null
+            })()}
           </div>
           <MessageActionsMenu
             canEdit={canEdit}
