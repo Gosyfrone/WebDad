@@ -193,6 +193,32 @@ export const messages: Record<Locale, Messages> = {
     'settings.user_title': 'Paramètres utilisateur',
     'settings.user_desc':
       'Gérez les identifiants et la sécurité de votre compte.',
+    'settings.mfa.title': 'Double authentification (2FA)',
+    'settings.mfa.desc':
+      "Ajoutez un code à usage unique généré par une application d'authentification (Microsoft/Google Authenticator) à la connexion.",
+    'settings.mfa.enabled_badge': 'Activée',
+    'settings.mfa.loading': 'Chargement…',
+    'settings.mfa.switch_label': 'Double authentification',
+    'settings.mfa.state_on': 'Activée — un code sera demandé à la connexion.',
+    'settings.mfa.state_off': 'Désactivée',
+    'settings.mfa.not_configured':
+      "La double authentification n'est pas disponible sur ce serveur pour le moment.",
+    'settings.mfa.activate': 'Activer la 2FA',
+    'settings.mfa.setup_intro':
+      "Scannez ce QR code avec votre application d'authentification, ou saisissez la clé manuellement, puis entrez le code généré.",
+    'settings.mfa.qr_alt': 'QR code de configuration 2FA',
+    'settings.mfa.secret_label': 'Clé de configuration (saisie manuelle)',
+    'settings.mfa.code_label': 'Code de vérification',
+    'settings.mfa.password_label': 'Ou votre mot de passe',
+    'settings.mfa.confirm': 'Activer',
+    'settings.mfa.cancel': 'Annuler',
+    'settings.mfa.disable': 'Désactiver la 2FA',
+    'settings.mfa.disable_intro':
+      'Confirmez avec un code de votre application OU votre mot de passe pour désactiver la double authentification.',
+    'settings.mfa.success_enabled': 'Double authentification activée.',
+    'settings.mfa.success_disabled': 'Double authentification désactivée.',
+    'settings.mfa.error_code': 'Code de vérification invalide.',
+    'settings.mfa.error_generic': 'Opération impossible. Réessayez.',
     'settings.password.title': 'Changer le mot de passe',
     'settings.password.desc': 'Le changement déconnectera vos autres sessions.',
     'settings.password.current': 'Ancien mot de passe',
@@ -783,6 +809,16 @@ export const messages: Record<Locale, Messages> = {
     'auth.verify.resend_done':
       "Si un compte non vérifié correspond à cette adresse, un e-mail vient d'être envoyé.",
     'auth.verify.resend_label': 'Ton adresse e-mail',
+    'auth.mfa.title': 'Vérification en deux étapes',
+    'auth.mfa.subtitle':
+      "Entre le code à 6 chiffres affiché par ton application d'authentification.",
+    'auth.mfa.code_label': 'Code de vérification',
+    'auth.mfa.verify': 'Vérifier',
+    'auth.mfa.verifying': 'Vérification…',
+    'auth.mfa.back': 'Revenir à la connexion',
+    'auth.mfa.error_code': 'Code invalide. Réessaie.',
+    'auth.mfa.error_challenge':
+      'La session de connexion a expiré. Reconnecte-toi.',
     'auth.verify.loading_title': 'Vérification en cours…',
     'auth.verify.loading_desc': 'Un instant, on confirme ton adresse e-mail.',
     'auth.verify.success_title': 'Adresse vérifiée !',
@@ -1195,6 +1231,32 @@ export const messages: Record<Locale, Messages> = {
     'settings.general_desc': 'Customize your Breezy experience.',
     'settings.user_title': 'User settings',
     'settings.user_desc': 'Manage your account credentials and security.',
+    'settings.mfa.title': 'Two-factor authentication (2FA)',
+    'settings.mfa.desc':
+      'Add a one-time code from an authenticator app (Microsoft/Google Authenticator) when you sign in.',
+    'settings.mfa.enabled_badge': 'Enabled',
+    'settings.mfa.loading': 'Loading…',
+    'settings.mfa.switch_label': 'Two-factor authentication',
+    'settings.mfa.state_on': 'On — a code will be required at sign-in.',
+    'settings.mfa.state_off': 'Off',
+    'settings.mfa.not_configured':
+      'Two-factor authentication is not available on this server right now.',
+    'settings.mfa.activate': 'Enable 2FA',
+    'settings.mfa.setup_intro':
+      'Scan this QR code with your authenticator app, or enter the key manually, then type the generated code.',
+    'settings.mfa.qr_alt': '2FA setup QR code',
+    'settings.mfa.secret_label': 'Setup key (manual entry)',
+    'settings.mfa.code_label': 'Verification code',
+    'settings.mfa.password_label': 'Or your password',
+    'settings.mfa.confirm': 'Enable',
+    'settings.mfa.cancel': 'Cancel',
+    'settings.mfa.disable': 'Disable 2FA',
+    'settings.mfa.disable_intro':
+      'Confirm with a code from your app OR your password to disable two-factor authentication.',
+    'settings.mfa.success_enabled': 'Two-factor authentication enabled.',
+    'settings.mfa.success_disabled': 'Two-factor authentication disabled.',
+    'settings.mfa.error_code': 'Invalid verification code.',
+    'settings.mfa.error_generic': 'Operation failed. Please try again.',
     'settings.password.title': 'Change password',
     'settings.password.desc': 'Changing it will sign out your other sessions.',
     'settings.password.current': 'Current password',
@@ -1756,6 +1818,15 @@ export const messages: Record<Locale, Messages> = {
     'auth.verify.resend_done':
       'If an unverified account matches this address, an email has just been sent.',
     'auth.verify.resend_label': 'Your email address',
+    'auth.mfa.title': 'Two-step verification',
+    'auth.mfa.subtitle':
+      'Enter the 6-digit code shown in your authenticator app.',
+    'auth.mfa.code_label': 'Verification code',
+    'auth.mfa.verify': 'Verify',
+    'auth.mfa.verifying': 'Verifying…',
+    'auth.mfa.back': 'Back to sign in',
+    'auth.mfa.error_code': 'Invalid code. Try again.',
+    'auth.mfa.error_challenge': 'Your sign-in session expired. Please sign in again.',
     'auth.verify.loading_title': 'Verifying…',
     'auth.verify.loading_desc':
       'One moment, we are confirming your email address.',

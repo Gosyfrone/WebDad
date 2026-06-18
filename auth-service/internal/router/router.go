@@ -50,6 +50,14 @@ func New(auth *services.AuthService, oauthReg *oauth.Registry) *gin.Engine {
 		authGroup.POST("/password/change", middleware.JWTAuth(auth), h.ChangePassword)
 		authGroup.POST("/email/change/request", middleware.JWTAuth(auth), h.RequestEmailChange)
 		authGroup.POST("/email/change/confirm", h.ConfirmEmailChange)
+		// MFA TOTP (opt-in). setup/enable/disable/status sont authentifiés
+		// (gestion depuis /parametres) ; verify est PUBLIQUE : le challenge émis
+		// au login (mot de passe déjà validé) y tient lieu d'authentification.
+		authGroup.POST("/mfa/setup", middleware.JWTAuth(auth), h.MFASetup)
+		authGroup.POST("/mfa/enable", middleware.JWTAuth(auth), h.MFAEnable)
+		authGroup.POST("/mfa/disable", middleware.JWTAuth(auth), h.MFADisable)
+		authGroup.GET("/mfa/status", middleware.JWTAuth(auth), h.MFAStatus)
+		authGroup.POST("/mfa/verify", h.MFAVerify)
 		// /auth/refresh : échange le refresh token (cookie httpOnly relayé par
 		// le BFF) contre une nouvelle paire access+refresh (rotation).
 		authGroup.POST("/refresh", h.Refresh)

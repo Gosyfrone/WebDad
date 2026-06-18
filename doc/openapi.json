@@ -188,7 +188,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Connexion réussie — data: {token, refresh_token, user}",
+            "description": "Connexion réussie — data: {token, refresh_token, user} ; si MFA active : data: {mfa_required: true, challenge} (aucun token, appeler /auth/mfa/verify)",
             "schema": {
               "$ref": "#/definitions/models.AuthUser"
             }
@@ -275,6 +275,299 @@
           },
           "500": {
             "description": "Erreur interne",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/mfa/disable": {
+      "post": {
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "auth"
+        ],
+        "summary": "Désactiver la MFA",
+        "parameters": [
+          {
+            "description": "Code TOTP courant OU mot de passe du compte",
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/models.MFADisableRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "data: {enabled: false}",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "boolean"
+              }
+            }
+          },
+          "400": {
+            "description": "Preuve invalide (code: invalid_mfa_code) ou MFA non active (code: mfa_not_enabled)",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "401": {
+            "description": "Non authentifié",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "503": {
+            "description": "MFA non configurée",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/mfa/enable": {
+      "post": {
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "auth"
+        ],
+        "summary": "Activer la MFA (confirmation du code)",
+        "parameters": [
+          {
+            "description": "Code TOTP affiché par l'app",
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/models.MFAEnableRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "data: {enabled: true}",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "boolean"
+              }
+            }
+          },
+          "400": {
+            "description": "Code invalide (code: invalid_mfa_code) ou aucun setup en attente (code: mfa_not_pending)",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "401": {
+            "description": "Non authentifié",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "409": {
+            "description": "MFA déjà activée",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "503": {
+            "description": "MFA non configurée",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/mfa/setup": {
+      "post": {
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "description": "Génère un secret TOTP et renvoie un QR code (data URI) + l'URI otpauth:// à scanner dans une app d'authentification. Le secret n'est PAS encore actif : il faut le confirmer via /auth/mfa/enable.",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "auth"
+        ],
+        "summary": "Démarrer la configuration MFA (TOTP)",
+        "responses": {
+          "200": {
+            "description": "data: {secret, otpauth_url, qr_data_uri}",
+            "schema": {
+              "$ref": "#/definitions/models.MFASetupData"
+            }
+          },
+          "401": {
+            "description": "Non authentifié",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "409": {
+            "description": "MFA déjà activée",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "503": {
+            "description": "MFA non configurée (code: mfa_not_configured)",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/mfa/status": {
+      "get": {
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "auth"
+        ],
+        "summary": "Statut MFA du compte",
+        "responses": {
+          "200": {
+            "description": "data: {enabled, configured}",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "boolean"
+              }
+            }
+          },
+          "401": {
+            "description": "Non authentifié",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/mfa/verify": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "auth"
+        ],
+        "summary": "Valider le second facteur (login MFA)",
+        "parameters": [
+          {
+            "description": "Challenge (issu du login) + code TOTP",
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/models.MFAVerifyRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Connexion réussie — data: {token, refresh_token, user}",
+            "schema": {
+              "$ref": "#/definitions/models.AuthUser"
+            }
+          },
+          "400": {
+            "description": "Challenge invalide/expiré (code: invalid_challenge) ou code TOTP faux (code: invalid_mfa_code)",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "403": {
+            "description": "Compte désactivé",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "503": {
+            "description": "MFA non configurée",
             "schema": {
               "type": "object",
               "additionalProperties": {
@@ -6293,6 +6586,60 @@
           "type": "string"
         },
         "user_id": {
+          "type": "string"
+        }
+      }
+    },
+    "models.MFADisableRequest": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        }
+      }
+    },
+    "models.MFAEnableRequest": {
+      "type": "object",
+      "required": [
+        "code"
+      ],
+      "properties": {
+        "code": {
+          "type": "string"
+        }
+      }
+    },
+    "models.MFASetupData": {
+      "type": "object",
+      "properties": {
+        "otpauth_url": {
+          "type": "string",
+          "example": "otpauth://totp/Breezy:user@mail?secret=...&issuer=Breezy"
+        },
+        "qr_data_uri": {
+          "type": "string",
+          "example": "data:image/png;base64,iVBORw0KGgo..."
+        },
+        "secret": {
+          "type": "string",
+          "example": "JBSWY3DPEHPK3PXP"
+        }
+      }
+    },
+    "models.MFAVerifyRequest": {
+      "type": "object",
+      "required": [
+        "challenge",
+        "code"
+      ],
+      "properties": {
+        "challenge": {
+          "type": "string"
+        },
+        "code": {
           "type": "string"
         }
       }
