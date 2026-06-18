@@ -63,6 +63,8 @@ import { PostComposer } from '@/components/feed/post-composer'
 import { PostPhotoModal } from '@/components/feed/post-photo-modal'
 import { TranslatedContent } from '@/components/feed/translated-content'
 import { MentionText } from '@/components/mention/mention-text'
+import { ShareDialog } from '@/components/share/share-dialog'
+import { postHref } from '@/lib/routes'
 import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
 import { ProfilLink } from '@/components/profil/profil-link'
 
@@ -120,6 +122,7 @@ export function PostCard({ post, showPinBadge = false, focusCommentId, embedded 
   const [repostCount, setRepostCount] = useState(post.repostsCount)
   const [reposting, setReposting] = useState(false)
   const [repostMenuOpen, setRepostMenuOpen] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
   const [quoteOpen, setQuoteOpen] = useState(false)
 
   const [bookmarked, setBookmarked] = useState(post.bookmarked)
@@ -573,11 +576,20 @@ export function PostCard({ post, showPinBadge = false, focusCommentId, embedded 
           </button>
           <button
             aria-label={t('post.share')}
+            onClick={() => setShareOpen(true)}
             className="rounded-full p-1.5 transition-colors hover:bg-primary/10 hover:text-primary"
           >
             <Share className="h-4 w-4" />
           </button>
         </div>
+
+        <ShareDialog
+          open={shareOpen}
+          onOpenChange={setShareOpen}
+          url={postHref(post.id)}
+          kind="post"
+          title={t('post.share')}
+        />
 
         {/* Commentaires (repliable) */}
         {showComments && (
