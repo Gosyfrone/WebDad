@@ -889,7 +889,7 @@ export const messages: Record<Locale, Messages> = {
     'onboarding.subtitle':
       "Choisis ton nom d'utilisateur et indique ta date de naissance pour finaliser ton compte.",
     'onboarding.oauth_subtitle':
-      "Finalise ton inscription Google avec {email}. Aucun compte Breezy n'est créé avant cette étape.",
+      "Finalise ton inscription avec {email}. Aucun compte Breezy n'est créé avant cette étape.",
     'onboarding.username_label': "Nom d'utilisateur",
     'onboarding.username_placeholder': 'ex. felipe',
     'onboarding.username_hint': '3 à 24 caractères : lettres, chiffres, tiret bas (_) et point (.).',
@@ -2064,7 +2064,7 @@ export const messages: Record<Locale, Messages> = {
     'onboarding.subtitle':
       'Pick your username and enter your date of birth to finish setting up your account.',
     'onboarding.oauth_subtitle':
-      'Finish your Google sign-up with {email}. No Breezy account is created before this step.',
+      'Finish your sign-up with {email}. No Breezy account is created before this step.',
     'onboarding.username_label': 'Username',
     'onboarding.username_placeholder': 'e.g. felipe',
     'onboarding.username_hint': '3 to 24 characters: letters, numbers, underscore (_) and dot (.).',

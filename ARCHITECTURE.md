@@ -57,9 +57,10 @@ composed by the **caller** (front/BFF).
   the Next BFF same-origin). Login accepts email directly; username login is resolved by the
   BFF through `GET /users/by-username/:username`, then auth-service checks credentials by
   `user_id`. Refresh is single-flight on 401.
-- **Registration gate:** local registration requires `acceptedTerms=true` in the Next BFF. Google
+- **Registration gate:** local registration requires `acceptedTerms=true` in the Next BFF. OAuth
   sign-up exchanges/verifies the provider code, then returns a short `pending_token` when no
-  account exists yet; the public callback form collects username/date/CGU and only then creates
+  account exists yet; the callback stores it in `sessionStorage` and redirects to the blocking
+  public `/auth/oauth/terms` page. That page collects username/date/CGU and only then creates
   the auth credential, user row, profile and session.
 - **Credential settings:** password changes reuse the authenticated BFF route and rotate the session.
   Email changes use `pending_email` plus a one-use 24h token sent to the new address; confirmation

@@ -162,15 +162,17 @@
   the provider authenticated the user and returns a confirmed address (for GitHub we explicitly pick a *verified*
   one), `EmailVerified=true` is set for them (the handler still rejects an **absent** email). OIDC providers keep the
   strict `email_verified` check (added/explicit-`true`).
-- **CGU acceptance gate lives in the BFF/front, and new Google sign-up is pending until final submit.**
+- **CGU acceptance gate lives in the BFF/front, and new OAuth sign-up is pending until final submit.**
   The legal read marker is local UX (`/cgu` scrolled to bottom → checkbox/button unlock) while the
-  Next BFF enforces `acceptedTerms=true` for classic `/api/auth/register`. For Google sign-up,
+  Next BFF enforces `acceptedTerms=true` for classic `/api/auth/register`. For OAuth sign-up,
   `/auth/oauth/:provider/exchange` verifies the provider identity but, when no account exists, writes only
   a short `oauth_signup_tokens` row and returns `onboarding_required + pending_token + email` — **no
-  credential, no user/profile, no JWT**. The public callback form then collects username/date/CGU and
+  credential, no user/profile, no JWT**. The callback stores the pending data in `sessionStorage` and
+  redirects to the blocking public `/auth/oauth/terms` page (back navigation trapped, unload warned) which
+  collects username/date/CGU; only then
   `POST /auth/oauth/:provider/complete` consumes the pending token in a transaction to create the
   credential and issue the first session; the BFF provisions user-service/profil-service immediately
-  after. Existing Google logins still issue tokens directly.
+  after. Existing OAuth logins still issue tokens directly.
 - **Account reconciliation by email:** existing account → connect + fill `provider_subject` (only if unset, no
   hijack); absent → create with `password NULL`. Classic login on a password-less account is refused with a clear
   409 (`ErrNoLocalPassword`) steering the user to the external provider. Schema migrated via idempotent `ALTER`
@@ -287,17 +289,10 @@
 - **Profil: `POST` = the ONLY creation (`display_name` required); `GET /profils/me` is read-only (404 if absent).**
   No write-on-GET, no guessed display_name. Front handles the 404 (POST-if-absent). profil-service never calls
   user-service at runtime; the BFF aligns `display_name = username` at register.
-- **OAuth first-login onboarding gate (front).** A Google sign-up creates `credentials` (auth) + lazily a
-  `users` row (derived handle via `GET /users/me`) but **no profil** → invisible in Explorer (`/profils/search`)
-  though mentionable via `@` (`/users/search`). Rather than auto-deriving a profil silently, the **profil-absent
-  signal** (`GET /profils/me` 404) drives a **blocking modal** mounted in the `(app)` layout (`OnboardingGate`):
-  present on every authenticated page, non-dismissible (ESC/outside/close disabled), re-checked each load. The
-  user picks a username (pre-filled with the derived handle, availability-checked, kept = treated as available)
-  and a birth date (≥13 age parity with register), then **`PATCH /users/me`** (rename only if it differs from the
-  derived handle — first rename never hits the cooldown, `username_changed_at` nil) **+ `POST /profils`**
-  (`display_name`=username, `birth_date`). Frontend-only, **zero backend change** (reuses existing endpoints).
-  Register users always have a profil → never gated. *Assumed limit:* it's a UX gate, not server-enforced (a
-  client could call APIs directly); a gateway-level barrier would be a separate effort.
+- **Legacy OAuth profil-absent onboarding gate (front).** Accounts created before the pending-token flow may still
+  have credentials/users but no profil. The **profil-absent signal** (`GET /profils/me` 404) still drives the
+  authenticated `(app)` `OnboardingGate` as a repair path. New OAuth sign-ups no longer enter this state: they stay
+  unauthenticated on `/auth/oauth/terms` and are provisioned only after username/date/CGU are submitted.
 
 ## Data ownership
 
