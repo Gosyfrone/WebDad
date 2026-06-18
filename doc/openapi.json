@@ -296,14 +296,17 @@
         "tags": [
           "auth"
         ],
-        "summary": "Finaliser une connexion OAuth (Google)",
+        "summary": "Finaliser une connexion OAuth (Google, GitHub, Facebook, Spotify)",
         "parameters": [
           {
             "enum": [
-              "google"
+              "google",
+              "github",
+              "facebook",
+              "spotify"
             ],
             "type": "string",
-            "description": "Fournisseur OIDC",
+            "description": "Fournisseur OAuth",
             "name": "provider",
             "in": "path",
             "required": true
@@ -381,14 +384,17 @@
         "tags": [
           "auth"
         ],
-        "summary": "Démarrer une connexion OAuth (Google)",
+        "summary": "Démarrer une connexion OAuth (Google, GitHub, Facebook, Spotify)",
         "parameters": [
           {
             "enum": [
-              "google"
+              "google",
+              "github",
+              "facebook",
+              "spotify"
             ],
             "type": "string",
-            "description": "Fournisseur OIDC",
+            "description": "Fournisseur OAuth",
             "name": "provider",
             "in": "path",
             "required": true

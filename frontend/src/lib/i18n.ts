@@ -623,6 +623,7 @@ export const messages: Record<Locale, Messages> = {
 
     // — OAuth —
     'auth.oauth.loading': 'Connexion en cours…',
+    'auth.oauth.continue_with': 'Continuer avec {provider}',
     'auth.oauth.error':
       'La connexion a échoué. Réessaie depuis la page de connexion.',
     'auth.oauth.back_to_login': 'Retour à la connexion',
@@ -1587,6 +1588,7 @@ export const messages: Record<Locale, Messages> = {
 
     // — OAuth —
     'auth.oauth.loading': 'Signing in…',
+    'auth.oauth.continue_with': 'Continue with {provider}',
     'auth.oauth.error': 'Sign-in failed. Try again from the sign-in page.',
     'auth.oauth.back_to_login': 'Back to sign in',
 

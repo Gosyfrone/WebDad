@@ -71,7 +71,7 @@ ALTER TABLE account_tokens DROP CONSTRAINT IF EXISTS account_tokens_purpose_chec
 ALTER TABLE account_tokens ADD CONSTRAINT account_tokens_purpose_check
     CHECK (purpose IN ('verify', 'reset', 'email_change'));
 
--- ─── Connexion via fournisseurs OIDC (Login with Google / Microsoft) ──
+-- ─── Connexion via fournisseurs externes (Google / GitHub / Facebook / Spotify) ──
 -- ALTER idempotents : la base existante est migrée au boot sans script externe.
 DO $$
 BEGIN
@@ -79,6 +79,12 @@ BEGIN
         CREATE TYPE auth_provider AS ENUM ('local', 'google', 'microsoft');
     END IF;
 END$$;
+
+-- Nouveaux providers : ADD VALUE IF NOT EXISTS est idempotent et hors
+-- transaction (EnsureSchema applique le fichier en autocommit), donc sûr au boot.
+ALTER TYPE auth_provider ADD VALUE IF NOT EXISTS 'github';
+ALTER TYPE auth_provider ADD VALUE IF NOT EXISTS 'facebook';
+ALTER TYPE auth_provider ADD VALUE IF NOT EXISTS 'spotify';
 
 -- provider : origine du compte ('local' par défaut → comportement inchangé).
 ALTER TABLE credentials ADD COLUMN IF NOT EXISTS provider auth_provider NOT NULL DEFAULT 'local';

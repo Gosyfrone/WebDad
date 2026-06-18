@@ -66,9 +66,24 @@
   absent or explicit-`false` value is rejected (Google always sends it).
   *(Microsoft/Entra support — multi-tenant `common` issuer with manual `tid` verification — was implemented then
   removed on owner's request; only Google remains. See CHANGELOG 10/06/2026.)*
-- **Generic provider registry** (`internal/oauth`, map `{google}` = issuer + scopes): adding a provider is
-  one map entry + env vars; a provider with no `CLIENT_ID` is skipped (→ 404). Providers are **lazily** built
-  (OIDC discovery at first use, not at boot) so the service starts offline-resilient.
+- **Generic provider registry, two families** (`internal/oauth`, map `defs`): adding a provider is one map entry +
+  env vars; a provider with no `CLIENT_ID` is skipped (→ 404). Two `kind`s behind the same `AuthURL`/`Exchange`
+  interface: **`kindOIDC`** (Google) — OIDC discovery + `id_token` verification (lazy discovery at first
+  use, not at boot → offline-resilient); **`kindOAuth2`** (GitHub, Facebook, Spotify) — plain OAuth2 (no `id_token`):
+  code→`access_token`, then a **userinfo** call (`api.github.com/user`, `graph.facebook.com/me?fields=id,email`,
+  `api.spotify.com/v1/me`) mapped to `Identity{Subject,Email}` via a per-provider `userInfoMap`. This keeps non-OIDC
+  providers as config, not code.
+  *(LinkedIn — initially planned as a second `kindOIDC` provider — was dropped: its dev app requires an attached
+  company Page, heavy for a project. Replaced by GitHub.)*
+- **GitHub specifics within `kindOAuth2`.** GitHub's `/user` returns `email:null` when the address is private, so an
+  optional `emailsURL` fallback (`/user/emails`, scope `user:email`) fetches the **primary verified** address (no
+  provisioning on an unverified email). Its `id` is a JSON number (helper `idField`), and `api.github.com` requires a
+  `User-Agent` header (set by the shared `authedGetJSON`). These three points are the only provider-specific code;
+  everything else stays in `defs`.
+- **OAuth2 (non-OIDC) email is trusted as verified.** GitHub/Facebook/Spotify expose no `email_verified` claim; since
+  the provider authenticated the user and returns a confirmed address (for GitHub we explicitly pick a *verified*
+  one), `EmailVerified=true` is set for them (the handler still rejects an **absent** email). OIDC providers keep the
+  strict `email_verified` check (added/explicit-`true`).
 - **Account reconciliation by email:** existing account → connect + fill `provider_subject` (only if unset, no
   hijack); absent → create with `password NULL`. Classic login on a password-less account is refused with a clear
   409 (`ErrNoLocalPassword`) steering the user to the external provider. Schema migrated via idempotent `ALTER`
