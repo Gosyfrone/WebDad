@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Activity, Loader2, ShieldAlert } from 'lucide-react'
 
 import { getMonitoring, type MonitoringSnapshot } from '@/lib/monitoring'
-import { useSession } from '@/lib/session'
+import { useCurrentUser } from '@/components/current-user-provider'
 import { useLanguage } from '@/components/language-provider'
 import { CreateAccountDialog } from '@/components/admin/create-account-dialog'
 import { timeAgo } from '@/lib/utils'
@@ -28,8 +28,7 @@ const REFRESH_MS = 5000
  */
 export function AdminInfra({ embedded = false }: { embedded?: boolean } = {}) {
   const { t, locale } = useLanguage()
-  const session = useSession()
-  const isAdmin = session?.role === 'administrator'
+  const { session, isAdmin } = useCurrentUser()
 
   const [snapshot, setSnapshot] = useState<MonitoringSnapshot | null>(null)
   const [loading, setLoading] = useState(true)

@@ -8,14 +8,14 @@ import { useT } from '@/components/language-provider'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { getAccessToken, setAccessToken } from '@/lib/auth-client'
-import { useSession } from '@/lib/session'
+import { useCurrentUser } from '@/components/current-user-provider'
 import { MfaSettings } from '@/components/settings/mfa-settings'
 
 type Notice = { kind: 'error' | 'success'; text: string }
 
 export function UserAccountSettings() {
   const t = useT()
-  const session = useSession()
+  const { session } = useCurrentUser()
   const router = useRouter()
   const pathname = usePathname()
   const [currentPassword, setCurrentPassword] = React.useState('')

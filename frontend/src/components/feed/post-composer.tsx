@@ -17,21 +17,18 @@ import {
 } from 'lucide-react'
 
 import { cn, initialOf } from '@/lib/utils'
-import { getAccessToken } from '@/lib/auth-client'
-import { getMyProfil, subscribeProfilUpdated } from '@/lib/profil-client'
 import { exceedsMediaLimit, MAX_MEDIA_MB, resolveMediaUrl, uploadMedia } from '@/lib/media'
 import {
   createPost,
   notifyPostCreated,
   pinPost,
-  type CreatePollPayload,
   type FeedPost,
   type PollAudience,
   type PostMedia,
   type ReplyAudience,
 } from '@/lib/posts'
+import { usePollDraft, type PollChoiceDraft } from '@/lib/use-poll-draft'
 import { useToast } from '@/hooks/use-toast'
-import type { ProfilDetails } from '@/types'
 import { useMention } from '@/lib/use-mention'
 import { mentionSearchGlobal } from '@/lib/mention-search'
 import { useHashtag } from '@/lib/use-hashtag'
@@ -51,34 +48,22 @@ import { MentionAutocomplete } from '@/components/mention/mention-autocomplete'
 import { HashtagAutocomplete } from '@/components/hashtag/hashtag-autocomplete'
 import { ComposerHighlight } from '@/components/hashtag/composer-highlight'
 import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
+import { useCurrentUser } from '@/components/current-user-provider'
 
 const MAX_CHARS = 280
 /** Nombre maximal de médias par post (aligné sur le validateur post-service). */
 const MAX_MEDIA = 4
 
-/** Brouillon d'un choix de sondage : libellé + image optionnelle (chemin `/media/<id>`). */
-type PollChoiceDraft = { label: string; imageUrl?: string }
-
 interface PostComposerProps {
-  /** Classes du conteneur externe (padding/bordure gérés par le parent). */
   className?: string
-  /** Place le curseur dans le champ dès le montage (utile en modale). */
   autoFocus?: boolean
-  /** Libellé du bouton d'envoi (défaut : « Breezer » traduit). */
   submitLabel?: string
-  /** Appelé après une publication réussie (ex. fermer la popup). */
   onPosted?: (content: string) => void
-  /** Post cité, affiché sous le champ et envoyé comme quote_post_id. */
+  /** Post cité, affiché sous le champ et envoyé comme `quote_post_id`. */
   quotePost?: FeedPost
 }
 
-/**
- * Formulaire de rédaction d'un post (avatar + zone de saisie + barre d'outils).
- *
- * Partagé entre la zone de composition inline du fil (`CreatePost`) et la
- * popup déclenchée depuis la sidebar (`CreatePostDialog`) — une seule source
- * de vérité pour la limite de caractères et la validation.
- */
+/** Formulaire de post partagé entre le fil inline et la popup sidebar (validation centralisée). */
 export function PostComposer({
   className,
   autoFocus = false,
@@ -88,22 +73,17 @@ export function PostComposer({
 }: PostComposerProps) {
   const t = useT()
   const { toast } = useToast()
+  const { profil } = useCurrentUser()
   const label = submitLabel ?? t('nav.post')
   const [content, setContent] = useState('')
   const [media, setMedia] = useState<PostMedia[]>([])
   const [uploadingMedia, setUploadingMedia] = useState(false)
-  const [userId, setUserId] = useState('')
-  const [avatarUrl, setAvatarUrl] = useState('')
-  const [initial, setInitial] = useState('U')
+  const userId = profil?.userId ?? ''
+  const avatarUrl = profil?.avatarUrl ?? ''
+  const initial = initialOf(profil?.displayName, profil?.username)
   const [submitting, setSubmitting] = useState(false)
   const [pinOnProfile, setPinOnProfile] = useState(false)
-  const [pollOpen, setPollOpen] = useState(false)
-  const [pollChoices, setPollChoices] = useState<PollChoiceDraft[]>([{ label: '' }, { label: '' }])
-  const [uploadingChoice, setUploadingChoice] = useState<number | null>(null)
-  const [pollDays, setPollDays] = useState(0)
-  const [pollHours, setPollHours] = useState(0)
-  const [pollMinutes, setPollMinutes] = useState(10)
-  const [pollAudience, setPollAudience] = useState<PollAudience>('everyone')
+  const poll = usePollDraft()
   const [replyAudience, setReplyAudience] = useState<ReplyAudience>('everyone')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -118,42 +98,14 @@ export function PostComposer({
     search: hashtagSearchGlobal,
   })
   const remaining = MAX_CHARS - content.length
-  // Une question doit durer au moins 1 minute : si jours et heures sont à 0,
-  // les minutes ne peuvent pas descendre sous 1 (sinon durée totale nulle).
-  const minPollMinutes = pollDays === 0 && pollHours === 0 ? 1 : 0
-  useEffect(() => {
-    if (pollMinutes < minPollMinutes) setPollMinutes(minPollMinutes)
-  }, [minPollMinutes, pollMinutes])
-  const pollPayload = buildPollPayload(pollOpen, pollChoices, pollDays, pollHours, pollMinutes, pollAudience)
-  const isEmpty = content.trim().length === 0 && media.length === 0 && !pollPayload
+  const isEmpty = content.trim().length === 0 && media.length === 0 && !poll.payload
   const isOver = remaining < 0
-
-  // Avatar de l'utilisateur courant (resync sur édition du profil, comme la
-  // sidebar). Repli silencieux sur l'initiale si la session/le profil manque.
-  useEffect(() => {
-    let cancelled = false
-    function apply(profil: ProfilDetails) {
-      if (cancelled) return
-      setUserId(profil.userId)
-      setAvatarUrl(profil.avatarUrl)
-      setInitial(initialOf(profil.displayName, profil.username))
-    }
-    // Sans token (visiteur, ou course d'hydratation avant que `isVisitor` ne
-    // bascule) : pas de profil à charger. `/profils/me` renverrait 401 →
-    // refresh raté → redirection forcée vers /login.
-    if (getAccessToken()) getMyProfil().then(apply).catch(() => {})
-    const unsubscribe = subscribeProfilUpdated(apply)
-    return () => {
-      cancelled = true
-      unsubscribe()
-    }
-  }, [])
 
   async function handleSubmit() {
     if (isEmpty || isOver || submitting || uploadingMedia) return
     setSubmitting(true)
     try {
-      const created = await createPost(content.trim(), media, quotePost?.id, pollPayload, replyAudience)
+      const created = await createPost(content.trim(), media, quotePost?.id, poll.payload, replyAudience)
       const post = pinOnProfile ? await pinPost(created.id) : created
       notifyPostCreated(post) // le fil prépend sans refetch
       onPosted?.(content)
@@ -161,7 +113,7 @@ export function PostComposer({
       setMedia([])
       setPinOnProfile(false)
       setReplyAudience('everyone')
-      resetPoll()
+      poll.reset()
     } catch {
       toast({ title: t('composer.post_failed'), variant: 'destructive' })
     } finally {
@@ -224,49 +176,6 @@ export function PostComposer({
     })
   }
 
-  function resetPoll() {
-    setPollOpen(false)
-    setPollChoices([{ label: '' }, { label: '' }])
-    setUploadingChoice(null)
-    setPollDays(0)
-    setPollHours(0)
-    setPollMinutes(10)
-    setPollAudience('everyone')
-  }
-
-  function updatePollChoice(index: number, value: string) {
-    setPollChoices((prev) => prev.map((choice, i) => (i === index ? { ...choice, label: value } : choice)))
-  }
-
-  function addPollChoice() {
-    setPollChoices((prev) => (prev.length >= 4 ? prev : [...prev, { label: '' }]))
-  }
-
-  function removePollChoice(index: number) {
-    setPollChoices((prev) => (prev.length <= 2 ? prev : prev.filter((_, i) => i !== index)))
-  }
-
-  /** Upload d'une image de choix (cap 5 Mo, admins exemptés) puis association au choix. */
-  async function pickPollChoiceImage(index: number, file: File) {
-    if (exceedsMediaLimit(file.size)) {
-      toast({ title: t('media.too_large', { max: MAX_MEDIA_MB }), variant: 'brand' })
-      return
-    }
-    setUploadingChoice(index)
-    try {
-      const { url } = await uploadMedia(file)
-      setPollChoices((prev) => prev.map((choice, i) => (i === index ? { ...choice, imageUrl: url } : choice)))
-    } catch {
-      toast({ title: t('composer.media_failed'), variant: 'destructive' })
-    } finally {
-      setUploadingChoice(null)
-    }
-  }
-
-  function removePollChoiceImage(index: number) {
-    setPollChoices((prev) => prev.map((choice, i) => (i === index ? { ...choice, imageUrl: undefined } : choice)))
-  }
-
   return (
     <div className={cn('flex gap-3', className)}>
       <Avatar className="mt-1 h-10 w-10 shrink-0 shadow-[0_12px_30px_rgba(91,108,255,0.22)]">
@@ -316,25 +225,25 @@ export function PostComposer({
           <MediaPreviews media={media} onRemove={removeMedia} removeLabel={t('composer.media_remove')} />
         )}
 
-        {pollOpen && (
+        {poll.open && (
           <PollPanel
-            choices={pollChoices}
-            days={pollDays}
-            hours={pollHours}
-            minutes={pollMinutes}
-            minMinutes={minPollMinutes}
-            audience={pollAudience}
-            uploadingChoice={uploadingChoice}
-            onChoiceChange={updatePollChoice}
-            onChoiceImage={pickPollChoiceImage}
-            onRemoveChoiceImage={removePollChoiceImage}
-            onAddChoice={addPollChoice}
-            onRemoveChoice={removePollChoice}
-            onDaysChange={setPollDays}
-            onHoursChange={setPollHours}
-            onMinutesChange={setPollMinutes}
-            onAudienceChange={setPollAudience}
-            onRemove={resetPoll}
+            choices={poll.choices}
+            days={poll.days}
+            hours={poll.hours}
+            minutes={poll.minutes}
+            minMinutes={poll.minMinutes}
+            audience={poll.audience}
+            uploadingChoice={poll.uploadingChoice}
+            onChoiceChange={poll.updateChoice}
+            onChoiceImage={poll.pickChoiceImage}
+            onRemoveChoiceImage={poll.removeChoiceImage}
+            onAddChoice={poll.addChoice}
+            onRemoveChoice={poll.removeChoice}
+            onDaysChange={poll.setDays}
+            onHoursChange={poll.setHours}
+            onMinutesChange={poll.setMinutes}
+            onAudienceChange={poll.setAudience}
+            onRemove={poll.reset}
           />
         )}
 
@@ -385,11 +294,11 @@ export function PostComposer({
             <button
               type="button"
               aria-label={t('composer.add_poll')}
-              aria-pressed={pollOpen}
-              onClick={() => setPollOpen((v) => !v)}
+              aria-pressed={poll.open}
+              onClick={() => poll.setOpen((v) => !v)}
               className={cn(
                 'rounded-full p-2 transition-colors hover:bg-primary/10',
-                pollOpen && 'bg-primary/10 text-primary',
+                poll.open && 'bg-primary/10 text-primary',
               )}
             >
               <ListChecks className="h-5 w-5" />
@@ -535,24 +444,6 @@ function PollAudiencePill({
       </DropdownMenuContent>
     </DropdownMenu>
   )
-}
-
-function buildPollPayload(
-  open: boolean,
-  choices: PollChoiceDraft[],
-  days: number,
-  hours: number,
-  minutes: number,
-  audience: PollAudience,
-): CreatePollPayload | undefined {
-  if (!open) return undefined
-  // Un choix est retenu s'il a un libellé (l'image seule ne suffit pas).
-  const cleaned = choices
-    .map((choice) => ({ label: choice.label.trim(), imageUrl: choice.imageUrl }))
-    .filter((choice) => choice.label.length > 0)
-  const durationMinutes = days * 24 * 60 + hours * 60 + minutes
-  if (cleaned.length < 2 || durationMinutes < 1) return undefined
-  return { choices: cleaned, durationMinutes, audience }
 }
 
 function PollPanel({

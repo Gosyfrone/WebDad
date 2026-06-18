@@ -66,10 +66,7 @@ function applyPostUpdate(current: FeedPost[], updated: FeedPost): FeedPost[] {
 
 /**
  * Corps de la page profil : en-tête sticky (retour + nb de posts), en-tête de
- * profil éditable, onglets, puis la liste de posts de l'onglet actif.
- *
- * Le profil est chargé via l'API Gateway. Les onglets « Réponses » et
- * « J'aime » restent des placeholders tant que l'API n'expose pas ces flux.
+ * profil éditable, et les onglets Posts / Réponses / J'aime (chargés à la demande).
  */
 export function ProfilView({ username }: ProfilViewProps) {
   const { toast } = useToast()

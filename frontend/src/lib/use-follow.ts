@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useState } from 'react'
 
-import { follow, getFollowingIds, getMe, getPendingFollowRequestIds, unfollow } from '@/lib/api'
+import { follow, getFollowingIds, getPendingFollowRequestIds, unfollow } from '@/lib/api'
 import { getAccessToken } from '@/lib/auth-client'
+import { currentUserId as readCurrentUserId } from '@/lib/session'
 import { subscribeFollowRequestDecision } from '@/lib/notifications'
 import type { RelationUser } from '@/types'
 import { useToast } from '@/hooks/use-toast'
@@ -38,8 +39,8 @@ export function useFollow(enabled = true) {
   const [loaded, setLoaded] = useState(!enabled)
 
   useEffect(() => {
-    // Visiteur (pas de token) : pas de graphe social à charger. `getMe` renverrait
-    // 401 → redirection forcée vers /login. On reste « non chargé/non suivi ».
+    // Visiteur (pas de token) : pas de graphe social à charger (les routes
+    // protégées renverraient 401 → redirection). On reste « non chargé/non suivi ».
     if (!enabled || !getAccessToken()) {
       setLoaded(true)
       return
@@ -48,10 +49,9 @@ export function useFollow(enabled = true) {
     setLoaded(false)
     ;(async () => {
       try {
-        const me = await getMe()
-        if (cancelled) return
-        setCurrentUserId(me.id)
-        const ids = await getFollowingIds(me.id)
+        const uid = readCurrentUserId()
+        setCurrentUserId(uid)
+        const ids = await getFollowingIds(uid)
         const pendingIds = await getPendingFollowRequestIds()
         if (!cancelled) {
           setFollowingIds(ids)

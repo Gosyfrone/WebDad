@@ -6,6 +6,10 @@
 
 ---
 
+## Store utilisateur connecté (front, 18/06/2026)
+
+- **Un `CurrentUserProvider` (Context React), pas zustand.** L'identité JWT était déjà centralisée (`lib/session.ts`) mais le **profil** du user connecté (username/display_name/avatar/rôle) était refetché indépendamment par chaque composant visible (sidebar + header + composer = 6 requêtes au boot), et `useSession()` était instancié 10+ fois (chacun son listener + décodage JWT). Le store fait **un seul** `getMyProfil()`+`getMe()` au montage, écoute `SESSION_CHANGED` une seule fois et `subscribeProfilUpdated` (MAJ sans refetch), et expose `useCurrentUser()` (`session`, `profil`, `isAdmin`/`isModerator`, `usernamePending`, `preferredLocale`, `refresh`). **Context plutôt que zustand** : cohérent avec les providers existants (`LanguageProvider`, `NotificationsProvider`, `MessagesProvider`…), zéro dépendance ajoutée. Monté en tête de `(app)/layout.tsx` (espace authentifié) → gère le visiteur (`null`). `lib/session.ts` reste la source sync (libs non-React comme `posts.ts`/`messages.ts` lisent `currentUserId()` ; les définitions dupliquées y réexportent désormais celle de `session.ts`). `language-provider` (root layout, parent du provider) garde son `getMe()` propre.
+
 ## Observability
 
 - **Structured logging — slog + X-Request-Id (user-service pilote, 13/06/2026).** `log/slog` stdlib (Go 1.21+, aucune dépendance externe). Format JSON en `release`, texte en `debug/test` (lisible humain). Niveau depuis `LOG_LEVEL`. Trois middlewares Gin dédiés : `RequestID` (lit ou génère un UUID hex 16 B, propagé dans la réponse), `Recovery` (panic → `slog.Error` + 500 sans stack exposée), `RequestLogger` (une ligne/requête avec method, path sans query, status, latency_ms, client_ip, request_id, user_id). `JWTAuth` pose `user_id` dans le contexte Gin pour que `RequestLogger` corrèle l'utilisateur. `gin.Default()` remplacé par `gin.New()` + chaîne explicite. Ce motif sera répliqué à l'identique sur les autres services.

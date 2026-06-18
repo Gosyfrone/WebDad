@@ -82,8 +82,19 @@ jobs:
       - name: Build
         run: go build ./...
 
-      - name: Test (race detector)
-        run: go test -race ./...
+      - name: Test (race detector + coverage)
+        run: go test -race -covermode=atomic -coverprofile=coverage.out ./...
+
+      # Upload de la couverture vers Codecov, un flag par service pour une
+      # lecture service-par-service. Non bloquant (fail_ci_if_error: false) :
+      # un hoquet Codecov ne doit jamais casser la CI.
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ${{ matrix.service }}/coverage.out
+          flags: ${{ matrix.service }}
+          fail_ci_if_error: false
 
       - name: go.mod / go.sum à jour
         run: |

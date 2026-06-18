@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { ShieldAlert } from 'lucide-react'
 
-import { useSession } from '@/lib/session'
+import { useCurrentUser } from '@/components/current-user-provider'
 import { useT } from '@/components/language-provider'
 import { cn } from '@/lib/utils'
 import { AdminInfra } from '@/components/admin/admin-infra'
@@ -27,8 +27,7 @@ const ADMIN_TABS: AdminTab[] = ['reports', 'settings', 'infra']
  */
 export function AdminView() {
   const t = useT()
-  const session = useSession()
-  const isAdmin = session?.role === 'administrator'
+  const { session, isAdmin } = useCurrentUser()
   const [tab, setTab] = useState<AdminTab>('reports')
 
   // Onglet persistant entre rafraîchissements (localStorage, lu après montage).
