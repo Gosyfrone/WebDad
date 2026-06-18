@@ -909,6 +909,37 @@ func (s *MessageService) DeleteMessage(ctx context.Context, conversationID, mess
 	return updated, memberIDs, nil
 }
 
+// ModerateDeleteMessage supprime « pour tout le monde » un message signalé, à la
+// demande de la MODÉRATION DE PLATEFORME (rôle mod/admin, garde au niveau route).
+// Identifié par son seul id (la modération ne connaît pas la conversation et n'en
+// est pas membre). Tombstone marqué `deleted_by_moderation`. Le serveur reste
+// aveugle (E2EE) : il ne lit pas le contenu, il ne fait que le marquer supprimé.
+// Renvoie le message tombstoné + les ids des membres (diffusion WS).
+func (s *MessageService) ModerateDeleteMessage(ctx context.Context, messageID string) (*models.Message, []string, error) {
+	oid, err := parseID(messageID)
+	if err != nil {
+		return nil, nil, err
+	}
+	msg, err := s.repo.GetMessageByID(ctx, oid)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return nil, nil, ErrMessageNotFound
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+
+	updated, err := s.repo.ModerateSoftDelete(ctx, oid, time.Now())
+	if err != nil {
+		return nil, nil, translateNotFound(err)
+	}
+
+	memberIDs, err := s.repo.MemberIDs(ctx, msg.ConversationID)
+	if err != nil {
+		memberIDs = nil
+	}
+	return updated, memberIDs, nil
+}
+
 // canDeleteMessage : règle d'autorisation de la suppression d'un message
 // (fonction PURE, testée). L'auteur peut toujours supprimer le sien ; dans un
 // groupe ou une communauté, l'owner et l'admin peuvent supprimer ceux des autres

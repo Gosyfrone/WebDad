@@ -302,7 +302,10 @@ func (s *PostService) GetPost(ctx context.Context, id, viewerID, viewerRole stri
 	if err != nil {
 		return nil, translateNotFound(err)
 	}
-	if post.IsHidden && !isModerator(viewerRole) {
+	// Masqué (retrait manuel) OU auto-masqué (seuil de signalements) : invisible
+	// au public, mais consultable par un modérateur (pour juger sur pièce dans le
+	// détail du ticket).
+	if (post.IsHidden || post.AutoHidden) && !isModerator(viewerRole) {
 		return nil, ErrPostNotFound
 	}
 	allowed, err := s.canReadAuthor(ctx, viewerID, post.AuthorID)
@@ -474,11 +477,11 @@ func (s *PostService) hardDeletePost(ctx context.Context, oid bson.ObjectID, id,
 // ListHiddenPosts renvoie la corbeille de modération (posts masqués par
 // suppression douce), réservée aux modérateurs/admins. Du plus récemment
 // masqué au plus ancien.
-func (s *PostService) ListHiddenPosts(ctx context.Context, actorRole string, limit, offset int64) ([]models.Post, error) {
+func (s *PostService) ListHiddenPosts(ctx context.Context, actorRole string, f repository.HiddenFilter, limit, offset int64) ([]models.Post, error) {
 	if !isModerator(actorRole) {
 		return nil, ErrForbidden
 	}
-	posts, err := s.repo.ListHidden(ctx, clampLimit(limit), clampOffset(offset))
+	posts, err := s.repo.ListHidden(ctx, f, clampLimit(limit), clampOffset(offset))
 	if err != nil {
 		return nil, err
 	}
@@ -571,6 +574,28 @@ func (s *PostService) RestorePost(ctx context.Context, id, actorRole string) (*m
 		return nil, err
 	}
 	post, err := s.repo.RestoreHidden(ctx, oid)
+	return post, translateNotFound(err)
+}
+
+// AutoHide / AutoUnhide pilotent l'auto-masquage d'un post déclenché par le
+// report-service (seuil de signalements). Appelés en serveur-à-serveur via les
+// endpoints internes (authentifiés par secret partagé) — PAS de contrôle de rôle
+// ici : la garde est le secret interne. mongo.ErrNoDocuments → 404 plus haut.
+func (s *PostService) AutoHide(ctx context.Context, id string) (*models.Post, error) {
+	oid, err := parseID(id)
+	if err != nil {
+		return nil, err
+	}
+	post, err := s.repo.SetAutoHidden(ctx, oid, true)
+	return post, translateNotFound(err)
+}
+
+func (s *PostService) AutoUnhide(ctx context.Context, id string) (*models.Post, error) {
+	oid, err := parseID(id)
+	if err != nil {
+		return nil, err
+	}
+	post, err := s.repo.SetAutoHidden(ctx, oid, false)
 	return post, translateNotFound(err)
 }
 

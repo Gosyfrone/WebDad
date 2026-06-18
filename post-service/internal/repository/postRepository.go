@@ -48,11 +48,17 @@ func NewPostRepository(db *mongo.Database) *PostRepository {
 
 // --- Posts -------------------------------------------------------------------
 
-// notHidden renvoie la condition « post non masqué par la modération »
-// (is_hidden absent ou false). Fusionnée dans tous les filtres de lecture
-// publique pour que les posts retirés en suppression douce sortent des fils
-// sans être effacés. Une nouvelle map à chaque appel (pas d'aliasing).
-func notHidden() bson.M { return bson.M{"is_hidden": bson.M{"$ne": true}} }
+// notHidden renvoie la condition « post visible » : ni masqué par la modération
+// (is_hidden, retrait manuel → corbeille), ni AUTO-masqué (auto_hidden, seuil de
+// signalements atteint, en attente de décision). Fusionnée dans tous les filtres
+// de lecture publique pour que ces posts sortent des fils sans être effacés. Une
+// nouvelle map à chaque appel (pas d'aliasing).
+func notHidden() bson.M {
+	return bson.M{
+		"is_hidden":   bson.M{"$ne": true},
+		"auto_hidden": bson.M{"$ne": true},
+	}
+}
 
 func withHashtag(filter bson.M, hashtag string) bson.M {
 	if hashtag != "" {
@@ -132,9 +138,9 @@ func (r *PostRepository) GetByProfileHashtag(ctx context.Context, authorID, hash
 		if err != nil {
 			continue
 		}
-		// Un repost pointant un post masqué par la modération ne réapparaît pas
-		// par la bande sur le profil de celui qui l'a reposté.
-		if post.IsHidden {
+		// Un repost pointant un post masqué (modération ou auto-masquage) ne
+		// réapparaît pas par la bande sur le profil de celui qui l'a reposté.
+		if post.IsHidden || post.AutoHidden {
 			continue
 		}
 		if hashtag != "" && !postHasHashtag(post, hashtag) {
@@ -174,8 +180,9 @@ func (r *PostRepository) GetByAuthorsHashtag(ctx context.Context, authorIDs []st
 func (r *PostRepository) ListTopHashtags(ctx context.Context, limit int64) ([]models.HashtagTrend, error) {
 	pipeline := mongo.Pipeline{
 		{{Key: "$match", Value: bson.M{
-			"is_hidden": bson.M{"$ne": true},
-			"hashtags":  bson.M{"$exists": true, "$ne": bson.A{}},
+			"is_hidden":   bson.M{"$ne": true},
+			"auto_hidden": bson.M{"$ne": true},
+			"hashtags":    bson.M{"$exists": true, "$ne": bson.A{}},
 		}}},
 		{{Key: "$unwind", Value: "$hashtags"}},
 		{{Key: "$group", Value: bson.M{"_id": "$hashtags", "count": bson.M{"$sum": 1}}}},
@@ -212,7 +219,7 @@ func (r *PostRepository) StatsByIDs(ctx context.Context, oids []bson.ObjectID) (
 	if len(oids) == 0 {
 		return []models.Post{}, nil
 	}
-	filter := bson.M{"_id": bson.M{"$in": oids}, "is_hidden": bson.M{"$ne": true}}
+	filter := bson.M{"_id": bson.M{"$in": oids}, "is_hidden": bson.M{"$ne": true}, "auto_hidden": bson.M{"$ne": true}}
 	opts := options.Find().SetProjection(bson.M{
 		"author_id":      1,
 		"likes_count":    1,
@@ -313,8 +320,11 @@ func (r *PostRepository) Hide(ctx context.Context, id bson.ObjectID, byUserID st
 // RestoreHidden lève le masquage d'un post (retour dans les fils publics) et
 // efface les métadonnées de modération. Renvoie le document à jour.
 func (r *PostRepository) RestoreHidden(ctx context.Context, id bson.ObjectID) (*models.Post, error) {
+	// Lève aussi un éventuel auto-masquage : restaurer depuis la corbeille rend le
+	// post pleinement visible (sinon un post auto-masqué PUIS retiré resterait
+	// invisible par `auto_hidden` après restauration).
 	update := bson.M{
-		"$set":   bson.M{"is_hidden": false, "updated_at": time.Now()},
+		"$set":   bson.M{"is_hidden": false, "auto_hidden": false, "updated_at": time.Now()},
 		"$unset": bson.M{"hidden_by": "", "hidden_at": ""},
 	}
 	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
@@ -326,15 +336,54 @@ func (r *PostRepository) RestoreHidden(ctx context.Context, id bson.ObjectID) (*
 	return &post, nil
 }
 
+// SetAutoHidden (dé)pose le masquage AUTOMATIQUE d'un post (seuil de
+// signalements). `hidden=true` le sort des fils publics ; `false` le rétablit.
+// N'altère PAS is_hidden (retrait manuel de modération, indépendant).
+// mongo.ErrNoDocuments si le post est absent.
+func (r *PostRepository) SetAutoHidden(ctx context.Context, id bson.ObjectID, hidden bool) (*models.Post, error) {
+	update := bson.M{"$set": bson.M{"auto_hidden": hidden, "updated_at": time.Now()}}
+	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
+
+	var post models.Post
+	if err := r.posts.FindOneAndUpdate(ctx, bson.M{"_id": id}, update, opts).Decode(&post); err != nil {
+		return nil, err
+	}
+	return &post, nil
+}
+
+// HiddenFilter borne la corbeille de modération : auteur et/ou plage de date de
+// retrait (`hidden_at`). Champs vides/nil = pas de contrainte (corbeille entière).
+type HiddenFilter struct {
+	AuthorID string
+	Since    *time.Time
+	Until    *time.Time
+}
+
 // ListHidden renvoie les posts masqués (corbeille de modération, partagée
-// mod/admin), du plus récemment masqué au plus ancien, paginés.
-func (r *PostRepository) ListHidden(ctx context.Context, limit, skip int64) ([]models.Post, error) {
+// mod/admin), du plus récemment masqué au plus ancien, paginés et filtrés
+// (auteur + plage de date de retrait).
+func (r *PostRepository) ListHidden(ctx context.Context, f HiddenFilter, limit, skip int64) ([]models.Post, error) {
+	filter := bson.M{"is_hidden": true}
+	if f.AuthorID != "" {
+		filter["author_id"] = f.AuthorID
+	}
+	if f.Since != nil || f.Until != nil {
+		rng := bson.M{}
+		if f.Since != nil {
+			rng["$gte"] = *f.Since
+		}
+		if f.Until != nil {
+			rng["$lte"] = *f.Until
+		}
+		filter["hidden_at"] = rng
+	}
+
 	opts := options.Find().
 		SetSort(bson.D{{Key: "hidden_at", Value: -1}}).
 		SetLimit(limit).
 		SetSkip(skip)
 
-	cursor, err := r.posts.Find(ctx, bson.M{"is_hidden": true}, opts)
+	cursor, err := r.posts.Find(ctx, filter, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -629,8 +678,9 @@ func (r *PostRepository) LikedPostsByUser(ctx context.Context, userID string, li
 	}
 
 	postCur, err := r.posts.Find(ctx, bson.M{
-		"_id":       bson.M{"$in": oids},
-		"is_hidden": bson.M{"$ne": true},
+		"_id":         bson.M{"$in": oids},
+		"is_hidden":   bson.M{"$ne": true},
+		"auto_hidden": bson.M{"$ne": true},
 	})
 	if err != nil {
 		return nil, err

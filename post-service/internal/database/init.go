@@ -188,6 +188,7 @@ var validators = map[string]bson.M{
 				},
 				"reply_audience":  bson.M{"enum": bson.A{"everyone", "followers"}},
 				"is_hidden":       bson.M{"bsonType": "bool"},
+				"auto_hidden":     bson.M{"bsonType": "bool"},
 				"hidden_by":       bson.M{"bsonType": bson.A{"string", "null"}},
 				"hidden_at":       bson.M{"bsonType": bson.A{"date", "null"}},
 				"purge_warned_at": bson.M{"bsonType": bson.A{"date", "null"}},

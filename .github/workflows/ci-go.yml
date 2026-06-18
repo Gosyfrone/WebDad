@@ -11,6 +11,7 @@ on:
       - "post-service/**"
       - "message-service/**"
       - "notification-service/**"
+      - "report-service/**"
       - "media-service/**"
       - "mail-service/**"
       - "api-gateway/**"
@@ -40,6 +41,7 @@ jobs:
           - post-service
           - message-service
           - notification-service
+          - report-service
           - media-service
           - mail-service
           - api-gateway

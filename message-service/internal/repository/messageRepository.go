@@ -510,6 +510,34 @@ func (r *MessageRepository) GetMessage(ctx context.Context, conversationID strin
 	return &msg, nil
 }
 
+// GetMessageByID retrouve un message par son seul id (sans connaître la
+// conversation) — utilisé par la modération de plateforme, qui ne dispose que de
+// l'id du message signalé. mongo.ErrNoDocuments si absent.
+func (r *MessageRepository) GetMessageByID(ctx context.Context, id bson.ObjectID) (*models.Message, error) {
+	var msg models.Message
+	if err := r.messages.FindOne(ctx, bson.M{"_id": id}).Decode(&msg); err != nil {
+		return nil, err
+	}
+	return &msg, nil
+}
+
+// ModerateSoftDelete tombstone un message PAR LA MODÉRATION : pose `deleted_at`,
+// `deleted_by_moderation=true`, vide le contenu chiffré et retire les versions
+// originales. Filtré par _id seul (la modération ne connaît pas la conversation).
+// Le serveur ne lit jamais le contenu (E2EE) : il ne fait que marquer le message.
+func (r *MessageRepository) ModerateSoftDelete(ctx context.Context, id bson.ObjectID, at time.Time) (*models.Message, error) {
+	update := bson.M{
+		"$set":   bson.M{"ciphertext": "", "nonce": "", "deleted_at": at, "deleted_by_moderation": true},
+		"$unset": bson.M{"original_ciphertext": "", "original_nonce": "", "edited_at": ""},
+	}
+	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
+	var updated models.Message
+	if err := r.messages.FindOneAndUpdate(ctx, bson.M{"_id": id}, update, opts).Decode(&updated); err != nil {
+		return nil, err
+	}
+	return &updated, nil
+}
+
 // UpdateMessageCiphertext remplace la version courante par une nouvelle version
 // chiffrée, en conservant la version originale chiffrée au premier edit.
 func (r *MessageRepository) UpdateMessageCiphertext(ctx context.Context, msg *models.Message, ciphertext, nonce string, editedAt time.Time) (*models.Message, error) {

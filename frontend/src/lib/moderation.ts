@@ -82,10 +82,26 @@ function toDeletedPost(p: ApiHiddenPost): DeletedPost {
   }
 }
 
+/** Filtres de la corbeille de modération (tous cumulables et optionnels). */
+export interface DeletedPostsFilter {
+  limit?: number
+  offset?: number
+  /** Filtrer sur l'auteur du tweet retiré. */
+  authorId?: string
+  /** Bornes ISO (RFC3339) sur la date de retrait (`hidden_at`). */
+  since?: string
+  until?: string
+}
+
 /** Corbeille de modération (tweets masqués), du plus récemment retiré au plus ancien. */
-export async function listDeletedPosts(limit = 50, offset = 0): Promise<DeletedPost[]> {
+export async function listDeletedPosts(filter: DeletedPostsFilter = {}): Promise<DeletedPost[]> {
+  const { limit = 50, offset = 0, authorId, since, until } = filter
+  const params = new URLSearchParams({ limit: String(limit), offset: String(offset) })
+  if (authorId) params.set('author_id', authorId)
+  if (since) params.set('since', since)
+  if (until) params.set('until', until)
   const posts = await unwrap<ApiHiddenPost[]>(
-    await apiFetch(`/posts/moderation/deleted?limit=${limit}&offset=${offset}`),
+    await apiFetch(`/posts/moderation/deleted?${params}`),
   )
   return (posts ?? []).map(toDeletedPost)
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ShieldAlert } from 'lucide-react'
 
 import { useSession } from '@/lib/session'
@@ -8,8 +8,12 @@ import { useT } from '@/components/language-provider'
 import { cn } from '@/lib/utils'
 import { AccountsPanel } from '@/components/moderation/accounts-panel'
 import { DeletedPosts } from '@/components/moderation/deleted-posts'
+import { TicketsPanel } from '@/components/moderation/tickets-panel'
 
-type ModerationTab = 'posts' | 'accounts'
+type ModerationTab = 'posts' | 'accounts' | 'reports'
+
+const TAB_STORAGE_KEY = 'breezy-moderation-tab'
+const MODERATION_TABS: ModerationTab[] = ['posts', 'accounts', 'reports']
 
 /**
  * Centre de modération, partagé par les modérateurs ET les administrateurs
@@ -27,6 +31,18 @@ export function ModerationView() {
   const session = useSession()
   const [tab, setTab] = useState<ModerationTab>('posts')
 
+  // Onglet persistant entre rafraîchissements (localStorage, lu après montage
+  // pour éviter tout décalage d'hydratation SSR).
+  useEffect(() => {
+    const saved = localStorage.getItem(TAB_STORAGE_KEY) as ModerationTab | null
+    if (saved && MODERATION_TABS.includes(saved)) setTab(saved)
+  }, [])
+
+  function selectTab(key: ModerationTab) {
+    setTab(key)
+    localStorage.setItem(TAB_STORAGE_KEY, key)
+  }
+
   const isModerator = session?.role === 'moderator' || session?.role === 'administrator'
   const isAdmin = session?.role === 'administrator'
 
@@ -42,9 +58,11 @@ export function ModerationView() {
     )
   }
 
+  // « Signalement » placé APRÈS « Comptes » (exigence fonctionnelle).
   const tabs: { key: ModerationTab; label: string }[] = [
     { key: 'posts', label: t('moderation.tab_posts') },
     { key: 'accounts', label: t('moderation.tab_accounts') },
+    { key: 'reports', label: t('moderation.tab_reports') },
   ]
 
   return (
@@ -63,7 +81,7 @@ export function ModerationView() {
             type="button"
             role="tab"
             aria-selected={tab === item.key}
-            onClick={() => setTab(item.key)}
+            onClick={() => selectTab(item.key)}
             className={cn(
               'flex-1 px-4 py-3 text-sm font-semibold transition-colors',
               tab === item.key
@@ -76,7 +94,13 @@ export function ModerationView() {
         ))}
       </div>
 
-      {tab === 'posts' ? <DeletedPosts /> : <AccountsPanel canGovern={isAdmin} />}
+      {tab === 'posts' ? (
+        <DeletedPosts />
+      ) : tab === 'accounts' ? (
+        <AccountsPanel canGovern={isAdmin} />
+      ) : (
+        <TicketsPanel category="moderation" canTransfer={isAdmin} />
+      )}
     </div>
   )
 }
