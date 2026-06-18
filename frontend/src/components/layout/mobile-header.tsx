@@ -7,11 +7,9 @@ import { usePathname, useRouter } from 'next/navigation'
 import { ArrowLeft, Bell, LogIn, LogOut, Settings } from 'lucide-react'
 
 import { cn, initialOf } from '@/lib/utils'
-import { getAccessToken, logout } from '@/lib/auth-client'
-import { getMyProfil, subscribeProfilUpdated } from '@/lib/profil-client'
-import { useSession } from '@/lib/session'
+import { logout } from '@/lib/auth-client'
 import { ROUTES, navItemsForRole } from '@/lib/routes'
-import type { ProfilDetails } from '@/types'
+import { useCurrentUser } from '@/components/current-user-provider'
 import { useAuthGate } from '@/components/auth-prompt-provider'
 import { useNotifications } from '@/components/notifications-provider'
 import { useMessages } from '@/components/messages-provider'
@@ -54,7 +52,7 @@ export function MobileHeader() {
   const t = useT()
   const pathname = usePathname()
   const router = useRouter()
-  const session = useSession()
+  const { session, profil } = useCurrentUser()
   const { isVisitor } = useAuthGate()
   const { unreadCount } = useNotifications()
   const { activeConversationId } = useMessages()
@@ -114,51 +112,14 @@ export function MobileHeader() {
 
   const [open, setOpen] = useState(false)
   const [themeDialogOpen, setThemeDialogOpen] = useState(false)
-  const [account, setAccount] = useState({
-    userId: '',
-    displayName: '',
-    username: '',
-    avatarUrl: '',
-  })
 
-  // Rôle réel issu du JWT (cf. lib/session) ; `null` au 1er rendu (hydratation).
+  // Rôle issu du JWT ; `null` au 1er rendu (hydratation).
   const role = session?.role ?? null
-  const fallbackInitial = initialOf(account.displayName, account.username)
+  const fallbackInitial = initialOf(profil?.displayName, profil?.username)
   // Avant le chargement du profil (username vide) on affiche un libellé traduit.
-  const shownName = account.username ? account.displayName : t('common.user')
-  const handle = account.username ? `@${account.username}` : `@${t('common.username_fallback')}`
+  const shownName = profil?.username ? profil.displayName : t('common.user')
+  const handle = profil?.username ? `@${profil.username}` : `@${t('common.username_fallback')}`
   const displayedRole = role
-
-  useEffect(() => {
-    let cancelled = false
-
-    function applyProfil(profil: ProfilDetails) {
-      setAccount({
-        userId: profil.userId,
-        displayName: profil.displayName,
-        username: profil.username,
-        avatarUrl: profil.avatarUrl,
-      })
-    }
-
-    async function loadAccount() {
-      // Visiteur : pas de profil (et `/profils/me` renverrait 401 → redirection).
-      if (!getAccessToken()) return
-      try {
-        const profil = await getMyProfil()
-        if (!cancelled) applyProfil(profil)
-      } catch {
-        // Le header conserve le fallback si la session est expirée.
-      }
-    }
-
-    const unsubscribe = subscribeProfilUpdated(applyProfil)
-    void loadAccount()
-    return () => {
-      cancelled = true
-      unsubscribe()
-    }
-  }, [])
 
   // Ouverture par swipe depuis le bord gauche (→ droite). Désactivée pour le
   // visiteur (pas de tiroir) et sur les pages à flèche retour (gauche ≠ avatar).
@@ -252,11 +213,11 @@ export function MobileHeader() {
             className="rounded-full ring-offset-background transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
             <Avatar className="h-8 w-8">
-              {account.avatarUrl && (
-                <AvatarImage src={account.avatarUrl} alt={account.displayName} />
+              {profil?.avatarUrl && (
+                <AvatarImage src={profil.avatarUrl} alt={profil.displayName} />
               )}
               <AvatarFallback>{fallbackInitial}</AvatarFallback>
-              <ActivityPresenceDot userId={account.userId} className="h-2.5 w-2.5" />
+              <ActivityPresenceDot userId={profil?.userId ?? ''} className="h-2.5 w-2.5" />
             </Avatar>
           </button>
         </SheetTrigger>
@@ -266,11 +227,11 @@ export function MobileHeader() {
           <SheetHeader className="border-b p-4 text-left">
             <div className="flex items-center gap-3">
               <Avatar className="h-12 w-12">
-                {account.avatarUrl && (
-                  <AvatarImage src={account.avatarUrl} alt={account.displayName} />
+                {profil?.avatarUrl && (
+                  <AvatarImage src={profil.avatarUrl} alt={profil.displayName} />
                 )}
                 <AvatarFallback className="text-lg">{fallbackInitial}</AvatarFallback>
-                <ActivityPresenceDot userId={account.userId} />
+                <ActivityPresenceDot userId={profil?.userId ?? ''} />
               </Avatar>
               <div className="flex min-w-0 flex-col">
                 <SheetTitle className="truncate">{shownName}</SheetTitle>

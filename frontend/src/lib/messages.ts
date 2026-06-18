@@ -40,6 +40,7 @@ import {
 import { createBackupAsync, openBackupAsync } from '@/lib/key-backup-async'
 import { fetchMediaBytes, uploadEncryptedMedia } from '@/lib/media'
 import { getLegacyIdentity, getStoredIdentity, setStoredIdentity } from '@/lib/key-store'
+import { currentUserId } from '@/lib/session'
 
 export class MessageApiError extends Error {
   status: number
@@ -403,20 +404,8 @@ function maybeUpgradeBackup(blob: BackupBlob, identity: KeyPair, passphrase: str
   })()
 }
 
-/** Id de l'utilisateur courant, lu dans les claims du JWT (ou '' sans session). */
-export function currentUserId(): string {
-  const token = getAccessToken()
-  if (!token) return ''
-  const [, payload] = token.split('.')
-  if (!payload) return ''
-  try {
-    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/')
-    const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=')
-    return (JSON.parse(window.atob(padded)) as { user_id?: string }).user_id ?? ''
-  } catch {
-    return ''
-  }
-}
+// Réexporté pour les modules qui importaient déjà depuis `lib/messages`.
+export { currentUserId }
 
 // --- Clés publiques ----------------------------------------------------------
 

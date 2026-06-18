@@ -38,22 +38,13 @@ type Status = 'checking' | 'needed' | 'done'
 type Availability = 'idle' | 'checking' | 'available' | 'taken'
 
 /**
- * Gate d'onboarding pour les comptes créés via OAuth (Google) : ces comptes
- * n'ont pas de document profil (le register est la seule voie qui le crée). Le
- * signal « profil absent » (`GET /profils/me` → 404) déclenche une modale
- * BLOQUANTE — montée au niveau du layout (app), donc présente sur toutes les
- * pages authentifiées, non-fermable (ni ESC, ni clic extérieur, pas de bouton
- * fermer) et re-vérifiée à chaque chargement tant qu'elle n'est pas validée.
+ * Gate d'onboarding pour les comptes OAuth (Google), qui n'ont pas de document
+ * profil : « profil absent » (`GET /profils/me` → 404) déclenche une modale
+ * bloquante, non-fermable, re-vérifiée à chaque chargement tant qu'elle n'est pas
+ * validée. L'utilisateur choisit username (pré-rempli) + date de naissance (≥ 13 ans) ;
+ * à la validation : PATCH /users/me (si renommage) puis POST /profils.
  *
- * L'utilisateur y choisit son username (pré-rempli avec le handle auto-dérivé
- * de l'email, qu'il peut conserver ou changer) et sa date de naissance (parité
- * avec la barrière d'âge ≥ 13 ans du register). À la validation : renommage du
- * username (PATCH /users/me, seulement s'il diffère du dérivé) puis création du
- * profil (POST /profils). Aucun changement backend : tout passe par des
- * endpoints existants.
- *
- * Limite assumée : c'est un gate côté front (UX). Un blocage serveur strict
- * (gateway refusant les actions sans profil) serait un chantier séparé.
+ * Limite assumée : gate côté front (UX) ; un blocage serveur strict serait un chantier séparé.
  */
 export function OnboardingGate() {
   const t = useT()

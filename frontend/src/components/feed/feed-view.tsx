@@ -11,7 +11,7 @@ import {
   readMutedWords,
   subscribeMutedWords,
 } from '@/lib/content-filters'
-import { getFollowingIds, getMe } from '@/lib/api'
+import { getFollowingIds } from '@/lib/api'
 import { subscribeProfilUpdated } from '@/lib/profil-client'
 import { useInfiniteScroll } from '@/lib/use-infinite-scroll'
 import {
@@ -60,13 +60,8 @@ function applyPostUpdate(current: FeedPost[], updated: FeedPost): FeedPost[] {
   })
 }
 
-/**
- * Corps du fil d'actualité : en-tête sticky, onglets « Pour toi » /
- * « Abonnements », zone de composition, puis la liste de l'onglet actif.
- *
- * Les pages sont chargées au défilement (`useInfiniteScroll`). Un post
- * fraîchement publié est prépendu sans refetch (event `post-created`).
- */
+/** Fil d'actualité (onglets « Pour toi » / « Abonnements »), paginé au défilement ;
+ *  un post fraîchement publié est prépendu sans refetch. */
 export function FeedView() {
   const t = useT()
   const { isVisitor } = useAuthGate()
@@ -256,32 +251,11 @@ export function FeedView() {
   }, [isVisitor])
 
   useEffect(() => {
-    let cancelled = false
-    let unsubscribe = () => {}
-
-    async function loadUserScopedFilters() {
-      let userId = currentUserId()
-      // Visiteur : pas de session → pas de filtres par utilisateur (et `getMe`
-      // renverrait 401 → redirection forcée vers /login).
-      if (!userId && getAccessToken()) {
-        try {
-          userId = (await getMe()).id
-        } catch {
-          userId = ''
-        }
-      }
-
-      if (cancelled) return
-      setViewerUserId(userId)
-      setMutedWords(readMutedWords(userId))
-      unsubscribe = subscribeMutedWords(userId, setMutedWords)
-    }
-
-    void loadUserScopedFilters()
-    return () => {
-      cancelled = true
-      unsubscribe()
-    }
+    // Visiteur : `currentUserId()` rend '' → pas de filtres par utilisateur.
+    const userId = currentUserId()
+    setViewerUserId(userId)
+    setMutedWords(readMutedWords(userId))
+    return subscribeMutedWords(userId, setMutedWords)
   }, [])
 
   // Un nouveau post (composer inline ou popup sidebar) est prépendu au fil.

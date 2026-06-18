@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { ShieldAlert } from 'lucide-react'
 
-import { useSession } from '@/lib/session'
+import { useCurrentUser } from '@/components/current-user-provider'
 import { useT } from '@/components/language-provider'
 import { cn } from '@/lib/utils'
 import { AccountsPanel } from '@/components/moderation/accounts-panel'
@@ -28,7 +28,7 @@ const MODERATION_TABS: ModerationTab[] = ['posts', 'accounts', 'reports']
  */
 export function ModerationView() {
   const t = useT()
-  const session = useSession()
+  const { session, isAdmin, isModerator } = useCurrentUser()
   const [tab, setTab] = useState<ModerationTab>('posts')
 
   // Onglet persistant entre rafraîchissements (localStorage, lu après montage
@@ -42,9 +42,6 @@ export function ModerationView() {
     setTab(key)
     localStorage.setItem(TAB_STORAGE_KEY, key)
   }
-
-  const isModerator = session?.role === 'moderator' || session?.role === 'administrator'
-  const isAdmin = session?.role === 'administrator'
 
   // Session lue au montage : `null` tant qu'on ne sait pas → on n'affiche le
   // refus que lorsqu'on a une session confirmée non habilitée.

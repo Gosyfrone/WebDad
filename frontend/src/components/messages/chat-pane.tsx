@@ -101,15 +101,12 @@ function prependUnique(
 }
 
 /**
- * Volet de conversation : en-tête (interlocuteur / groupe), historique chiffré
- * (déchiffré localement) en défilement infini vers le HAUT (curseur `before`),
- * et zone de saisie. Les nouveaux messages arrivent par WebSocket (prop
- * `liveMessage`) ; l'envoi est géré ici (`sendMessage`).
+ * Volet de conversation : historique chiffré (déchiffré localement), défilement
+ * infini vers le haut, envoi, messages live par WebSocket.
  *
- * Cas particuliers gérés :
- *   - clé de contenu absente sur cet appareil (`contentKey === null`) → bandeau,
- *     lecture/écriture désactivées (identité créée sur un autre appareil) ;
- *   - communauté en lecture seule (`viewer`) → composer désactivé.
+ * Cas particuliers : clé de contenu absente sur cet appareil (`contentKey === null`,
+ * identité créée ailleurs) → lecture/écriture désactivées ; communauté en lecture
+ * seule (`viewer`) → composer désactivé.
  */
 export function ChatPane({
   conversation,
@@ -871,10 +868,8 @@ function MessageBubble({
 }
 
 /**
- * Menu d'actions « … » d'un message (éditer / supprimer). Vrai `<button>` (Radix
- * DropdownMenu) → tap fiable sur iOS, contrairement à un `onClick` sur `<div>` ;
- * un seul menu ouvert à la fois. Toujours visible sur tactile ; révélé au survol
- * sur les appareils à survol réel (desktop). Rien si aucune action permise.
+ * Menu d'actions « … » d'un message (éditer / supprimer / signaler). Vrai `<button>`
+ * Radix → tap fiable sur iOS. Rien si aucune action permise.
  */
 function MessageActionsMenu({
   canEdit,

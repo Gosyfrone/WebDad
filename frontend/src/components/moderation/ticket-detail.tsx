@@ -21,7 +21,7 @@ import { setUserBanned } from '@/lib/admin'
 import { deletePost, getPostById, type FeedPost } from '@/lib/posts'
 import { moderateDeleteMessage } from '@/lib/messages'
 import { resolveUser, type ResolvedUser } from '@/lib/user-cache'
-import { useSession } from '@/lib/session'
+import { useCurrentUser } from '@/components/current-user-provider'
 import { postHref, profilHref } from '@/lib/routes'
 import { timeAgo } from '@/lib/utils'
 import { useLanguage } from '@/components/language-provider'
@@ -72,7 +72,7 @@ const STATUS_VARIANT: Record<TicketStatus, 'secondary' | 'destructive' | 'outlin
 export function TicketDetail({ ticketId, canTransfer, onBack, onChanged }: TicketDetailProps) {
   const { t, locale } = useLanguage()
   const { toast } = useToast()
-  const session = useSession()
+  const { session } = useCurrentUser()
   useNow() // re-render chaque seconde → durées relatives (timeAgo) qui s'incrémentent
   const [ticket, setTicket] = useState<Ticket | null>(null)
   const [people, setPeople] = useState<Record<string, ResolvedUser>>({})

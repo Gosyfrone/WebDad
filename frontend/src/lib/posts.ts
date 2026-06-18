@@ -1,21 +1,15 @@
 /**
- * Client typé du post-service via l'API Gateway.
- *
- * Tous les appels passent par `apiFetch` (Bearer + refresh single-flight). Le
- * post-service ne stocke que `author_id` : ce module **résout l'auteur**
- * (username via user-service, displayName/avatar via profil-service) et
- * **mémoïse** le résultat (`authorCache`) pour ne pas refetch le même auteur à
- * chaque post d'un fil (N+1 best-effort, acceptable à l'échelle du projet).
- *
- * Les réponses de l'API sont enveloppées dans `{ data }` ; le snake_case de
- * l'API est mappé vers le camelCase des types front.
+ * Client du post-service (via l'API Gateway, `apiFetch`). Le post-service ne
+ * stocke que `author_id` : ce module résout l'auteur (user + profil-service) et
+ * le mémoïse (`authorCache`) pour éviter le N+1 au scroll, puis mappe le
+ * snake_case de l'API vers le camelCase des types front.
  */
 
 import { apiFetch, getAccessToken } from '@/lib/auth-client'
 import { API_URL } from '@/lib/config'
 import { resolveMediaUrl } from '@/lib/media'
 import type { ProfilDetails } from '@/types'
-import { decodeClaims } from '@/lib/session'
+import { currentUserId, decodeClaims } from '@/lib/session'
 
 /** Erreur d'appel API portant le code HTTP. */
 export class PostApiError extends Error {
@@ -248,10 +242,8 @@ async function expectOk(res: Response, message: string): Promise<void> {
 
 // --- Contexte utilisateur courant (claims JWT) ------------------------------
 
-/** Id de l'utilisateur courant (ou '' si pas de session). Cf. `lib/session`. */
-export function currentUserId(): string {
-  return decodeClaims()?.user_id ?? ''
-}
+// Réexporté pour les vues qui importaient déjà depuis `lib/posts`.
+export { currentUserId }
 
 /** L'utilisateur courant peut-il supprimer un contenu de `authorId` ? */
 function canDelete(authorId: string): boolean {
@@ -471,6 +463,11 @@ export async function getBookmarkedIds(): Promise<Set<string>> {
   return new Set(ids ?? [])
 }
 
+/** États « moi » (liké / reposté / signé) chargés en un lot pour enrichir les posts. */
+function getMyPostStates(): Promise<[Set<string>, Set<string>, Set<string>]> {
+  return Promise.all([getLikedIds(), getRepostedIds(), getBookmarkedIds()])
+}
+
 async function getPost(
   id: string,
   likedIds = new Set<string>(),
@@ -486,25 +483,13 @@ async function getPost(
 
 /** Charge un post complet par son id (page détail, lien depuis une notification). */
 export async function getPostById(id: string): Promise<FeedPost | null> {
-  const [likedIds, repostedIds, bookmarkedIds] = await Promise.all([
-    getLikedIds(),
-    getRepostedIds(),
-    getBookmarkedIds(),
-  ])
+  const [likedIds, repostedIds, bookmarkedIds] = await getMyPostStates()
   return getPost(id, likedIds, repostedIds, bookmarkedIds)
 }
 
-/**
- * Mappe une liste brute de posts vers des `FeedPost` enrichis (auteur résolu +
- * état liké/reposté/signé de l'utilisateur courant). Exporté pour les vues qui
- * lisent des posts via d'autres endpoints du post-service (ex. signets).
- */
+/** Mappe des `ApiPost` bruts en `FeedPost` enrichis (auteur + états « moi »). */
 export async function mapPosts(raw: ApiPost[]): Promise<FeedPost[]> {
-  const [likedIds, repostedIds, bookmarkedIds] = await Promise.all([
-    getLikedIds(),
-    getRepostedIds(),
-    getBookmarkedIds(),
-  ])
+  const [likedIds, repostedIds, bookmarkedIds] = await getMyPostStates()
   return Promise.all(
     (raw ?? []).map((p) => toFeedPost(p, likedIds, repostedIds, bookmarkedIds)),
   )
@@ -637,11 +622,7 @@ export async function votePoll(
       body: JSON.stringify({ choice_id: choiceId }),
     }),
   )
-  const [likedIds, repostedIds, bookmarkedIds] = await Promise.all([
-    getLikedIds(),
-    getRepostedIds(),
-    getBookmarkedIds(),
-  ])
+  const [likedIds, repostedIds, bookmarkedIds] = await getMyPostStates()
   return toFeedPost(updated, likedIds, repostedIds, bookmarkedIds)
 }
 
@@ -649,11 +630,7 @@ export async function closePoll(postId: string): Promise<FeedPost> {
   const updated = await unwrap<ApiPost>(
     await apiFetch(`/posts/${postId}/poll/close`, { method: 'POST' }),
   )
-  const [likedIds, repostedIds, bookmarkedIds] = await Promise.all([
-    getLikedIds(),
-    getRepostedIds(),
-    getBookmarkedIds(),
-  ])
+  const [likedIds, repostedIds, bookmarkedIds] = await getMyPostStates()
   return toFeedPost(updated, likedIds, repostedIds, bookmarkedIds)
 }
 
@@ -662,11 +639,7 @@ export async function pinPost(id: string): Promise<FeedPost> {
   const updated = await unwrap<ApiPost>(
     await apiFetch(`/posts/${id}/pin`, { method: 'PATCH' }),
   )
-  const [likedIds, repostedIds, bookmarkedIds] = await Promise.all([
-    getLikedIds(),
-    getRepostedIds(),
-    getBookmarkedIds(),
-  ])
+  const [likedIds, repostedIds, bookmarkedIds] = await getMyPostStates()
   return toFeedPost(updated, likedIds, repostedIds, bookmarkedIds)
 }
 
@@ -675,11 +648,7 @@ export async function unpinPost(id: string): Promise<FeedPost> {
   const updated = await unwrap<ApiPost>(
     await apiFetch(`/posts/${id}/pin`, { method: 'DELETE' }),
   )
-  const [likedIds, repostedIds, bookmarkedIds] = await Promise.all([
-    getLikedIds(),
-    getRepostedIds(),
-    getBookmarkedIds(),
-  ])
+  const [likedIds, repostedIds, bookmarkedIds] = await getMyPostStates()
   return toFeedPost(updated, likedIds, repostedIds, bookmarkedIds)
 }
 
@@ -716,11 +685,7 @@ export async function repostPost(id: string): Promise<FeedPost> {
   const updated = await unwrap<ApiPost>(
     await apiFetch(`/posts/${id}/repost`, { method: 'POST' }),
   )
-  const [likedIds, repostedIds, bookmarkedIds] = await Promise.all([
-    getLikedIds(),
-    getRepostedIds(),
-    getBookmarkedIds(),
-  ])
+  const [likedIds, repostedIds, bookmarkedIds] = await getMyPostStates()
   return toFeedPost(updated, likedIds, repostedIds, bookmarkedIds)
 }
 
@@ -784,11 +749,7 @@ export async function listCommentsByAuthor(
   }
   // États (liké/reposté/signé) de l'utilisateur courant, récupérés une seule
   // fois pour enrichir tous les posts parents.
-  const [likedIds, repostedIds, bookmarkedIds] = await Promise.all([
-    getLikedIds(),
-    getRepostedIds(),
-    getBookmarkedIds(),
-  ])
+  const [likedIds, repostedIds, bookmarkedIds] = await getMyPostStates()
   return Promise.all(
     raw.map(async (item) => {
       const comment = await toComment(item)
@@ -936,11 +897,8 @@ export function getPostAuthor(userId: string): Promise<PostAuthor> {
 }
 
 // --- Compteurs dynamiques (polling périodique) ------------------------------
-// Façon X : les compteurs (likes/commentaires/reposts) des posts AFFICHÉS sont
-// rafraîchis par lots toutes les quelques secondes, sans recharger les posts ni
-// toucher l'état « moi » (liked/reposted/bookmarked, piloté par les actions
-// locales). Lecture seule via le fil authentifié normal → barrière de visibilité
-// server-side (les posts invisibles sont simplement absents de la réponse).
+// Les compteurs des posts affichés sont rafraîchis par lots, sans toucher l'état
+// local « moi » (liked/reposted/bookmarked, piloté par les actions).
 
 /** Intervalle de rafraîchissement des compteurs (ms) — fil/profil (plusieurs posts). */
 export const STATS_POLL_INTERVAL_MS = 7000
@@ -975,11 +933,7 @@ interface ApiCommentStat {
   likes_count: number
 }
 
-/**
- * Récupère les compteurs des posts demandés en un seul lot. Renvoie une map
- * `id → compteurs` ; les posts invisibles/supprimés en sont absents. Le lot est
- * borné à `STATS_BATCH_MAX` ids.
- */
+/** Compteurs des posts en un lot (`id → compteurs`, max `STATS_BATCH_MAX`, invisibles exclus). */
 export async function getPostsStats(
   ids: string[],
 ): Promise<Map<string, PostStats>> {
@@ -1003,10 +957,7 @@ export async function getPostsStats(
   return out
 }
 
-/**
- * Récupère les compteurs des commentaires demandés en un seul lot.
- * Renvoie une map `id → likes`.
- */
+/** Compteurs (likes) des commentaires en un lot (`id → likes`). */
 export async function getCommentsStats(
   ids: string[],
 ): Promise<Map<string, CommentStats>> {

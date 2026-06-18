@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Bookmark,
@@ -37,6 +37,7 @@ import {
 } from '@/lib/posts'
 import { resolveMediaUrl } from '@/lib/media'
 import { quickBookmark, removeBookmarkEverywhere } from '@/lib/bookmarks'
+import { useLongPress } from '@/lib/use-long-press'
 import { BookmarkDialog } from '@/components/feed/bookmark-dialog'
 import { ToastAction } from '@/components/ui/toast'
 import { useToast } from '@/hooks/use-toast'
@@ -93,13 +94,8 @@ interface PostCardProps {
   noNavigate?: boolean
 }
 
-/**
- * Carte d'un post : en-tête (auteur + horodatage + menu), contenu, barre
- * d'actions (commenter / liker / partager) et section commentaires repliable.
- *
- * Like et suppression sont câblés sur le post-service (optimistes + rollback).
- * Repost simple et citation sont câblés sur le post-service.
- */
+/** Carte de post : en-tête, contenu, barre d'actions (like, repost, signet, suppression
+ *  optimistes) et commentaires repliables. */
 export function PostCard({ post, showPinBadge = false, focusCommentId, embedded = false, onDeleted, onUpdated, defaultShowComments = false, onCommentClick, noNavigate = false }: PostCardProps) {
   const router = useRouter()
   const { toast } = useToast()
@@ -139,9 +135,8 @@ export function PostCard({ post, showPinBadge = false, focusCommentId, embedded 
   const displayPinBadge = isPinned && (showPinBadge || post.canPin)
   const showPrivateBadge =
     post.author.visibility === 'private' && post.author.id !== currentUserId()
-  // Détection de l'appui long (ouvre le sélecteur sans auto-classer).
-  const longPress = useRef(false)
-  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Appui long sur le signet → sélecteur de collection (sans auto-classer).
+  const bookmarkLongPress = useLongPress(() => setPickerOpen(true), { enabled: !isVisitor })
 
   useEffect(() => {
     setBookmarked(post.bookmarked)
@@ -171,9 +166,7 @@ export function PostCard({ post, showPinBadge = false, focusCommentId, embedded 
     setRepostCount(post.repostsCount)
   }, [post.reposted, post.repostedById, post.repostsCount])
 
-  // Compteurs rafraîchis dynamiquement (polling périodique côté fil/détail/profil) :
-  // on resynchronise l'affichage sur la prop. L'état « liked » par moi n'est PAS
-  // touché (le polling ne le modifie pas) — seul le nombre suit le serveur.
+  // Resync du compteur serveur (polling) sans toucher l'état local « liked ».
   useEffect(() => {
     setLikeCount(post.likesCount)
   }, [post.likesCount])
@@ -327,23 +320,6 @@ export function PostCard({ post, showPinBadge = false, focusCommentId, embedded 
     }
   }
 
-  function startLongPress() {
-    // Visiteur : pas de sélecteur de collection (signets réservés aux membres).
-    if (isVisitor) return
-    longPress.current = false
-    longPressTimer.current = setTimeout(() => {
-      longPress.current = true
-      setPickerOpen(true)
-    }, 500)
-  }
-
-  function cancelLongPress() {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current)
-      longPressTimer.current = null
-    }
-  }
-
   function handleCardClick(e: React.MouseEvent) {
     const target = e.target as HTMLElement
     if (target.closest('button, a, [role="button"], [data-no-nav]')) return
@@ -352,10 +328,7 @@ export function PostCard({ post, showPinBadge = false, focusCommentId, embedded 
 
   function handleBookmarkClick() {
     // Un appui long a déjà ouvert le sélecteur → on n'enchaîne pas le clic court.
-    if (longPress.current) {
-      longPress.current = false
-      return
-    }
+    if (bookmarkLongPress.consume()) return
     // Visiteur : invite à se connecter (signets réservés aux membres).
     if (isVisitor) {
       promptLogin()
@@ -601,9 +574,9 @@ export function PostCard({ post, showPinBadge = false, focusCommentId, embedded 
           <button
             aria-label={bookmarked ? t('bookmarks.remove_aria') : t('bookmarks.add_aria')}
             onClick={handleBookmarkClick}
-            onPointerDown={startLongPress}
-            onPointerUp={cancelLongPress}
-            onPointerLeave={cancelLongPress}
+            onPointerDown={bookmarkLongPress.start}
+            onPointerUp={bookmarkLongPress.cancel}
+            onPointerLeave={bookmarkLongPress.cancel}
             onContextMenu={(e) => e.preventDefault()}
             className={cn(
               'rounded-full p-1.5 transition-colors hover:bg-primary/10 hover:text-primary',

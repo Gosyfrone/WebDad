@@ -10,7 +10,7 @@ import {
   updateUserRole,
   type AdminUser,
 } from '@/lib/admin'
-import { useSession } from '@/lib/session'
+import { useCurrentUser } from '@/components/current-user-provider'
 import { cn, initialOf, timeAgo } from '@/lib/utils'
 import { ProfilLink } from '@/components/profil/profil-link'
 import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
@@ -68,7 +68,7 @@ type AccountFilter = 'all' | 'banned' | 'moderators' | 'admins'
 export function AccountsPanel({ canGovern }: AccountsPanelProps) {
   const { t, locale } = useLanguage()
   const { toast } = useToast()
-  const session = useSession()
+  const { session } = useCurrentUser()
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<AccountFilter>('all')
   const [users, setUsers] = useState<AdminUser[]>([])
