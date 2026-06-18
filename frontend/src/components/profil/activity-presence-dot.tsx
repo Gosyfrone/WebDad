@@ -52,7 +52,7 @@ export function ActivityPresenceDot({
     <span
       aria-hidden
       className={cn(
-        'pointer-events-none absolute -bottom-0.5 -left-0.5 z-20 h-3.5 w-3.5 rounded-full border-2 border-background shadow-[0_0_0_1px_rgba(15,23,42,0.18)]',
+        'pointer-events-none absolute -bottom-0.5 -left-0.5 h-3.5 w-3.5 rounded-full border-2 border-background shadow-[0_0_0_1px_rgba(15,23,42,0.18)]',
         presence.isOnline ? 'bg-emerald-500' : 'bg-slate-400',
         className,
       )}

@@ -14,6 +14,7 @@ import { UsernamePendingGate } from '@/components/account/username-pending-gate'
 import { ExplorerFilterProvider } from '@/components/explorer/explorer-filter-context'
 import { FeedView } from '@/components/feed/feed-view'
 import { OverlayScrollLock } from '@/components/feed/overlay-scroll-lock'
+import { ActivityLifecycle } from '@/components/activity/activity-lifecycle'
 
 /**
  * Layout de l'espace authentifié, responsive (mobile-first).
@@ -76,6 +77,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   (prioritaire), puis du username provisoire si suffixé. */}
               <PasswordChangeGate />
               <UsernamePendingGate />
+              <ActivityLifecycle />
 
               {/* Gèle le défilement du feed quand un overlay est ouvert (≠ /feed). */}
               <OverlayScrollLock />
