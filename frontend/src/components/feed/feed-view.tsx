@@ -346,7 +346,7 @@ export function FeedView() {
   return (
     <div className="flex flex-col">
       {/* En-tête : sticky sur desktop ; sur mobile l'en-tête global (logo) prend le relais */}
-      <div className="panel z-10 border-b lg:sticky lg:top-0">
+      <div className="panel z-30 border-b lg:sticky lg:top-0">
         {selectedHashtag ? (
           <>
             <form onSubmit={submitHashtagSearch} className="flex items-center gap-2 px-4 py-3">
