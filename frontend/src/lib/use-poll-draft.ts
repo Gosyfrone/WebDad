@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type Dispatch, type SetStateAction } from 'react'
 
-import { exceedsMediaLimit, MAX_MEDIA_MB, uploadMedia } from '@/lib/media'
+import { exceedsMediaLimit, MAX_MEDIA_MB, uploadMedia, uploadedMediaUrl } from '@/lib/media'
 import type { CreatePollPayload, PollAudience } from '@/lib/posts'
 import { useToast } from '@/hooks/use-toast'
 import { useT } from '@/components/language-provider'
@@ -82,8 +82,9 @@ export function usePollDraft(): PollDraft {
     }
     setUploadingChoice(index)
     try {
-      const { url } = await uploadMedia(file)
-      setChoices((prev) => prev.map((c, i) => (i === index ? { ...c, imageUrl: url } : c)))
+      const uploaded = await uploadMedia(file)
+      const imageUrl = uploadedMediaUrl(uploaded, 'medium')
+      setChoices((prev) => prev.map((c, i) => (i === index ? { ...c, imageUrl } : c)))
     } catch {
       toast({ title: t('composer.media_failed'), variant: 'destructive' })
     } finally {

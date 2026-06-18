@@ -11,6 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/webdad/media-service/internal/config"
+	"github.com/webdad/media-service/internal/imageproc"
 	"github.com/webdad/media-service/internal/logging"
 	"github.com/webdad/media-service/internal/middleware"
 	"github.com/webdad/media-service/internal/storage"
@@ -25,6 +26,11 @@ const roleAdmin = "admin"
 // sniffLen : nombre d'octets lus en tête pour la détection MIME réelle.
 // mimetype recommande ≥ 3072 octets.
 const sniffLen = 3072
+
+// maxTransformBytes borne le traitement image en mémoire. Les utilisateurs
+// ordinaires sont déjà plafonnés à 5 Mo ; cette limite protège surtout le
+// bypass admin contre les très gros originaux.
+const maxTransformBytes = 20 * 1024 * 1024
 
 // MediaHandler sert les endpoints média au-dessus du stockage objet.
 type MediaHandler struct {
@@ -48,11 +54,22 @@ func NewMediaHandler(store *storage.Store, cfg *config.Config) *MediaHandler {
 // uploadResponse : corps renvoyé après un upload réussi. `url` est RELATIVE à
 // la gateway (`/media/<id>`) ; le front la préfixe de l'URL de la gateway.
 type uploadResponse struct {
-	ID   string `json:"id"`
-	URL  string `json:"url"`
-	Mime string `json:"mime"`
-	Kind string `json:"kind"`
-	Size int64  `json:"size"`
+	ID       string                    `json:"id"`
+	URL      string                    `json:"url"`
+	Mime     string                    `json:"mime"`
+	Kind     string                    `json:"kind"`
+	Size     int64                     `json:"size"`
+	Width    int                       `json:"width,omitempty"`
+	Height   int                       `json:"height,omitempty"`
+	Variants map[string]variantPayload `json:"variants,omitempty"`
+}
+
+type variantPayload struct {
+	URL    string `json:"url"`
+	Mime   string `json:"mime"`
+	Size   int64  `json:"size"`
+	Width  int    `json:"width"`
+	Height int    `json:"height"`
 }
 
 // Upload : POST /media (multipart, champ `file`). Valide le type réel (magic
@@ -131,20 +148,55 @@ func (h *MediaHandler) Upload(c *gin.Context) {
 		return
 	}
 
-	reader := io.MultiReader(bytes.NewReader(head), f)
-	if err := h.store.Put(c.Request.Context(), id, reader, fileHeader.Size, mime, claims.UserID); err != nil {
+	data, err := io.ReadAll(io.MultiReader(bytes.NewReader(head), f))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "lecture du fichier impossible"})
+		return
+	}
+
+	if err := h.store.Put(c.Request.Context(), id, bytes.NewReader(data), int64(len(data)), mime, claims.UserID); err != nil {
 		logging.FromGin(c).Error("échec stockage MinIO (upload)", "error", err)
 		c.JSON(http.StatusBadGateway, gin.H{"error": "échec du stockage"})
 		return
 	}
 
+	width, height := 0, 0
+	variants := map[string]variantPayload{}
+	if kind == validate.KindImage && int64(len(data)) <= maxTransformBytes {
+		info, generated, err := imageproc.GenerateVariants(data, mime)
+		if err != nil {
+			logging.FromGin(c).Warn("variantes image non générées", "media_id", id, "mime", mime, "error", err)
+		} else {
+			width, height = info.Width, info.Height
+			for _, v := range generated {
+				if err := h.store.PutVariant(c.Request.Context(), id, v.Name, bytes.NewReader(v.Bytes), int64(len(v.Bytes)), v.Mime, claims.UserID); err != nil {
+					logging.FromGin(c).Warn("variante image non stockée", "media_id", id, "variant", v.Name, "error", err)
+					continue
+				}
+				variants[v.Name] = variantPayload{
+					URL:    "/media/" + id + "/" + v.Name,
+					Mime:   v.Mime,
+					Size:   int64(len(v.Bytes)),
+					Width:  v.Width,
+					Height: v.Height,
+				}
+			}
+		}
+	}
+	if len(variants) == 0 {
+		variants = nil
+	}
+
 	logging.FromGin(c).Info("média uploadé", "media_id", id, "mime", mime, "size", fileHeader.Size)
 	c.JSON(http.StatusCreated, gin.H{"data": uploadResponse{
-		ID:   id,
-		URL:  "/media/" + id,
-		Mime: mime,
-		Kind: string(kind),
-		Size: fileHeader.Size,
+		ID:       id,
+		URL:      "/media/" + id,
+		Mime:     mime,
+		Kind:     string(kind),
+		Size:     int64(len(data)),
+		Width:    width,
+		Height:   height,
+		Variants: variants,
 	}})
 }
 
@@ -227,7 +279,21 @@ func (h *MediaHandler) UploadEncrypted(c *gin.Context) {
 // @Router      /media/{id} [get]
 func (h *MediaHandler) Download(c *gin.Context) {
 	id := c.Param("id")
+	h.serveObject(c, id)
+}
 
+// DownloadVariant : GET /media/:id/:variant — sert une variante générée.
+func (h *MediaHandler) DownloadVariant(c *gin.Context) {
+	id := c.Param("id")
+	variant := c.Param("variant")
+	if !validVariant(variant) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "média introuvable"})
+		return
+	}
+	h.serveObject(c, storage.VariantKey(id, variant))
+}
+
+func (h *MediaHandler) serveObject(c *gin.Context, id string) {
 	obj, info, err := h.store.Open(c.Request.Context(), id)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
@@ -287,12 +353,21 @@ func (h *MediaHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	if err := h.store.Remove(c.Request.Context(), id); err != nil {
+	if err := h.store.RemoveMediaSet(c.Request.Context(), id); err != nil {
 		logging.FromGin(c).Error("erreur suppression MinIO", "media_id", id, "error", err)
 		c.JSON(http.StatusBadGateway, gin.H{"error": "suppression impossible"})
 		return
 	}
 	c.Status(http.StatusNoContent)
+}
+
+func validVariant(name string) bool {
+	switch name {
+	case "thumb", "small", "medium", "large":
+		return true
+	default:
+		return false
+	}
 }
 
 // PurgeByOwner : DELETE /media/owners/:id — efface TOUS les objets d'un

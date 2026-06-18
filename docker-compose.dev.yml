@@ -121,6 +121,7 @@ services:
       target: dev
     volumes:
       - ./media-service:/app
+      - /app/node_modules
       - /app/tmp
       - go-mod-media:/go/pkg/mod
       - go-build-media:/root/.cache/go-build

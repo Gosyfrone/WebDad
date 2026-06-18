@@ -6,7 +6,7 @@ import { Heart, Image as ImageIcon, Loader2, Smile, Trash2, Users, X } from 'luc
 import { cn, initialOf, timeAgo } from '@/lib/utils'
 import { getAccessToken } from '@/lib/auth-client'
 import { useInfiniteScroll } from '@/lib/use-infinite-scroll'
-import { exceedsMediaLimit, MAX_MEDIA_MB, resolveMediaUrl, uploadMedia } from '@/lib/media'
+import { exceedsMediaLimit, MAX_MEDIA_MB, resolveMediaUrl, uploadedMediaUrl, uploadMedia } from '@/lib/media'
 import {
   createComment,
   deleteComment,
@@ -255,8 +255,8 @@ export function CommentSection({ postId, focusCommentId, onCountChange, canReply
     try {
       const uploaded = await Promise.all(
         files.slice(0, room).map(async (file) => {
-          const { url, kind } = await uploadMedia(file)
-          return { url, type: kind } as PostMedia
+          const uploaded = await uploadMedia(file)
+          return { url: uploadedMediaUrl(uploaded, 'large'), type: uploaded.kind } as PostMedia
         }),
       )
       setMedia((prev) => [...prev, ...uploaded])
@@ -690,8 +690,8 @@ function CommentThread({
     try {
       const uploaded = await Promise.all(
         files.slice(0, room).map(async (file) => {
-          const { url, kind } = await uploadMedia(file)
-          return { url, type: kind } as PostMedia
+          const uploaded = await uploadMedia(file)
+          return { url: uploadedMediaUrl(uploaded, 'large'), type: uploaded.kind } as PostMedia
         }),
       )
       setMedia((prev) => [...prev, ...uploaded])
