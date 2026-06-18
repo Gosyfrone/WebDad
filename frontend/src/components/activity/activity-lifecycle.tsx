@@ -8,8 +8,8 @@ const OFFLINE_ENDPOINT = '/api/activity/offline'
 
 /**
  * Synchronise la présence avec le cycle de vie de l'onglet :
- * - montage / retour BFCache : en ligne ;
- * - fermeture, refresh, navigation dure : hors ligne.
+ * - montage / retour BFCache / retour premier plan : en ligne ;
+ * - arrière-plan, fermeture, refresh, navigation dure : hors ligne.
  */
 export function ActivityLifecycle() {
   const onlineInFlight = useRef(false)
@@ -43,11 +43,23 @@ export function ActivityLifecycle() {
       void markOnline()
     }
 
+    function handleVisibilityChange() {
+      if (document.visibilityState === 'visible') {
+        void markOnline()
+      } else {
+        markOffline()
+      }
+    }
+
     window.addEventListener('pageshow', handlePageShow)
     window.addEventListener('pagehide', markOffline)
+    window.addEventListener('freeze', markOffline)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
     return () => {
       window.removeEventListener('pageshow', handlePageShow)
       window.removeEventListener('pagehide', markOffline)
+      window.removeEventListener('freeze', markOffline)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
   }, [])
 
