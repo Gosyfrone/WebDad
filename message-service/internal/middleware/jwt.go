@@ -17,9 +17,10 @@ const contextKey = "claims"
 // Claims : contenu du JWT, identique à celui émis par auth-service. Le service
 // ne signe pas de token, il les VALIDE avec le même JWT_SECRET partagé.
 type Claims struct {
-	UserID string `json:"user_id"`
-	Email  string `json:"email"`
-	Role   string `json:"role"`
+	UserID        string `json:"user_id"`
+	Email         string `json:"email"`
+	Role          string `json:"role"`
+	EmailVerified bool   `json:"email_verified"`
 	jwt.RegisteredClaims
 }
 
@@ -84,6 +85,27 @@ func ModeratorOnly() gin.HandlerFunc {
 		}
 		if claims.Role != "moderator" && claims.Role != "admin" {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "réservé à la modération"})
+			return
+		}
+		c.Next()
+	}
+}
+
+// VerifiedOnly exige une adresse e-mail vérifiée (claim email_verified). À
+// chaîner APRÈS JWTAuth. Empêche un compte non vérifié (RIV-002) de créer des
+// conversations ou d'envoyer des messages. 403 sinon.
+func VerifiedOnly() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		claims, ok := ClaimsFrom(c)
+		if !ok {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "token manquant"})
+			return
+		}
+		if !claims.EmailVerified {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
+				"error": "adresse e-mail non vérifiée",
+				"code":  "email_not_verified",
+			})
 			return
 		}
 		c.Next()

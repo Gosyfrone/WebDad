@@ -310,6 +310,13 @@ func (h *MediaHandler) serveObject(c *gin.Context, id string) {
 	if info.ContentType != "" {
 		header.Set("Content-Type", info.ContentType)
 	}
+	// BRZ-004 : empêche le navigateur de « renifler » un type différent de celui
+	// déclaré (anti MIME-confusion). Les blobs chiffrés (octet-stream) sont en
+	// outre forcés en téléchargement plutôt qu'affichés inline.
+	header.Set("X-Content-Type-Options", "nosniff")
+	if info.ContentType == "application/octet-stream" {
+		header.Set("Content-Disposition", "attachment")
+	}
 	header.Set("Cache-Control", "public, max-age=31536000, immutable")
 	if info.ETag != "" {
 		header.Set("ETag", `"`+info.ETag+`"`)

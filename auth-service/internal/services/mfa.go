@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"image/png"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/pquerna/otp"
@@ -38,7 +39,38 @@ const (
 	purposeMFAChallenge = "mfa_challenge"
 	// mfaChallengeTTL : fenêtre pour saisir le second facteur après le mot de passe.
 	mfaChallengeTTL = 5 * time.Minute
+	// maxMFAVerifyAttempts : nombre de codes TOTP faux tolérés sur un même
+	// challenge avant de l'invalider (BRZ-001). Au-delà, l'utilisateur doit
+	// relancer un login (nouveau challenge).
+	maxMFAVerifyAttempts = 5
 )
+
+// mfaAttemptTracker compte les essais TOTP ratés par challenge (en mémoire).
+// Le challenge expirant en 5 min, les entrées résiduelles sont éphémères ;
+// elles sont en outre effacées au succès ou à l'invalidation.
+type mfaAttemptTracker struct {
+	mu sync.Mutex
+	m  map[string]int
+}
+
+func newMFAAttemptTracker() *mfaAttemptTracker {
+	return &mfaAttemptTracker{m: make(map[string]int)}
+}
+
+// incr incrémente et renvoie le nombre d'essais ratés pour la clé.
+func (t *mfaAttemptTracker) incr(key string) int {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.m[key]++
+	return t.m[key]
+}
+
+// clear oublie le compteur d'une clé (succès ou challenge consommé).
+func (t *mfaAttemptTracker) clear(key string) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	delete(t.m, key)
+}
 
 // MFAConfigured indique si la MFA est utilisable (clé de chiffrement présente).
 func (s *AuthService) MFAConfigured() bool { return s.mfaCipher != nil }
@@ -246,11 +278,23 @@ func (s *AuthService) VerifyMFA(challenge, code string) (string, string, *models
 	if err != nil {
 		return "", "", nil, fmt.Errorf("déchiffrement secret MFA : %w", err)
 	}
+	challengeKey := hashToken(challenge)
 	if !validateTOTP(secret, code) {
+		// BRZ-001 : au-delà de maxMFAVerifyAttempts codes faux, on BRÛLE le
+		// challenge (used_at) pour qu'il ne puisse plus être deviné — y compris
+		// par un attaquant distribué sur plusieurs IP (le rate-limit par IP ne
+		// suffirait pas seul). L'utilisateur légitime relance un login.
+		if s.mfaAttempts.incr(challengeKey) >= maxMFAVerifyAttempts {
+			if _, derr := tx.Exec(`UPDATE account_tokens SET used_at = NOW() WHERE id = $1`, tokenID); derr == nil {
+				_ = tx.Commit()
+			}
+			s.mfaAttempts.clear(challengeKey)
+		}
 		return "", "", nil, ErrInvalidMFACode
 	}
 
-	// Code valide : on consomme le challenge puis on valide la transaction.
+	// Code valide : on oublie le compteur, on consomme le challenge, on valide.
+	s.mfaAttempts.clear(challengeKey)
 	if _, err := tx.Exec(`UPDATE account_tokens SET used_at = NOW() WHERE id = $1`, tokenID); err != nil {
 		return "", "", nil, fmt.Errorf("consommation challenge MFA : %w", err)
 	}

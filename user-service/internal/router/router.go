@@ -37,8 +37,12 @@ func New(users *service.UserService, jwtSecret string) *gin.Engine {
 
 	u := r.Group("/users")
 	{
-		// Lecture publique.
-		u.GET("", h.List)
+		// RIV-003 : l'annuaire complet (énumération de toute la base) exige
+		// désormais une session. Le front ne consomme pas cette liste (il passe
+		// par /search, /suggestions, /by-username) → restriction sans impact UX.
+		u.GET("", auth, h.List)
+		// Lecture publique (volontairement) : nécessaire au login (résolution
+		// username→id), aux aperçus de profil et à la recherche de l'explorer.
 		u.GET("/search", h.Search)           // ?q= : recherche par username
 		u.GET("/suggestions", h.Suggestions) // comptes les plus suivis
 		u.GET("/by-username/:username", h.GetByUsername)

@@ -17,6 +17,8 @@ import (
 func RegisterRoutes(r *gin.Engine, serviceName string, postService *service.PostService, jwtSecret string, hub *realtime.Hub, allowedOrigins []string, internalSecret string) {
 	auth := middleware.JWTAuth(jwtSecret)
 	optionalAuth := middleware.OptionalJWTAuth(jwtSecret)
+	// RIV-002 : la création de contenu exige une adresse e-mail vérifiée.
+	verified := middleware.VerifiedOnly()
 
 	r.GET("/health", Health(serviceName))
 
@@ -45,8 +47,8 @@ func RegisterRoutes(r *gin.Engine, serviceName string, postService *service.Post
 		// GET /posts?author_id=<id> (cf. ListPosts) — pas de préfixe séparé,
 		// pour rester sous `/posts` (le seul routé par la gateway).
 		posts.GET("", optionalAuth, PostHandler.ListPosts)
-		// Création authentifiée (auteur dérivé du JWT).
-		posts.POST("", auth, PostHandler.CreatePost)
+		// Création authentifiée (auteur dérivé du JWT) + e-mail vérifié (RIV-002).
+		posts.POST("", auth, verified, PostHandler.CreatePost)
 
 		// Posts likés par un utilisateur (visibility contrôlée côté serveur) —
 		// route STATIQUE avant `/:id`.
@@ -123,7 +125,7 @@ func RegisterRoutes(r *gin.Engine, serviceName string, postService *service.Post
 			comment := post.Group("/comments")
 			{
 				comment.GET("", optionalAuth, CommentHandler.ListPostComments)
-				comment.POST("", auth, CommentHandler.CreatPostComment)
+				comment.POST("", auth, verified, CommentHandler.CreatPostComment)
 				comment.GET("/:commentId/replies", optionalAuth, CommentHandler.ListCommentReplies)
 				comment.DELETE("/:commentId", auth, CommentHandler.DeletePostComment)
 				comment.POST("/:commentId/like", auth, CommentHandler.LikeComment)

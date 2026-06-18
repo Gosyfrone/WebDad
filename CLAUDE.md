@@ -10,7 +10,7 @@
 > - Knowledge graph in `graphify-out/` — query it before reading source (Operating Rule 11).
 >
 > **Latest session work and suggested commit messages live in `CHANGELOG.md`, not here.**
-> **Session freshness:** current work log updated in `CHANGELOG.md` on 18/06/2026 (chore CI : couverture de tests Codecov backend Go + frontend ; reste 2 actions manuelles user : `CODECOV_TOKEN` + régénérer `package-lock.json`).
+> **Session freshness:** current work log updated in `CHANGELOG.md` on 18/06/2026 (sécurité : pentest complet + durcissement — rate-limiting, MFA anti-brute-force, gate `email_verified`, annuaire authentifié, en-têtes Caddy ; rapport interne `PENTEST.md`, gitignoré).
 
 ---
 

@@ -17,7 +17,43 @@ const DEFAULT_TRANSLATION_API_URL = 'https://libretranslate.de/translate'
 const MAX_TEXT_LENGTH = 5_000
 const TRANSLATION_TIMEOUT_MS = 8_000
 
+// BRZ-006 : throttle par IP. La traduction relaie vers une API externe
+// (coût/abus potentiel) sans authentification. Limiteur en mémoire (fenêtre
+// glissante) — suffisant pour le serveur Next standalone (process unique).
+const RATE_LIMIT = 30 // requêtes
+const RATE_WINDOW_MS = 60_000 // par minute, par IP
+const hits = new Map<string, { count: number; resetAt: number }>()
+
+function clientIp(request: NextRequest): string {
+  const xff = request.headers.get('x-forwarded-for')
+  if (xff) return xff.split(',')[0]!.trim()
+  return request.headers.get('x-real-ip') ?? 'unknown'
+}
+
+function rateLimited(ip: string): boolean {
+  const now = Date.now()
+  const entry = hits.get(ip)
+  if (!entry || now > entry.resetAt) {
+    hits.set(ip, { count: 1, resetAt: now + RATE_WINDOW_MS })
+    if (hits.size > 10_000) {
+      // Garde-fou anti-fuite mémoire : purge les entrées expirées.
+      for (const [k, v] of hits) if (now > v.resetAt) hits.delete(k)
+    }
+    return false
+  }
+  if (entry.count >= RATE_LIMIT) return true
+  entry.count++
+  return false
+}
+
 export async function POST(request: NextRequest) {
+  if (rateLimited(clientIp(request))) {
+    return NextResponse.json(
+      { error: 'Trop de requêtes de traduction. Réessaie dans un instant.' },
+      { status: 429 },
+    )
+  }
+
   let body: TranslateRequest
 
   try {

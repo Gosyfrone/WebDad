@@ -33,17 +33,24 @@ func New(auth *services.AuthService, oauthReg *oauth.Registry) *gin.Engine {
 		})
 	})
 
+	// Limiteurs anti brute-force / abus (RIV-001, BRZ-001), par IP cliente.
+	//   - credLimiter : tentatives sensibles (login, 2ᵉ facteur) — fenêtre courte.
+	//   - mailLimiter : endpoints qui déclenchent un e-mail / créent un compte
+	//     (register, forgot, resend) — anti mail-bombing/énumération scriptée.
+	credLimiter := middleware.NewRateLimiter(10, 5*time.Minute)
+	mailLimiter := middleware.NewRateLimiter(5, 15*time.Minute)
+
 	authGroup := r.Group("/auth")
 	{
-		authGroup.POST("/register", h.Register)
-		authGroup.POST("/login", h.Login)
+		authGroup.POST("/register", mailLimiter.Middleware(), h.Register)
+		authGroup.POST("/login", credLimiter.Middleware(), h.Login)
 		// Vérification d'e-mail (PUBLIQUES, pas de middleware JWT) :
 		// confirm consomme le token du lien ; request (re)envoie le mail.
 		authGroup.POST("/verify-email/confirm", h.ConfirmVerifyEmail)
-		authGroup.POST("/verify-email/request", h.RequestVerifyEmail)
+		authGroup.POST("/verify-email/request", mailLimiter.Middleware(), h.RequestVerifyEmail)
 		// Mot de passe oublié (PUBLIQUES, pas de middleware JWT) : forgot
 		// déclenche le mail (anti-énumération) ; reset consomme le token.
-		authGroup.POST("/password/forgot", h.ForgotPassword)
+		authGroup.POST("/password/forgot", mailLimiter.Middleware(), h.ForgotPassword)
 		authGroup.POST("/password/reset", h.ResetPassword)
 		// /auth/password/change : changement de mot de passe authentifié (volontaire
 		// ou imposé après création par un admin). Protégé par le JWT.
@@ -57,7 +64,7 @@ func New(auth *services.AuthService, oauthReg *oauth.Registry) *gin.Engine {
 		authGroup.POST("/mfa/enable", middleware.JWTAuth(auth), h.MFAEnable)
 		authGroup.POST("/mfa/disable", middleware.JWTAuth(auth), h.MFADisable)
 		authGroup.GET("/mfa/status", middleware.JWTAuth(auth), h.MFAStatus)
-		authGroup.POST("/mfa/verify", h.MFAVerify)
+		authGroup.POST("/mfa/verify", credLimiter.Middleware(), h.MFAVerify)
 		// /auth/refresh : échange le refresh token (cookie httpOnly relayé par
 		// le BFF) contre une nouvelle paire access+refresh (rotation).
 		authGroup.POST("/refresh", h.Refresh)
