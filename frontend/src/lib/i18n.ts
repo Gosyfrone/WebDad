@@ -1070,6 +1070,9 @@ export const messages: Record<Locale, Messages> = {
     'explorer.filter_title': 'Filtrer',
     'explorer.filter_publications': 'Publications',
     'explorer.filter_users': 'Utilisateurs',
+    'explorer.filter_required': 'Au moins un filtre requis',
+    'explorer.at_least_one_filter_publications': 'Au moins un type de résultat doit être activé. Veuillez activer les utilisateurs avant de désactiver les publications.',
+    'explorer.at_least_one_filter_users': 'Au moins un type de résultat doit être activé. Veuillez activer les publications avant de désactiver les utilisateurs.',
     'explorer.no_publications_for':
       'Aucune publication ne correspond à « {q} ».',
     'explorer.no_users_for': 'Aucun utilisateur ne correspond à « {q} ».',
@@ -2036,6 +2039,9 @@ export const messages: Record<Locale, Messages> = {
     'explorer.filter_title': 'Filter',
     'explorer.filter_publications': 'Posts',
     'explorer.filter_users': 'Users',
+    'explorer.filter_required': 'At least one filter required',
+    'explorer.at_least_one_filter_publications': 'At least one result type must be active. Please enable users before disabling posts.',
+    'explorer.at_least_one_filter_users': 'At least one result type must be active. Please enable posts before disabling users.',
     'explorer.no_publications_for': 'No posts match “{q}”.',
     'explorer.no_users_for': 'No users match “{q}”.',
 

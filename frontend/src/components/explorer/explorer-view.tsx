@@ -26,7 +26,7 @@ import { useFollow } from '@/lib/use-follow'
 import type { RelationUser } from '@/types'
 import { cn, initialOf } from '@/lib/utils'
 import { useExplorerFilters } from '@/components/explorer/explorer-filter-context'
-import { MobileFilterMenu } from '@/components/explorer/explorer-filter-controls'
+import { MobileFilterButtons } from '@/components/explorer/explorer-filter-controls'
 import { useT } from '@/components/language-provider'
 import { PostCard } from '@/components/feed/post-card'
 import { ProfilLink } from '@/components/profil/profil-link'
@@ -64,8 +64,8 @@ export function ExplorerView() {
     setSubmittedSearchActive,
     showPublications,
     showUsers,
-    togglePublications,
-    toggleUsers,
+    tryTogglePublications,
+    tryToggleUsers,
   } = useExplorerFilters()
   const viewerId = currentUserId ?? readCurrentUserId()
 
@@ -278,11 +278,11 @@ export function ExplorerView() {
         </p>
         {submittedQuery && (
           <div className="mt-3 flex justify-end xl:hidden">
-            <MobileFilterMenu
+            <MobileFilterButtons
               showPublications={showPublications}
               showUsers={showUsers}
-              onTogglePublications={togglePublications}
-              onToggleUsers={toggleUsers}
+              onTogglePublications={tryTogglePublications}
+              onToggleUsers={tryToggleUsers}
             />
           </div>
         )}

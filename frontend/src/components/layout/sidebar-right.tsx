@@ -38,8 +38,8 @@ export function SidebarRight() {
     showPublications,
     showUsers,
     submittedSearchActive,
-    togglePublications,
-    toggleUsers,
+    tryTogglePublications,
+    tryToggleUsers,
   } = useExplorerFilters()
   const showExplorerFilters =
     pathname === ROUTES.explorer &&
@@ -121,8 +121,8 @@ export function SidebarRight() {
         <ExplorerFilterCard
           showPublications={showPublications}
           showUsers={showUsers}
-          onTogglePublications={togglePublications}
-          onToggleUsers={toggleUsers}
+          onTogglePublications={tryTogglePublications}
+          onToggleUsers={tryToggleUsers}
         />
       )}
 

@@ -8,8 +8,10 @@ interface ExplorerFilterContextValue {
   setFilters: (filters: { publications: boolean; users: boolean }) => void
   setSubmittedSearchActive: (active: boolean) => void
   submittedSearchActive: boolean
-  togglePublications: () => void
-  toggleUsers: () => void
+  /** Bascule « Publications ». Renvoie false si refusé (dernier filtre actif). */
+  tryTogglePublications: () => boolean
+  /** Bascule « Utilisateurs ». Renvoie false si refusé (dernier filtre actif). */
+  tryToggleUsers: () => boolean
 }
 
 const ExplorerFilterContext = createContext<ExplorerFilterContextValue | null>(null)
@@ -30,17 +32,15 @@ export function ExplorerFilterProvider({ children }: { children: ReactNode }) {
       },
       submittedSearchActive,
       setSubmittedSearchActive,
-      togglePublications: () => {
-        setShowPublications((current) => {
-          if (current && !showUsers) return current
-          return !current
-        })
+      tryTogglePublications: () => {
+        if (showPublications && !showUsers) return false
+        setShowPublications((current) => !current)
+        return true
       },
-      toggleUsers: () => {
-        setShowUsers((current) => {
-          if (current && !showPublications) return current
-          return !current
-        })
+      tryToggleUsers: () => {
+        if (showUsers && !showPublications) return false
+        setShowUsers((current) => !current)
+        return true
       },
     }),
     [showPublications, showUsers, submittedSearchActive],
