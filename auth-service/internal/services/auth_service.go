@@ -94,11 +94,20 @@ type AuthService struct {
 	// adminCreateAutoVerify : DEV/LOCAL — marque les comptes créés par un admin
 	// comme vérifiés d'office (court-circuit de la vérif e-mail). False en prod.
 	adminCreateAutoVerify bool
+	// mfaCipher : chiffre le secret TOTP at-rest. nil = MFA non configurée
+	// (MFA_ENCRYPTION_KEY absente) → les endpoints MFA répondent 503.
+	mfaCipher *secretCipher
 }
 
 // New construit le service. mailer peut être nil (mail non configuré) : l'envoi
 // devient alors un no-op loggé et auth reste pleinement fonctionnel.
-func New(db *sql.DB, jwtSecret string, jwtExpiry, refreshExpiry time.Duration, mailer Mailer, appBaseURL, mailLogoURL string, adminCreateAutoVerify bool) *AuthService {
+// mfaEncryptionKey vide → MFA désactivée (cf. mfaCipher). Renvoie une erreur
+// uniquement si la clé est présente mais invalide (config erronée = échec boot).
+func New(db *sql.DB, jwtSecret string, jwtExpiry, refreshExpiry time.Duration, mailer Mailer, appBaseURL, mailLogoURL string, adminCreateAutoVerify bool, mfaEncryptionKey string) (*AuthService, error) {
+	cipher, err := newSecretCipher(mfaEncryptionKey)
+	if err != nil {
+		return nil, err
+	}
 	return &AuthService{
 		db:                    db,
 		jwtSecret:             []byte(jwtSecret),
@@ -108,7 +117,8 @@ func New(db *sql.DB, jwtSecret string, jwtExpiry, refreshExpiry time.Duration, m
 		appBaseURL:            appBaseURL,
 		mailLogoURL:           mailLogoURL,
 		adminCreateAutoVerify: adminCreateAutoVerify,
-	}
+		mfaCipher:             cipher,
+	}, nil
 }
 
 // Register crée un compte (role=user), puis connecte l'utilisateur dans la
@@ -489,11 +499,21 @@ func (s *AuthService) sendAdminWelcomeMail(u *models.User, username, tempPasswor
 	}
 }
 
-// Login vérifie les credentials et retourne un access token + un refresh
-// token + l'utilisateur.
-func (s *AuthService) Login(email, password string) (string, string, *models.User, error) {
+// LoginOutcome porte le résultat d'un login par mot de passe. Soit une session
+// directe (Token/Refresh/User remplis), soit — quand la MFA est active — une
+// demande de second facteur (MFARequired=true + Challenge), sans aucun JWT émis.
+type LoginOutcome struct {
+	Token       string
+	Refresh     string
+	User        *models.User
+	MFARequired bool
+	Challenge   string // jeton court à présenter à VerifyMFA (TTL mfaChallengeTTL)
+}
+
+// Login vérifie les credentials et retourne soit une session, soit un challenge MFA.
+func (s *AuthService) Login(email, password string) (*LoginOutcome, error) {
 	const q = `
-		SELECT id, email, password, role, is_active, email_verified, must_change_password, created_at
+		SELECT id, email, password, role, is_active, email_verified, must_change_password, mfa_enabled, created_at
 		FROM credentials WHERE email = $1`
 
 	return s.loginWithQuery(q, email, password)
@@ -501,44 +521,58 @@ func (s *AuthService) Login(email, password string) (string, string, *models.Use
 
 // LoginByUserID vérifie les credentials à partir de l'id auth. Utilisé par le
 // BFF après résolution d'un username dans user-service.
-func (s *AuthService) LoginByUserID(userID, password string) (string, string, *models.User, error) {
+func (s *AuthService) LoginByUserID(userID, password string) (*LoginOutcome, error) {
 	const q = `
-		SELECT id, email, password, role, is_active, email_verified, must_change_password, created_at
+		SELECT id, email, password, role, is_active, email_verified, must_change_password, mfa_enabled, created_at
 		FROM credentials WHERE id = $1`
 
 	return s.loginWithQuery(q, userID, password)
 }
 
-func (s *AuthService) loginWithQuery(query, identifier, password string) (string, string, *models.User, error) {
+func (s *AuthService) loginWithQuery(query, identifier, password string) (*LoginOutcome, error) {
 	u := &models.User{}
 	var pwHash sql.NullString // NULL pour les comptes OAuth (sans mot de passe)
 	err := s.db.QueryRow(query, identifier).
-		Scan(&u.ID, &u.Email, &pwHash, &u.Role, &u.IsActive, &u.EmailVerified, &u.MustChangePassword, &u.CreatedAt)
+		Scan(&u.ID, &u.Email, &pwHash, &u.Role, &u.IsActive, &u.EmailVerified, &u.MustChangePassword, &u.MFAEnabled, &u.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
-		return "", "", nil, ErrInvalidCredentials
+		return nil, ErrInvalidCredentials
 	}
 	if err != nil {
-		return "", "", nil, fmt.Errorf("lecture utilisateur : %w", err)
+		return nil, fmt.Errorf("lecture utilisateur : %w", err)
 	}
 
 	if !u.IsActive {
-		return "", "", nil, ErrUserInactive
+		return nil, ErrUserInactive
 	}
 	// Compte sans mot de passe local (créé via OAuth) : login classique refusé
 	// avec un message clair plutôt qu'un 401 générique.
 	if !pwHash.Valid || pwHash.String == "" {
-		return "", "", nil, ErrNoLocalPassword
+		return nil, ErrNoLocalPassword
 	}
 	if bcrypt.CompareHashAndPassword([]byte(pwHash.String), []byte(password)) != nil {
-		return "", "", nil, ErrInvalidCredentials
+		return nil, ErrInvalidCredentials
 	}
 	// Blocage dur : un compte non vérifié ne peut pas se connecter (aucun token
 	// émis). Vérifié APRÈS le bcrypt pour ne pas révéler l'existence du compte.
 	if !u.EmailVerified {
-		return "", "", nil, ErrEmailNotVerified
+		return nil, ErrEmailNotVerified
 	}
 
-	return s.issueTokens(u)
+	// MFA active : mot de passe OK mais on n'émet PAS de JWT. On crée un challenge
+	// court ; le second facteur est validé par VerifyMFA contre ce challenge.
+	if u.MFAEnabled {
+		challenge, err := s.createAccountToken(u.ID, purposeMFAChallenge, mfaChallengeTTL)
+		if err != nil {
+			return nil, err
+		}
+		return &LoginOutcome{MFARequired: true, Challenge: challenge, User: u}, nil
+	}
+
+	token, refresh, user, err := s.issueTokens(u)
+	if err != nil {
+		return nil, err
+	}
+	return &LoginOutcome{Token: token, Refresh: refresh, User: user}, nil
 }
 
 // LoginWithOAuth connecte un utilisateur à partir d'une identité OIDC vérifiée

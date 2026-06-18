@@ -65,6 +65,12 @@ export default function LoginPage() {
   const [isResending, setIsResending] = React.useState(false)
   const [resendNotice, setResendNotice] = React.useState<string | null>(null)
   const [oauthLoading, setOauthLoading] = React.useState<string | null>(null)
+  // MFA : si le mot de passe est bon mais la double auth active, le BFF renvoie
+  // un challenge. On bascule alors sur l'écran de saisie du code (TOTP).
+  const [mfaChallenge, setMfaChallenge] = React.useState<string | null>(null)
+  const [mfaCode, setMfaCode] = React.useState('')
+  const [mfaError, setMfaError] = React.useState<string | null>(null)
+  const [mfaBusy, setMfaBusy] = React.useState(false)
 
   const validate = React.useCallback((): FormErrors => {
     const nextErrors: FormErrors = {}
@@ -145,6 +151,15 @@ export default function LoginPage() {
         return
       }
 
+      // MFA active : aucun token encore. On bascule sur l'écran de code ; la
+      // session sera ouverte par /api/auth/mfa/verify.
+      if (payload?.mfaRequired && payload?.challenge) {
+        setMfaChallenge(payload.challenge)
+        setMfaCode('')
+        setMfaError(null)
+        return
+      }
+
       // L'access token court (15 min) vit en localStorage ; le refresh token
       // a été posé en cookie httpOnly par le BFF (/api/auth/login).
       if (payload?.accessToken) {
@@ -187,6 +202,42 @@ export default function LoginPage() {
       setResendNotice(t('auth.verify.resend_done'))
     } finally {
       setIsResending(false)
+    }
+  }
+
+  const handleMfaVerify = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!mfaChallenge || !mfaCode.trim()) return
+
+    setMfaBusy(true)
+    setMfaError(null)
+    try {
+      const response = await fetch('/api/auth/mfa/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ challenge: mfaChallenge, code: mfaCode.trim() }),
+      })
+      const payload = await response.json().catch(() => null)
+
+      if (!response.ok) {
+        // Challenge expiré/invalide → on renvoie à l'écran mot de passe.
+        if (payload?.code === 'invalid_challenge') {
+          setMfaChallenge(null)
+          setErrors({ form: t('auth.mfa.error_challenge') })
+          return
+        }
+        setMfaError(t('auth.mfa.error_code'))
+        return
+      }
+
+      if (payload?.accessToken) {
+        setAccessToken(payload.accessToken)
+      }
+      window.location.assign(ROUTES.feed)
+    } catch (error) {
+      setMfaError(getMessage(error, t('auth.err.network')))
+    } finally {
+      setMfaBusy(false)
     }
   }
 
@@ -363,6 +414,64 @@ export default function LoginPage() {
           </CardHeader>
 
           <CardContent className="relative px-5 pb-5 sm:px-8 sm:pb-7">
+            {mfaChallenge ? (
+              <form className="space-y-4" onSubmit={handleMfaVerify} noValidate>
+                <div className="space-y-1.5">
+                  <h2 className="text-lg font-semibold text-foreground">
+                    {t('auth.mfa.title')}
+                  </h2>
+                  <p className="text-sm text-muted-foreground">
+                    {t('auth.mfa.subtitle')}
+                  </p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label htmlFor="mfa-login-code" className="text-sm font-medium text-foreground/80">
+                    {t('auth.mfa.code_label')}
+                  </label>
+                  <Input
+                    id="mfa-login-code"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    placeholder="123456"
+                    autoFocus
+                    className="h-12 rounded-2xl border-white/70 bg-white/90 text-center text-lg tracking-[0.4em] shadow-sm transition-all focus-visible:border-[#5B6CFF] focus-visible:ring-4 focus-visible:ring-[#5B6CFF]/15 dark:border-white/15 dark:bg-white/5"
+                    value={mfaCode}
+                    onChange={(event) => {
+                      setMfaCode(event.target.value)
+                      if (mfaError) setMfaError(null)
+                    }}
+                  />
+                </div>
+
+                {mfaError ? (
+                  <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50/90 px-4 py-2.5 text-sm text-red-700 shadow-sm dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
+                    <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" />
+                    <p>{mfaError}</p>
+                  </div>
+                ) : null}
+
+                <Button
+                  type="submit"
+                  className="h-12 w-full rounded-2xl bg-gradient-to-r from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] text-base font-semibold text-white shadow-[0_18px_44px_rgba(91,108,255,0.34)] transition duration-300 hover:scale-[1.015] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70"
+                  disabled={mfaBusy || !mfaCode.trim()}
+                >
+                  {mfaBusy ? t('auth.mfa.verifying') : t('auth.mfa.verify')}
+                </Button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMfaChallenge(null)
+                    setMfaCode('')
+                    setMfaError(null)
+                  }}
+                  className="w-full text-center text-sm font-medium text-[#5B6CFF] underline-offset-4 transition hover:text-[#8D3DFF] hover:underline"
+                >
+                  {t('auth.mfa.back')}
+                </button>
+              </form>
+            ) : (
             <form className="space-y-3.5" onSubmit={handleSubmit} noValidate>
               <div className="space-y-1.5">
                 <label htmlFor="identifier" className="text-sm font-medium text-foreground/80">
@@ -545,6 +654,7 @@ export default function LoginPage() {
 
               <LegalLinks className="items-center text-center" />
             </form>
+            )}
           </CardContent>
         </Card>
       </section>

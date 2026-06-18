@@ -19,7 +19,7 @@ import (
 // @Accept      json
 // @Produce     json
 // @Param       body body models.LoginRequest true "Credentials (email ou user_id + password)"
-// @Success     200 {object} models.AuthUser "Connexion réussie — data: {token, refresh_token, user}"
+// @Success     200 {object} models.AuthUser "Connexion réussie — data: {token, refresh_token, user} ; si MFA active : data: {mfa_required: true, challenge} (aucun token, appeler /auth/mfa/verify)"
 // @Failure     400 {object} map[string]string "Payload invalide"
 // @Failure     401 {object} map[string]string "Credentials invalides"
 // @Failure     403 {object} map[string]string "Compte désactivé ou e-mail non vérifié (code: email_not_verified)"
@@ -41,15 +41,13 @@ func (h *Handler) Login(c *gin.Context) {
 	}
 
 	var (
-		token   string
-		refresh string
-		user    *models.User
+		outcome *services.LoginOutcome
 		err     error
 	)
 	if userID != "" {
-		token, refresh, user, err = h.auth.LoginByUserID(userID, req.Password)
+		outcome, err = h.auth.LoginByUserID(userID, req.Password)
 	} else {
-		token, refresh, user, err = h.auth.Login(email, req.Password)
+		outcome, err = h.auth.Login(email, req.Password)
 	}
 	if err != nil {
 		switch {
@@ -74,10 +72,21 @@ func (h *Handler) Login(c *gin.Context) {
 		return
 	}
 
-	logging.FromGin(c).Info("connexion réussie", "user_id", user.ID)
+	// MFA active : mot de passe OK mais aucun JWT émis. On renvoie un challenge
+	// court (5 min) ; le front affiche l'écran de code et appelle /auth/mfa/verify.
+	if outcome.MFARequired {
+		logging.FromGin(c).Info("login : second facteur requis", "user_id", outcome.User.ID)
+		c.JSON(http.StatusOK, gin.H{"data": gin.H{
+			"mfa_required": true,
+			"challenge":    outcome.Challenge,
+		}})
+		return
+	}
+
+	logging.FromGin(c).Info("connexion réussie", "user_id", outcome.User.ID)
 	c.JSON(http.StatusOK, gin.H{"data": gin.H{
-		"token":         token,
-		"refresh_token": refresh,
-		"user":          models.NewAuthUser(user),
+		"token":         outcome.Token,
+		"refresh_token": outcome.Refresh,
+		"user":          models.NewAuthUser(outcome.User),
 	}})
 }

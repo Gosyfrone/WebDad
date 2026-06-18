@@ -183,6 +183,8 @@ services:
       # OAuth : base du redirect URI front (<base>/auth/callback/<provider>).
       # Les CLIENT_ID/SECRET des providers viennent d'auth-service/.env (env_file).
       OAUTH_REDIRECT_BASE_URL: ${OAUTH_REDIRECT_BASE_URL:-http://localhost:3000}
+      # MFA TOTP : clé de chiffrement du secret at-rest (racine). Absente → MFA off.
+      MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:-}
     ports:
       - "8081:8081"
     networks:

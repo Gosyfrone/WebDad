@@ -38,6 +38,11 @@ type Config struct {
 	// destinataire). Défaut rétro-compatible : AppBaseURL/logo_breezy.png.
 	MailLogoURL string
 
+	// MFAEncryptionKey : clé base64 (32 octets) chiffrant le secret TOTP at-rest
+	// (AES-256-GCM). Absente → la MFA est désactivée (endpoints 503), auth reste
+	// bootable. Jamais en dur : vient du .env racine (règle 5).
+	MFAEncryptionKey string
+
 	// AdminCreateAutoVerify : raccourci de DEV/LOCAL. Quand true, un compte créé
 	// par un admin est marqué vérifié d'office (email_verified=true) → la
 	// vérification d'e-mail est court-circuitée et l'utilisateur peut se connecter
@@ -105,6 +110,7 @@ func Load() *Config {
 	// DEV/LOCAL : court-circuite la vérification d'e-mail des comptes créés par
 	// un admin (l'envoi de mail réel se fait en ligne). À laisser false en prod.
 	cfg.AdminCreateAutoVerify = getEnv("ADMIN_CREATE_AUTO_VERIFY", "false") == "true"
+	cfg.MFAEncryptionKey = os.Getenv("MFA_ENCRYPTION_KEY")
 
 	cfg.SeedAdmin = getEnv("SEED_DEFAULT_ADMIN", "false") == "true"
 	cfg.SeedAdminEmail = getEnv("SEED_ADMIN_EMAIL", "admin@webdad.local")

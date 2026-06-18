@@ -47,7 +47,16 @@ func main() {
 		slog.Warn("MAIL_INTERNAL_SECRET absent — envoi d'e-mails désactivé (no-op)")
 	}
 
-	auth := services.New(conn, cfg.JWTSecret, cfg.JWTExpiry, cfg.RefreshExpiry, mailer, cfg.AppBaseURL, cfg.MailLogoURL, cfg.AdminCreateAutoVerify)
+	auth, err := services.New(conn, cfg.JWTSecret, cfg.JWTExpiry, cfg.RefreshExpiry, mailer, cfg.AppBaseURL, cfg.MailLogoURL, cfg.AdminCreateAutoVerify, cfg.MFAEncryptionKey)
+	if err != nil {
+		slog.Error("init service auth", "error", err)
+		os.Exit(1)
+	}
+	if auth.MFAConfigured() {
+		slog.Info("MFA TOTP configurée")
+	} else {
+		slog.Warn("MFA_ENCRYPTION_KEY absente — double authentification désactivée")
+	}
 
 	if cfg.SeedAdmin {
 		if err := auth.EnsureDefaultAdmin(cfg.SeedAdminEmail, cfg.SeedAdminPassword); err != nil {

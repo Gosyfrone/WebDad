@@ -9,6 +9,8 @@ type AuthPayload = {
     token?: string
     refresh_token?: string
     user?: unknown
+    mfa_required?: boolean
+    challenge?: string
   }
   message?: string
   error?: string
@@ -119,6 +121,16 @@ export async function POST(request: NextRequest) {
       )
     }
     return NextResponse.json({ error: message }, { status: upstreamResponse.status })
+  }
+
+  // MFA active : le mot de passe est bon mais aucun JWT n'est émis. On relaie le
+  // challenge au client SANS poser de cookie ni provisionner ; le client affiche
+  // l'écran de code puis appelle /api/auth/mfa/verify.
+  if (payload?.data?.mfa_required && payload?.data?.challenge) {
+    return NextResponse.json(
+      { mfaRequired: true, challenge: payload.data.challenge },
+      { status: 200 }
+    )
   }
 
   const accessToken = payload?.data?.token ?? null

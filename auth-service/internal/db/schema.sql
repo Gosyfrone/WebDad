@@ -42,6 +42,20 @@ ALTER TABLE credentials ADD COLUMN IF NOT EXISTS pending_email VARCHAR(255);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_credentials_pending_email
     ON credentials(pending_email) WHERE pending_email IS NOT NULL;
 
+-- MFA TOTP (optionnelle, opt-in). mfa_enabled a un DÉFAUT → rétro-compatible
+-- (aucun backfill requis, règle 5b) : en PostgreSQL, ADD COLUMN ... DEFAULT false
+-- pose la valeur sur TOUTES les lignes existantes au déploiement → tous les
+-- comptes déjà en prod démarrent avec la MFA DÉSACTIVÉE (aucun verrouillage
+-- possible). NB : surtout pas d'UPDATE inconditionnel ici, il réinitialiserait
+-- la MFA des comptes qui l'auront activée à chaque redémarrage.
+-- mfa_secret est NULLABLE et contient le
+-- secret TOTP CHIFFRÉ at-rest (AES-256-GCM, clé MFA_ENCRYPTION_KEY) :
+--   - setup non confirmé  → secret présent + mfa_enabled = false
+--   - MFA active          → secret présent + mfa_enabled = true
+--   - MFA désactivée      → secret NULL    + mfa_enabled = false
+ALTER TABLE credentials ADD COLUMN IF NOT EXISTS mfa_enabled BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE credentials ADD COLUMN IF NOT EXISTS mfa_secret TEXT;
+
 -- Refresh tokens (préparé pour la feature bonus).
 CREATE TABLE IF NOT EXISTS refresh_tokens (
     id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -58,7 +72,7 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
 CREATE TABLE IF NOT EXISTS account_tokens (
     id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id     UUID NOT NULL REFERENCES credentials(id) ON DELETE CASCADE,
-    purpose     VARCHAR(16) NOT NULL CHECK (purpose IN ('verify', 'reset', 'email_change')),
+    purpose     VARCHAR(16) NOT NULL CHECK (purpose IN ('verify', 'reset', 'email_change', 'mfa_challenge')),
     token_hash  TEXT NOT NULL UNIQUE,
     expires_at  TIMESTAMPTZ NOT NULL,
     used_at     TIMESTAMPTZ,                    -- NULL tant que non consommé
@@ -69,7 +83,7 @@ CREATE TABLE IF NOT EXISTS account_tokens (
 -- contrainte à deux valeurs. La remplacer au boot est idempotent.
 ALTER TABLE account_tokens DROP CONSTRAINT IF EXISTS account_tokens_purpose_check;
 ALTER TABLE account_tokens ADD CONSTRAINT account_tokens_purpose_check
-    CHECK (purpose IN ('verify', 'reset', 'email_change'));
+    CHECK (purpose IN ('verify', 'reset', 'email_change', 'mfa_challenge'));
 
 -- ─── Connexion via fournisseurs externes (Google / GitHub / Facebook / Spotify) ──
 -- ALTER idempotents : la base existante est migrée au boot sans script externe.

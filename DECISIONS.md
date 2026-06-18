@@ -147,6 +147,44 @@
 - **Dev sans SMTP configuré = transport console** : le mailer logge le mail + le lien sur stdout au
   lieu d'envoyer (zéro dépendance Gmail en dev, on clique le lien depuis les logs).
 
+## MFA (double authentification TOTP, 18/06/2026)
+
+- **TOTP seul, opt-in, sans codes de secours (tranché avec l'utilisateur).** RFC 6238 via `pquerna/otp`,
+  compatible Microsoft/Google Authenticator/Authy. La MFA est **facultative** : un compte sans MFA conserve
+  le login inchangé. Périmètre volontairement réduit au TOTP — **pas de codes de secours** pour livrer/tester
+  vite. *Limite assumée :* perte du téléphone = verrouillage (la désactivation exige une session, donc un code) ;
+  un échappatoire (codes de secours, ou reset admin) est une évolution ultérieure.
+- **Secret TOTP chiffré at-rest (AES-256-GCM), clé hors-DB.** `credentials.mfa_secret` stocke le secret
+  **chiffré** sous `MFA_ENCRYPTION_KEY` (base64 32 o, `.env` racine, jamais en dur — règle 5). Une fuite de la
+  table ne livre donc aucun secret sans la clé. **Pattern « nil = MFA off »** (symétrique du mailer) : clé absente
+  → `mfaCipher` nil → endpoints `/auth/mfa/*` en 503, auth reste bootable. Schéma rétro-compatible (règle 5b) :
+  `mfa_enabled BOOL DEFAULT false` (aucun backfill) + `mfa_secret` nullable. États portés par le couple
+  (secret présent + `mfa_enabled`) : setup non confirmé / actif / désactivé (secret NULL).
+- **QR généré côté serveur (data URI), pas côté front.** `node_modules` du front est root-owned → interdiction
+  d'ajouter une dépendance npm (même contrainte que la roue chromatique maison). `key.Image()` de `pquerna/otp`
+  (via `boombuler/barcode`) rend le PNG ; `/auth/mfa/setup` renvoie `{secret, otpauth_url, qr_data_uri}` et le
+  front pose juste un `<img>`. Le `secret` permet la saisie manuelle si le QR n'est pas scannable.
+- **Login en deux temps via un challenge court, réutilisant `account_tokens`.** Quand `mfa_enabled`, le login
+  valide le mot de passe (et `email_verified`) mais **n'émet aucun JWT** : il crée un jeton `purpose='mfa_challenge'`
+  (TTL 5 min, opaque haché, même infra que verify/reset/email_change — CHECK étendu idempotemment) et renvoie
+  `{mfa_required, challenge}`. `POST /auth/mfa/verify` (**publique** : le challenge, preuve que le mot de passe est
+  déjà passé, tient lieu d'auth) valide le TOTP **avant** de consommer le challenge (lecture `FOR UPDATE`, validation,
+  puis `used_at` dans une transaction) → **un code faux ne brûle pas le challenge**, l'utilisateur réessaie dans la
+  fenêtre. `Login`/`LoginByUserID` renvoient désormais un `LoginOutcome` (session OU challenge) au lieu du quadruplet.
+- **Désactivation par code OU mot de passe ; activation confirmée par un code.** `enable` valide un premier TOTP
+  (preuve que le secret est bien enrôlé) avant `mfa_enabled=true`. `disable` accepte un TOTP courant **ou** le mot de
+  passe du compte (un compte OAuth sans mot de passe ne peut donc se désactiver qu'au TOTP). Validation TOTP avec
+  **skew ±1** (dérive d'horloge) et trim des espaces (saisie).
+- **MFA = login par mot de passe uniquement.** Les comptes OAuth s'authentifient via leur provider (2FA propre au
+  provider) et ne passent pas par `/auth/login` → la MFA Breezy ne s'y interpose pas. Cohérent avec « un datum, un
+  service » : le second facteur vit dans auth-service à côté des credentials.
+- **Front :** section « Sécurité » dans `/parametres` **au-dessus du mot de passe** (`MfaSettings` dans
+  `UserAccountSettings`), pilotée par un **interrupteur on/off style iOS** (markup partagé avec `visibility-settings`) :
+  off→on déploie le QR + le champ code, on→off déploie la confirmation (code/mot de passe) ; l'état coché ne bascule
+  qu'après confirmation côté serveur. Client `lib/mfa.ts` sur `apiFetch` (appels authentifiés directs à la gateway, aucun cookie
+  touché). Seuls login + `mfa/verify` passent par le BFF (cookie refresh) : `verify` pose le cookie et provisionne
+  comme le login normal. Écran de challenge intégré à la page login (bascule mot de passe → code). i18n FR/EN.
+
 ## Gateway
 
 - **Thin reverse proxy (stdlib).** Prefix→URL table, transparent forward, preserves prefix. Mince + "we built it"
