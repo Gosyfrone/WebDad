@@ -5,10 +5,11 @@ import { useEffect, useRef } from 'react'
 import { apiFetch, getAccessToken } from '@/lib/auth-client'
 
 const OFFLINE_ENDPOINT = '/api/activity/offline'
+const HEARTBEAT_MS = 25_000
 
 /**
  * Synchronise la présence avec le cycle de vie de l'onglet :
- * - montage / retour BFCache / retour premier plan : en ligne ;
+ * - montage / retour BFCache / retour premier plan : en ligne + heartbeat ;
  * - arrière-plan, fermeture, refresh, navigation dure : hors ligne.
  */
 export function ActivityLifecycle() {
@@ -38,6 +39,11 @@ export function ActivityLifecycle() {
     }
 
     void markOnline()
+    const heartbeat = window.setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        void markOnline()
+      }
+    }, HEARTBEAT_MS)
 
     function handlePageShow() {
       void markOnline()
@@ -60,6 +66,7 @@ export function ActivityLifecycle() {
       window.removeEventListener('pagehide', markOffline)
       window.removeEventListener('freeze', markOffline)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.clearInterval(heartbeat)
     }
   }, [])
 

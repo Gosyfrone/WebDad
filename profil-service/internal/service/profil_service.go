@@ -43,6 +43,8 @@ type ProfilService struct {
 	follows             FollowChecker
 }
 
+const onlineGracePeriod = 45 * time.Second
+
 // FollowChecker interroge le graphe social dans user-service : vérifie la
 // relation follower -> following et accepte en masse les demandes en attente
 // (quand un profil privé repasse public).
@@ -74,7 +76,12 @@ func New(repo *repository.ProfilRepository, displayNameCooldown time.Duration, o
 // GetByUserID retourne le profil public d'un utilisateur (404 si absent).
 func (s *ProfilService) GetByUserID(ctx context.Context, userID string) (*models.Profil, error) {
 	p, err := s.repo.GetByUserID(ctx, userID)
-	return mapGet(p, err)
+	p, err = mapGet(p, err)
+	if err != nil {
+		return nil, err
+	}
+	normalizeActivity(p, time.Now().UTC())
+	return p, nil
 }
 
 // Search retourne les profils dont le display_name contient `term` (insensible
@@ -85,7 +92,15 @@ func (s *ProfilService) Search(ctx context.Context, term string, limit int64) ([
 	if term == "" {
 		return []models.Profil{}, nil
 	}
-	return s.repo.SearchByDisplayName(ctx, regexp.QuoteMeta(term), limit)
+	profils, err := s.repo.SearchByDisplayName(ctx, regexp.QuoteMeta(term), limit)
+	if err != nil {
+		return nil, err
+	}
+	now := time.Now().UTC()
+	for i := range profils {
+		normalizeActivity(&profils[i], now)
+	}
+	return profils, nil
 }
 
 // Create est l'UNIQUE voie de création d'un profil (POST /profils). L'id vient
@@ -291,4 +306,13 @@ func mapGet(p *models.Profil, err error) (*models.Profil, error) {
 		return nil, err
 	}
 	return p, nil
+}
+
+func normalizeActivity(p *models.Profil, now time.Time) {
+	if p == nil || !p.IsOnline || p.LastLoginAt == nil {
+		return
+	}
+	if now.Sub(*p.LastLoginAt) > onlineGracePeriod {
+		p.IsOnline = false
+	}
 }
