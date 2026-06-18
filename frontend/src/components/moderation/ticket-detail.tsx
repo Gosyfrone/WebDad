@@ -2,21 +2,26 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, ArrowRightLeft, CheckCircle2, ExternalLink, Loader2, Lock, ShieldAlert, Trash2 } from 'lucide-react'
+import { ArrowLeft, ArrowRightLeft, Ban, CheckCircle2, ExternalLink, Loader2, Lock, ShieldAlert, Trash2 } from 'lucide-react'
 
 import {
   approveTicket,
   changeTicketStatus,
   getTicket,
+  getUserWarningCount,
+  issueWarning,
   recordTicketRemoval,
   replyTicket,
   transferTicket,
+  ReportApiError,
   type Ticket,
   type TicketStatus,
 } from '@/lib/reports'
+import { setUserBanned } from '@/lib/admin'
 import { deletePost, getPostById, type FeedPost } from '@/lib/posts'
 import { moderateDeleteMessage } from '@/lib/messages'
 import { resolveUser, type ResolvedUser } from '@/lib/user-cache'
+import { useSession } from '@/lib/session'
 import { postHref, profilHref } from '@/lib/routes'
 import { timeAgo } from '@/lib/utils'
 import { useLanguage } from '@/components/language-provider'
@@ -28,6 +33,14 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 
 interface TicketDetailProps {
   ticketId: string
@@ -59,6 +72,7 @@ const STATUS_VARIANT: Record<TicketStatus, 'secondary' | 'destructive' | 'outlin
 export function TicketDetail({ ticketId, canTransfer, onBack, onChanged }: TicketDetailProps) {
   const { t, locale } = useLanguage()
   const { toast } = useToast()
+  const session = useSession()
   useNow() // re-render chaque seconde → durées relatives (timeAgo) qui s'incrémentent
   const [ticket, setTicket] = useState<Ticket | null>(null)
   const [people, setPeople] = useState<Record<string, ResolvedUser>>({})
@@ -71,6 +85,17 @@ export function TicketDetail({ ticketId, canTransfer, onBack, onChanged }: Ticke
   const [messageRemoved, setMessageRemoved] = useState(false)
   const [authorId, setAuthorId] = useState<string | null>(null)
   const [warnOpen, setWarnOpen] = useState(false)
+  // Message pré-rempli de la modale d'avertissement (justification d'un retrait).
+  const [warnDefault, setWarnDefault] = useState('')
+  // La modale d'avertissement est en mode « retrait » : valider = supprimer + avertir
+  // + clôturer (atomique) ; sinon simple avertissement.
+  const [pendingDelete, setPendingDelete] = useState(false)
+  // Profil de risque de l'utilisateur ciblé : nb total d'avertissements reçus.
+  const [warningCount, setWarningCount] = useState<number | null>(null)
+  // Garde-fou de clôture (aucune action posée) et confirmation de bannissement.
+  const [closeConfirmOpen, setCloseConfirmOpen] = useState(false)
+  const [banConfirmOpen, setBanConfirmOpen] = useState(false)
+  const [banning, setBanning] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -78,22 +103,27 @@ export function TicketDetail({ ticketId, canTransfer, onBack, onChanged }: Ticke
       const tk = await getTicket(ticketId)
       setTicket(tk)
       // Résout les identités (auteurs des signalements + modérateurs + l'utilisateur
-      // ciblé quand l'entité EST un profil → lien « voir » + nom de la cible).
+      // ciblé pour l'encart « profil de risque » → nom + avatar). Le propriétaire de
+      // l'entité (`entity_owner_id`) est inclus quand il est connu.
       const ids = Array.from(
-        new Set([
-          ...tk.reports.map((r) => r.reporterId),
-          ...tk.actions.map((a) => a.moderatorId),
-          ...(tk.entityType === 'profile' ? [tk.entityId] : []),
-        ]),
+        new Set(
+          [
+            ...tk.reports.map((r) => r.reporterId),
+            ...tk.actions.map((a) => a.moderatorId),
+            ...(tk.entityType === 'profile' ? [tk.entityId] : []),
+            tk.entityOwnerId,
+          ].filter(Boolean),
+        ),
       )
       const resolved = await Promise.all(ids.map((id) => resolveUser(id)))
-      setPeople(Object.fromEntries(ids.map((id, i) => [id, resolved[i]])))
+      const peopleMap: Record<string, ResolvedUser> = Object.fromEntries(ids.map((id, i) => [id, resolved[i]]))
+      setPeople(peopleMap)
 
       // Cible de l'avertissement : le propriétaire de l'entité, capturé AU
       // signalement (`entity_owner_id`) → robuste, indépendant d'une relecture du
       // post (qui peut être masqué/supprimé) et disponible aussi pour les messages.
       // Repli pour d'anciens tickets sans ce champ : profil → l'id, post → auteur récupéré.
-      const owner = tk.entityOwnerId || (tk.entityType === 'profile' ? tk.entityId : '')
+      let owner = tk.entityOwnerId || (tk.entityType === 'profile' ? tk.entityId : '')
       setAuthorId(owner || null)
 
       // Chargement du CONTENU original (affichage) pour un ticket de post.
@@ -101,7 +131,20 @@ export function TicketDetail({ ticketId, canTransfer, onBack, onChanged }: Ticke
         const p = await getPostById(tk.entityId).catch(() => null)
         setPost(p)
         setPostMissing(p === null)
-        if (!owner) setAuthorId(p?.author.id ?? null) // repli si owner non stocké
+        if (!owner) {
+          owner = p?.author.id ?? '' // repli si owner non stocké
+          setAuthorId(owner || null)
+        }
+      }
+
+      // Profil de risque : identité de la cible (si pas déjà résolue) + nombre
+      // d'avertissements déjà reçus.
+      if (owner) {
+        if (!peopleMap[owner]) {
+          peopleMap[owner] = await resolveUser(owner)
+          setPeople({ ...peopleMap })
+        }
+        setWarningCount(await getUserWarningCount(owner).catch(() => null))
       }
     } catch {
       toast({ title: t('tickets.error'), variant: 'brand' })
@@ -117,6 +160,7 @@ export function TicketDetail({ ticketId, canTransfer, onBack, onChanged }: Ticke
     setPostMissing(false)
     setMessageRemoved(false)
     setAuthorId(null)
+    setWarningCount(null)
     void load()
   }, [load])
 
@@ -171,50 +215,94 @@ export function TicketDetail({ ticketId, canTransfer, onBack, onChanged }: Ticke
       setTicket(await approveTicket(ticket.id))
       toast({ title: t('tickets.approved') })
       onChanged?.()
-    } catch {
-      toast({ title: t('tickets.action_failed'), variant: 'brand' })
+    } catch (err) {
+      // Backstop du garde-fou serveur : 409 si une sanction a déjà été posée.
+      const conflict = err instanceof ReportApiError && err.status === 409
+      toast({ title: conflict ? t('tickets.cannot_approve_actioned') : t('tickets.action_failed'), variant: 'brand' })
+      if (conflict) await load() // resynchronise (l'action manquait côté front)
     } finally {
       setBusy(false)
     }
   }
 
-  // Retrait du contenu : suppression douce côté post-service (→ « Tweets
-  // supprimés »). Réservé aux tickets de publication. On JOURNALISE le retrait
-  // dans le ticket, mais on NE clôt PAS : la clôture reste manuelle.
-  async function onSoftDelete() {
-    if (!ticket || ticket.entityType !== 'post') return
-    setBusy(true)
-    try {
-      await deletePost(ticket.entityId)
-      setTicket(await recordTicketRemoval(ticket.id))
-      setPost(null)
-      setPostMissing(true)
-      toast({ title: t('tickets.post_removed') })
-      onChanged?.()
-    } catch {
-      toast({ title: t('tickets.action_failed'), variant: 'brand' })
-    } finally {
-      setBusy(false)
-    }
+  // Ouvre la modale d'avertissement SIMPLE (avertir, sans autre effet).
+  function openWarn(defaultMessage = '') {
+    setPendingDelete(false)
+    setWarnDefault(defaultMessage)
+    setWarnOpen(true)
   }
 
-  // Retrait d'un message signalé (DM/groupe) par la modération : tombstone côté
-  // message-service (« supprimé par la modération », diffusé aux participants),
-  // puis JOURNALISATION du retrait dans le ticket. On NE clôt PAS : la clôture
-  // reste manuelle. E2EE préservé : le serveur ne lit pas le contenu.
-  async function onModerateDeleteMessage() {
+  // Lance un RETRAIT de contenu : ouvre la modale d'avertissement en mode « retrait ».
+  // RIEN n'est supprimé tant que le modérateur n'a pas validé → Annuler = aucun effet.
+  function openRemovalWarn() {
     if (!ticket) return
-    setBusy(true)
+    setPendingDelete(true)
+    setWarnDefault(
+      ticket.entityType === 'post'
+        ? t('tickets.warn_after_delete_post')
+        : t('tickets.warn_after_delete_message'),
+    )
+    setWarnOpen(true)
+  }
+
+  // Validation du mode « retrait » : suppression du contenu → journal du retrait →
+  // avertissement de l'auteur → CLÔTURE automatique. Exécutée seulement à la
+  // confirmation de la modale (jamais au simple clic sur « Supprimer »).
+  // IDEMPOTENT : chaque étape est sautée si déjà journalisée → après un échec
+  // partiel (ex. avertissement KO), un nouvel essai NE redéclenche PAS la
+  // suppression ni un second avertissement ; il ne complète que ce qui manque.
+  async function handleRemovalConfirm(message: string) {
+    if (!ticket) return
     try {
-      await moderateDeleteMessage(ticket.entityId)
-      setTicket(await recordTicketRemoval(ticket.id))
-      setMessageRemoved(true)
-      toast({ title: t('tickets.message_removed') })
+      let current = ticket
+      // 1) Retrait effectif du contenu — sauté si déjà retiré (`content_removed`).
+      if (!current.actions.some((a) => a.type === 'content_removed')) {
+        if (current.entityType === 'post') {
+          await deletePost(current.entityId) // suppression douce → « Tweets supprimés »
+          setPost(null)
+          setPostMissing(true)
+        } else {
+          await moderateDeleteMessage(current.entityId) // tombstone E2EE-safe (serveur aveugle)
+          setMessageRemoved(true)
+        }
+        current = await recordTicketRemoval(current.id) // journalise `content_removed`
+        setTicket(current)
+      }
+      // 2) Avertissement de l'auteur — sauté s'il a déjà été averti (`warned`). On
+      //    relit le ticket pour capter l'action `warned` (sinon un retry clôture-KO
+      //    renverrait un second avertissement).
+      if (authorId && !current.actions.some((a) => a.type === 'warned')) {
+        await issueWarning({ targetUserId: authorId, ticketId: current.id, message })
+        current = await getTicket(current.id)
+        setTicket(current)
+      }
+      // 3) Clôture automatique du ticket.
+      setTicket(await changeTicketStatus(current.id, 'closed'))
+      toast({ title: t('tickets.removed_and_closed') })
       onChanged?.()
-    } catch {
+    } catch (err) {
+      // Message propre au RETRAIT (≠ « avertissement » de WarnDialog). On relance pour
+      // que la modale reste ouverte → l'essai suivant reprend là où il s'est arrêté.
       toast({ title: t('tickets.action_failed'), variant: 'brand' })
+      throw err
+    }
+  }
+
+  // Bannissement de l'utilisateur ciblé depuis le ticket (réutilise l'orchestration
+  // auth+user de l'annuaire). Un modérateur ne peut bannir qu'un utilisateur simple :
+  // le back renvoie 403 si la cible est mod/admin → message dédié.
+  async function onBan() {
+    if (!authorId) return
+    setBanning(true)
+    try {
+      await setUserBanned(authorId, true)
+      toast({ title: t('tickets.user_banned') })
+      setBanConfirmOpen(false)
+    } catch (err) {
+      const restricted = (err as { status?: number })?.status === 403
+      toast({ title: restricted ? t('moderation.ban_restricted') : t('tickets.action_failed'), variant: 'brand' })
     } finally {
-      setBusy(false)
+      setBanning(false)
     }
   }
 
@@ -236,6 +324,19 @@ export function TicketDetail({ ticketId, canTransfer, onBack, onChanged }: Ticke
         .sort((a, b) => b[1] - a[1])
         .slice(0, 3)
     : []
+
+  // Une sanction (retrait du contenu ou avertissement) a déjà été posée → on ne
+  // peut plus « valider » l'entité comme conforme (miroir du garde-fou serveur).
+  const hasSanction = !!ticket?.actions.some(
+    (a) => a.type === 'content_removed' || a.type === 'warned',
+  )
+  // Le contenu a déjà été retiré par la modération (journal) — un modérateur VOIT
+  // encore les posts masqués, donc `postMissing` ne suffit pas : on s'appuie sur le
+  // journal pour ne pas re-proposer « Supprimer » sur un contenu déjà retiré.
+  const alreadyRemoved = !!ticket?.actions.some((a) => a.type === 'content_removed')
+  // Bannissement possible sur la cible, sauf soi-même (l'accès au panneau est déjà
+  // réservé mod/admin ; le back borne les cibles selon le rôle de l'acteur).
+  const canBan = !!authorId && authorId !== session?.userId
 
   return (
     <div className="flex flex-col">
@@ -294,6 +395,39 @@ export function TicketDetail({ ticketId, canTransfer, onBack, onChanged }: Ticke
               </div>
             )}
           </div>
+
+          {/* Profil de risque de l'utilisateur ciblé : antécédents (nb d'avertissements)
+              + action de bannissement directe depuis le ticket. */}
+          {authorId && (
+            <div className="flex flex-col gap-2 rounded-xl border p-3">
+              <div className="flex items-center gap-2">
+                <ShieldAlert className="h-4 w-4 shrink-0 text-[#5B6CFF]" aria-hidden />
+                <span className="text-sm font-bold">{t('tickets.target_user')}</span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Avatar className="h-8 w-8 shrink-0">
+                  {people[authorId]?.avatarUrl && <AvatarImage src={people[authorId].avatarUrl} alt="" />}
+                  <AvatarFallback>{(nameOf(authorId) || 'U').charAt(0).toUpperCase()}</AvatarFallback>
+                </Avatar>
+                <span className="truncate text-sm font-semibold">{nameOf(authorId)}</span>
+                <Badge variant={warningCount && warningCount > 0 ? 'destructive' : 'secondary'} className="text-[10px]">
+                  {t('tickets.warning_count', { count: warningCount ?? 0 })}
+                </Badge>
+                {canBan && (
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    disabled={busy || banning}
+                    onClick={() => setBanConfirmOpen(true)}
+                    className="ml-auto shrink-0"
+                  >
+                    <Ban className="mr-1.5 h-4 w-4" aria-hidden />
+                    {t('tickets.ban_user')}
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Contenu original signalé — pour juger sur pièce. */}
           <section className="flex flex-col gap-2">
@@ -408,6 +542,8 @@ export function TicketDetail({ ticketId, canTransfer, onBack, onChanged }: Ticke
                     <p className="text-muted-foreground">{t('tickets.action.auto_hidden')}</p>
                   ) : a.type === 'approved' ? (
                     <p className="text-muted-foreground">{t('tickets.action.approved')}</p>
+                  ) : a.type === 'warned' ? (
+                    <p className="text-muted-foreground">{t('tickets.action.warned')}</p>
                   ) : (
                     <p className="text-muted-foreground">{t('tickets.action.transfer')}</p>
                   )}
@@ -443,13 +579,25 @@ export function TicketDetail({ ticketId, canTransfer, onBack, onChanged }: Ticke
                 {t('tickets.set_open')}
               </Button>
             ) : (
-              <Button variant="outline" size="sm" disabled={busy} onClick={() => void onStatus('closed')}>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={busy}
+                // Garde-fou : clôturer un ticket de modération SANS aucune sanction
+                // demande confirmation (« non fondé ? ») ; sinon clôture directe.
+                onClick={() =>
+                  ticket.category === 'moderation' && !hasSanction
+                    ? setCloseConfirmOpen(true)
+                    : void onStatus('closed')
+                }
+              >
                 {t('tickets.set_closed')}
               </Button>
             )}
 
-            {/* Valider : l'entité est conforme (ne doit pas être signalée). */}
-            {ticket.category === 'moderation' && (
+            {/* Valider : l'entité est conforme (ne doit pas être signalée). Masqué
+                dès qu'une sanction a été posée (retrait/avertissement) → cohérence. */}
+            {ticket.category === 'moderation' && !hasSanction && (
               <Button variant="outline" size="sm" disabled={busy} onClick={() => void onApprove()} className="text-emerald-600">
                 <CheckCircle2 className="mr-1.5 h-4 w-4" />
                 {t('tickets.approve')}
@@ -457,21 +605,21 @@ export function TicketDetail({ ticketId, canTransfer, onBack, onChanged }: Ticke
             )}
 
             {authorId && (
-              <Button variant="outline" size="sm" disabled={busy} onClick={() => setWarnOpen(true)}>
+              <Button variant="outline" size="sm" disabled={busy} onClick={() => openWarn()}>
                 <ShieldAlert className="mr-1.5 h-4 w-4" />
                 {t('tickets.warn')}
               </Button>
             )}
 
-            {ticket.entityType === 'post' && !postMissing && (
-              <Button variant="outline" size="sm" disabled={busy} onClick={() => void onSoftDelete()} className="text-destructive">
+            {ticket.entityType === 'post' && !postMissing && !alreadyRemoved && (
+              <Button variant="outline" size="sm" disabled={busy} onClick={openRemovalWarn} className="text-destructive">
                 <Trash2 className="mr-1.5 h-4 w-4" />
                 {t('post.delete')}
               </Button>
             )}
 
-            {(ticket.entityType === 'message' || ticket.entityType === 'group_message') && !messageRemoved && (
-              <Button variant="outline" size="sm" disabled={busy} onClick={() => void onModerateDeleteMessage()} className="text-destructive">
+            {(ticket.entityType === 'message' || ticket.entityType === 'group_message') && !messageRemoved && !alreadyRemoved && (
+              <Button variant="outline" size="sm" disabled={busy} onClick={openRemovalWarn} className="text-destructive">
                 <Trash2 className="mr-1.5 h-4 w-4" />
                 {t('tickets.delete_message')}
               </Button>
@@ -489,8 +637,65 @@ export function TicketDetail({ ticketId, canTransfer, onBack, onChanged }: Ticke
       )}
 
       {authorId && (
-        <WarnDialog open={warnOpen} onOpenChange={setWarnOpen} targetUserId={authorId} ticketId={ticket?.id} />
+        <WarnDialog
+          open={warnOpen}
+          onOpenChange={setWarnOpen}
+          targetUserId={authorId}
+          ticketId={ticket?.id}
+          defaultMessage={warnDefault}
+          // Mode « retrait » : la validation supprime + avertit + clôture, de façon
+          // atomique (le contenu n'est touché qu'ici). Sinon, simple avertissement.
+          title={pendingDelete ? t('tickets.delete_warn_title') : undefined}
+          description={pendingDelete ? t('tickets.delete_warn_desc') : undefined}
+          confirmLabel={pendingDelete ? t('tickets.delete_and_warn') : undefined}
+          onConfirm={pendingDelete ? handleRemovalConfirm : undefined}
+          onSubmitted={() => void load()}
+        />
       )}
+
+      {/* Garde-fou de clôture : aucune sanction posée → confirmer « non fondé ». */}
+      <Dialog open={closeConfirmOpen} onOpenChange={setCloseConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('tickets.close_confirm_title')}</DialogTitle>
+            <DialogDescription>{t('tickets.close_confirm_desc')}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCloseConfirmOpen(false)} disabled={busy}>
+              {t('common.cancel')}
+            </Button>
+            <Button
+              onClick={() => {
+                setCloseConfirmOpen(false)
+                void onStatus('closed')
+              }}
+              disabled={busy}
+            >
+              {t('tickets.close_confirm_submit')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirmation de bannissement de l'utilisateur ciblé. */}
+      <Dialog open={banConfirmOpen} onOpenChange={(open) => !banning && setBanConfirmOpen(open)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('tickets.ban_confirm_title')}</DialogTitle>
+            <DialogDescription>
+              {t('tickets.ban_confirm_desc', { name: authorId ? nameOf(authorId) : '' })}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBanConfirmOpen(false)} disabled={banning}>
+              {t('common.cancel')}
+            </Button>
+            <Button variant="destructive" onClick={() => void onBan()} disabled={banning}>
+              {banning ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : t('tickets.ban_user')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

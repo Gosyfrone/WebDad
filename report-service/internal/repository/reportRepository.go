@@ -284,6 +284,12 @@ func (r *ReportRepository) CreateWarning(ctx context.Context, w *models.Warning)
 	return w, nil
 }
 
+// CountWarnings renvoie le nombre TOTAL d'avertissements reçus par un utilisateur
+// (acquittés ou non) — sert au « profil de risque » affiché côté modération.
+func (r *ReportRepository) CountWarnings(ctx context.Context, userID string) (int64, error) {
+	return r.warnings.CountDocuments(ctx, bson.M{"target_user_id": userID})
+}
+
 // PendingWarnings renvoie les avertissements non acquittés d'un utilisateur,
 // du plus ancien au plus récent (on affiche d'abord le plus vieux).
 func (r *ReportRepository) PendingWarnings(ctx context.Context, userID string) ([]models.Warning, error) {

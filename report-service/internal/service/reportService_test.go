@@ -57,3 +57,33 @@ func TestTextLimits(t *testing.T) {
 		t.Errorf("comptage runes = %d, attendu 255", len([]rune(accented)))
 	}
 }
+
+// TestHasBlockingSanction couvre le garde-fou de la validation : une entité
+// déjà sanctionnée (contenu retiré ou auteur averti) ne peut plus être jugée
+// conforme. Les autres actions (réponse, changement de statut…) ne bloquent pas.
+func TestHasBlockingSanction(t *testing.T) {
+	cases := []struct {
+		name  string
+		types []string
+		want  bool
+	}{
+		{"aucune action", nil, false},
+		{"contenu retiré", []string{models.ActionContentRemoved}, true},
+		{"auteur averti", []string{models.ActionWarned}, true},
+		{"retrait après réponse", []string{models.ActionReply, models.ActionContentRemoved}, true},
+		{"réponse seule", []string{models.ActionReply}, false},
+		{"changement de statut seul", []string{models.ActionStatusChange}, false},
+		{"auto-masquage seul ne bloque pas", []string{models.ActionAutoHidden}, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			actions := make([]models.Action, len(tc.types))
+			for i, ty := range tc.types {
+				actions[i] = models.Action{Type: ty}
+			}
+			if got := hasBlockingSanction(actions); got != tc.want {
+				t.Errorf("hasBlockingSanction(%v) = %v, attendu %v", tc.types, got, tc.want)
+			}
+		})
+	}
+}

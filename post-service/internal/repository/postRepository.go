@@ -351,15 +351,39 @@ func (r *PostRepository) SetAutoHidden(ctx context.Context, id bson.ObjectID, hi
 	return &post, nil
 }
 
+// HiddenFilter borne la corbeille de modération : auteur et/ou plage de date de
+// retrait (`hidden_at`). Champs vides/nil = pas de contrainte (corbeille entière).
+type HiddenFilter struct {
+	AuthorID string
+	Since    *time.Time
+	Until    *time.Time
+}
+
 // ListHidden renvoie les posts masqués (corbeille de modération, partagée
-// mod/admin), du plus récemment masqué au plus ancien, paginés.
-func (r *PostRepository) ListHidden(ctx context.Context, limit, skip int64) ([]models.Post, error) {
+// mod/admin), du plus récemment masqué au plus ancien, paginés et filtrés
+// (auteur + plage de date de retrait).
+func (r *PostRepository) ListHidden(ctx context.Context, f HiddenFilter, limit, skip int64) ([]models.Post, error) {
+	filter := bson.M{"is_hidden": true}
+	if f.AuthorID != "" {
+		filter["author_id"] = f.AuthorID
+	}
+	if f.Since != nil || f.Until != nil {
+		rng := bson.M{}
+		if f.Since != nil {
+			rng["$gte"] = *f.Since
+		}
+		if f.Until != nil {
+			rng["$lte"] = *f.Until
+		}
+		filter["hidden_at"] = rng
+	}
+
 	opts := options.Find().
 		SetSort(bson.D{{Key: "hidden_at", Value: -1}}).
 		SetLimit(limit).
 		SetSkip(skip)
 
-	cursor, err := r.posts.Find(ctx, bson.M{"is_hidden": true}, opts)
+	cursor, err := r.posts.Find(ctx, filter, opts)
 	if err != nil {
 		return nil, err
 	}

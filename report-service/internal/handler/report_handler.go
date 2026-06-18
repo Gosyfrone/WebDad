@@ -241,6 +241,7 @@ func (h *ReportHandler) Transfer(c *gin.Context) {
 // @Param    id path string true "Ticket ID"
 // @Success  200 {object} map[string]interface{} "data: ticket"
 // @Failure  404 {object} map[string]string
+// @Failure  409 {object} map[string]string "une sanction a déjà été appliquée"
 // @Router   /reports/tickets/{id}/approve [post]
 func (h *ReportHandler) Approve(c *gin.Context) {
 	claims, _ := middleware.ClaimsFrom(c)
@@ -370,6 +371,25 @@ func (h *ReportHandler) AckWarning(c *gin.Context) {
 		return
 	}
 	c.Status(http.StatusNoContent)
+}
+
+// UserWarningCount : GET /reports/users/:id/warnings/count — nombre total
+// d'avertissements reçus par un utilisateur (profil de risque côté modération).
+// @Summary  Nombre d'avertissements d'un utilisateur
+// @Tags     reports
+// @Produce  json
+// @Security BearerAuth
+// @Param    id path string true "User ID"
+// @Success  200 {object} map[string]interface{} "data: { count }"
+// @Failure  400 {object} map[string]string
+// @Router   /reports/users/{id}/warnings/count [get]
+func (h *ReportHandler) UserWarningCount(c *gin.Context) {
+	count, err := h.service.WarningCount(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": gin.H{"count": count}})
 }
 
 // parseTime lit une date RFC3339 (filtres temporels). nil si vide/invalide.

@@ -28,6 +28,10 @@ var (
 	// ErrReportingLocked : l'entité a été jugée conforme par la modération
 	// (ticket `approved`) → tout nouveau signalement est refusé (verrou définitif) → 409.
 	ErrReportingLocked = errors.New("cet élément a été validé par la modération et ne peut plus être signalé")
+	// ErrAlreadyActioned : une sanction (retrait du contenu ou avertissement) a déjà
+	// été posée sur le ticket → on ne peut plus le « valider » comme conforme
+	// (décisions contradictoires) → 409.
+	ErrAlreadyActioned = errors.New("une sanction a déjà été appliquée : validation impossible")
 )
 
 // Bornes de la liste de tickets.
@@ -202,6 +206,18 @@ func (s *ReportService) maybeAutoHide(ctx context.Context, t *models.Ticket) {
 	s.posts.AutoHide(t.EntityID)
 }
 
+// hasBlockingSanction indique qu'une sanction TERMINALE pour la validation a déjà
+// été posée sur le ticket (retrait du contenu ou avertissement de l'auteur) : on
+// ne peut alors plus juger l'entité « conforme » (décisions contradictoires).
+func hasBlockingSanction(actions []models.Action) bool {
+	for _, a := range actions {
+		if a.Type == models.ActionContentRemoved || a.Type == models.ActionWarned {
+			return true
+		}
+	}
+	return false
+}
+
 // Approve marque une entité comme CONFORME (décision terminale du modérateur) :
 // statut → approved, action tracée, démasquage du post si auto-masqué, et verrou
 // de re-signalement (toute tentative ultérieure est refusée, cf. CreateReport).
@@ -209,6 +225,18 @@ func (s *ReportService) Approve(ctx context.Context, id, moderatorID string) (*m
 	oid, err := bson.ObjectIDFromHex(id)
 	if err != nil {
 		return nil, ErrInvalidID
+	}
+	// Garde-fou : valider (« conforme ») contredit une sanction déjà posée — on
+	// refuse si le contenu a été retiré ou l'auteur averti sur ce ticket.
+	current, err := s.repo.GetTicket(ctx, oid)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	if hasBlockingSanction(current.Actions) {
+		return nil, ErrAlreadyActioned
 	}
 	action := models.Action{ModeratorID: moderatorID, Type: models.ActionApproved, CreatedAt: time.Now()}
 	t, err := s.repo.AddAction(ctx, oid, action, bson.M{"status": models.StatusApproved, "reports_since_closed": int32(0)})
@@ -359,15 +387,40 @@ func (s *ReportService) IssueWarning(ctx context.Context, issuedBy, targetUserID
 	if targetUserID == "" || message == "" || len([]rune(message)) > models.MaxWarningMessage {
 		return nil, ErrValidation
 	}
+	ticketID = strings.TrimSpace(ticketID)
 	w := &models.Warning{
 		TargetUserID: targetUserID,
-		TicketID:     strings.TrimSpace(ticketID),
+		TicketID:     ticketID,
 		Message:      message,
 		IssuedBy:     issuedBy,
 		Acknowledged: false,
 		CreatedAt:    time.Now(),
 	}
-	return s.repo.CreateWarning(ctx, w)
+	created, err := s.repo.CreateWarning(ctx, w)
+	if err != nil {
+		return nil, err
+	}
+	// Avertissement émis DEPUIS un ticket → on le journalise (`warned`) pour que le
+	// ticket soit auto-descriptif : trace de la sanction (cf. garde-fou Approve) et
+	// affichage dans le journal des actions. Best-effort : un id de ticket invalide
+	// ou un ticket disparu n'invalide pas l'avertissement, déjà créé.
+	if ticketID != "" {
+		if oid, oerr := bson.ObjectIDFromHex(ticketID); oerr == nil {
+			action := models.Action{ModeratorID: issuedBy, Type: models.ActionWarned, CreatedAt: time.Now()}
+			_, _ = s.repo.AddAction(ctx, oid, action, nil)
+		}
+	}
+	return created, nil
+}
+
+// WarningCount renvoie le nombre total d'avertissements reçus par un utilisateur
+// (profil de risque côté modération).
+func (s *ReportService) WarningCount(ctx context.Context, userID string) (int64, error) {
+	userID = strings.TrimSpace(userID)
+	if userID == "" {
+		return 0, ErrValidation
+	}
+	return s.repo.CountWarnings(ctx, userID)
 }
 
 // PendingWarnings renvoie les avertissements non acquittés de l'utilisateur.

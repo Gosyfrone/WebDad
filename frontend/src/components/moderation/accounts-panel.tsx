@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { Loader2, MoreVertical, Search } from 'lucide-react'
+import { Loader2, MoreHorizontal, Search } from 'lucide-react'
 
 import {
   hardDeleteUser,
@@ -32,8 +32,10 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import type { UserRole } from '@/types'
@@ -216,6 +218,11 @@ export function AccountsPanel({ canGovern }: AccountsPanelProps) {
             // Un modérateur ne peut bannir qu'un utilisateur simple (le back le
             // refuse aussi). Un admin agit sur tout le monde sauf lui-même.
             const banAllowed = !isSelf && (canGovern || user.role === 'user')
+            // Gouvernance (rôle + effacement) = admin, sauf sur soi-même.
+            const canChangeRole = canGovern && !isSelf
+            const canErase = canGovern && !isSelf
+            // Au moins une action disponible → on affiche la bulle « … ».
+            const hasActions = canChangeRole || banAllowed || canErase
             const initial = initialOf(user.displayName, user.username || user.email)
             return (
               <li
@@ -255,132 +262,79 @@ export function AccountsPanel({ canGovern }: AccountsPanelProps) {
                   )}
                 </div>
 
+                {/* Rôle élevé en badge (utilisateur simple → juste le statut). */}
+                {user.role !== 'user' && (
+                  <Badge variant="outline" className="shrink-0 text-[10px]">
+                    {t(`role.${user.role}`)}
+                  </Badge>
+                )}
+
                 {/* État du compte */}
                 <Badge variant={user.isActive ? 'secondary' : 'destructive'} className="shrink-0">
                   {user.isActive ? t('admin.status_active') : t('admin.status_banned')}
                 </Badge>
 
-                {/* Actions inline (desktop) : rôle + bannir + supprimer. Sur mobile
-                    elles sont regroupées dans le menu kebab (cf. plus bas) pour ne
-                    pas déborder du cadre étroit. */}
-                <div className="hidden items-center gap-2 lg:flex">
-                  {/* Changement de rôle — gouvernance (admin uniquement) */}
-                  {canGovern && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={isSelf || busy}
-                          className="shrink-0"
-                        >
-                          {t(`role.${user.role}`)}
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="panel border">
-                        {ROLES.map((role) => (
-                          <DropdownMenuItem
-                            key={role}
-                            disabled={role === user.role}
-                            onSelect={() => void onChangeRole(user, role)}
-                          >
-                            {t(`role.${role}`)}
-                          </DropdownMenuItem>
-                        ))}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
-
-                  {/* Bannir / réactiver — modération (mod + admin, cibles bornées) */}
-                  <Button
-                    variant={user.isActive ? 'destructive' : 'outline'}
-                    size="sm"
-                    disabled={!banAllowed || busy}
-                    onClick={() => void onToggleBan(user)}
-                    className="shrink-0"
-                    title={!banAllowed && !isSelf ? t('moderation.ban_restricted') : undefined}
-                  >
-                    {busy ? (
-                      <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-                    ) : user.isActive ? (
-                      t('admin.action_ban')
-                    ) : (
-                      t('admin.action_unban')
-                    )}
-                  </Button>
-
-                  {/* Suppression définitive du compte (RGPD) — gouvernance admin,
-                      effacement cross-service avec confirmation par re-saisie. */}
-                  {canGovern && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      disabled={isSelf || busy}
-                      onClick={() => openErase(user)}
-                      className="shrink-0 text-destructive hover:text-destructive"
-                      title={t('moderation.account_delete')}
-                    >
-                      {t('moderation.account_delete')}
-                    </Button>
-                  )}
-                </div>
-
-                {/* Menu kebab (mobile) : regroupe rôle / bannir / supprimer pour
-                    tenir dans la largeur du téléphone (aucun bouton hors champ). */}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      disabled={busy}
-                      aria-label={t('moderation.account_actions')}
-                      className="shrink-0 lg:hidden"
-                    >
-                      {busy ? (
-                        <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-                      ) : (
-                        <MoreVertical className="h-4 w-4" aria-hidden />
-                      )}
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="panel border">
-                    {/* Rôle — gouvernance (admin uniquement) */}
-                    {canGovern && (
-                      <>
-                        <DropdownMenuLabel>{t('moderation.role_label')}</DropdownMenuLabel>
-                        {ROLES.map((role) => (
-                          <DropdownMenuItem
-                            key={role}
-                            disabled={role === user.role || isSelf}
-                            onSelect={() => void onChangeRole(user, role)}
-                          >
-                            {t(`role.${role}`)}
-                          </DropdownMenuItem>
-                        ))}
-                        <DropdownMenuSeparator />
-                      </>
-                    )}
-
-                    {/* Bannir / réactiver */}
-                    <DropdownMenuItem
-                      disabled={!banAllowed}
-                      onSelect={() => void onToggleBan(user)}
-                    >
-                      {user.isActive ? t('admin.action_ban') : t('admin.action_unban')}
-                    </DropdownMenuItem>
-
-                    {/* Suppression définitive (RGPD) — gouvernance admin */}
-                    {canGovern && (
-                      <DropdownMenuItem
-                        disabled={isSelf}
-                        onSelect={() => openErase(user)}
-                        className="text-destructive focus:text-destructive"
+                {/* Toutes les actions repliées dans une bulle « … » → ligne compacte
+                    sur mobile comme desktop (plus de débordement à droite). */}
+                {hasActions && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        disabled={busy}
+                        className="h-8 w-8 shrink-0"
+                        aria-label={t('accounts.actions')}
                       >
-                        {t('moderation.account_delete')}
-                      </DropdownMenuItem>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                        {busy ? (
+                          <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                        ) : (
+                          <MoreHorizontal className="h-4 w-4" aria-hidden />
+                        )}
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="panel border">
+                      {/* Changement de rôle — gouvernance (admin) */}
+                      {canChangeRole && (
+                        <DropdownMenuSub>
+                          <DropdownMenuSubTrigger>{t('admin.change_role')}</DropdownMenuSubTrigger>
+                          <DropdownMenuSubContent className="panel border">
+                            {ROLES.map((role) => (
+                              <DropdownMenuItem
+                                key={role}
+                                disabled={role === user.role}
+                                onSelect={() => void onChangeRole(user, role)}
+                              >
+                                {t(`role.${role}`)}
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuSubContent>
+                        </DropdownMenuSub>
+                      )}
+
+                      {/* Bannir / réactiver — modération (mod + admin, cibles bornées) */}
+                      {banAllowed && (
+                        <DropdownMenuItem onSelect={() => void onToggleBan(user)}>
+                          {user.isActive ? t('admin.action_ban') : t('admin.action_unban')}
+                        </DropdownMenuItem>
+                      )}
+
+                      {/* Suppression définitive du compte (RGPD) — gouvernance admin,
+                          effacement cross-service avec confirmation par re-saisie. */}
+                      {canErase && (
+                        <>
+                          {(canChangeRole || banAllowed) && <DropdownMenuSeparator />}
+                          <DropdownMenuItem
+                            onSelect={() => openErase(user)}
+                            className="text-destructive focus:text-destructive"
+                          >
+                            {t('moderation.account_delete')}
+                          </DropdownMenuItem>
+                        </>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
               </li>
             )
           })}

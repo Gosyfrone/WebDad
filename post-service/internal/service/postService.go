@@ -477,11 +477,11 @@ func (s *PostService) hardDeletePost(ctx context.Context, oid bson.ObjectID, id,
 // ListHiddenPosts renvoie la corbeille de modération (posts masqués par
 // suppression douce), réservée aux modérateurs/admins. Du plus récemment
 // masqué au plus ancien.
-func (s *PostService) ListHiddenPosts(ctx context.Context, actorRole string, limit, offset int64) ([]models.Post, error) {
+func (s *PostService) ListHiddenPosts(ctx context.Context, actorRole string, f repository.HiddenFilter, limit, offset int64) ([]models.Post, error) {
 	if !isModerator(actorRole) {
 		return nil, ErrForbidden
 	}
-	posts, err := s.repo.ListHidden(ctx, clampLimit(limit), clampOffset(offset))
+	posts, err := s.repo.ListHidden(ctx, f, clampLimit(limit), clampOffset(offset))
 	if err != nil {
 		return nil, err
 	}

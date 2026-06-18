@@ -43,6 +43,7 @@ const (
 	ActionContentRemoved = "content_removed" // contenu signalé retiré par la modération
 	ActionAutoHidden     = "auto_hidden"     // entité auto-masquée (seuil de signalements atteint)
 	ActionApproved       = "approved"        // entité jugée conforme par la modération (terminal)
+	ActionWarned         = "warned"          // auteur de l'entité averti par la modération (depuis le ticket)
 )
 
 // Motifs de signalement (enum fermé : `reason_tags.<reason>` est une clé Mongo,

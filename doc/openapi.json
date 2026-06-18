@@ -3809,6 +3809,72 @@
         }
       }
     },
+    "/posts/moderation/deleted": {
+      "get": {
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "posts"
+        ],
+        "summary": "Corbeille de modération (filtrable)",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "Filtrer par auteur",
+            "name": "author_id",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "description": "RFC3339 — borne basse de la date de retrait",
+            "name": "since",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "description": "RFC3339 — borne haute de la date de retrait",
+            "name": "until",
+            "in": "query"
+          },
+          {
+            "type": "integer",
+            "description": "Nb résultats",
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "type": "integer",
+            "description": "Décalage (pagination)",
+            "name": "offset",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "data: [posts]",
+            "schema": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
     "/posts/stats": {
       "get": {
         "produces": [
@@ -6619,6 +6685,15 @@
                 "type": "string"
               }
             }
+          },
+          "409": {
+            "description": "une sanction a déjà été appliquée",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
           }
         }
       }
@@ -6809,6 +6884,49 @@
           },
           "409": {
             "description": "Conflict",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/reports/users/{id}/warnings/count": {
+      "get": {
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "reports"
+        ],
+        "summary": "Nombre d'avertissements d'un utilisateur",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "User ID",
+            "name": "id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "data: { count }",
+            "schema": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "400": {
+            "description": "Bad Request",
             "schema": {
               "type": "object",
               "additionalProperties": {

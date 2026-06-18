@@ -37,6 +37,9 @@ func RegisterRoutes(r *gin.Engine, serviceName string, svc *service.ReportServic
 		// Émission d'un avertissement — modération.
 		reports.POST("/warnings", mod, h.IssueWarning)
 
+		// Profil de risque d'un utilisateur (nb d'avertissements) — modération.
+		reports.GET("/users/:id/warnings/count", mod, h.UserWarningCount)
+
 		// Configuration de la modération : lecture mod/admin, écriture admin seul.
 		reports.GET("/settings", mod, h.GetSettings)
 		reports.PATCH("/settings", admin, h.UpdateSettings)

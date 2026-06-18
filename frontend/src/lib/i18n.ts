@@ -85,6 +85,7 @@ export const messages: Record<Locale, Messages> = {
     'common.not_connected': 'non connecté',
     'common.logout': 'Se déconnecter',
     'common.cancel': 'Annuler',
+    'common.clear': 'Effacer',
     'common.save': 'Enregistrer',
     'common.loading': 'Chargement…',
     'common.retry': 'Réessayer',
@@ -517,6 +518,7 @@ export const messages: Record<Locale, Messages> = {
     'admin.action_unban': 'Réactiver',
     'admin.you': 'Vous',
     'admin.role_changed': 'Rôle mis à jour : {role}',
+    'admin.change_role': 'Changer le rôle',
     'admin.banned_toast': 'Compte banni.',
     'admin.unbanned_toast': 'Compte réactivé.',
     'admin.action_failed': 'Action impossible.',
@@ -604,6 +606,7 @@ export const messages: Record<Locale, Messages> = {
     'tickets.action.content_removed': 'Contenu signalé retiré par la modération',
     'tickets.action.auto_hidden': 'Publication masquée automatiquement (seuil de signalements atteint)',
     'tickets.action.approved': 'Élément jugé conforme par la modération (signalements verrouillés)',
+    'tickets.action.warned': "Auteur averti par la modération",
     'tickets.system': 'Système',
     'tickets.set_open': 'Rouvrir',
     'tickets.set_closed': 'Clôturer',
@@ -618,6 +621,26 @@ export const messages: Record<Locale, Messages> = {
     'tickets.message_removed': 'Message supprimé par la modération dans la conversation.',
     'tickets.action_failed': 'Action impossible.',
     'tickets.warn': "Avertir l'auteur",
+    'tickets.cannot_approve_actioned': 'Validation impossible : une sanction a déjà été appliquée.',
+    // ── Profil de risque de l'utilisateur ciblé ──
+    'tickets.target_user': 'Utilisateur ciblé',
+    'tickets.warning_count': 'Averti {count} fois',
+    'tickets.ban_user': 'Bannir',
+    'tickets.user_banned': 'Utilisateur banni.',
+    'tickets.ban_confirm_title': "Bannir l'utilisateur ?",
+    'tickets.ban_confirm_desc': '{name} ne pourra plus se connecter. Vous pourrez le réactiver depuis l’annuaire des comptes.',
+    // ── Retrait de contenu + avertissement (atomique : supprime → avertit → clôture) ──
+    'tickets.warn_after_delete_post': 'Votre publication a été supprimée par la modération. Motif : ',
+    'tickets.warn_after_delete_message': 'Votre message a été supprimé par la modération. Motif : ',
+    'tickets.delete_warn_title': "Supprimer et avertir l'auteur",
+    'tickets.delete_warn_desc':
+      "Le contenu sera supprimé, l'auteur averti du motif, et le ticket clôturé. Rien n'est supprimé tant que vous n'avez pas validé.",
+    'tickets.delete_and_warn': 'Supprimer et avertir',
+    'tickets.removed_and_closed': 'Contenu supprimé, auteur averti, ticket clôturé.',
+    // ── Garde-fou de clôture (aucune action posée) ──
+    'tickets.close_confirm_title': 'Clôturer sans action ?',
+    'tickets.close_confirm_desc': "Aucune action n'a été prise sur ce ticket. Le clôturer comme signalement non fondé ?",
+    'tickets.close_confirm_submit': 'Clôturer comme non fondé',
     // ── Filtres tickets (cumulables) ──
     'tickets.filters': 'Filtres',
     'tickets.filter_status': 'Statut',
@@ -638,6 +661,7 @@ export const messages: Record<Locale, Messages> = {
     'warn.modal_ack': "J'ai compris",
 
     // ── Filtres comptes ──
+    'accounts.actions': 'Actions',
     'accounts.filter_all': 'Tous',
     'accounts.filter_banned': 'Bannis',
     'accounts.filter_moderators': 'Modérateurs',
@@ -653,6 +677,13 @@ export const messages: Record<Locale, Messages> = {
     'moderation.posts_empty': 'Aucun tweet dans la corbeille.',
     'moderation.posts_error': 'Impossible de charger la corbeille.',
     'moderation.restore': 'Restaurer',
+    // ── Corbeille : filtres (auteur + date de retrait) + pagination ──
+    'moderation.search_user': 'Rechercher un utilisateur…',
+    'moderation.filter_since': 'Retiré depuis',
+    'moderation.filter_until': "Retiré jusqu'à",
+    'moderation.filter_reset': 'Réinitialiser',
+    'moderation.no_match': 'Aucun tweet supprimé ne correspond aux filtres.',
+    'moderation.load_more': 'Charger plus',
     'moderation.purge': 'Supprimer définitivement',
     'moderation.purge_title': 'Supprimer définitivement ce tweet ?',
     'moderation.purge_desc':
@@ -1244,6 +1275,7 @@ export const messages: Record<Locale, Messages> = {
     'common.not_connected': 'not signed in',
     'common.logout': 'Log out',
     'common.cancel': 'Cancel',
+    'common.clear': 'Clear',
     'common.save': 'Save',
     'common.loading': 'Loading…',
     'common.retry': 'Retry',
@@ -1660,6 +1692,7 @@ export const messages: Record<Locale, Messages> = {
     'admin.action_unban': 'Reinstate',
     'admin.you': 'You',
     'admin.role_changed': 'Role updated: {role}',
+    'admin.change_role': 'Change role',
     'admin.banned_toast': 'Account banned.',
     'admin.unbanned_toast': 'Account reinstated.',
     'admin.action_failed': 'Action failed.',
@@ -1747,6 +1780,7 @@ export const messages: Record<Locale, Messages> = {
     'tickets.action.content_removed': 'Reported content removed by moderation',
     'tickets.action.auto_hidden': 'Post automatically hidden (report threshold reached)',
     'tickets.action.approved': 'Item deemed compliant by moderation (reporting locked)',
+    'tickets.action.warned': 'Author warned by moderation',
     'tickets.system': 'System',
     'tickets.set_open': 'Reopen',
     'tickets.set_closed': 'Close',
@@ -1761,6 +1795,26 @@ export const messages: Record<Locale, Messages> = {
     'tickets.message_removed': 'Message removed by moderation in the conversation.',
     'tickets.action_failed': 'Action failed.',
     'tickets.warn': 'Warn the author',
+    'tickets.cannot_approve_actioned': 'Cannot approve: a sanction has already been applied.',
+    // ── Targeted user risk profile ──
+    'tickets.target_user': 'Targeted user',
+    'tickets.warning_count': 'Warned {count} time(s)',
+    'tickets.ban_user': 'Ban',
+    'tickets.user_banned': 'User banned.',
+    'tickets.ban_confirm_title': 'Ban this user?',
+    'tickets.ban_confirm_desc': '{name} will no longer be able to sign in. You can reactivate them from the accounts directory.',
+    // ── Content removal + warning (atomic: remove → warn → close) ──
+    'tickets.warn_after_delete_post': 'Your post was removed by moderation. Reason: ',
+    'tickets.warn_after_delete_message': 'Your message was removed by moderation. Reason: ',
+    'tickets.delete_warn_title': 'Remove and warn the author',
+    'tickets.delete_warn_desc':
+      'The content will be removed, the author warned of the reason, and the ticket closed. Nothing is removed until you confirm.',
+    'tickets.delete_and_warn': 'Remove and warn',
+    'tickets.removed_and_closed': 'Content removed, author warned, ticket closed.',
+    // ── Close guard (no action taken) ──
+    'tickets.close_confirm_title': 'Close without action?',
+    'tickets.close_confirm_desc': 'No action has been taken on this ticket. Close it as an unfounded report?',
+    'tickets.close_confirm_submit': 'Close as unfounded',
     // ── Ticket filters (stackable) ──
     'tickets.filters': 'Filters',
     'tickets.filter_status': 'Status',
@@ -1781,6 +1835,7 @@ export const messages: Record<Locale, Messages> = {
     'warn.modal_ack': 'I understand',
 
     // ── Account filters ──
+    'accounts.actions': 'Actions',
     'accounts.filter_all': 'All',
     'accounts.filter_banned': 'Banned',
     'accounts.filter_moderators': 'Moderators',
@@ -1793,6 +1848,13 @@ export const messages: Record<Locale, Messages> = {
     'moderation.posts_empty': 'No tweets in the trash.',
     'moderation.posts_error': 'Could not load the trash.',
     'moderation.restore': 'Restore',
+    // ── Trash: filters (author + removal date) + pagination ──
+    'moderation.search_user': 'Search a user…',
+    'moderation.filter_since': 'Removed since',
+    'moderation.filter_until': 'Removed until',
+    'moderation.filter_reset': 'Reset',
+    'moderation.no_match': 'No deleted tweet matches the filters.',
+    'moderation.load_more': 'Load more',
     'moderation.purge': 'Delete permanently',
     'moderation.purge_title': 'Permanently delete this tweet?',
     'moderation.purge_desc':

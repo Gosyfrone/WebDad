@@ -69,7 +69,7 @@ export interface ChildReport {
 
 export interface TicketAction {
   moderatorId: string
-  type: 'reply' | 'status_change' | 'transfer' | 'auto_reopen' | 'content_removed' | 'auto_hidden' | 'approved'
+  type: 'reply' | 'status_change' | 'transfer' | 'auto_reopen' | 'content_removed' | 'auto_hidden' | 'approved' | 'warned'
   text: string
   status?: TicketStatus
   createdAt: string
@@ -322,6 +322,17 @@ export async function issueWarning(input: {
       }),
     }),
   )
+}
+
+/**
+ * Nombre total d'avertissements reçus par un utilisateur (profil de risque
+ * affiché dans le détail d'un ticket). Réservé mod/admin côté gateway.
+ */
+export async function getUserWarningCount(userId: string): Promise<number> {
+  const data = await unwrap<{ count: number }>(
+    await apiFetch(`/reports/users/${userId}/warnings/count`),
+  )
+  return data?.count ?? 0
 }
 
 export async function fetchPendingWarnings(): Promise<Warning[]> {
