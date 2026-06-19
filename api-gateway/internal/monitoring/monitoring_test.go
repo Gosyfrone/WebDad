@@ -7,6 +7,8 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"github.com/gin-gonic/gin"
 )
 
 func TestProbeOne(t *testing.T) {
@@ -50,6 +52,51 @@ func TestProbeAllIncludesGateway(t *testing.T) {
 	res := probeAll(context.Background(), &http.Client{Timeout: time.Second}, map[string]string{})
 	if len(res) != 1 || res[0].Name != "api-gateway" || res[0].Status != "up" {
 		t.Fatalf("le gateway doit être en tête et up : %+v", res)
+	}
+}
+
+// TestHandler_Response : Handler renvoie 200 avec la clé "data" > "services".
+func TestHandler_Response(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"status": "ok", "service": "auth", "uptime_seconds": 5,
+		})
+	}))
+	defer backend.Close()
+
+	h := Handler(map[string]string{"/auth": backend.URL})
+	r := gin.New()
+	r.GET("/admin/monitoring", h)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/admin/monitoring", nil)
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, attendu 200", w.Code)
+	}
+	var resp map[string]any
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode = %v", err)
+	}
+	data, ok := resp["data"].(map[string]any)
+	if !ok {
+		t.Fatalf("réponse sans clé 'data' : %+v", resp)
+	}
+	if _, ok := data["services"]; !ok {
+		t.Fatal("réponse sans clé 'services'")
+	}
+}
+
+// TestProbeOne_NewRequestError : une URL contenant un octet de contrôle fait
+// échouer http.NewRequestWithContext → status down + Error non vide.
+func TestProbeOne_NewRequestError(t *testing.T) {
+	client := &http.Client{Timeout: time.Second}
+	h := probeOne(context.Background(), client, "/bad", "http://host\x00")
+	if h.Status != "down" || h.Error == "" {
+		t.Fatalf("URL invalide doit être down avec error : %+v", h)
 	}
 }
 

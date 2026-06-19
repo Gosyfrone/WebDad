@@ -5,7 +5,85 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/gin-gonic/gin"
 )
+
+// TestNew_GinForward : le handler transfère bien la requête via rp.ServeHTTP.
+// Note : httptest.ResponseRecorder n'implémente pas http.CloseNotifier,
+// requis par httputil.ReverseProxy → on enveloppe gin dans un vrai serveur HTTP.
+func TestNew_GinForward(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	received := make(chan string, 1)
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		received <- r.URL.Path
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	}))
+	defer backend.Close()
+
+	h, err := New(backend.URL)
+	if err != nil {
+		t.Fatalf("New = %v", err)
+	}
+
+	engine := gin.New()
+	engine.GET("/*path", h)
+	srv := httptest.NewServer(engine)
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/auth/login")
+	if err != nil {
+		t.Fatalf("requête = %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, attendu 200", resp.StatusCode)
+	}
+	select {
+	case path := <-received:
+		if path != "/auth/login" {
+			t.Fatalf("path reçu = %q, attendu /auth/login", path)
+		}
+	default:
+		t.Fatal("backend n'a pas reçu la requête")
+	}
+}
+
+// TestNew_GinErrorHandler : ErrorHandler renvoie 503 JSON quand le backend est fermé.
+func TestNew_GinErrorHandler(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	backend := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	backendURL := backend.URL
+	backend.Close()
+
+	h, err := New(backendURL)
+	if err != nil {
+		t.Fatalf("New = %v", err)
+	}
+
+	engine := gin.New()
+	engine.GET("/*path", h)
+	srv := httptest.NewServer(engine)
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/test")
+	if err != nil {
+		t.Fatalf("requête = %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusServiceUnavailable {
+		t.Fatalf("backend fermé : status = %d, attendu 503", resp.StatusCode)
+	}
+	buf := make([]byte, 64)
+	n, _ := resp.Body.Read(buf)
+	if !strings.Contains(string(buf[:n]), "service indisponible") {
+		t.Fatalf("corps = %q", string(buf[:n]))
+	}
+}
 
 func TestNew_URLInvalide(t *testing.T) {
 	_, err := New("://bad-url")
