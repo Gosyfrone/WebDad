@@ -251,7 +251,11 @@ export function PostComposer({
             rows={3}
             autoFocus={autoFocus}
             className={cn(
-              'relative z-10 w-full cursor-text resize-none bg-transparent text-xl caret-[#5B6CFF] placeholder:text-muted-foreground focus:outline-none',
+              // Scrollbar masquée : sa gouttière (~15px) rétrécirait la largeur du
+              // textarea par rapport à l'overlay `ComposerHighlight` (overflow-hidden),
+              // décalant le caret par rapport au texte peint. Le scroll reste piloté
+              // par le textarea et synchronisé via `syncHighlightScroll`.
+              'relative z-10 w-full cursor-text resize-none bg-transparent text-xl caret-[#5B6CFF] placeholder:text-muted-foreground focus:outline-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
               content ? 'text-transparent' : 'text-foreground',
             )}
           />
