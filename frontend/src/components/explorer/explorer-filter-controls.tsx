@@ -4,6 +4,12 @@ import { cn } from '@/lib/utils'
 import { useT } from '@/components/language-provider'
 import { useToast } from '@/hooks/use-toast'
 
+/**
+ * Carte de filtres desktop (colonne de droite). Compacte par conception : un
+ * libellé court + les deux pastilles toggle. Garder un faible encombrement
+ * vertical est essentiel — la colonne de droite est épinglée et un encart trop
+ * haut repoussait « Tendances »/« Qui suivre » sous le pli lors d'une recherche.
+ */
 export function ExplorerFilterCard({
   showPublications,
   showUsers,
@@ -17,12 +23,9 @@ export function ExplorerFilterCard({
 }) {
   const t = useT()
   return (
-    <div className="glass overflow-hidden rounded-[24px] border p-4 backdrop-blur-xl">
-      <div className="mb-3">
-        <p className="brand-text text-lg font-bold">{t('explorer.filter_title')}</p>
-        <p className="mt-1 text-xs text-muted-foreground">{t('explorer.filters_hint')}</p>
-      </div>
-      <FilterControls
+    <div className="glass overflow-hidden rounded-[24px] border px-4 py-3 backdrop-blur-xl">
+      <p className="brand-text mb-2 text-sm font-bold">{t('explorer.filter_title')}</p>
+      <MobileFilterButtons
         showPublications={showPublications}
         showUsers={showUsers}
         onTogglePublications={onTogglePublications}
@@ -32,43 +35,11 @@ export function ExplorerFilterCard({
   )
 }
 
-export function FilterControls({
-  showPublications,
-  showUsers,
-  onTogglePublications,
-  onToggleUsers,
-}: {
-  showPublications: boolean
-  showUsers: boolean
-  onTogglePublications: () => void | boolean
-  onToggleUsers: () => void | boolean
-}) {
-  const t = useT()
-  return (
-    <div className="flex flex-col" aria-label={t('explorer.filters_hint')}>
-      <FilterRow
-        label={t('explorer.filter_publications')}
-        checked={showPublications}
-        locked={showPublications && !showUsers}
-        onChange={onTogglePublications}
-        filterType="publications"
-      />
-      <div className="border-t border-border/50" />
-      <FilterRow
-        label={t('explorer.filter_users')}
-        checked={showUsers}
-        locked={showUsers && !showPublications}
-        onChange={onToggleUsers}
-        filterType="users"
-      />
-    </div>
-  )
-}
-
 /**
- * Filtres mobiles : deux pastilles toggle toujours visibles (Publications /
- * Utilisateurs). Au moins une doit rester active ; tenter de désactiver la
- * dernière active déclenche un toast explicatif.
+ * Pastilles toggle des filtres (Publications / Utilisateurs), partagées par la
+ * barre mobile de l'explorateur et la carte desktop de la colonne de droite.
+ * Au moins une doit rester active ; tenter de désactiver la dernière active
+ * déclenche un toast explicatif.
  */
 export function MobileFilterButtons({
   showPublications,
@@ -140,61 +111,3 @@ function FilterChip({
   )
 }
 
-function FilterRow({
-  label,
-  checked,
-  locked,
-  onChange,
-  filterType,
-}: {
-  label: string
-  checked: boolean
-  /** Dernier filtre actif : grisé, mais cliquable pour afficher l'avertissement. */
-  locked: boolean
-  onChange: () => void | boolean
-  filterType?: 'publications' | 'users'
-}) {
-  const t = useT()
-  const { toast } = useToast()
-
-  const handleChange = () => {
-    const success = onChange()
-    if (success === false) {
-      toast({
-        title: t('explorer.filter_required'),
-        description:
-          filterType === 'publications'
-            ? t('explorer.at_least_one_filter_publications')
-            : t('explorer.at_least_one_filter_users'),
-      })
-    }
-  }
-
-  return (
-    <label
-      className={cn(
-        'flex cursor-pointer items-center justify-between px-4 py-3 transition-colors hover:bg-accent',
-        locked && 'opacity-60',
-      )}
-    >
-      <span className="text-sm font-medium text-foreground">{label}</span>
-      <input type="checkbox" checked={checked} onChange={handleChange} className="sr-only" />
-      <CircleIndicator checked={checked} />
-    </label>
-  )
-}
-
-function CircleIndicator({ checked }: { checked: boolean }) {
-  return (
-    <span
-      className={cn(
-        'flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors',
-        checked
-          ? 'border-[#5B6CFF] bg-[#5B6CFF] dark:border-[#9aa6ff] dark:bg-[#9aa6ff]'
-          : 'border-muted-foreground/50 bg-transparent',
-      )}
-    >
-      {checked && <span className="h-2 w-2 rounded-full bg-white" />}
-    </span>
-  )
-}

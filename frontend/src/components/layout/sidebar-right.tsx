@@ -94,7 +94,7 @@ export function SidebarRight() {
   }
 
   return (
-    <aside className="sticky top-0 hidden h-screen w-[min(350px,30vw)] min-w-[290px] flex-col gap-2 overflow-y-auto px-3 py-2 pb-8 xl:flex 2xl:px-4">
+    <aside className="sticky top-0 hidden max-h-screen w-[min(350px,30vw)] min-w-[290px] flex-col gap-2 overflow-y-auto overscroll-contain px-3 py-2 pb-8 xl:flex 2xl:px-4">
       {/* Search */}
       <form onSubmit={submitSearch} className="relative">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
