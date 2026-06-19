@@ -23,8 +23,6 @@ import * as React from 'react'
 const OAUTH_PROVIDERS = [
   { id: 'google', src: '/google-logo.jpg', label: 'Google' },
   { id: 'github', src: '/github.svg', label: 'GitHub' },
-  { id: 'facebook', src: '/facebook.svg', label: 'Facebook' },
-  { id: 'spotify', src: '/spotify.svg', label: 'Spotify' },
 ] as const
 
 import { Button } from '@/components/ui/button'

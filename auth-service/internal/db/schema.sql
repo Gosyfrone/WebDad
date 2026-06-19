@@ -85,7 +85,7 @@ ALTER TABLE account_tokens DROP CONSTRAINT IF EXISTS account_tokens_purpose_chec
 ALTER TABLE account_tokens ADD CONSTRAINT account_tokens_purpose_check
     CHECK (purpose IN ('verify', 'reset', 'email_change', 'mfa_challenge'));
 
--- ─── Connexion via fournisseurs externes (Google / GitHub / Facebook / Spotify) ──
+-- ─── Connexion via fournisseurs externes (Google / GitHub) ──
 -- ALTER idempotents : la base existante est migrée au boot sans script externe.
 DO $$
 BEGIN
@@ -96,9 +96,9 @@ END$$;
 
 -- Nouveaux providers : ADD VALUE IF NOT EXISTS est idempotent et hors
 -- transaction (EnsureSchema applique le fichier en autocommit), donc sûr au boot.
+-- NB : 'facebook'/'spotify' ont pu être ajoutés sur des bases existantes ; on ne
+-- les retire pas (PostgreSQL n'autorise pas DROP VALUE), ils restent inertes.
 ALTER TYPE auth_provider ADD VALUE IF NOT EXISTS 'github';
-ALTER TYPE auth_provider ADD VALUE IF NOT EXISTS 'facebook';
-ALTER TYPE auth_provider ADD VALUE IF NOT EXISTS 'spotify';
 
 -- provider : origine du compte ('local' par défaut → comportement inchangé).
 ALTER TABLE credentials ADD COLUMN IF NOT EXISTS provider auth_provider NOT NULL DEFAULT 'local';

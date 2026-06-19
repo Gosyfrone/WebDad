@@ -79,7 +79,7 @@ func main() {
 	})
 	go auth.RunAccountPurgeSweeper(sweepCtx, acctEraser, cfg.AccountPurgeAfter, cfg.AccountPurgeSweepInterval)
 
-	// Providers OAuth (Google, GitHub, Facebook, Spotify). Construction
+	// Providers OAuth (Google, GitHub). Construction
 	// paresseuse : le discovery OIDC se fait au premier usage, pas au boot.
 	// Un provider sans ClientID est ignoré (endpoints → 404).
 	oauthReg := oauth.NewRegistry(context.Background(), oauth.Options{
@@ -92,14 +92,6 @@ func main() {
 			"github": {
 				ClientID:     cfg.GitHubClientID,
 				ClientSecret: cfg.GitHubClientSecret,
-			},
-			"facebook": {
-				ClientID:     cfg.FacebookClientID,
-				ClientSecret: cfg.FacebookClientSecret,
-			},
-			"spotify": {
-				ClientID:     cfg.SpotifyClientID,
-				ClientSecret: cfg.SpotifyClientSecret,
 			},
 		},
 	})
