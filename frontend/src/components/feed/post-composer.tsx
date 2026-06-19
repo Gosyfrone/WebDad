@@ -51,7 +51,10 @@ import { ComposerHighlight } from '@/components/hashtag/composer-highlight'
 import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
 import { useCurrentUser } from '@/components/current-user-provider'
 
+/** Limite de caractères par défaut (aligné sur le validateur post-service). */
 const MAX_CHARS = 280
+/** Limite relevée pour les modérateurs/admins (garde-fou absolu, aligné back). */
+const MAX_CHARS_PRIVILEGED = 4000
 /** Nombre maximal de médias par post (aligné sur le validateur post-service). */
 const MAX_MEDIA = 4
 
@@ -74,7 +77,7 @@ export function PostComposer({
 }: PostComposerProps) {
   const t = useT()
   const { toast } = useToast()
-  const { profil } = useCurrentUser()
+  const { profil, isModerator } = useCurrentUser()
   const label = submitLabel ?? t('nav.post')
   const [content, setContent] = useState('')
   const [media, setMedia] = useState<PostMedia[]>([])
@@ -88,6 +91,7 @@ export function PostComposer({
   const poll = usePollDraft()
   const [replyAudience, setReplyAudience] = useState<ReplyAudience>('everyone')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const highlightRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const mention = useMention({
     inputRef: textareaRef,
@@ -99,9 +103,28 @@ export function PostComposer({
     onChange: setContent,
     search: hashtagSearchGlobal,
   })
-  const remaining = MAX_CHARS - content.length
+  // Limite relevée pour modos/admins (l'enforcement réel vit côté post-service).
+  const maxChars = isModerator ? MAX_CHARS_PRIVILEGED : MAX_CHARS
+  const remaining = maxChars - content.length
   const isEmpty = content.trim().length === 0 && media.length === 0 && !poll.payload
   const isOver = remaining < 0
+
+  // Le texte visible est peint par l'overlay `ComposerHighlight` (le textarea est
+  // transparent). Quand le textarea scrolle au-delà de 3 lignes, on aligne le
+  // scroll de l'overlay sinon le texte du bas devient invisible / se superpose.
+  function syncHighlightScroll() {
+    if (highlightRef.current && textareaRef.current) {
+      highlightRef.current.scrollTop = textareaRef.current.scrollTop
+    }
+  }
+
+  // Insertions programmatiques (emoji, mention/hashtag) modifient le scroll sans
+  // déclencher `onScroll` → resync après chaque mise à jour du contenu.
+  useEffect(() => {
+    if (highlightRef.current && textareaRef.current) {
+      highlightRef.current.scrollTop = textareaRef.current.scrollTop
+    }
+  }, [content])
 
   async function handleSubmit() {
     if (isEmpty || isOver || submitting || uploadingMedia) return
@@ -212,6 +235,7 @@ export function PostComposer({
               mention.sync()
               hashtag.sync()
             }}
+            onScroll={syncHighlightScroll}
             placeholder={t('composer.placeholder')}
             rows={3}
             autoFocus={autoFocus}
@@ -220,7 +244,7 @@ export function PostComposer({
               content ? 'text-transparent' : 'text-foreground',
             )}
           />
-          {content && <ComposerHighlight text={content} />}
+          {content && <ComposerHighlight ref={highlightRef} text={content} />}
           <MentionAutocomplete controller={mention} placement="bottom" />
           <HashtagAutocomplete controller={hashtag} placement="bottom" className="left-24" />
         </div>

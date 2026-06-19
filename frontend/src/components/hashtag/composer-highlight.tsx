@@ -1,18 +1,16 @@
 'use client'
 
+import { forwardRef } from 'react'
+
 import { parseHashtagSegments } from '@/lib/hashtags'
 import { cn } from '@/lib/utils'
 
-export function ComposerHighlight({
-  text,
-  className,
-}: {
-  text: string
-  className?: string
-}) {
+export const ComposerHighlight = forwardRef<HTMLDivElement, { text: string; className?: string }>(
+  function ComposerHighlight({ text, className }, ref) {
   const segments = parseHashtagSegments(text)
   return (
     <div
+      ref={ref}
       aria-hidden
       className={cn(
         'pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words text-xl',
@@ -36,4 +34,4 @@ export function ComposerHighlight({
       {text.endsWith('\n') && ' '}
     </div>
   )
-}
+})
