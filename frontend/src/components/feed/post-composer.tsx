@@ -84,6 +84,7 @@ export function PostComposer({
   const initial = initialOf(profil?.displayName, profil?.username)
   const [submitting, setSubmitting] = useState(false)
   const [pinOnProfile, setPinOnProfile] = useState(false)
+  const [nsfw, setNsfw] = useState(false)
   const poll = usePollDraft()
   const [replyAudience, setReplyAudience] = useState<ReplyAudience>('everyone')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -106,7 +107,7 @@ export function PostComposer({
     if (isEmpty || isOver || submitting || uploadingMedia) return
     setSubmitting(true)
     try {
-      const created = await createPost(content.trim(), media, quotePost?.id, poll.payload, replyAudience)
+      const created = await createPost(content.trim(), media, quotePost?.id, poll.payload, replyAudience, nsfw)
       const post = pinOnProfile ? await pinPost(created.id) : created
       notifyPostCreated(post) // le fil prépend sans refetch
       playAppSound('breeze_posted')
@@ -114,6 +115,7 @@ export function PostComposer({
       setContent('')
       setMedia([])
       setPinOnProfile(false)
+      setNsfw(false)
       setReplyAudience('everyone')
       poll.reset()
     } catch {
@@ -304,6 +306,19 @@ export function PostComposer({
               )}
             >
               <ListChecks className="h-5 w-5" />
+            </button>
+            <button
+              type="button"
+              title={t('nsfw.composer_tooltip')}
+              aria-label={t('nsfw.composer_tooltip')}
+              aria-pressed={nsfw}
+              onClick={() => setNsfw((v) => !v)}
+              className={cn(
+                'rounded-full px-2.5 py-1 text-xs font-bold uppercase tracking-wide transition-colors hover:bg-primary/10',
+                nsfw ? 'text-foreground' : 'text-muted-foreground/50',
+              )}
+            >
+              {t('nsfw.post_badge')}
             </button>
             <EmojiPicker onSelect={insertEmoji}>
               <button

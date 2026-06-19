@@ -57,7 +57,7 @@ func (h *PostHandler) CreatePost(c *gin.Context) {
 		return
 	}
 
-	post, err := h.service.CreatePost(c.Request.Context(), claims.UserID, req.Content, req.QuotePostID, req.Media, req.Poll, req.ReplyAudience)
+	post, err := h.service.CreatePost(c.Request.Context(), claims.UserID, req.Content, req.QuotePostID, req.Media, req.Poll, req.ReplyAudience, req.Nsfw)
 	if err != nil {
 		respondPostError(c, err)
 		return
@@ -283,6 +283,44 @@ func (h *PostHandler) UpdatePost(c *gin.Context) {
 		respondPostError(c, err)
 		return
 	}
+	c.JSON(http.StatusOK, gin.H{"data": post})
+}
+
+// SetNsfw : PATCH /posts/:id/nsfw — (dé)marque un post comme NSFW (modo/admin).
+// Le post reste visible ; le flag pilote le floutage côté front selon la
+// préférence/majorité du lecteur.
+// @Summary     Marquer/dé-marquer un post comme NSFW (modo/admin)
+// @Tags        posts
+// @Accept      json
+// @Produce     json
+// @Security    BearerAuth
+// @Param       id   path string                true "Post ID"
+// @Param       body body models.SetNsfwRequest true "nsfw: true|false"
+// @Success     200 {object} models.Post
+// @Failure     400 {object} map[string]string
+// @Failure     401 {object} map[string]string
+// @Failure     403 {object} map[string]string
+// @Failure     404 {object} map[string]string
+// @Router      /posts/{id}/nsfw [patch]
+func (h *PostHandler) SetNsfw(c *gin.Context) {
+	claims, ok := middleware.ClaimsFrom(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "claims absents"})
+		return
+	}
+
+	var req models.SetNsfwRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "payload invalide : " + err.Error()})
+		return
+	}
+
+	post, err := h.service.SetNsfw(c.Request.Context(), c.Param("id"), claims.UserID, claims.Role, req.Nsfw)
+	if err != nil {
+		respondPostError(c, err)
+		return
+	}
+	logging.FromGin(c).Info("post NSFW mis à jour", "post_id", c.Param("id"), "nsfw", req.Nsfw)
 	c.JSON(http.StatusOK, gin.H{"data": post})
 }
 

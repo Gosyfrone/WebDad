@@ -17,6 +17,7 @@ import {
   PinOff,
   Repeat2,
   Share,
+  ShieldAlert,
   Trash2,
   UserX,
 } from 'lucide-react'
@@ -31,6 +32,7 @@ import {
   notifyPostCreated,
   pinPost,
   repostPost,
+  setPostNsfw,
   unlikePost,
   unrepostPost,
   unpinPost,
@@ -45,6 +47,7 @@ import { useLongPress } from '@/lib/use-long-press'
 import { BookmarkDialog } from '@/components/feed/bookmark-dialog'
 import { ToastAction } from '@/components/ui/toast'
 import { useToast } from '@/hooks/use-toast'
+import { useCurrentUser } from '@/components/current-user-provider'
 import { useAuthGate } from '@/components/auth-prompt-provider'
 import { useLanguage } from '@/components/language-provider'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -107,12 +110,15 @@ export function PostCard({ post, showPinBadge = false, focusCommentId, embedded 
   const { toast } = useToast()
   const { isVisitor, promptLogin, requireAuth } = useAuthGate()
   const { t, locale } = useLanguage()
+  const { profil: viewerProfil } = useCurrentUser()
 
   const [liked, setLiked] = useState(post.liked)
   const [likeCount, setLikeCount] = useState(post.likesCount)
   const [commentCount, setCommentCount] = useState(post.commentsCount)
   const [isPinned, setIsPinned] = useState(post.isPinned)
   const [pinning, setPinning] = useState(false)
+  const [nsfw, setNsfw] = useState(post.nsfw)
+  const [nsfwSaving, setNsfwSaving] = useState(false)
   const [likeBurst, setLikeBurst] = useState(0)
   const [showComments, setShowComments] = useState(Boolean(focusCommentId) || defaultShowComments)
   const [deleting, setDeleting] = useState(false)
@@ -153,6 +159,15 @@ export function PostCard({ post, showPinBadge = false, focusCommentId, embedded 
   useEffect(() => {
     setIsPinned(post.isPinned)
   }, [post.isPinned])
+
+  useEffect(() => {
+    setNsfw(post.nsfw)
+  }, [post.nsfw])
+
+  // Floutage NSFW : un post marqué est masqué si le lecteur n'a pas la
+  // préférence/majorité pour le voir (nsfw_visible calculé serveur ; défaut
+  // `true` pour visiteur/profil non chargé, cohérent avec « adulte par défaut »).
+  const nsfwBlurred = nsfw && !(viewerProfil?.nsfwVisible ?? true)
 
   useEffect(() => {
     setPoll(post.poll)
@@ -277,6 +292,24 @@ export function PostCard({ post, showPinBadge = false, focusCommentId, embedded 
       toast({ title: 'Épinglage impossible', variant: 'destructive' })
     } finally {
       setPinning(false)
+    }
+  }
+
+  async function toggleNsfw() {
+    if (nsfwSaving) return
+    const next = !nsfw
+    setNsfwSaving(true)
+    setNsfw(next)
+    try {
+      const updated = await setPostNsfw(post.id, next)
+      setNsfw(updated.nsfw)
+      onUpdated?.(updated)
+      toast({ title: next ? t('nsfw.marked') : t('nsfw.unmarked') })
+    } catch {
+      setNsfw(!next)
+      toast({ title: t('nsfw.action_failed'), variant: 'destructive' })
+    } finally {
+      setNsfwSaving(false)
     }
   }
 
@@ -418,7 +451,7 @@ export function PostCard({ post, showPinBadge = false, focusCommentId, embedded 
             <span className="shrink-0 text-muted-foreground">{timeAgo(post.createdAt, locale)}</span>
           </div>
 
-          {(post.canDelete || canReport || canBlock) && (
+          {(post.canDelete || canReport || canBlock || post.canMarkNsfw) && (
             <DropdownMenu>
               <DropdownMenuTrigger
                 aria-label={t('post.more_options')}
@@ -440,6 +473,19 @@ export function PostCard({ post, showPinBadge = false, focusCommentId, embedded 
                       <Pin className="mr-2 h-4 w-4" />
                     )}
                     {isPinned ? 'Désépingler du profil' : 'Épingler sur le profil'}
+                  </DropdownMenuItem>
+                )}
+                {post.canMarkNsfw && (
+                  <DropdownMenuItem
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      void toggleNsfw()
+                    }}
+                    disabled={nsfwSaving}
+                    className="cursor-pointer"
+                  >
+                    <ShieldAlert className="mr-2 h-4 w-4" />
+                    {nsfw ? t('nsfw.unmark') : t('nsfw.mark')}
                   </DropdownMenuItem>
                 )}
                 {canReport && (
@@ -517,33 +563,59 @@ export function PostCard({ post, showPinBadge = false, focusCommentId, embedded 
           </div>
         )}
 
-        {/* Content */}
-        {post.content && (
-          <TranslatedContent
-            contentId={`post:${post.id}`}
-            content={post.content}
-            className="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/80"
-          />
-        )}
+        {/* Content (flouté si marqué NSFW et lecteur non autorisé/non consentant) */}
+        <div className={cn('relative', nsfwBlurred && 'min-h-[9rem]')}>
+          <div
+            className={cn(
+              nsfwBlurred && 'pointer-events-none select-none blur-xl',
+            )}
+            aria-hidden={nsfwBlurred}
+          >
+            {post.content && (
+              <TranslatedContent
+                contentId={`post:${post.id}`}
+                content={post.content}
+                className="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/80"
+              />
+            )}
 
-        {post.media.length > 0 && (
-          <MediaGallery media={post.media} onOpen={(i) => setPhotoIndex(i)} />
-        )}
+            {post.media.length > 0 && (
+              <MediaGallery media={post.media} onOpen={(i) => setPhotoIndex(i)} />
+            )}
 
-        {poll && (
-          <PostPollCard
-            poll={poll}
-            onVote={requireAuth(handlePollVote)}
-            onClose={poll.canClose ? handleClosePoll : undefined}
-            onRefresh={refreshPoll}
-          />
-        )}
+            {poll && (
+              <PostPollCard
+                poll={poll}
+                onVote={requireAuth(handlePollVote)}
+                onClose={poll.canClose ? handleClosePoll : undefined}
+                onRefresh={refreshPoll}
+              />
+            )}
 
-        {post.quotedPost && (
-          <QuotedPost post={post.quotedPost} />
-        )}
+            {post.quotedPost && (
+              <QuotedPost post={post.quotedPost} />
+            )}
+          </div>
 
-        {/* Actions */}
+          {nsfwBlurred && (
+            <div
+              className="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-xl bg-background/40 px-4 text-center backdrop-blur-sm"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-foreground/80 px-2.5 py-1 text-xs font-bold uppercase tracking-wide text-background">
+                <ShieldAlert className="h-3.5 w-3.5" aria-hidden />
+                {t('nsfw.post_badge')}
+              </span>
+              <p className="max-w-xs text-xs font-medium text-foreground">
+                {t('nsfw.post_hidden_desc')}
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Actions — masquées tant que le post est flouté NSFW (le lecteur
+            désactive d'abord le filtre dans les paramètres avant d'interagir). */}
+        {!nsfwBlurred && (
         <div className="-ml-2 mt-1 flex items-center justify-between text-muted-foreground">
           <ActionButton
             icon={MessageCircle}
@@ -639,6 +711,7 @@ export function PostCard({ post, showPinBadge = false, focusCommentId, embedded 
             <Share className="h-4 w-4" />
           </button>
         </div>
+        )}
 
         <ShareDialog
           open={shareOpen}

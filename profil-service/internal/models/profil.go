@@ -47,6 +47,60 @@ type Profil struct {
 	// capture maintenant pour ne pas avoir de profils sans baseline le jour où
 	// le cooldown est activé. Symétrique de users.username_changed_at.
 	DisplayNameChangedAt *time.Time `json:"display_name_changed_at,omitempty" bson:"display_name_changed_at,omitempty"`
+	// NsfwEnabled : préférence « afficher le contenu marqué NSFW ». Pointeur +
+	// omitempty : un document antérieur au champ (nil) vaut `true` (cf.
+	// NsfwEnabledOf) — défaut ON pour ne pas modifier l'expérience de la prod
+	// existante. La valeur stockée d'un MINEUR est sans effet : la politique
+	// effective (NsfwVisible) la combine avec la majorité calculée serveur.
+	NsfwEnabled *bool `json:"nsfw_enabled,omitempty" bson:"nsfw_enabled,omitempty"`
+	// IsAdult / NsfwVisible : politique « viewer » TRANSIENTE (bson:"-", jamais
+	// stockée), calculée serveur depuis birth_date et exposée seulement sur la vue
+	// privée /profils/me. IsAdult = ≥18 ans (dynamique : se débloque tout seul le
+	// jour des 18 ans). NsfwVisible = IsAdult && NsfwEnabledOf : un mineur ne peut
+	// pas se faire passer pour majeur (front non autoritatif, cf. Rule 6).
+	IsAdult     bool `json:"is_adult" bson:"-"`
+	NsfwVisible bool `json:"nsfw_visible" bson:"-"`
+}
+
+// nsfwMajorityAge : âge (en années) à partir duquel le contenu NSFW est
+// autorisé. Distinct de l'âge minimum d'inscription (13 ans, côté front).
+const nsfwMajorityAge = 18
+
+// NsfwEnabledOf normalise la préférence NSFW : absente (vieux document) ⇒ true
+// (défaut ON, pour ne pas modifier l'expérience de la prod existante).
+func NsfwEnabledOf(p *Profil) bool {
+	if p == nil || p.NsfwEnabled == nil {
+		return true
+	}
+	return *p.NsfwEnabled
+}
+
+// IsAdultAt indique si une date de naissance correspond à ≥18 ans à l'instant
+// `now`. birth_date nil ⇒ true (adulte par défaut : la migration backfille les
+// profils sans date au 01/01/1999, et un profil créé sans date — ex. admin — ne
+// doit pas être filtré). Calcul calendaire exact (anniversaire pas encore atteint
+// dans l'année ⇒ une année de moins).
+func IsAdultAt(birthDate *time.Time, now time.Time) bool {
+	if birthDate == nil {
+		return true
+	}
+	b := birthDate.UTC()
+	years := now.Year() - b.Year()
+	if now.Month() < b.Month() || (now.Month() == b.Month() && now.Day() < b.Day()) {
+		years--
+	}
+	return years >= nsfwMajorityAge
+}
+
+// HydrateViewerPolicy renseigne les champs transients is_adult / nsfw_visible
+// depuis birth_date et la préférence NSFW. À n'appeler que sur la vue privée du
+// propriétaire (/profils/me).
+func HydrateViewerPolicy(p *Profil, now time.Time) {
+	if p == nil {
+		return
+	}
+	p.IsAdult = IsAdultAt(p.BirthDate, now)
+	p.NsfwVisible = p.IsAdult && NsfwEnabledOf(p)
 }
 
 // CreateProfilRequest : payload de POST /profils. L'id provient TOUJOURS du
@@ -85,4 +139,6 @@ type UpdateProfilRequest struct {
 	Visibility         *string    `json:"visibility"        binding:"omitempty,oneof=public private"`
 	LikesVisibility    *string    `json:"likes_visibility"   binding:"omitempty,oneof=public private"`
 	ActivityVisibility *string    `json:"activity_visibility" binding:"omitempty,oneof=public private"`
+	// NsfwEnabled : préférence « afficher le contenu NSFW » (toggle des paramètres).
+	NsfwEnabled *bool `json:"nsfw_enabled" binding:"omitempty"`
 }

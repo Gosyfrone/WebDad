@@ -84,6 +84,18 @@ func (s *ProfilService) GetByUserID(ctx context.Context, userID string) (*models
 	return p, nil
 }
 
+// GetMine retourne le profil du propriétaire, enrichi de la politique « viewer »
+// (is_adult, nsfw_visible) calculée serveur depuis birth_date — jamais stockée.
+// Réservé à la vue privée /profils/me (ne pas exposer ces champs publiquement).
+func (s *ProfilService) GetMine(ctx context.Context, userID string) (*models.Profil, error) {
+	p, err := s.GetByUserID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	models.HydrateViewerPolicy(p, time.Now().UTC())
+	return p, nil
+}
+
 // Search retourne les profils dont le display_name contient `term` (insensible
 // à la casse). Un terme vide renvoie une liste vide (pas de balayage complet).
 // Les métacaractères regex de `term` sont neutralisés (recherche littérale).
@@ -115,6 +127,7 @@ func (s *ProfilService) Create(ctx context.Context, userID string, req models.Cr
 		return nil, ErrInvalidDisplayName
 	}
 	now := time.Now().UTC()
+	nsfwOn := true // défaut ON explicite (cf. Rule 5b : champ à défaut → valeur posée à la création)
 	p := &models.Profil{
 		UserID:             userID,
 		DisplayName:        displayName,
@@ -124,6 +137,7 @@ func (s *ProfilService) Create(ctx context.Context, userID string, req models.Cr
 		Visibility:         models.VisibilityPublic,
 		LikesVisibility:    models.VisibilityPublic,
 		ActivityVisibility: models.VisibilityPublic,
+		NsfwEnabled:        &nsfwOn,
 	}
 	if req.Gender != nil {
 		p.Gender = *req.Gender
@@ -279,6 +293,9 @@ func planUpdate(current *models.Profil, req models.UpdateProfilRequest, now time
 	}
 	if req.ActivityVisibility != nil && *req.ActivityVisibility != current.ActivityVisibility {
 		set["activity_visibility"] = *req.ActivityVisibility
+	}
+	if req.NsfwEnabled != nil {
+		set["nsfw_enabled"] = *req.NsfwEnabled
 	}
 
 	return set, nil

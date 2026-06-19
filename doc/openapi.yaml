@@ -3259,6 +3259,58 @@ paths:
             type: object
             additionalProperties:
               type: string
+  /posts/{id}/nsfw:
+    patch:
+      security:
+      - BearerAuth: []
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      tags:
+      - posts
+      summary: Marquer/dé-marquer un post comme NSFW (modo/admin)
+      parameters:
+      - type: string
+        description: Post ID
+        name: id
+        in: path
+        required: true
+      - description: 'nsfw: true|false'
+        name: body
+        in: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.SetNsfwRequest'
+      responses:
+        '200':
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Post'
+        '400':
+          description: Bad Request
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '403':
+          description: Forbidden
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '404':
+          description: Not Found
+          schema:
+            type: object
+            additionalProperties:
+              type: string
   /posts/{id}/pin:
     delete:
       security:
@@ -5161,6 +5213,21 @@ definitions:
       gender:
         description: '"male" | "female"'
         type: string
+      is_adult:
+        description: 'IsAdult / NsfwVisible : politique « viewer » TRANSIENTE (bson:"-",
+          jamais
+
+          stockée), calculée serveur depuis birth_date et exposée seulement sur la
+          vue
+
+          privée /profils/me. IsAdult = ≥18 ans (dynamique : se débloque tout seul
+          le
+
+          jour des 18 ans). NsfwVisible = IsAdult && NsfwEnabledOf : un mineur ne
+          peut
+
+          pas se faire passer pour majeur (front non autoritatif, cf. Rule 6).'
+        type: boolean
       is_online:
         type: boolean
       last_login_at:
@@ -5172,6 +5239,20 @@ definitions:
       nationality:
         description: ISO 3166-1 alpha-2
         type: string
+      nsfw_enabled:
+        description: 'NsfwEnabled : préférence « afficher le contenu marqué NSFW ».
+          Pointeur +
+
+          omitempty : un document antérieur au champ (nil) vaut `true` (cf.
+
+          NsfwEnabledOf) — défaut ON pour ne pas modifier l''expérience de la prod
+
+          existante. La valeur stockée d''un MINEUR est sans effet : la politique
+
+          effective (NsfwVisible) la combine avec la majorité calculée serveur.'
+        type: boolean
+      nsfw_visible:
+        type: boolean
       updated_at:
         type: string
       user_id:
@@ -5214,6 +5295,10 @@ definitions:
         type: string
       nationality:
         type: string
+      nsfw_enabled:
+        description: 'NsfwEnabled : préférence « afficher le contenu NSFW » (toggle
+          des paramètres).'
+        type: boolean
       visibility:
         type: string
         enum:
@@ -5378,6 +5463,12 @@ definitions:
         maxItems: 4
         items:
           $ref: '#/definitions/models.MediaRef'
+      nsfw:
+        description: 'Nsfw : l''auteur marque son propre post comme sensible dès la
+          publication
+
+          (bouton NSFW du composer). Modifiable ensuite uniquement par modo/admin.'
+        type: boolean
       poll:
         $ref: '#/definitions/models.CreatePollRequest'
       quote_post_id:
@@ -5517,6 +5608,20 @@ definitions:
         type: array
         items:
           $ref: '#/definitions/models.MediaRef'
+      nsfw:
+        description: 'Nsfw : post marqué « contenu sensible ». Posé par l''AUTEUR
+          à la création
+
+          (bouton NSFW du composer) ou par un modérateur/admin après coup (PATCH
+
+          /posts/:id/nsfw). Le post reste DÉLIVRÉ tel quel : c''est le front qui le
+
+          floute si le lecteur n''a pas le droit/la préférence de voir le NSFW
+
+          (nsfw_visible calculé serveur côté profil). `omitempty` ⇒ jamais de `false`
+
+          persisté ; absent sur un vieux doc = non-NSFW (aucune migration nécessaire).'
+        type: boolean
       pinned_at:
         type: string
       poll:
@@ -5568,6 +5673,11 @@ definitions:
       name:
         type: string
         maxLength: 60
+  models.SetNsfwRequest:
+    type: object
+    properties:
+      nsfw:
+        type: boolean
   models.UpdatePostRequest:
     type: object
     required:

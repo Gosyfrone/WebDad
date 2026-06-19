@@ -36,6 +36,10 @@ type ApiProfil = {
   activity_visibility?: 'public' | 'private'
   last_login_at?: string
   is_online?: boolean
+  nsfw_enabled?: boolean
+  /** Calculés serveur, présents uniquement sur la vue privée /profils/me. */
+  is_adult?: boolean
+  nsfw_visible?: boolean
 }
 
 const PROFIL_UPDATED_EVENT = 'breezy:profil-updated'
@@ -132,6 +136,20 @@ export async function saveMyActivityVisibility(
   return updated
 }
 
+export async function saveMyNsfw(
+  nsfwEnabled: boolean,
+): Promise<ProfilDetails> {
+  await fetchApiData<ApiProfil>('/profils/me', {
+    method: 'PATCH',
+    headers: jsonHeaders(),
+    body: JSON.stringify({ nsfw_enabled: nsfwEnabled }),
+  })
+
+  const updated = await getMyProfil()
+  notifyProfilUpdated(updated)
+  return updated
+}
+
 export function subscribeProfilUpdated(
   onUpdate: (profil: ProfilDetails) => void,
 ): () => void {
@@ -191,6 +209,12 @@ function mergeProfil(
     activityVisibility,
     lastLoginAt: profil?.last_login_at ?? '',
     isOnline: Boolean(profil?.is_online),
+    // Défaut `true` : pref NSFW ON / adulte par défaut (cf. backend). Sur un profil
+    // PUBLIC (currentUser=false) le serveur n'envoie pas is_adult/nsfw_visible —
+    // ces champs ne sont consommés que pour le viewer courant (getMyProfil).
+    nsfwEnabled: profil?.nsfw_enabled ?? true,
+    isAdult: profil?.is_adult ?? true,
+    nsfwVisible: profil?.nsfw_visible ?? true,
     followersCount: user.follower_count ?? 0,
     followingCount: user.following_count ?? 0,
     postsCount: 0,

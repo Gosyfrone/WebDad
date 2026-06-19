@@ -351,6 +351,33 @@ func (r *PostRepository) SetAutoHidden(ctx context.Context, id bson.ObjectID, hi
 	return &post, nil
 }
 
+// SetNsfw (dé)marque un post comme NSFW. `nsfw=true` pose le flag + la
+// métadonnée (qui/quand) ; `false` les efface. N'altère ni la visibilité ni les
+// compteurs. mongo.ErrNoDocuments si le post est absent.
+func (r *PostRepository) SetNsfw(ctx context.Context, id bson.ObjectID, nsfw bool, byUserID string, at time.Time) (*models.Post, error) {
+	var update bson.M
+	if nsfw {
+		update = bson.M{"$set": bson.M{
+			"nsfw":       true,
+			"nsfw_by":    byUserID,
+			"nsfw_at":    at,
+			"updated_at": at,
+		}}
+	} else {
+		update = bson.M{
+			"$set":   bson.M{"nsfw": false, "updated_at": at},
+			"$unset": bson.M{"nsfw_by": "", "nsfw_at": ""},
+		}
+	}
+	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
+
+	var post models.Post
+	if err := r.posts.FindOneAndUpdate(ctx, bson.M{"_id": id}, update, opts).Decode(&post); err != nil {
+		return nil, err
+	}
+	return &post, nil
+}
+
 // HiddenFilter borne la corbeille de modération : auteur et/ou plage de date de
 // retrait (`hidden_at`). Champs vides/nil = pas de contrainte (corbeille entière).
 type HiddenFilter struct {

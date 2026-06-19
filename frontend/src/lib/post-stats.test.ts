@@ -40,6 +40,8 @@ function makePost(overrides: Partial<FeedPost> = {}): FeedPost {
     bookmarked: true,
     canDelete: false,
     canPin: false,
+    nsfw: false,
+    canMarkNsfw: false,
     ...overrides,
   }
 }

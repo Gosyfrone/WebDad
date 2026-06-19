@@ -59,6 +59,12 @@ export interface ProfilDetails {
   activityVisibility: 'public' | 'private'
   lastLoginAt: string
   isOnline: boolean
+  /** Préférence « afficher le contenu NSFW » (toggle des paramètres, défaut on). */
+  nsfwEnabled: boolean
+  /** Majeur (≥18 ans), calculé serveur depuis birthDate (vue /profils/me). */
+  isAdult: boolean
+  /** Le contenu NSFW doit-il être affiché pour ce viewer ? `isAdult && nsfwEnabled`. */
+  nsfwVisible: boolean
   followersCount: number
   followingCount: number
   postsCount: number
