@@ -189,6 +189,65 @@ func TestPropagateJWT_TokenValideEcraseSpoof(t *testing.T) {
 	}
 }
 
+// makeNoneToken forge un token signé avec l'algorithme « none » (non-HMAC) :
+// vecteur classique d'« alg confusion ». parse doit le rejeter via le garde de
+// méthode de signature, sans jamais valider ses claims.
+func makeNoneToken(t *testing.T) string {
+	t.Helper()
+	cl := &claims{
+		UserID: "11111111-1111-1111-1111-111111111111",
+		Role:   "admin",
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
+		},
+	}
+	tok, err := jwt.NewWithClaims(jwt.SigningMethodNone, cl).
+		SignedString(jwt.UnsafeAllowNoneSignatureType)
+	if err != nil {
+		t.Fatalf("signature token none : %v", err)
+	}
+	return tok
+}
+
+// TestParse_RejetteAlgoNonHMAC couvre le garde anti « alg confusion » : un token
+// dont la méthode de signature n'est pas HMAC (ici « none ») est refusé, que ce
+// soit via PropagateJWT (passe-plat → 401) ou AdminJWT (401).
+func TestParse_RejetteAlgoNonHMAC(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	none := makeNoneToken(t)
+
+	t.Run("PropagateJWT", func(t *testing.T) {
+		r := gin.New()
+		r.Use(PropagateJWT(testSecret))
+		r.GET("/x", echoHeaders)
+
+		req := httptest.NewRequest(http.MethodGet, "/x", nil)
+		req.Header.Set("Authorization", "Bearer "+none)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusUnauthorized {
+			t.Fatalf("status = %d, attendu 401 (corps: %s)", w.Code, w.Body.String())
+		}
+	})
+
+	t.Run("AdminJWT", func(t *testing.T) {
+		r := gin.New()
+		r.GET("/admin", AdminJWT(testSecret), func(c *gin.Context) {
+			c.JSON(http.StatusOK, gin.H{"ok": true})
+		})
+
+		req := httptest.NewRequest(http.MethodGet, "/admin", nil)
+		req.Header.Set("Authorization", "Bearer "+none)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusUnauthorized {
+			t.Fatalf("status = %d, attendu 401 (corps: %s)", w.Code, w.Body.String())
+		}
+	})
+}
+
 func TestAdminJWT_SecretVide(t *testing.T) {
 	// Secret vide → fail-closed : aucun token ne passe
 	gin.SetMode(gin.TestMode)
