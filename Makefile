@@ -1,11 +1,11 @@
-.PHONY: help env env-sync sync-one up dev dev-down dev-logs down build logs ps clean reset db-only \
-        logs-gateway logs-auth logs-user logs-profil logs-post logs-message logs-notification logs-media logs-mail logs-front logs-db \
-        sh-auth sh-user sh-profil sh-post sh-message sh-notification sh-media sh-mail sh-gateway \
-        psql-auth psql-user mongo-profil-cli mongo-post-cli mongo-message-cli mongo-notification-cli \
+.PHONY: help env env-sync sync-one up dev dev-lan dev-down dev-logs down build logs ps clean reset db-only \
+        logs-gateway logs-auth logs-user logs-profil logs-post logs-message logs-notification logs-report logs-media logs-mail logs-front logs-db \
+        sh-auth sh-user sh-profil sh-post sh-message sh-notification sh-report sh-media sh-mail sh-gateway \
+        psql-auth psql-user mongo-profil-cli mongo-post-cli mongo-message-cli mongo-notification-cli mongo-report-cli \
         swagger swagger-site
 
 # Services possédant un .env propre (chargé par compose via env_file)
-SERVICES := auth-service user-service profil-service post-service message-service notification-service media-service mail-service api-gateway
+SERVICES := auth-service user-service profil-service post-service message-service notification-service report-service media-service mail-service api-gateway
 
 # Invocation compose en mode DEV (overlay hot-reload par-dessus la base)
 DEV := docker compose -f docker-compose.yml -f docker-compose.dev.yml
@@ -105,9 +105,31 @@ dev:
 	@echo "    Arrêt    → make dev-down"
 	@echo ""
 
+# Accès LAN (téléphone, même Wi-Fi) : auto-détecte l'IP locale et injecte les
+# 3 vars réseau (front rebuild avec la nouvelle URL API). Override : make dev-lan IP=192.168.1.42
+IP ?= $(shell hostname -I 2>/dev/null | awk '{print $$1}')
+dev-lan:
+	@test -f .env || { echo " .env racine manquant — exécute : make env"; exit 1; }
+	@for s in $(SERVICES); do \
+		test -f $$s/.env || { echo " $$s/.env manquant (requis par compose) — exécute : make env"; exit 1; }; \
+	done
+	@test -n "$(IP)" || { echo " IP LAN introuvable — passe-la : make dev-lan IP=192.168.1.42"; exit 1; }
+	@echo "  ▶ Accès LAN configuré pour l'IP $(IP)"
+	NEXT_PUBLIC_API_URL=http://$(IP):8080 \
+	CORS_ALLOWED_ORIGINS=http://localhost:3000,http://$(IP):3000 \
+	APP_BASE_URL=http://$(IP):3000 \
+	$(DEV) up --build -d
+	@echo ""
+	@echo "  ▶ Mode DEV LAN démarré (hot-reload front + Go)"
+	@echo "    Sur ce PC  → http://localhost:3000"
+	@echo "    Sur le tel → http://$(IP):3000   (même Wi-Fi que le PC)"
+	@echo "    Si bloqué  → sudo ufw allow 3000,8080/tcp   (pare-feu)"
+	@echo "    Arrêt      → make dev-down"
+	@echo ""
+
 # Logs des services applicatifs (front + Go), sans le bruit des BDD.
 dev-logs:
-	$(DEV) logs -f frontend api-gateway auth-service user-service profil-service post-service message-service notification-service media-service mail-service
+	$(DEV) logs -f frontend api-gateway auth-service user-service profil-service post-service message-service notification-service report-service media-service mail-service
 
 dev-down:
 	$(DEV) down
@@ -158,6 +180,9 @@ logs-message:
 logs-notification:
 	docker compose logs -f notification-service
 
+logs-report:
+	docker compose logs -f report-service
+
 logs-media:
 	docker compose logs -f media-service minio
 
@@ -189,6 +214,9 @@ sh-message:
 sh-notification:
 	docker compose exec notification-service sh
 
+sh-report:
+	docker compose exec report-service sh
+
 sh-media:
 	docker compose exec media-service sh
 
@@ -219,6 +247,9 @@ mongo-message-cli:
 
 mongo-notification-cli:
 	docker compose exec mongo-notification sh -c 'mongosh -u "$$MONGO_INITDB_ROOT_USERNAME" -p "$$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin "$$MONGO_INITDB_DATABASE"'
+
+mongo-report-cli:
+	docker compose exec mongo-report sh -c 'mongosh -u "$$MONGO_INITDB_ROOT_USERNAME" -p "$$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin "$$MONGO_INITDB_DATABASE"'
 
 # ─── Documentation API ───────────────────────────────────────────────────────
 swagger:

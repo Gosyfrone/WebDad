@@ -1,7 +1,7 @@
 /**
  * Client d'authentification (navigateur).
  *
- * Modèle : access token court (15 min) en localStorage + refresh token (24 h)
+ * Modèle : access token court (5 min) en localStorage + refresh token (24 h)
  * en cookie httpOnly (géré par le BFF Next). Les appels API partent
  * directement vers l'API Gateway avec `Authorization: Bearer <access>`.
  *
@@ -53,9 +53,9 @@ function refreshAccessToken(): Promise<string | null> {
         // same-origin → le cookie httpOnly refresh part automatiquement.
         const res = await fetch('/api/auth/refresh', { method: 'POST' })
         if (!res.ok) return null
-        const payload = (await res.json().catch(() => null)) as
-          | { accessToken?: string }
-          | null
+        const payload = (await res.json().catch(() => null)) as {
+          accessToken?: string
+        } | null
         const token = payload?.accessToken ?? null
         if (token) setAccessToken(token)
         return token
@@ -67,6 +67,29 @@ function refreshAccessToken(): Promise<string | null> {
     })()
   }
   return refreshPromise
+}
+
+/**
+ * Garde : le bootstrap de session ne tente qu'UN refresh par chargement de page,
+ * même pour les vrais visiteurs (cookie absent → 401 → on n'insiste pas).
+ */
+let bootstrapped = false
+
+/**
+ * Réhydrate la session au démarrage depuis le cookie httpOnly refresh (24 h).
+ *
+ * L'access token vit en localStorage (cache 15 min), mais iOS Safari (ITP)
+ * évince ce stockage bien plus vite que le cookie same-origin. Sans ce bootstrap,
+ * un localStorage purgé alors que le cookie reste valide afficherait l'utilisateur
+ * en visiteur jusqu'au prochain 401. On tente donc un refresh si aucun access
+ * token n'est présent : succès → `setAccessToken` émet `breezy:session-changed`,
+ * et `useSession` bascule visiteur → connecté sans rechargement.
+ */
+export async function bootstrapSession(): Promise<void> {
+  if (typeof window === 'undefined' || bootstrapped) return
+  bootstrapped = true
+  if (getAccessToken()) return
+  await refreshAccessToken()
 }
 
 function redirectToLogin(): void {
@@ -88,7 +111,7 @@ function resolveUrl(path: string): string {
  */
 export async function apiFetch(
   path: string,
-  init: RequestInit = {}
+  init: RequestInit = {},
 ): Promise<Response> {
   const url = resolveUrl(path)
 
@@ -124,8 +147,12 @@ export async function apiFetch(
  * session locale est nettoyée même si l'appel réseau échoue.
  */
 export async function logout(): Promise<void> {
+  const token = getAccessToken()
   try {
-    await fetch('/api/auth/logout', { method: 'POST' })
+    await fetch('/api/auth/logout', {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    })
   } catch {
     // best-effort : on nettoie quand même côté client.
   } finally {

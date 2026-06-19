@@ -9,6 +9,7 @@ import { ArrowRight, Hash, Loader2, Search, Sparkles, UserX } from 'lucide-react
 import {
   getCommonFollowers,
   getFollowingIds,
+  getPendingFollowRequestIds,
   getSuggestions,
   searchUsers,
 } from '@/lib/api'
@@ -23,13 +24,14 @@ import { hashtagHref } from '@/lib/routes'
 import { rememberSearchPath } from '@/lib/search-tab'
 import { useFollow } from '@/lib/use-follow'
 import type { RelationUser } from '@/types'
-import { cn } from '@/lib/utils'
+import { cn, initialOf } from '@/lib/utils'
 import { useExplorerFilters } from '@/components/explorer/explorer-filter-context'
-import { MobileFilterMenu } from '@/components/explorer/explorer-filter-controls'
+import { MobileFilterButtons } from '@/components/explorer/explorer-filter-controls'
 import { useT } from '@/components/language-provider'
 import { PostCard } from '@/components/feed/post-card'
 import { ProfilLink } from '@/components/profil/profil-link'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
 import { Button } from '@/components/ui/button'
 
 /**
@@ -56,14 +58,14 @@ export function ExplorerView() {
   const [loadingSearch, setLoadingSearch] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const { currentUserId, isFollowing, isPending, toggle } = useFollow()
+  const { currentUserId, isFollowing, isRequested, isPending, toggle } = useFollow()
   const {
     setFilters,
     setSubmittedSearchActive,
     showPublications,
     showUsers,
-    togglePublications,
-    toggleUsers,
+    tryTogglePublications,
+    tryToggleUsers,
   } = useExplorerFilters()
   const viewerId = currentUserId ?? readCurrentUserId()
 
@@ -94,11 +96,17 @@ export function ExplorerView() {
       viewerId
         ? getFollowingIds(viewerId).catch(() => new Set<string>())
         : Promise.resolve(new Set<string>()),
+      viewerId
+        ? getPendingFollowRequestIds().catch(() => new Set<string>())
+        : Promise.resolve(new Set<string>()),
     ])
-      .then(([nextTrends, nextSuggestions, nextPosts, followingIds]) => {
+      .then(([nextTrends, nextSuggestions, nextPosts, followingIds, requestedIds]) => {
         if (cancelled) return
         const visibleSuggestions = nextSuggestions
-          .filter((user) => user.id !== viewerId && !followingIds.has(user.id))
+          .filter(
+            (user) =>
+              user.id !== viewerId && !followingIds.has(user.id) && !requestedIds.has(user.id),
+          )
           .slice(0, 6)
         setTrends(nextTrends)
         setSuggestions(visibleSuggestions)
@@ -229,7 +237,8 @@ export function ExplorerView() {
   return (
     <div className="flex flex-col">
       <div className="panel z-10 border-b px-4 py-3 lg:sticky lg:top-0">
-        <h1 className="brand-text mb-3 text-xl font-bold">{t('nav.explore')}</h1>
+        {/* Titre masqué sur mobile : porté par l'en-tête global. La recherche reste. */}
+        <h1 className="brand-text mb-3 hidden text-xl font-bold lg:block">{t('nav.explore')}</h1>
         <form onSubmit={handleSearchSubmit} className="relative">
           <div className="relative">
             <Search
@@ -269,11 +278,11 @@ export function ExplorerView() {
         </p>
         {submittedQuery && (
           <div className="mt-3 flex justify-end xl:hidden">
-            <MobileFilterMenu
+            <MobileFilterButtons
               showPublications={showPublications}
               showUsers={showUsers}
-              onTogglePublications={togglePublications}
-              onToggleUsers={toggleUsers}
+              onTogglePublications={tryTogglePublications}
+              onToggleUsers={tryToggleUsers}
             />
           </div>
         )}
@@ -291,6 +300,7 @@ export function ExplorerView() {
           showPublications={showPublications}
           showUsers={showUsers}
           isFollowing={isFollowing}
+          isRequested={isRequested}
           isPending={isPending}
           onToggleFollow={toggle}
           onDeleted={handlePostDeleted}
@@ -312,6 +322,7 @@ export function ExplorerView() {
             currentUserId={viewerId}
             commonFollowers={commonFollowers}
             isFollowing={isFollowing}
+            isRequested={isRequested}
             isPending={isPending}
             onToggleFollow={toggle}
           />
@@ -423,6 +434,7 @@ function LiveSearchMenu({
                   <Avatar className="h-10 w-10">
                     {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user.displayName} />}
                     <AvatarFallback>{initials(user)}</AvatarFallback>
+                    <ActivityPresenceDot userId={user.id} />
                   </Avatar>
                   <span className="min-w-0">
                     <span className="block truncate font-bold text-foreground">{user.displayName}</span>
@@ -454,6 +466,7 @@ function SubmittedSearchResults({
   showPublications,
   showUsers,
   isFollowing,
+  isRequested,
   isPending,
   onToggleFollow,
   onDeleted,
@@ -469,6 +482,7 @@ function SubmittedSearchResults({
   showPublications: boolean
   showUsers: boolean
   isFollowing: (id: string) => boolean
+  isRequested: (id: string) => boolean
   isPending: (id: string) => boolean
   onToggleFollow: (user: RelationUser, next: boolean) => void
   onDeleted: (id: string) => void
@@ -523,6 +537,7 @@ function SubmittedSearchResults({
                 user={user}
                 isSelf={user.id === currentUserId}
                 isFollowing={isFollowing(user.id)}
+                isRequested={isRequested(user.id)}
                 pending={isPending(user.id)}
                 onToggleFollow={onToggleFollow}
               />
@@ -610,6 +625,7 @@ function SuggestionsSection({
   currentUserId,
   commonFollowers,
   isFollowing,
+  isRequested,
   isPending,
   onToggleFollow,
 }: {
@@ -617,6 +633,7 @@ function SuggestionsSection({
   currentUserId: string | null
   commonFollowers: Record<string, RelationUser[]>
   isFollowing: (id: string) => boolean
+  isRequested: (id: string) => boolean
   isPending: (id: string) => boolean
   onToggleFollow: (user: RelationUser, next: boolean) => void
 }) {
@@ -634,6 +651,7 @@ function SuggestionsSection({
               common={commonFollowers[user.id] ?? []}
               isSelf={user.id === currentUserId}
               isFollowing={isFollowing(user.id)}
+              isRequested={isRequested(user.id)}
               pending={isPending(user.id)}
               onToggleFollow={onToggleFollow}
             />
@@ -649,6 +667,7 @@ function SuggestionCard({
   common,
   isSelf,
   isFollowing,
+  isRequested,
   pending,
   onToggleFollow,
 }: {
@@ -656,6 +675,7 @@ function SuggestionCard({
   common: RelationUser[]
   isSelf: boolean
   isFollowing: boolean
+  isRequested: boolean
   pending: boolean
   onToggleFollow: (user: RelationUser, next: boolean) => void
 }) {
@@ -673,6 +693,7 @@ function SuggestionCard({
           <Avatar className="h-14 w-14">
             {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user.displayName} />}
             <AvatarFallback>{initials(user)}</AvatarFallback>
+            <ActivityPresenceDot userId={user.id} className="h-3.5 w-3.5" />
           </Avatar>
         </ProfilLink>
         <div className="min-w-0 flex-1">
@@ -694,14 +715,18 @@ function SuggestionCard({
           <Button
             size="sm"
             variant={isFollowing ? 'outline' : 'default'}
-            disabled={pending}
+            disabled={pending || isRequested}
             onClick={() => onToggleFollow(user, !isFollowing)}
             className={cn(
               'shrink-0 rounded-full font-bold',
               !isFollowing && 'bg-gradient-to-r from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] text-white',
             )}
           >
-            {isFollowing ? t('follow.followed') : t('follow.follow')}
+            {isRequested
+              ? t('follow.requested')
+              : isFollowing
+                ? t('follow.followed')
+                : t('follow.follow')}
           </Button>
         )}
       </div>
@@ -738,12 +763,14 @@ function ExplorerUserRow({
   user,
   isSelf,
   isFollowing,
+  isRequested,
   pending,
   onToggleFollow,
 }: {
   user: RelationUser
   isSelf: boolean
   isFollowing: boolean
+  isRequested: boolean
   pending: boolean
   onToggleFollow: (user: RelationUser, next: boolean) => void
 }) {
@@ -754,6 +781,7 @@ function ExplorerUserRow({
         <Avatar className="h-11 w-11">
           {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user.displayName} />}
           <AvatarFallback>{initials(user)}</AvatarFallback>
+          <ActivityPresenceDot userId={user.id} />
         </Avatar>
       </ProfilLink>
       <div className="min-w-0 flex-1">
@@ -774,14 +802,18 @@ function ExplorerUserRow({
         <Button
           size="sm"
           variant={isFollowing ? 'outline' : 'default'}
-          disabled={pending}
+          disabled={pending || isRequested}
           onClick={() => onToggleFollow(user, !isFollowing)}
           className={cn(
             'shrink-0 rounded-full font-bold',
             !isFollowing && 'bg-gradient-to-r from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] text-white',
           )}
         >
-          {isFollowing ? t('follow.followed') : t('follow.follow')}
+          {isRequested
+            ? t('follow.requested')
+            : isFollowing
+              ? t('follow.followed')
+              : t('follow.follow')}
         </Button>
       )}
     </div>
@@ -827,7 +859,7 @@ function EmptyState({
 }
 
 function initials(user: RelationUser): string {
-  return (user.displayName.charAt(0) || user.username.charAt(0) || '?').toUpperCase()
+  return initialOf(user.displayName, user.username)
 }
 
 function postMatchesQuery(post: FeedPost, query: string): boolean {

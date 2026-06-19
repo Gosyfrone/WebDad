@@ -1,8 +1,11 @@
+import { Suspense } from 'react'
+
 import { SidebarLeft } from '@/components/layout/sidebar-left'
 import { SidebarRight } from '@/components/layout/sidebar-right'
 import { MobileHeader } from '@/components/layout/mobile-header'
 import { MobileTabBar } from '@/components/layout/mobile-tab-bar'
 import { ComposeFab } from '@/components/layout/compose-fab'
+import { CurrentUserProvider } from '@/components/current-user-provider'
 import { NotificationsProvider } from '@/components/notifications-provider'
 import { MessagesProvider } from '@/components/messages-provider'
 import { AuthPromptProvider } from '@/components/auth-prompt-provider'
@@ -10,67 +13,78 @@ import { OnboardingGate } from '@/components/onboarding/onboarding-gate'
 import { PasswordChangeGate } from '@/components/account/password-change-gate'
 import { UsernamePendingGate } from '@/components/account/username-pending-gate'
 import { ExplorerFilterProvider } from '@/components/explorer/explorer-filter-context'
+import { FeedView } from '@/components/feed/feed-view'
+import { OverlayScrollLock } from '@/components/feed/overlay-scroll-lock'
+import { ActivityLifecycle } from '@/components/activity/activity-lifecycle'
+import { WarningsGate } from '@/components/moderation/warnings-gate'
 
 /**
- * Layout de l'espace authentifié, responsive (mobile-first).
+ * Layout de l'espace authentifié, responsive : en-tête mobile + tab bar < lg,
+ * sidebar gauche ≥ lg, colonne de droite ≥ xl.
  *
- *   - < lg (téléphones, iPad portrait) : en-tête mobile (avatar + logo) +
- *     barre d'onglets fixe en bas + bouton « + » flottant sur le feed.
- *   - ≥ lg (iPad paysage, desktop) : colonne de navigation à gauche + contenu.
- *   - ≥ xl : ajout de la colonne de droite (suggestions / tendances).
- *
- * Le rôle réel est désormais dérivé du JWT par `useSession()` directement dans
- * `SidebarLeft` / `MobileHeader` (cf. lib/session.ts) — plus de placeholder.
+ * **Feed persistant.** `FeedView` est monté une seule fois ici (colonne centrale) :
+ * il porte le scroll de la fenêtre et conserve son état sur toute la navigation.
+ * Les autres sections se rendent en overlay plein écran par-dessus, `/feed` se
+ * rend en `null` (fond visible) — d'où l'abandon des parallel/intercepting routes
+ * (`@modal`), source des bugs 404/refresh/scroll.
  */
-export default function AppLayout({
-  children,
-  modal,
-}: {
-  children: React.ReactNode
-  modal: React.ReactNode
-}) {
+export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
-    <AuthPromptProvider>
-      <NotificationsProvider>
-        <MessagesProvider>
-          <ExplorerFilterProvider>
-            <div className="bg-page relative flex min-h-screen justify-center overflow-x-clip">
-              <div className="bg-page-glow-1 pointer-events-none fixed inset-0" />
-              <div className="bg-page-glow-2 pointer-events-none fixed inset-0" />
+    <CurrentUserProvider>
+      <AuthPromptProvider>
+        <NotificationsProvider>
+          <MessagesProvider>
+            <ExplorerFilterProvider>
+              <div className="bg-page relative flex min-h-screen justify-center overflow-x-clip">
+                <div className="bg-page-glow-1 pointer-events-none fixed inset-0" />
+                <div className="bg-page-glow-2 pointer-events-none fixed inset-0" />
 
-              <div className="relative flex w-full max-w-[1265px]">
-                <SidebarLeft />
+                <div className="relative flex w-full max-w-[1265px]">
+                  <SidebarLeft />
 
-                {/* Colonne centrale. overflow-x-clip : empêche tout défilement horizontal
-                    parasite sur mobile (sans créer de conteneur de scroll, donc sans
-                    casser les en-têtes sticky, contrairement à overflow-x-hidden). */}
-                <div className="glass-column flex min-h-screen w-full min-w-0 flex-1 flex-col overflow-x-clip backdrop-blur-2xl lg:border-x">
-                  <MobileHeader />
-                  {/* pb-16 : dégage la barre d'onglets fixe (masquée ≥ lg) */}
-                  <main className="flex-1 pb-16 lg:pb-0">{children}</main>
+                  {/* Colonne centrale. overflow-x-clip : pas de scroll horizontal parasite
+                      sur mobile, sans créer de conteneur de scroll (≠ overflow-x-hidden, qui
+                      casserait les en-têtes sticky). */}
+                  <div className="glass-column flex min-h-screen w-full min-w-0 flex-1 flex-col overflow-x-clip backdrop-blur-2xl lg:border-x">
+                    {/* pt-14 / pb-16 : dégagent l'en-tête mobile fixe et la tab bar (masqués ≥ lg). */}
+                    <main className="flex-1 pb-16 pt-14 lg:pb-0 lg:pt-0">
+                      <Suspense fallback={null}>
+                        <FeedView />
+                      </Suspense>
+                    </main>
+                  </div>
+
+                  <SidebarRight />
                 </div>
 
-                <SidebarRight />
+                {/* Chrome mobile (masqué ≥ lg) */}
+                <MobileTabBar />
+                <ComposeFab />
+
+                {/* Onboarding OAuth sans profil, puis mot de passe temporaire et username
+                    provisoire (comptes créés par un admin). */}
+                <OnboardingGate />
+                <PasswordChangeGate />
+                <UsernamePendingGate />
+                <ActivityLifecycle />
+                <WarningsGate />
+
+                {/* Gèle le défilement du feed quand un overlay est ouvert (≠ /feed). */}
+                <OverlayScrollLock />
+
+                {/* Overlays des sections, rendus au niveau racine (hors colonne centrale)
+                    pour que leur `fixed` se réfère au viewport, pas au bloc créé par le
+                    `backdrop-blur` de la colonne. `/feed` se rend en `null`. */}
+                {children}
+
+                {/* En-tête mobile (masqué ≥ lg), rendu APRÈS les overlays en `fixed z-[60]`
+                    pour rester au-dessus d'eux → header unique sur toutes les pages. */}
+                <MobileHeader />
               </div>
-
-              {/* Chrome mobile (masqué ≥ lg) */}
-              <MobileTabBar />
-              <ComposeFab />
-
-              {/* Onboarding bloquant pour les comptes OAuth sans profil (cf. composant). */}
-              <OnboardingGate />
-              {/* Comptes créés par un admin : changement du mot de passe temporaire
-                  (prioritaire), puis du username provisoire si suffixé. */}
-              <PasswordChangeGate />
-              <UsernamePendingGate />
-
-              {/* Slot parallèle : détail d'un post en panneau plein écran
-                  (intercepting route), feed gardé monté derrière. */}
-              {modal}
-            </div>
-          </ExplorerFilterProvider>
-        </MessagesProvider>
-      </NotificationsProvider>
-    </AuthPromptProvider>
+            </ExplorerFilterProvider>
+          </MessagesProvider>
+        </NotificationsProvider>
+      </AuthPromptProvider>
+    </CurrentUserProvider>
   )
 }

@@ -8,14 +8,12 @@ import * as React from 'react'
 import { useT } from '@/components/language-provider'
 import { setAccessToken } from '@/lib/auth-client'
 import { ROUTES } from '@/lib/routes'
+import { savePendingOAuthSignup } from '@/lib/oauth-pending'
 
 function CallbackContent({ provider }: { provider: string }) {
   const t = useT()
   const searchParams = useSearchParams()
   const [error, setError] = React.useState<string | null>(null)
-  // Le code OAuth est à usage unique : on garantit un seul échange même sous le
-  // double-montage de React StrictMode (dev), sinon le 2e POST réutilise un code
-  // déjà consommé et fait flasher une fausse erreur sur un login pourtant réussi.
   const exchangeStarted = React.useRef(false)
 
   React.useEffect(() => {
@@ -44,12 +42,20 @@ function CallbackContent({ provider }: { provider: string }) {
           return
         }
 
+        if (payload?.onboardingRequired && payload?.pendingToken) {
+          savePendingOAuthSignup({
+            provider,
+            pendingToken: payload.pendingToken,
+            email: payload.email ?? '',
+          })
+          window.location.replace('/auth/oauth/terms')
+          return
+        }
+
         if (payload?.accessToken) {
           setAccessToken(payload.accessToken)
         }
 
-        // Navigation DURE (cf. login) : entrée cross-groupe `(auth)` → `(app)`,
-        // la nav soft ne résout pas le slot parallèle `@modal` → 404.
         window.location.assign(ROUTES.feed)
       } catch {
         setError(t('auth.oauth.error'))

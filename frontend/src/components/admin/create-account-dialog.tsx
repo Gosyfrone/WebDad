@@ -29,7 +29,7 @@ import { useT } from '@/components/language-provider'
 import { useToast } from '@/hooks/use-toast'
 
 // Règles alignées sur le register / l'onboarding (parité de validation username).
-const usernamePattern = /^[a-zA-Z0-9_]{3,24}$/
+const usernamePattern = /^(?=.{3,24}$)[a-zA-Z0-9_]+(?:\.[a-zA-Z0-9_]+)*$/
 const reservedUsernames = new Set([
   'me',
   'admin',

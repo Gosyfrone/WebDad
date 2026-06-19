@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 import { apiUrl } from '@/lib/config'
-import { provisionUser } from '@/lib/provision'
+import { markLoginActivity, provisionUser } from '@/lib/provision'
 import { setRefreshCookie } from '@/lib/server/auth-cookie'
 
 type AuthPayload = {
@@ -9,6 +9,8 @@ type AuthPayload = {
     token?: string
     refresh_token?: string
     user?: unknown
+    mfa_required?: boolean
+    challenge?: string
   }
   message?: string
   error?: string
@@ -121,6 +123,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: message }, { status: upstreamResponse.status })
   }
 
+  // MFA active : le mot de passe est bon mais aucun JWT n'est émis. On relaie le
+  // challenge au client SANS poser de cookie ni provisionner ; le client affiche
+  // l'écran de code puis appelle /api/auth/mfa/verify.
+  if (payload?.data?.mfa_required && payload?.data?.challenge) {
+    return NextResponse.json(
+      { mfaRequired: true, challenge: payload.data.challenge },
+      { status: 200 }
+    )
+  }
+
   const accessToken = payload?.data?.token ?? null
   const refreshToken = payload?.data?.refresh_token ?? null
 
@@ -138,6 +150,7 @@ export async function POST(request: NextRequest) {
   // Provisioning paresseux : crée la ligne `users` à partir du JWT (best-effort).
   if (accessToken) {
     void provisionUser(accessToken)
+    void markLoginActivity(accessToken)
   }
 
   return nextResponse

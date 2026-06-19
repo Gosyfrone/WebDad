@@ -16,15 +16,19 @@ type User struct {
 	ID            string `json:"id"`
 	Email         string `json:"email"`
 	PasswordHash  string `json:"-"`        // colonne `password` (hash bcrypt, NULL si compte OAuth)
-	Provider      string `json:"provider"` // 'local' | 'google'
+	Provider      string `json:"provider"` // 'local' | 'google' | 'github' | 'facebook' | 'spotify'
 	Role          string `json:"role"`
 	IsActive      bool   `json:"is_active"`
 	EmailVerified bool   `json:"email_verified"`
 	// MustChangePassword : mot de passe temporaire posé par un admin → le front
 	// impose un changement bloquant à la première connexion. Propagé dans le JWT.
-	MustChangePassword bool       `json:"must_change_password"`
-	DeactivatedAt      *time.Time `json:"deactivated_at,omitempty"` // date du bannissement (NULL si actif)
-	CreatedAt          time.Time  `json:"created_at"`
+	MustChangePassword bool `json:"must_change_password"`
+	// MFAEnabled : la double authentification TOTP est active sur le compte.
+	// Quand true, le login par mot de passe n'émet pas de JWT directement mais
+	// un challenge à valider via POST /auth/mfa/verify.
+	MFAEnabled    bool       `json:"mfa_enabled"`
+	DeactivatedAt *time.Time `json:"deactivated_at,omitempty"` // date du bannissement (NULL si actif)
+	CreatedAt     time.Time  `json:"created_at"`
 }
 
 // AuthUser : vue publique d'un utilisateur renvoyée par l'API d'auth.
@@ -96,6 +100,25 @@ type OAuthExchangeRequest struct {
 	State string `json:"state"`
 }
 
+// OAuthCompleteRequest finalise une inscription OAuth en attente. Le token est
+// celui renvoyé par /exchange quand aucun compte n'existe encore.
+type OAuthCompleteRequest struct {
+	PendingToken  string `json:"pending_token" binding:"required"`
+	AcceptedTerms *bool  `json:"accepted_terms" binding:"required"`
+}
+
+// OAuthExchangeData : réponse de POST /auth/oauth/:provider/exchange.
+// Si onboarding_required=true, aucun compte/JWT n'a été créé : le front doit
+// finaliser l'inscription avec pending_token.
+type OAuthExchangeData struct {
+	Token              string   `json:"token,omitempty"`
+	RefreshToken       string   `json:"refresh_token,omitempty"`
+	User               AuthUser `json:"user,omitempty"`
+	OnboardingRequired bool     `json:"onboarding_required,omitempty"`
+	PendingToken       string   `json:"pending_token,omitempty"`
+	Email              string   `json:"email,omitempty"`
+}
+
 // RefreshRequest : payload de POST /auth/refresh et /auth/logout. Le refresh
 // token transite dans le corps (transmis par le BFF Next depuis le cookie
 // httpOnly) — pas de binding `required` pour que /logout reste best-effort.
@@ -129,6 +152,36 @@ type ChangeEmailRequest struct {
 // ConfirmEmailChangeRequest confirme le changement d'adresse par jeton.
 type ConfirmEmailChangeRequest struct {
 	Token string `json:"token" binding:"required"`
+}
+
+// MFAEnableRequest : payload de POST /auth/mfa/enable. Le code TOTP à 6 chiffres
+// affiché par l'app d'authentification confirme que le secret a bien été scanné.
+type MFAEnableRequest struct {
+	Code string `json:"code" binding:"required"`
+}
+
+// MFADisableRequest : payload de POST /auth/mfa/disable. L'utilisateur prouve
+// son identité soit par un code TOTP courant, soit par son mot de passe — l'un
+// des deux suffit.
+type MFADisableRequest struct {
+	Code     string `json:"code,omitempty"`
+	Password string `json:"password,omitempty"`
+}
+
+// MFAVerifyRequest : payload de POST /auth/mfa/verify (public). `challenge` est
+// le jeton court émis au login après un mot de passe valide ; `code` est le TOTP.
+type MFAVerifyRequest struct {
+	Challenge string `json:"challenge" binding:"required"`
+	Code      string `json:"code"      binding:"required"`
+}
+
+// MFASetupData : corps de la réponse 200 de POST /auth/mfa/setup. Le QR PNG est
+// renvoyé en data URI prêt à poser dans un <img> (génération serveur → aucune
+// dépendance front). `secret` permet la saisie manuelle si le QR n'est pas scannable.
+type MFASetupData struct {
+	Secret     string `json:"secret"       example:"JBSWY3DPEHPK3PXP"`
+	OtpauthURL string `json:"otpauth_url"  example:"otpauth://totp/Breezy:user@mail?secret=...&issuer=Breezy"`
+	QRDataURI  string `json:"qr_data_uri"  example:"data:image/png;base64,iVBORw0KGgo..."`
 }
 
 // UpdateRoleRequest : payload de PATCH /auth/users/:id/role (admin).

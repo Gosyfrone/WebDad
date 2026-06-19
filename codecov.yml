@@ -1,0 +1,30 @@
+# Configuration Codecov — couverture backend (un flag par service Go) + frontend.
+# Targets souples et non bloquants au démarrage : on mesure d'abord, on durcit
+# ensuite une fois une base de tests établie.
+
+coverage:
+  status:
+    project:
+      default:
+        target: auto          # comparé au commit de base, pas de seuil absolu
+        threshold: 1%         # tolère -1% sans marquer la PR en échec
+        informational: true   # report-only : ne bloque jamais le merge
+    patch:
+      default:
+        informational: true
+
+comment:
+  layout: "reach, diff, flags, files"
+  require_changes: true        # pas de commentaire si la couverture ne bouge pas
+
+flag_management:
+  default_rules:
+    carryforward: true         # garde le dernier % d'un flag si son job n'a pas tourné (paths filters)
+
+# Fichiers exclus du calcul : tests, généré, et l'UI shadcn (non testée par design).
+ignore:
+  - "**/*_test.go"
+  - "**/mocks/**"
+  - "doc/**"
+  - "frontend/src/components/ui/**"
+  - "frontend/**/*.test.ts"

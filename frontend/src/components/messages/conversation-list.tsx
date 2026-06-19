@@ -86,44 +86,65 @@ export function ConversationList({
 }: ConversationListProps) {
   const { t } = useLanguage()
 
+  // Menu de création (DM / groupe / communauté / découvrir), partagé entre
+  // l'en-tête desktop (bouton « + » rond) et le bouton « Nouveau message » du
+  // body sur mobile (l'en-tête global y porte le titre « Messages »).
+  const newConversationMenu = (trigger: React.ReactNode) => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuItem onClick={onNewDM}>
+          <MessageSquarePlus className="mr-2 h-4 w-4" />
+          {t('messages.new_dm')}
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={onNewGroup}>
+          <Users className="mr-2 h-4 w-4" />
+          {t('messages.new_group')}
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={onNewCommunity}>
+          <Plus className="mr-2 h-4 w-4" />
+          {t('messages.new_community')}
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={onDiscover}>
+          <Compass className="mr-2 h-4 w-4" />
+          {t('messages.discover')}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+
   return (
     <div className="flex h-full min-h-0 flex-col">
-      {/* En-tête */}
-      <div className="panel flex items-center justify-between border-b px-4 py-3">
+      {/* En-tête (desktop) : sur mobile, le titre est porté par l'en-tête global. */}
+      <div className="panel hidden items-center justify-between border-b px-4 py-3 lg:flex">
         <h1 className="brand-text text-xl font-bold">{t('messages.title')}</h1>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              size="icon"
-              aria-label={t('messages.new')}
-              className="h-9 w-9 rounded-full bg-gradient-to-r from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] text-white"
-            >
-              <Plus className="h-5 w-5" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuItem onClick={onNewDM}>
-              <MessageSquarePlus className="mr-2 h-4 w-4" />
-              {t('messages.new_dm')}
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={onNewGroup}>
-              <Users className="mr-2 h-4 w-4" />
-              {t('messages.new_group')}
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={onNewCommunity}>
-              <Plus className="mr-2 h-4 w-4" />
-              {t('messages.new_community')}
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={onDiscover}>
-              <Compass className="mr-2 h-4 w-4" />
-              {t('messages.discover')}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {newConversationMenu(
+          <Button
+            size="icon"
+            aria-label={t('messages.new')}
+            className="h-9 w-9 rounded-full bg-gradient-to-r from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] text-white"
+          >
+            <Plus className="h-5 w-5" />
+          </Button>,
+        )}
       </div>
 
       {/* Liste */}
       <div className="flex-1 overflow-y-auto">
+        {/* Action « Nouveau message » (mobile) : au-dessus de la 1ère conversation,
+            sans bande dédiée (l'en-tête global porte le titre « Messages »). */}
+        <div className="px-4 pt-3 lg:hidden">
+          {newConversationMenu(
+            <Button
+              size="sm"
+              className="rounded-full bg-gradient-to-r from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] text-white"
+            >
+              <MessageSquarePlus className="mr-2 h-4 w-4" />
+              {t('messages.new_message')}
+            </Button>,
+          )}
+        </div>
+
         {loading ? (
           <div className="flex justify-center py-16">
             <Loader2 className="h-6 w-6 animate-spin text-[#5B6CFF] dark:text-[#9aa6ff]" />

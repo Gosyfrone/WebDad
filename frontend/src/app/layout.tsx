@@ -3,6 +3,7 @@ import localFont from 'next/font/local'
 import { ThemeProvider } from '@/components/theme-provider'
 import { LanguageProvider } from '@/components/language-provider'
 import { RouteOriginTracker } from '@/components/route-origin-tracker'
+import { SessionBootstrap } from '@/components/session-bootstrap'
 import { Toaster } from '@/components/ui/toaster'
 import { CUSTOM_THEME_INLINE_SCRIPT } from '@/lib/custom-theme'
 import './globals.css'
@@ -52,6 +53,7 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <LanguageProvider>
+            <SessionBootstrap />
             <RouteOriginTracker />
             {children}
             <Toaster />

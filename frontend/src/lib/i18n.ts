@@ -85,15 +85,24 @@ export const messages: Record<Locale, Messages> = {
     'common.not_connected': 'non connecté',
     'common.logout': 'Se déconnecter',
     'common.cancel': 'Annuler',
+    'common.clear': 'Effacer',
     'common.save': 'Enregistrer',
     'common.loading': 'Chargement…',
     'common.retry': 'Réessayer',
     'common.close': 'Fermer',
     'media.download': "Télécharger l'image",
+    'media.open_image': "Agrandir l'image",
+    'media.copy_image': "Copier l'image",
+    'media.save_image': "Enregistrer l'image",
+    'media.copy_success': 'Image copiée.',
+    'media.copy_failed': "Impossible de copier l'image.",
+    'media.save_started': "Enregistrement de l'image lancé.",
+    'media.save_failed': "Impossible d'enregistrer l'image.",
     'media.previous': 'Image précédente',
     'media.next': 'Image suivante',
     'media.speed': 'Vitesse de lecture',
     'media.speed_normal': 'Normal',
+    'media.too_large': 'Fichier trop volumineux (max {max} Mo).',
 
     // — Navigation —
     'nav.feed': 'Fil',
@@ -107,6 +116,7 @@ export const messages: Record<Locale, Messages> = {
     'nav.home': 'Accueil',
     'nav.bookmarks': 'Signets',
     'nav.open_menu': 'Ouvrir le menu de navigation',
+    'nav.back': 'Retour',
     'nav.post': 'Breezer',
     'nav.compose': 'Composer une publication',
     'nav.search': 'Recherche',
@@ -137,7 +147,8 @@ export const messages: Record<Locale, Messages> = {
     'bookmarks.rename': 'Renommer',
     'bookmarks.delete': 'Supprimer',
     'bookmarks.delete_title': 'Supprimer la collection',
-    'bookmarks.delete_confirm': 'Les posts ne seront plus dans cette collection (ils restent publiés).',
+    'bookmarks.delete_confirm':
+      'Les posts ne seront plus dans cette collection (ils restent publiés).',
     'bookmarks.empty_title': 'Aucun signet',
     'bookmarks.empty_message': 'Enregistrez des posts pour les retrouver ici.',
     'bookmarks.empty_collection': 'Cette collection est vide.',
@@ -188,7 +199,34 @@ export const messages: Record<Locale, Messages> = {
     'settings.general_title': 'Paramètres généraux',
     'settings.general_desc': 'Personnalisez votre expérience Breezy.',
     'settings.user_title': 'Paramètres utilisateur',
-    'settings.user_desc': 'Gérez les identifiants et la sécurité de votre compte.',
+    'settings.user_desc':
+      'Gérez les identifiants et la sécurité de votre compte.',
+    'settings.mfa.title': 'Double authentification (2FA)',
+    'settings.mfa.desc':
+      "Ajoutez un code à usage unique généré par une application d'authentification (Microsoft/Google Authenticator) à la connexion.",
+    'settings.mfa.enabled_badge': 'Activée',
+    'settings.mfa.loading': 'Chargement…',
+    'settings.mfa.switch_label': 'Double authentification',
+    'settings.mfa.state_on': 'Activée — un code sera demandé à la connexion.',
+    'settings.mfa.state_off': 'Désactivée',
+    'settings.mfa.not_configured':
+      "La double authentification n'est pas disponible sur ce serveur pour le moment.",
+    'settings.mfa.activate': 'Activer la 2FA',
+    'settings.mfa.setup_intro':
+      "Scannez ce QR code avec votre application d'authentification, ou saisissez la clé manuellement, puis entrez le code généré.",
+    'settings.mfa.qr_alt': 'QR code de configuration 2FA',
+    'settings.mfa.secret_label': 'Clé de configuration (saisie manuelle)',
+    'settings.mfa.code_label': 'Code de vérification',
+    'settings.mfa.password_label': 'Ou votre mot de passe',
+    'settings.mfa.confirm': 'Activer',
+    'settings.mfa.cancel': 'Annuler',
+    'settings.mfa.disable': 'Désactiver la 2FA',
+    'settings.mfa.disable_intro':
+      'Confirmez avec un code de votre application OU votre mot de passe pour désactiver la double authentification.',
+    'settings.mfa.success_enabled': 'Double authentification activée.',
+    'settings.mfa.success_disabled': 'Double authentification désactivée.',
+    'settings.mfa.error_code': 'Code de vérification invalide.',
+    'settings.mfa.error_generic': 'Opération impossible. Réessayez.',
     'settings.password.title': 'Changer le mot de passe',
     'settings.password.desc': 'Le changement déconnectera vos autres sessions.',
     'settings.password.current': 'Ancien mot de passe',
@@ -196,36 +234,51 @@ export const messages: Record<Locale, Messages> = {
     'settings.password.confirm': 'Confirmer le nouveau mot de passe',
     'settings.password.submit': 'Modifier le mot de passe',
     'settings.password.success': 'Mot de passe modifié.',
-    'settings.password.error_length': 'Le nouveau mot de passe doit contenir au moins 8 caractères.',
-    'settings.password.error_match': 'Les deux nouveaux mots de passe ne correspondent pas.',
-    'settings.password.error_same': "Le nouveau mot de passe doit être différent de l'ancien.",
+    'settings.password.error_length':
+      'Le nouveau mot de passe doit contenir au moins 8 caractères.',
+    'settings.password.error_match':
+      'Les deux nouveaux mots de passe ne correspondent pas.',
+    'settings.password.error_same':
+      "Le nouveau mot de passe doit être différent de l'ancien.",
     'settings.password.error_current': "L'ancien mot de passe est incorrect.",
-    'settings.password.error_generic': 'Impossible de modifier le mot de passe.',
+    'settings.password.error_generic':
+      'Impossible de modifier le mot de passe.',
     'settings.email.title': "Modifier l'adresse e-mail",
-    'settings.email.desc': "L'adresse actuelle reste active jusqu'à la validation de la nouvelle.",
+    'settings.email.desc':
+      "L'adresse actuelle reste active jusqu'à la validation de la nouvelle.",
     'settings.email.new': 'Nouvelle adresse e-mail',
     'settings.email.submit': 'Envoyer le lien de validation',
-    'settings.email.success': 'Un lien de validation a été envoyé à la nouvelle adresse.',
-    'settings.email.error_same': 'Cette adresse est déjà celle de votre compte.',
+    'settings.email.success':
+      'Un lien de validation a été envoyé à la nouvelle adresse.',
+    'settings.email.error_same':
+      'Cette adresse est déjà celle de votre compte.',
     'settings.email.error_taken': 'Cette adresse est déjà utilisée.',
-    'settings.email.error_delivery': "Le service d'envoi est indisponible. L'adresse n'a pas été mise en attente.",
-    'settings.email.error_generic': "Impossible de demander le changement d'adresse.",
+    'settings.email.error_delivery':
+      "Le service d'envoi est indisponible. L'adresse n'a pas été mise en attente.",
+    'settings.email.error_generic':
+      "Impossible de demander le changement d'adresse.",
     'settings.email.confirm_loading_title': 'Validation en cours…',
-    'settings.email.confirm_loading_desc': 'Nous confirmons votre nouvelle adresse e-mail.',
+    'settings.email.confirm_loading_desc':
+      'Nous confirmons votre nouvelle adresse e-mail.',
     'settings.email.confirm_success_title': 'Adresse e-mail modifiée',
-    'settings.email.confirm_success_desc': 'Votre nouvelle adresse est maintenant active et votre session a été renouvelée.',
+    'settings.email.confirm_success_desc':
+      'Votre nouvelle adresse est maintenant active et votre session a été renouvelée.',
     'settings.email.confirm_invalid_title': 'Lien invalide ou expiré',
-    'settings.email.confirm_invalid_desc': 'Cette demande ne peut plus être confirmée. Recommencez depuis les paramètres.',
+    'settings.email.confirm_invalid_desc':
+      'Cette demande ne peut plus être confirmée. Recommencez depuis les paramètres.',
     'settings.email.confirm_back': 'Retour aux paramètres',
     'settings.email.changed': 'Adresse e-mail modifiée.',
     'visibility.title': 'Visibilité du compte',
-    'visibility.desc': 'Choisissez qui peut voir vos publications, réponses et mentions J’aime.',
+    'visibility.desc':
+      'Choisissez qui peut voir vos publications, réponses et mentions J’aime.',
     'visibility.public_title': 'Public',
     'visibility.public_desc': 'Tout le monde peut voir votre profil.',
     'visibility.private_title': 'Privé',
-    'visibility.private_desc': 'Seuls vos abonnés acceptés voient votre contenu.',
+    'visibility.private_desc':
+      'Seuls vos abonnés acceptés voient votre contenu.',
     'visibility.private_account': 'Compte privé',
-    'visibility.private_toggle_desc': 'Activez pour limiter votre contenu aux abonnés acceptés.',
+    'visibility.private_toggle_desc':
+      'Activez pour limiter votre contenu aux abonnés acceptés.',
     'visibility.toggle_aria': 'Changer la visibilité du compte',
     'visibility.saving': 'Enregistrement...',
     'visibility.saved': 'Visibilité mise à jour.',
@@ -236,10 +289,24 @@ export const messages: Record<Locale, Messages> = {
       "Activez pour masquer vos mentions J'aime aux autres utilisateurs.",
     'visibility.likes_toggle_aria': "Changer la visibilité des J'aime",
     'visibility.likes_saved': "Visibilité des J'aime mise à jour.",
-    'visibility.likes_save_failed': "Impossible de modifier la visibilité des J'aime.",
+    'visibility.likes_save_failed':
+      "Impossible de modifier la visibilité des J'aime.",
+    'visibility.activity_private_account': 'Activité masquée',
+    'visibility.activity_private_toggle_desc':
+      'Activez pour masquer votre statut en ligne et votre dernière connexion.',
+    'visibility.activity_forced_private_desc':
+      'Un compte privé masque automatiquement le statut en ligne et la dernière connexion.',
+    'visibility.activity_private_followers_desc':
+      'Sur profil privé, seuls vos abonnés acceptés peuvent voir votre activité si ce réglage reste public.',
+    'visibility.activity_toggle_aria': "Changer la visibilité de l'activité",
+    'visibility.activity_saved': "Visibilité de l'activité mise à jour.",
+    'visibility.activity_save_failed':
+      "Impossible de modifier la visibilité de l'activité.",
+    'activity.online': 'En ligne',
+    'activity.last_seen': 'Dernière connexion {time}',
     'filters.title': 'Mots filtrés',
     'filters.desc':
-      "Masquez les posts du fil qui contiennent un mot ou une expression que vous ne voulez pas voir.",
+      'Masquez les posts du fil qui contiennent un mot ou une expression que vous ne voulez pas voir.',
     'filters.placeholder': 'Ex. one piece',
     'filters.input_aria': 'Mot ou expression à filtrer',
     'filters.add': 'Ajouter le filtre',
@@ -261,10 +328,14 @@ export const messages: Record<Locale, Messages> = {
     'notifications.empty': 'Aucune notification pour le moment.',
     'notifications.load_more': 'Voir plus',
     'notifications.like_one': '{name} a aimé votre publication',
-    'notifications.like_other': '{name} et {count} autres personnes ont aimé votre publication',
+    'notifications.like_other':
+      '{name} et {count} autres personnes ont aimé votre publication',
     'notifications.comment_one': '{name} a commenté votre publication',
     'notifications.comment_other':
       '{name} et {count} autres personnes ont commenté votre publication',
+    'notifications.comment_like_one': '{name} a aimé votre commentaire',
+    'notifications.comment_like_other':
+      '{name} et {count} autres personnes ont aimé votre commentaire',
     'notifications.reply_one': '{name} a répondu à votre commentaire',
     'notifications.reply_other':
       '{name} et {count} autres personnes ont répondu à votre commentaire',
@@ -273,18 +344,25 @@ export const messages: Record<Locale, Messages> = {
       '{name} et {count} autres personnes ont reposté votre publication',
     'notifications.quote': '{name} a cité votre publication',
     'notifications.mention': '{name} vous a mentionné',
-    'notifications.message_mention_one': '{name} vous a mentionné dans un message',
-    'notifications.message_mention_other': '{name} vous a mentionné dans {count} messages',
+    'notifications.message_one': '{name} vous a envoyé un message',
+    'notifications.message_other': '{name} et {count} autres personnes vous ont envoyé un message',
+    'notifications.message_mention_one':
+      '{name} vous a mentionné dans un message',
+    'notifications.message_mention_other':
+      '{name} vous a mentionné dans {count} messages',
     'notifications.follow_one': "{name} s'est abonné(e) à vous",
-    'notifications.follow_other': "{name} et {count} autres personnes se sont abonnées à vous",
+    'notifications.follow_other':
+      '{name} et {count} autres personnes se sont abonnées à vous',
 
     // — Mentions (@handle) —
     'mentions.view_in_search': 'Voir dans la recherche',
     'mentions.user_not_found': 'Compte introuvable',
     'notifications.follow_request': '{name} demande à vous suivre',
     'notifications.follow_request_accepted': '{name} a accepté votre demande',
-    'notifications.follow_request_accept_confirm': 'Vous avez accepté la demande de {name}',
-    'notifications.follow_request_accept_confirm_prefix': 'Vous avez accepté la demande de',
+    'notifications.follow_request_accept_confirm':
+      'Vous avez accepté la demande de {name}',
+    'notifications.follow_request_accept_confirm_prefix':
+      'Vous avez accepté la demande de',
     'notifications.post_purge_warning':
       'Un de vos tweets retiré par la modération sera supprimé définitivement dans environ un mois.',
     'notifications.accept': 'Accepter',
@@ -297,11 +375,13 @@ export const messages: Record<Locale, Messages> = {
 
     // — Pages stub (états vides) —
     'notifications.heading': 'Rien pour le moment',
-    'notifications.desc': 'Vos notifications (likes, abonnements, mentions) apparaîtront ici.',
+    'notifications.desc':
+      'Vos notifications (likes, abonnements, mentions) apparaîtront ici.',
     'messages.title': 'Messages',
     'messages.heading': 'Aucune conversation',
     'messages.empty_desc': 'Démarrez une discussion avec le bouton +.',
     'messages.new': 'Nouveau',
+    'messages.new_message': 'Nouveau message',
     'messages.new_dm': 'Nouveau message',
     'messages.new_dm_desc':
       'Recherchez une personne pour démarrer une conversation chiffrée de bout en bout.',
@@ -320,12 +400,14 @@ export const messages: Record<Locale, Messages> = {
       'Le nom est public et les messages sont lisibles par un administrateur (communauté semi-publique).',
     'messages.community_admin_note':
       'Communauté semi-publique : les messages peuvent être lus par un administrateur.',
-    'messages.search_user_placeholder': 'Rechercher une personne (@ pour l’identifiant)…',
+    'messages.search_user_placeholder':
+      'Rechercher une personne (@ pour l’identifiant)…',
     'messages.search_community_placeholder': 'Rechercher une communauté…',
     'messages.no_users': 'Aucun utilisateur trouvé.',
     'messages.no_communities': 'Aucune communauté trouvée.',
     'messages.select_title': 'Vos messages',
-    'messages.select_desc': 'Sélectionnez une conversation ou démarrez-en une nouvelle.',
+    'messages.select_desc':
+      'Sélectionnez une conversation ou démarrez-en une nouvelle.',
     'messages.composer_placeholder': 'Écrivez un message…',
     'messages.send': 'Envoyer',
     'messages.edit': 'Modifier',
@@ -353,12 +435,15 @@ export const messages: Record<Locale, Messages> = {
     'messages.joined': 'Rejoint',
     'messages.you': 'vous',
     'messages.message_action': 'Message',
-    'messages.read_only': 'Lecture seule — vous ne pouvez pas écrire dans cette communauté.',
+    'messages.read_only':
+      'Lecture seule — vous ne pouvez pas écrire dans cette communauté.',
     'messages.receipt_delivered': 'Envoyé',
     'messages.receipt_read': 'Ouvert',
     'messages.deleted': 'Message supprimé',
+    'messages.deleted_by_moderation': 'Ce message a été supprimé par la modération',
     'messages.actions': 'Actions du message',
-    'messages.peer_not_activated': "Cette personne n'a pas encore activé ces messages",
+    'messages.peer_not_activated':
+      "Cette personne n'a pas encore activé ces messages",
     'messages.delete_confirm': 'Supprimer ce message pour tout le monde ?',
     'messages.typing': 'écrit…',
     'messages.typing_user': '{name} écrit…',
@@ -386,11 +471,15 @@ export const messages: Record<Locale, Messages> = {
     'messages.passphrase.strength.strong': 'Excellente',
     'messages.passphrase.too_weak':
       'Phrase trop simple : visez au moins 10 caractères et un mélange de mots/chiffres/symboles.',
-    'messages.passphrase.mismatch': 'Les deux phrases de passe ne correspondent pas.',
+    'messages.passphrase.mismatch':
+      'Les deux phrases de passe ne correspondent pas.',
     'messages.passphrase.wrong': 'Phrase de passe incorrecte.',
-    'messages.passphrase.setup_failed': 'Impossible d’enregistrer la phrase de passe. Réessayez.',
-    'messages.passphrase.unlock_failed': 'Impossible de déverrouiller. Vérifiez votre phrase de passe.',
-    'messages.passphrase.warning': 'À retenir absolument : sans elle, vos messages restent inaccessibles ailleurs.',
+    'messages.passphrase.setup_failed':
+      'Impossible d’enregistrer la phrase de passe. Réessayez.',
+    'messages.passphrase.unlock_failed':
+      'Impossible de déverrouiller. Vérifiez votre phrase de passe.',
+    'messages.passphrase.warning':
+      'À retenir absolument : sans elle, vos messages restent inaccessibles ailleurs.',
     'messages.no_messages_title': 'Aucun message',
     'messages.no_messages_desc': 'Envoyez le premier message 👋',
     'messages.new_messages_divider': 'Nouveaux messages',
@@ -436,20 +525,172 @@ export const messages: Record<Locale, Messages> = {
     'admin.action_unban': 'Réactiver',
     'admin.you': 'Vous',
     'admin.role_changed': 'Rôle mis à jour : {role}',
+    'admin.change_role': 'Changer le rôle',
     'admin.banned_toast': 'Compte banni.',
     'admin.unbanned_toast': 'Compte réactivé.',
     'admin.action_failed': 'Action impossible.',
     'admin.access_denied': 'Accès refusé',
     'admin.access_denied_desc': 'Cette page est réservée aux administrateurs.',
-    'admin.role_note': "Un changement de rôle prend effet à la prochaine reconnexion de l'utilisateur (rafraîchissement du jeton).",
+    'admin.role_note':
+      "Un changement de rôle prend effet à la prochaine reconnexion de l'utilisateur (rafraîchissement du jeton).",
+
+    // ── Signalement (formulaire réutilisable) ──
+    'report.action': 'Signaler',
+    'report.profile_action': 'Signaler ce profil',
+    'report.message_action': 'Signaler le message',
+    'report.title': 'Signaler ce contenu',
+    'report.title_bug': 'Signaler un bug',
+    'report.subtitle': 'Aidez-nous à garder Breezy sain. Votre signalement reste confidentiel.',
+    'report.subtitle_target': 'Signalement de {target}. Votre signalement reste confidentiel.',
+    'report.reason_label': 'Motif',
+    'report.text_label': 'Détails',
+    'report.text_placeholder': 'Décrivez le problème (facultatif)…',
+    'report.reason.inappropriate': 'Comportement inapproprié',
+    'report.reason.offensive': 'Langage offensant',
+    'report.reason.bug': 'Bug technique',
+    'report.reason.spam': 'Spam / publicité',
+    'report.reason.other': 'Autre',
+    'report.attachment_add': 'Ajouter une image',
+    'report.attachment_hint': 'Image facultative, 5 Mo maximum.',
+    'report.attachment_type_error': 'Seules les images sont acceptées.',
+    'report.attachment_size_error': 'Image trop lourde (5 Mo maximum).',
+    'report.submit': 'Envoyer le signalement',
+    'report.success': 'Merci, votre signalement a été envoyé.',
+    'report.error': "Impossible d'envoyer le signalement.",
+    'report.already': 'Vous avez déjà signalé cet élément.',
+    'report.locked': 'Cet élément a été validé par la modération : il ne peut plus être signalé.',
+    'report.disclose_notice':
+      'Ce message est chiffré : en le signalant, vous transmettez cette copie à la modération (le serveur ne peut pas la lire seul).',
+    'report.disclose_empty': '(message vide ou non déchiffrable)',
+
+    // ── Onglets Signalements (modération + admin) ──
+    'moderation.tab_reports': 'Signalements',
+    'admin.tab_reports': 'Signalements (bugs)',
+    'admin.tab_settings': 'Paramètres',
+    'admin.tab_infra': 'Infrastructure',
+    'admin.settings.auto_hide_title': 'Auto-masquage des publications signalées',
+    'admin.settings.auto_hide_desc':
+      "Au-delà de ce nombre de signalements, une publication est automatiquement masquée et mise en attente d'une décision de modérateur. 0 désactive l'auto-masquage.",
+    'admin.settings.auto_hide_label': 'Seuil de signalements',
+    'admin.settings.saved': 'Paramètres enregistrés.',
+    'admin.settings.save_failed': "Impossible d'enregistrer les paramètres.",
+    'admin.settings.invalid': 'Valeur invalide (entier ≥ 0 attendu).',
+    'admin.settings.error': 'Impossible de charger les paramètres.',
+
+    // ── Tickets ──
+    'tickets.empty': 'Aucun ticket de signalement.',
+    'tickets.empty_bug': 'Aucun rapport de bug.',
+    'tickets.error': 'Impossible de charger les tickets.',
+    'tickets.reports_count': '{count} signalement(s)',
+    'tickets.last_report': 'Dernier : {when}',
+    'tickets.reason_tags': 'Motifs',
+    'tickets.status.open': 'Ouvert',
+    'tickets.status.closed': 'Clôturé',
+    'tickets.status.reopened': 'Rouvert',
+    'tickets.status.approved': 'Validé',
+    'tickets.entity.post': 'Publication',
+    'tickets.entity.message': 'Message privé',
+    'tickets.entity.group_message': 'Message de groupe',
+    'tickets.entity.profile': 'Profil',
+    'tickets.entity.app': 'Application',
+    'tickets.detail_title': 'Ticket',
+    'tickets.original_content': 'Contenu signalé',
+    'tickets.content_unavailable': 'Contenu indisponible (déjà retiré ou supprimé).',
+    'tickets.content_encrypted':
+      'Message chiffré de bout en bout : le serveur ne peut pas le lire. La copie transmise par le signaleur (destinataire) figure dans le fil ci-dessous.',
+    'tickets.disclosed_content': 'Message divulgué par le signaleur',
+    'tickets.open_entity': "Voir l'élément signalé",
+    'tickets.thread_title': 'Fil des signalements ({count})',
+    'tickets.actions_title': 'Journal des actions',
+    'tickets.by_moderator': 'par {who}',
+    'tickets.reply_placeholder': 'Réponse interne (visible par la modération)…',
+    'tickets.reply_submit': 'Répondre',
+    'tickets.reply_added': 'Réponse ajoutée.',
+    'tickets.action.reply': 'Réponse interne',
+    'tickets.action.status_change': 'Statut modifié → {status}',
+    'tickets.action.transfer': 'Transféré vers la modération',
+    'tickets.action.auto_reopen': 'Rouvert automatiquement (seuil de re-signalements atteint)',
+    'tickets.action.content_removed': 'Contenu signalé retiré par la modération',
+    'tickets.action.auto_hidden': 'Publication masquée automatiquement (seuil de signalements atteint)',
+    'tickets.action.approved': 'Élément jugé conforme par la modération (signalements verrouillés)',
+    'tickets.action.warned': "Auteur averti par la modération",
+    'tickets.system': 'Système',
+    'tickets.set_open': 'Rouvrir',
+    'tickets.set_closed': 'Clôturer',
+    'tickets.approve': 'Valider (conforme)',
+    'tickets.approved': 'Élément validé : il est de nouveau visible et ne peut plus être signalé.',
+    'tickets.approved_locked':
+      'Élément validé par la modération : de nouveau visible, il ne peut plus être signalé (décision définitive).',
+    'tickets.transfer': 'Transférer vers la modération',
+    'tickets.transferred': 'Ticket transféré vers la modération.',
+    'tickets.post_removed': 'Publication retirée et déplacée dans « Tweets supprimés ».',
+    'tickets.delete_message': 'Supprimer le message',
+    'tickets.message_removed': 'Message supprimé par la modération dans la conversation.',
+    'tickets.action_failed': 'Action impossible.',
+    'tickets.warn': "Avertir l'auteur",
+    'tickets.cannot_approve_actioned': 'Validation impossible : une sanction a déjà été appliquée.',
+    // ── Profil de risque de l'utilisateur ciblé ──
+    'tickets.target_user': 'Utilisateur ciblé',
+    'tickets.warning_count': 'Averti {count} fois',
+    'tickets.ban_user': 'Bannir',
+    'tickets.user_banned': 'Utilisateur banni.',
+    'tickets.ban_confirm_title': "Bannir l'utilisateur ?",
+    'tickets.ban_confirm_desc': '{name} ne pourra plus se connecter. Vous pourrez le réactiver depuis l’annuaire des comptes.',
+    // ── Retrait de contenu + avertissement (atomique : supprime → avertit → clôture) ──
+    'tickets.warn_after_delete_post': 'Votre publication a été supprimée par la modération. Motif : ',
+    'tickets.warn_after_delete_message': 'Votre message a été supprimé par la modération. Motif : ',
+    'tickets.delete_warn_title': "Supprimer et avertir l'auteur",
+    'tickets.delete_warn_desc':
+      "Le contenu sera supprimé, l'auteur averti du motif, et le ticket clôturé. Rien n'est supprimé tant que vous n'avez pas validé.",
+    'tickets.delete_and_warn': 'Supprimer et avertir',
+    'tickets.removed_and_closed': 'Contenu supprimé, auteur averti, ticket clôturé.',
+    // ── Garde-fou de clôture (aucune action posée) ──
+    'tickets.close_confirm_title': 'Clôturer sans action ?',
+    'tickets.close_confirm_desc': "Aucune action n'a été prise sur ce ticket. Le clôturer comme signalement non fondé ?",
+    'tickets.close_confirm_submit': 'Clôturer comme non fondé',
+    // ── Filtres tickets (cumulables) ──
+    'tickets.filters': 'Filtres',
+    'tickets.filter_status': 'Statut',
+    'tickets.filter_status_all': 'Tous',
+    'tickets.filter_min_reports': 'Signalements min.',
+    'tickets.filter_since': 'Depuis',
+    'tickets.filter_until': "Jusqu'à",
+    'tickets.filter_reset': 'Réinitialiser',
+
+    // ── Avertissements (warns) ──
+    'warn.title': "Avertir l'utilisateur",
+    'warn.desc': "L'utilisateur verra cet avertissement à sa prochaine connexion ou action.",
+    'warn.placeholder': "Message d'avertissement…",
+    'warn.submit': "Envoyer l'avertissement",
+    'warn.sent': 'Avertissement envoyé.',
+    'warn.error': "Impossible d'envoyer l'avertissement.",
+    'warn.modal_title': 'Avertissement de la modération',
+    'warn.modal_ack': "J'ai compris",
+
+    // ── Filtres comptes ──
+    'accounts.actions': 'Actions',
+    'accounts.filter_all': 'Tous',
+    'accounts.filter_banned': 'Bannis',
+    'accounts.filter_moderators': 'Modérateurs',
+    'accounts.filter_admins': 'Administrateurs',
+
     'moderation.heading': 'Centre de modération',
-    'moderation.desc': 'Les signalements et les actions de modération apparaîtront ici.',
-    'moderation.subtitle': 'Gardez l’ordre sur Breezy : tweets retirés et comptes.',
+    'moderation.desc':
+      'Les signalements et les actions de modération apparaîtront ici.',
+    'moderation.subtitle':
+      'Gardez l’ordre sur Breezy : tweets retirés et comptes.',
     'moderation.tab_posts': 'Tweets supprimés',
     'moderation.tab_accounts': 'Comptes',
     'moderation.posts_empty': 'Aucun tweet dans la corbeille.',
     'moderation.posts_error': 'Impossible de charger la corbeille.',
     'moderation.restore': 'Restaurer',
+    // ── Corbeille : filtres (auteur + date de retrait) + pagination ──
+    'moderation.search_user': 'Rechercher un utilisateur…',
+    'moderation.filter_since': 'Retiré depuis',
+    'moderation.filter_until': "Retiré jusqu'à",
+    'moderation.filter_reset': 'Réinitialiser',
+    'moderation.no_match': 'Aucun tweet supprimé ne correspond aux filtres.',
+    'moderation.load_more': 'Charger plus',
     'moderation.purge': 'Supprimer définitivement',
     'moderation.purge_title': 'Supprimer définitivement ce tweet ?',
     'moderation.purge_desc':
@@ -460,17 +701,23 @@ export const messages: Record<Locale, Messages> = {
     'moderation.restored_toast': 'Tweet restauré.',
     'moderation.purged_toast': 'Tweet supprimé définitivement.',
     'moderation.access_denied': 'Accès refusé',
-    'moderation.access_denied_desc': 'Cette page est réservée aux modérateurs et administrateurs.',
-    'moderation.ban_restricted': 'Un modérateur ne peut bannir qu’un utilisateur.',
+    'moderation.access_denied_desc':
+      'Cette page est réservée aux modérateurs et administrateurs.',
+    'moderation.ban_restricted':
+      'Un modérateur ne peut bannir qu’un utilisateur.',
     'moderation.banned_since': 'Banni depuis {when}',
     'moderation.account_delete': 'Supprimer le compte',
-    'moderation.account_delete_soon': 'Suppression définitive du compte (RGPD) — à venir.',
+    'moderation.account_delete_soon':
+      'Suppression définitive du compte (RGPD) — à venir.',
     'moderation.account_delete_title': 'Supprimer définitivement ce compte ?',
     'moderation.account_delete_desc':
       'Effacement RGPD irréversible : profil, tweets, messages, médias et relations seront supprimés de tous les services. Tapez « {username} » pour confirmer.',
     'moderation.account_delete_confirm_label': 'Nom d’utilisateur à confirmer',
     'moderation.account_deleted_toast': 'Compte supprimé définitivement.',
-    'moderation.account_delete_failed': 'Échec de la suppression (effacement partiel possible).',
+    'moderation.account_delete_failed':
+      'Échec de la suppression (effacement partiel possible).',
+    'moderation.role_label': 'Rôle',
+    'moderation.account_actions': 'Actions du compte',
     'admin.infra_subtitle': 'Supervision de l’infrastructure et des services.',
     'admin.infra_heading': 'État des services',
     'admin.infra_desc':
@@ -523,15 +770,19 @@ export const messages: Record<Locale, Messages> = {
     'auth.err.email_required': "L'adresse e-mail est requise.",
     'auth.err.email_invalid': 'Saisis une adresse e-mail valide.',
     'auth.err.email_max': "L'adresse e-mail est limitée à 50 caractères.",
-    'auth.err.identifier_required': "L'adresse e-mail ou le username est requis.",
+    'auth.err.identifier_required':
+      "L'adresse e-mail ou le username est requis.",
     'auth.err.password_required': 'Le mot de passe est requis.',
-    'auth.err.password_min': 'Le mot de passe doit contenir au moins 8 caractères.',
-    'auth.err.network': "Impossible de contacter l'API. Réessaie dans un instant.",
+    'auth.err.password_min':
+      'Le mot de passe doit contenir au moins 8 caractères.',
+    'auth.err.network':
+      "Impossible de contacter l'API. Réessaie dans un instant.",
 
     // — Login —
     'auth.login.demo.kicker': 'Fil en direct',
     'auth.login.demo.heading': 'Retrouve ton monde.',
-    'auth.login.demo.post1': 'Nouvelle playlist, nouveaux débats, même énergie Breezy.',
+    'auth.login.demo.post1':
+      'Nouvelle playlist, nouveaux débats, même énergie Breezy.',
     'auth.login.demo.views': '18.4K vues',
     'auth.login.demo.joined': 'Noa a rejoint la conversation',
     'auth.login.demo.joined_sub': 'Découvre les sujets qui montent ce soir.',
@@ -556,7 +807,9 @@ export const messages: Record<Locale, Messages> = {
 
     // — OAuth —
     'auth.oauth.loading': 'Connexion en cours…',
-    'auth.oauth.error': 'La connexion a échoué. Réessaie depuis la page de connexion.',
+    'auth.oauth.continue_with': 'Continuer avec {provider}',
+    'auth.oauth.error':
+      'La connexion a échoué. Réessaie depuis la page de connexion.',
     'auth.oauth.back_to_login': 'Retour à la connexion',
 
     // — Register —
@@ -575,7 +828,8 @@ export const messages: Record<Locale, Messages> = {
     'auth.register.demo.comm2': 'Campus CESI',
     'auth.register.demo.comm3': 'Dev Distribué',
     'auth.register.demo.alive': 'Ton compte prend vie',
-    'auth.register.demo.alive_sub': 'Profil, posts et conversations en quelques secondes.',
+    'auth.register.demo.alive_sub':
+      'Profil, posts et conversations en quelques secondes.',
     'auth.register.badge': 'Nouveau profil Breezy',
     'auth.register.title': 'Rejoins Breezy et commence à publier.',
     'auth.register.subtitle':
@@ -590,42 +844,62 @@ export const messages: Record<Locale, Messages> = {
     'auth.register.gender_male': 'Homme',
     'auth.register.gender_female': 'Femme',
     'auth.register.password_confirm_label': 'Confirmation du mot de passe',
-    'auth.register.show_password_confirm': 'Afficher la confirmation du mot de passe',
-    'auth.register.hide_password_confirm': 'Masquer la confirmation du mot de passe',
+    'auth.register.show_password_confirm':
+      'Afficher la confirmation du mot de passe',
+    'auth.register.hide_password_confirm':
+      'Masquer la confirmation du mot de passe',
     'auth.register.password_help':
       '8 caractères min., majuscule, minuscule, chiffre et caractère spécial.',
+    'auth.register.terms_prefix': "J'accepte les",
+    'auth.register.terms_link': 'Conditions Générales d’Utilisation',
+    'auth.register.terms_locked':
+      'Lis les CGU jusqu’en bas pour déverrouiller cette case.',
+    'auth.register.terms_unlocked':
+      'Tu peux maintenant cocher cette case pour continuer.',
     'auth.register.submit': 'Créer mon compte',
     'auth.register.submitting': 'Création du compte…',
     'auth.register.or': 'Ou créer mon compte avec',
     'auth.register.have_account': 'Tu as déjà un compte ?',
     'auth.register.err.username_required': "Le nom d'utilisateur est requis.",
     'auth.register.err.username_format':
-      '3 à 24 caractères : lettres, chiffres et tiret bas (_) uniquement.',
+      '3 à 24 caractères : lettres, chiffres, tiret bas (_) et point (.) ; le point ni en début/fin ni doublé.',
     'auth.register.err.username_max': "Le nom d'utilisateur est limité à 24 caractères.",
     'auth.register.err.username_reserved': "Ce nom d'utilisateur n'est pas autorisé.",
     'auth.register.err.username_taken': "Ce nom d'utilisateur est déjà pris.",
     'auth.register.err.username_check':
       "Impossible de vérifier le nom d'utilisateur. Réessaie dans un instant.",
     'auth.register.err.birthdate_required': 'La date de naissance est requise.',
-    'auth.register.err.birthdate_invalid': 'Saisis une date de naissance valide.',
-    'auth.register.err.birthdate_future': 'La date de naissance ne peut pas être dans le futur.',
+    'auth.register.err.birthdate_invalid':
+      'Saisis une date de naissance valide.',
+    'auth.register.err.birthdate_future':
+      'La date de naissance ne peut pas être dans le futur.',
     'auth.register.err.age': "Tu dois avoir au moins 13 ans pour t'inscrire.",
     'auth.register.err.gender_required': 'Choisis un genre.',
-    'auth.register.err.password_max': 'Le mot de passe est limité à 250 caractères.',
+    'auth.register.err.password_max':
+      'Le mot de passe est limité à 250 caractères.',
     'auth.register.err.password_format':
       '8 caractères minimum, une majuscule, une minuscule, un chiffre et un caractère spécial.',
     'auth.register.err.confirm_required': 'Confirme ton mot de passe.',
-    'auth.register.err.confirm_max': 'La confirmation est limitée à 250 caractères.',
-    'auth.register.err.confirm_mismatch': 'Les mots de passe ne correspondent pas.',
-    'auth.register.err.failed': "L'inscription a échoué. Vérifie les informations saisies.",
+    'auth.register.err.confirm_max':
+      'La confirmation est limitée à 250 caractères.',
+    'auth.register.err.confirm_mismatch':
+      'Les mots de passe ne correspondent pas.',
+    'auth.register.err.terms_required':
+      'Tu dois accepter les CGU pour créer ton compte.',
+    'auth.register.err.terms_read_required':
+      'Lis les CGU jusqu’au bout avant de les accepter.',
+    'auth.register.err.failed':
+      "L'inscription a échoué. Vérifie les informations saisies.",
 
     // — Onboarding (finalisation des comptes OAuth sans profil) —
     'onboarding.title': 'Bienvenue sur Breezy 👋',
     'onboarding.subtitle':
       "Choisis ton nom d'utilisateur et indique ta date de naissance pour finaliser ton compte.",
+    'onboarding.oauth_subtitle':
+      "Finalise ton inscription avec {email}. Aucun compte Breezy n'est créé avant cette étape.",
     'onboarding.username_label': "Nom d'utilisateur",
     'onboarding.username_placeholder': 'ex. felipe',
-    'onboarding.username_hint': '3 à 24 caractères : lettres, chiffres et tiret bas (_).',
+    'onboarding.username_hint': '3 à 24 caractères : lettres, chiffres, tiret bas (_) et point (.).',
     'onboarding.username_checking': 'Vérification de la disponibilité…',
     'onboarding.username_available': 'Disponible ✓',
     'onboarding.birthdate_label': 'Date de naissance',
@@ -633,7 +907,10 @@ export const messages: Record<Locale, Messages> = {
       "En dessous de 18 ans, les contenus sensibles (NSFW) seront masqués. La date de naissance n'est pas modifiable après validation.",
     'onboarding.submit': 'Valider et continuer',
     'onboarding.submitting': 'Enregistrement…',
-    'onboarding.err.generic': 'Une erreur est survenue. Réessaie dans un instant.',
+    'onboarding.accept_terms': 'Accepter les CGU',
+    'onboarding.terms_accepted': 'CGU acceptées',
+    'onboarding.err.generic':
+      'Une erreur est survenue. Réessaie dans un instant.',
 
     // — Création de compte par un admin —
     'admin.create_account': 'Créer un compte',
@@ -652,7 +929,8 @@ export const messages: Record<Locale, Messages> = {
     'admin.create.hide_password': 'Masquer le mot de passe',
     'admin.create.submit': 'Créer le compte',
     'admin.create.submitting': 'Création…',
-    'admin.create.success': 'Compte créé. Mot de passe temporaire envoyé à {email}.',
+    'admin.create.success':
+      'Compte créé. Mot de passe temporaire envoyé à {email}.',
     'admin.create.success_suffixed':
       'Compte créé sous @{username} (le nom demandé était déjà pris). Mot de passe envoyé à {email}.',
     'admin.create.err.email_taken': 'Cette adresse e-mail est déjà utilisée.',
@@ -669,7 +947,8 @@ export const messages: Record<Locale, Messages> = {
     'account.password_change.hint': 'Au moins 8 caractères.',
     'account.password_change.submit': 'Mettre à jour',
     'account.password_change.submitting': 'Mise à jour…',
-    'account.password_change.err.mismatch': 'Les mots de passe ne correspondent pas.',
+    'account.password_change.err.mismatch':
+      'Les mots de passe ne correspondent pas.',
     'account.password_change.err.current': 'Mot de passe temporaire invalide.',
     'account.password_change.err.same':
       'Le nouveau mot de passe doit être différent du temporaire.',
@@ -682,7 +961,8 @@ export const messages: Record<Locale, Messages> = {
     'account.username_pending.label': "Nom d'utilisateur",
     'account.username_pending.submit': 'Valider',
     'account.username_pending.submitting': 'Enregistrement…',
-    'account.username_pending.err.generic': 'Une erreur est survenue. Réessaie.',
+    'account.username_pending.err.generic':
+      'Une erreur est survenue. Réessaie.',
 
     // — Vérification d'e-mail —
     'auth.check_email.title': 'Vérifie ta boîte mail',
@@ -691,7 +971,7 @@ export const messages: Record<Locale, Messages> = {
     'auth.check_email.subtitle_generic':
       "Un lien de vérification vient d'être envoyé à ton adresse. Clique dessus pour activer ton compte.",
     'auth.check_email.hint':
-      "Pense à regarder dans tes spams. Le lien expire dans 24 heures.",
+      'Pense à regarder dans tes spams. Le lien expire dans 24 heures.',
     'auth.check_email.resend': 'Renvoyer le lien de vérification',
     'auth.check_email.back_to_login': 'Retour à la connexion',
     'auth.verify.login_blocked':
@@ -701,6 +981,16 @@ export const messages: Record<Locale, Messages> = {
     'auth.verify.resend_done':
       "Si un compte non vérifié correspond à cette adresse, un e-mail vient d'être envoyé.",
     'auth.verify.resend_label': 'Ton adresse e-mail',
+    'auth.mfa.title': 'Vérification en deux étapes',
+    'auth.mfa.subtitle':
+      "Entre le code à 6 chiffres affiché par ton application d'authentification.",
+    'auth.mfa.code_label': 'Code de vérification',
+    'auth.mfa.verify': 'Vérifier',
+    'auth.mfa.verifying': 'Vérification…',
+    'auth.mfa.back': 'Revenir à la connexion',
+    'auth.mfa.error_code': 'Code invalide. Réessaie.',
+    'auth.mfa.error_challenge':
+      'La session de connexion a expiré. Reconnecte-toi.',
     'auth.verify.loading_title': 'Vérification en cours…',
     'auth.verify.loading_desc': 'Un instant, on confirme ton adresse e-mail.',
     'auth.verify.success_title': 'Adresse vérifiée !',
@@ -709,7 +999,7 @@ export const messages: Record<Locale, Messages> = {
     'auth.verify.go_to_app': 'Accéder à Breezy',
     'auth.verify.invalid_title': 'Lien invalide ou expiré',
     'auth.verify.invalid_desc':
-      "Ce lien de vérification est invalide ou a expiré. Demande-en un nouveau ci-dessous.",
+      'Ce lien de vérification est invalide ou a expiré. Demande-en un nouveau ci-dessous.',
     'auth.forgot.title': 'Mot de passe oublié ?',
     'auth.forgot.subtitle':
       "Saisis ton adresse e-mail : on t'envoie un lien pour choisir un nouveau mot de passe.",
@@ -719,7 +1009,8 @@ export const messages: Record<Locale, Messages> = {
     'auth.forgot.sent_desc':
       "Si un compte correspond à cette adresse, un e-mail avec un lien de réinitialisation vient d'être envoyé. Le lien expire dans 1 heure.",
     'auth.reset.title': 'Nouveau mot de passe',
-    'auth.reset.subtitle': 'Choisis un nouveau mot de passe pour ton compte Breezy.',
+    'auth.reset.subtitle':
+      'Choisis un nouveau mot de passe pour ton compte Breezy.',
     'auth.reset.new_password_label': 'Nouveau mot de passe',
     'auth.reset.confirm_password_label': 'Confirme le mot de passe',
     'auth.reset.submit': 'Réinitialiser le mot de passe',
@@ -747,7 +1038,8 @@ export const messages: Record<Locale, Messages> = {
     'feed.load_error': 'Impossible de charger le fil.',
     'feed.unavailable': 'Fil indisponible',
     'feed.empty_title': 'Aucun post pour le moment',
-    'feed.empty_for_you': 'Soyez le premier à publier quelque chose sur Breezy.',
+    'feed.empty_for_you':
+      'Soyez le premier à publier quelque chose sur Breezy.',
     'feed.empty_following':
       'Les posts des comptes que vous suivez apparaîtront ici. Abonnez-vous à des profils pour personnaliser ce fil.',
     'feed.filtered_empty_title': 'Tous les posts visibles sont filtrés',
@@ -762,7 +1054,8 @@ export const messages: Record<Locale, Messages> = {
     'feed.hashtag_tab_recent': 'Récent',
     'feed.hashtag_tab_media': 'Média',
     'feed.hashtag_no_media_title': 'Aucun média pour ce hashtag',
-    'feed.hashtag_no_media_msg': 'Les images et vidéos associées à ce hashtag apparaîtront ici.',
+    'feed.hashtag_no_media_msg':
+      'Les images et vidéos associées à ce hashtag apparaîtront ici.',
     'feed.hashtag_media_open': 'Voir le post du média',
 
     // — Composer —
@@ -776,6 +1069,8 @@ export const messages: Record<Locale, Messages> = {
     'composer.poll_choice': 'Choix {number}',
     'composer.poll_add_choice': 'Ajouter un choix',
     'composer.poll_remove_choice': 'Retirer ce choix',
+    'composer.poll_choice_image': 'Ajouter une image au choix {number}',
+    'composer.poll_choice_image_remove': "Retirer l'image",
     'composer.poll_duration': 'Durée de la question',
     'composer.poll_days': 'Jours',
     'composer.poll_hours': 'Heures',
@@ -790,7 +1085,8 @@ export const messages: Record<Locale, Messages> = {
     'composer.poll_remove': 'Supprimer la question',
     'composer.pin_profile': 'Épingler sur mon profil',
     'composer.post_failed': 'Publication impossible',
-    'composer.dialog_desc': 'Rédigez et publiez un nouveau post (280 caractères maximum).',
+    'composer.dialog_desc':
+      'Rédigez et publiez un nouveau post (280 caractères maximum).',
     'emoji.aria': 'Emoji {emoji}',
 
     // — Post (carte) —
@@ -811,14 +1107,29 @@ export const messages: Record<Locale, Messages> = {
     'post.poll_close': 'Terminer le sondage',
     'post.poll_close_failed': 'Fermeture du sondage impossible',
     'post.share': 'Partager',
+    'share.title': 'Partager',
+    'share.post_desc': 'Envoyez ce post en message privé, partagez-le ou copiez le lien.',
+    'share.profile_desc': 'Envoyez ce profil en message privé, partagez-le ou copiez le lien.',
+    'share.send_dm': 'Envoyer en message privé',
+    'share.send_dm_hint': 'Choisissez une personne à qui envoyer le lien.',
+    'share.recent': 'Récents',
+    'share.via': 'Partager via…',
+    'share.copy': 'Copier le lien',
+    'share.copied': 'Lien copié',
+    'share.sent': 'Envoyé en message privé',
+    'share.send_failed': "Envoi impossible",
+    'share.login_required': 'Connectez-vous pour envoyer en message privé.',
+    'share.post_message_prefix': 'Regarde ce post :',
     'post.deleted': 'Post supprimé',
     'post.private_account_tooltip': 'Ce compte est privé',
 
     // — Commentaires —
+    'comment.like': 'J’aime',
     'comment.reply': 'Répondre',
     'comment.placeholder': 'Écrire un commentaire…',
     'comment.reply_placeholder': 'Écrire une réponse…',
-    'comment.restricted_followers': "Seuls les abonnés de l'auteur peuvent répondre à ce post.",
+    'comment.restricted_followers':
+      "Seuls les abonnés de l'auteur peuvent répondre à ce post.",
     'comment.load_error': 'Impossible de charger les commentaires.',
     'comment.empty': 'Aucun commentaire. Soyez le premier à réagir.',
     'comment.hide_replies': 'Masquer les réponses',
@@ -837,7 +1148,8 @@ export const messages: Record<Locale, Messages> = {
     'profil.save_failed': "Le profil n'a pas pu être enregistré.",
     'profil.unavailable': 'Profil indisponible',
     'profil.banned_title': 'Compte banni',
-    'profil.banned_desc': 'Ce compte a été banni par un administrateur et n’est plus accessible.',
+    'profil.banned_desc':
+      'Ce compte a été banni par un administrateur et n’est plus accessible.',
     'profil.back_aria': 'Retour au fil',
     'profil.posts_count_one': '{count} post',
     'profil.posts_count_other': '{count} posts',
@@ -850,7 +1162,8 @@ export const messages: Record<Locale, Messages> = {
     'profil.replies_deleted_parent': 'Publication d’origine indisponible.',
     'profil.empty_likes': 'Les posts que vous aimez apparaîtront ici.',
     'profil.likes_private_title': "Les J'aime de @{username} sont privés",
-    'profil.likes_private_message': "Cet utilisateur a choisi de garder ses mentions J'aime privées.",
+    'profil.likes_private_message':
+      "Cet utilisateur a choisi de garder ses mentions J'aime privées.",
     'profil.private_title': 'Ce compte est privé',
     'profil.private_message':
       'Suivez ce profil pour voir ses posts, ses réponses et ses mentions J’aime.',
@@ -872,7 +1185,7 @@ export const messages: Record<Locale, Messages> = {
     'follow.remove_follower': 'Retirer',
     'follow.fail_title': 'Suivi impossible',
     'follow.unfail_title': 'Désabonnement impossible',
-    'follow.remove_follower_fail_title': "Retrait impossible",
+    'follow.remove_follower_fail_title': 'Retrait impossible',
     'follow.fail_desc': 'Connectez-vous pour gérer vos abonnements.',
 
     // — Liste d'utilisateurs —
@@ -881,7 +1194,7 @@ export const messages: Record<Locale, Messages> = {
     // — Carte de survol profil —
     'profile_hover.follow': "S'abonner",
     'profile_hover.following': 'Abonné',
-    'profile_hover.load_error': "Aperçu du profil indisponible.",
+    'profile_hover.load_error': 'Aperçu du profil indisponible.',
     'profile_hover.followed_by': 'Suivi par {names}',
 
     // — Modale des relations —
@@ -895,13 +1208,21 @@ export const messages: Record<Locale, Messages> = {
       'Ce profil est privé. Les compteurs restent visibles, mais la liste détaillée est réservée aux abonnés.',
 
     // — Édition du profil —
-    'editprofil.desc': 'Mettez à jour les informations visibles sur votre profil public.',
+    'editprofil.desc':
+      'Mettez à jour les informations visibles sur votre profil public.',
     'editprofil.change_banner': 'Changer la bannière',
     'editprofil.change_avatar': 'Changer la photo de profil',
+    'editprofil.reset_banner': 'Revenir à la bannière par défaut',
+    'editprofil.reset_avatar': 'Revenir à la photo de profil par défaut',
     'editprofil.upload_failed': "Échec de l'envoi de l'image.",
+    'editprofil.username_label': "Nom d'utilisateur",
+    'editprofil.username_hint': '3 à 24 caractères : lettres, chiffres, tiret bas (_) et point (.).',
+    'editprofil.username_cooldown': "Nom d'utilisateur modifié trop récemment, réessayez plus tard.",
+    'editprofil.username_error': "Échec de la mise à jour du nom d'utilisateur.",
     'editprofil.name_label': 'Nom',
     'editprofil.name_placeholder': 'Votre nom',
     'editprofil.name_max': '{count} caractères maximum.',
+    'editprofil.name_invalid': 'Utilisez uniquement des lettres, chiffres, espaces, points, tirets ou underscores.',
     'editprofil.name_locked': 'Le pseudo pourra être changé le {date}.',
     'editprofil.bio_label': 'Bio',
     'editprofil.bio_placeholder': 'Parlez de vous en quelques mots…',
@@ -909,8 +1230,9 @@ export const messages: Record<Locale, Messages> = {
     'editprofil.location_placeholder': 'Ville, pays',
     'editprofil.website_label': 'Site web',
     'editprofil.birthdate_locked':
-      "La date de naissance ne peut pas être changée une fois renseignée.",
-    'editprofil.gender_locked': 'Le genre ne peut pas être changé une fois renseigné.',
+      'La date de naissance ne peut pas être changée une fois renseignée.',
+    'editprofil.gender_locked':
+      'Le genre ne peut pas être changé une fois renseigné.',
     'editprofil.gender_none': 'Non renseigné',
     'editprofil.nationality_label': 'Nationalité',
     'editprofil.nationality_placeholder': 'Choisir une nationalité',
@@ -923,7 +1245,8 @@ export const messages: Record<Locale, Messages> = {
     // — Explorer —
     'explorer.search_placeholder': 'Rechercher un compte ou #hashtag',
     'explorer.hint_before': 'Astuce : commencez par',
-    'explorer.hint_after': 'pour chercher un hashtag. Les comptes marchent avec ou sans @.',
+    'explorer.hint_after':
+      'pour chercher un hashtag. Les comptes marchent avec ou sans @.',
     'explorer.hashtag_result': 'Voir les posts de ce hashtag',
     'explorer.search_failed_title': 'Recherche impossible',
     'explorer.search_failed_msg': 'Réessayez dans un instant.',
@@ -947,14 +1270,19 @@ export const messages: Record<Locale, Messages> = {
     'explorer.action_search': 'Rechercher « {q} »',
     'explorer.action_search_hint': 'Afficher les résultats dans Explorer',
     'explorer.action_go_user': 'Aller à @{q}',
-    'explorer.action_go_user_hint': 'Ouvrir le profil si cet identifiant existe',
+    'explorer.action_go_user_hint':
+      'Ouvrir le profil si cet identifiant existe',
     'explorer.no_results_for': 'Aucun résultat pour « {q} ».',
     'explorer.results_for': 'Filtrer les résultats pour « {q} »',
     'explorer.filters_hint': 'Sélectionnez au moins un type de résultat.',
     'explorer.filter_title': 'Filtrer',
     'explorer.filter_publications': 'Publications',
     'explorer.filter_users': 'Utilisateurs',
-    'explorer.no_publications_for': 'Aucune publication ne correspond à « {q} ».',
+    'explorer.filter_required': 'Au moins un filtre requis',
+    'explorer.at_least_one_filter_publications': 'Au moins un type de résultat doit être activé. Veuillez activer les utilisateurs avant de désactiver les publications.',
+    'explorer.at_least_one_filter_users': 'Au moins un type de résultat doit être activé. Veuillez activer les publications avant de désactiver les utilisateurs.',
+    'explorer.no_publications_for':
+      'Aucune publication ne correspond à « {q} ».',
     'explorer.no_users_for': 'Aucun utilisateur ne correspond à « {q} ».',
 
     // — Qui suivre —
@@ -968,15 +1296,24 @@ export const messages: Record<Locale, Messages> = {
     'common.not_connected': 'not signed in',
     'common.logout': 'Log out',
     'common.cancel': 'Cancel',
+    'common.clear': 'Clear',
     'common.save': 'Save',
     'common.loading': 'Loading…',
     'common.retry': 'Retry',
     'common.close': 'Close',
     'media.download': 'Download image',
+    'media.open_image': 'Open image',
+    'media.copy_image': 'Copy image',
+    'media.save_image': 'Save image',
+    'media.copy_success': 'Image copied.',
+    'media.copy_failed': "Couldn't copy the image.",
+    'media.save_started': 'Image save started.',
+    'media.save_failed': "Couldn't save the image.",
     'media.previous': 'Previous image',
     'media.next': 'Next image',
     'media.speed': 'Playback speed',
     'media.speed_normal': 'Normal',
+    'media.too_large': 'File too large (max {max} MB).',
 
     // — Navigation —
     'nav.feed': 'Feed',
@@ -990,6 +1327,7 @@ export const messages: Record<Locale, Messages> = {
     'nav.home': 'Home',
     'nav.bookmarks': 'Bookmarks',
     'nav.open_menu': 'Open navigation menu',
+    'nav.back': 'Back',
     'nav.post': 'Breeze',
     'nav.compose': 'Compose a post',
 
@@ -1019,7 +1357,8 @@ export const messages: Record<Locale, Messages> = {
     'bookmarks.rename': 'Rename',
     'bookmarks.delete': 'Delete',
     'bookmarks.delete_title': 'Delete collection',
-    'bookmarks.delete_confirm': 'Posts will leave this collection (they stay published).',
+    'bookmarks.delete_confirm':
+      'Posts will leave this collection (they stay published).',
     'bookmarks.empty_title': 'No bookmarks',
     'bookmarks.empty_message': 'Save posts to find them here.',
     'bookmarks.empty_collection': 'This collection is empty.',
@@ -1072,6 +1411,32 @@ export const messages: Record<Locale, Messages> = {
     'settings.general_desc': 'Customize your Breezy experience.',
     'settings.user_title': 'User settings',
     'settings.user_desc': 'Manage your account credentials and security.',
+    'settings.mfa.title': 'Two-factor authentication (2FA)',
+    'settings.mfa.desc':
+      'Add a one-time code from an authenticator app (Microsoft/Google Authenticator) when you sign in.',
+    'settings.mfa.enabled_badge': 'Enabled',
+    'settings.mfa.loading': 'Loading…',
+    'settings.mfa.switch_label': 'Two-factor authentication',
+    'settings.mfa.state_on': 'On — a code will be required at sign-in.',
+    'settings.mfa.state_off': 'Off',
+    'settings.mfa.not_configured':
+      'Two-factor authentication is not available on this server right now.',
+    'settings.mfa.activate': 'Enable 2FA',
+    'settings.mfa.setup_intro':
+      'Scan this QR code with your authenticator app, or enter the key manually, then type the generated code.',
+    'settings.mfa.qr_alt': '2FA setup QR code',
+    'settings.mfa.secret_label': 'Setup key (manual entry)',
+    'settings.mfa.code_label': 'Verification code',
+    'settings.mfa.password_label': 'Or your password',
+    'settings.mfa.confirm': 'Enable',
+    'settings.mfa.cancel': 'Cancel',
+    'settings.mfa.disable': 'Disable 2FA',
+    'settings.mfa.disable_intro':
+      'Confirm with a code from your app OR your password to disable two-factor authentication.',
+    'settings.mfa.success_enabled': 'Two-factor authentication enabled.',
+    'settings.mfa.success_disabled': 'Two-factor authentication disabled.',
+    'settings.mfa.error_code': 'Invalid verification code.',
+    'settings.mfa.error_generic': 'Operation failed. Please try again.',
     'settings.password.title': 'Change password',
     'settings.password.desc': 'Changing it will sign out your other sessions.',
     'settings.password.current': 'Current password',
@@ -1079,26 +1444,34 @@ export const messages: Record<Locale, Messages> = {
     'settings.password.confirm': 'Confirm new password',
     'settings.password.submit': 'Change password',
     'settings.password.success': 'Password changed.',
-    'settings.password.error_length': 'The new password must contain at least 8 characters.',
+    'settings.password.error_length':
+      'The new password must contain at least 8 characters.',
     'settings.password.error_match': 'The two new passwords do not match.',
-    'settings.password.error_same': 'The new password must differ from the current one.',
+    'settings.password.error_same':
+      'The new password must differ from the current one.',
     'settings.password.error_current': 'The current password is incorrect.',
     'settings.password.error_generic': 'Could not change the password.',
     'settings.email.title': 'Change email address',
-    'settings.email.desc': 'Your current address remains active until the new one is verified.',
+    'settings.email.desc':
+      'Your current address remains active until the new one is verified.',
     'settings.email.new': 'New email address',
     'settings.email.submit': 'Send verification link',
-    'settings.email.success': 'A verification link was sent to the new address.',
+    'settings.email.success':
+      'A verification link was sent to the new address.',
     'settings.email.error_same': 'This is already your account email address.',
     'settings.email.error_taken': 'This email address is already in use.',
-    'settings.email.error_delivery': 'Email delivery is unavailable. The address was not left pending.',
+    'settings.email.error_delivery':
+      'Email delivery is unavailable. The address was not left pending.',
     'settings.email.error_generic': 'Could not request the email change.',
     'settings.email.confirm_loading_title': 'Verifying…',
-    'settings.email.confirm_loading_desc': 'We are confirming your new email address.',
+    'settings.email.confirm_loading_desc':
+      'We are confirming your new email address.',
     'settings.email.confirm_success_title': 'Email address changed',
-    'settings.email.confirm_success_desc': 'Your new address is active and your session has been renewed.',
+    'settings.email.confirm_success_desc':
+      'Your new address is active and your session has been renewed.',
     'settings.email.confirm_invalid_title': 'Invalid or expired link',
-    'settings.email.confirm_invalid_desc': 'This request can no longer be confirmed. Start again from settings.',
+    'settings.email.confirm_invalid_desc':
+      'This request can no longer be confirmed. Start again from settings.',
     'settings.email.confirm_back': 'Back to settings',
     'settings.email.changed': 'Email address changed.',
     'visibility.title': 'Account visibility',
@@ -1108,17 +1481,31 @@ export const messages: Record<Locale, Messages> = {
     'visibility.private_title': 'Private',
     'visibility.private_desc': 'Only accepted followers can see your content.',
     'visibility.private_account': 'Private account',
-    'visibility.private_toggle_desc': 'Turn on to limit your content to accepted followers.',
+    'visibility.private_toggle_desc':
+      'Turn on to limit your content to accepted followers.',
     'visibility.toggle_aria': 'Change account visibility',
     'visibility.saving': 'Saving...',
     'visibility.saved': 'Visibility updated.',
     'visibility.load_failed': 'Could not load visibility.',
     'visibility.save_failed': 'Could not update visibility.',
     'visibility.likes_private_account': 'Private likes',
-    'visibility.likes_private_toggle_desc': 'Turn on to hide your likes from other users.',
+    'visibility.likes_private_toggle_desc':
+      'Turn on to hide your likes from other users.',
     'visibility.likes_toggle_aria': 'Change likes visibility',
     'visibility.likes_saved': 'Likes visibility updated.',
     'visibility.likes_save_failed': 'Could not update likes visibility.',
+    'visibility.activity_private_account': 'Hidden activity',
+    'visibility.activity_private_toggle_desc':
+      'Turn on to hide your online status and last connection.',
+    'visibility.activity_forced_private_desc':
+      'Private accounts automatically hide online status and last connection.',
+    'visibility.activity_private_followers_desc':
+      'On a private profile, only accepted followers can see your activity if this setting stays public.',
+    'visibility.activity_toggle_aria': 'Change activity visibility',
+    'visibility.activity_saved': 'Activity visibility updated.',
+    'visibility.activity_save_failed': 'Could not update activity visibility.',
+    'activity.online': 'Online',
+    'activity.last_seen': 'Last connection {time}',
     'filters.title': 'Muted words',
     'filters.desc':
       "Hide feed posts containing a word or phrase you don't want to see.",
@@ -1145,15 +1532,24 @@ export const messages: Record<Locale, Messages> = {
     'notifications.like_one': '{name} liked your post',
     'notifications.like_other': '{name} and {count} others liked your post',
     'notifications.comment_one': '{name} commented on your post',
-    'notifications.comment_other': '{name} and {count} others commented on your post',
+    'notifications.comment_other':
+      '{name} and {count} others commented on your post',
+    'notifications.comment_like_one': '{name} liked your comment',
+    'notifications.comment_like_other':
+      '{name} and {count} others liked your comment',
     'notifications.reply_one': '{name} replied to your comment',
-    'notifications.reply_other': '{name} and {count} others replied to your comment',
+    'notifications.reply_other':
+      '{name} and {count} others replied to your comment',
     'notifications.repost_one': '{name} reposted your post',
-    'notifications.repost_other': '{name} and {count} others reposted your post',
+    'notifications.repost_other':
+      '{name} and {count} others reposted your post',
     'notifications.quote': '{name} quoted your post',
     'notifications.mention': '{name} mentioned you',
+    'notifications.message_one': '{name} sent you a message',
+    'notifications.message_other': '{name} and {count} others sent you a message',
     'notifications.message_mention_one': '{name} mentioned you in a message',
-    'notifications.message_mention_other': '{name} mentioned you in {count} messages',
+    'notifications.message_mention_other':
+      '{name} mentioned you in {count} messages',
     'notifications.follow_one': '{name} followed you',
     'notifications.follow_other': '{name} and {count} others followed you',
 
@@ -1162,8 +1558,10 @@ export const messages: Record<Locale, Messages> = {
     'mentions.user_not_found': 'Account not found',
     'notifications.follow_request': '{name} requested to follow you',
     'notifications.follow_request_accepted': '{name} accepted your request',
-    'notifications.follow_request_accept_confirm': "You accepted {name}'s request",
-    'notifications.follow_request_accept_confirm_prefix': "You accepted the request from",
+    'notifications.follow_request_accept_confirm':
+      "You accepted {name}'s request",
+    'notifications.follow_request_accept_confirm_prefix':
+      'You accepted the request from',
     'notifications.post_purge_warning':
       'One of your tweets removed by moderation will be permanently deleted in about a month.',
     'notifications.accept': 'Accept',
@@ -1176,13 +1574,16 @@ export const messages: Record<Locale, Messages> = {
 
     // — Stub pages (empty states) —
     'notifications.heading': 'Nothing yet',
-    'notifications.desc': 'Your notifications (likes, follows, mentions) will show up here.',
+    'notifications.desc':
+      'Your notifications (likes, follows, mentions) will show up here.',
     'messages.title': 'Messages',
     'messages.heading': 'No conversations',
     'messages.empty_desc': 'Start a chat with the + button.',
     'messages.new': 'New',
+    'messages.new_message': 'New message',
     'messages.new_dm': 'New message',
-    'messages.new_dm_desc': 'Search for someone to start an end-to-end encrypted conversation.',
+    'messages.new_dm_desc':
+      'Search for someone to start an end-to-end encrypted conversation.',
     'messages.new_group': 'New group',
     'messages.new_group_desc':
       'Name the group and add members. The name and messages are end-to-end encrypted.',
@@ -1198,7 +1599,8 @@ export const messages: Record<Locale, Messages> = {
       'The name is public and messages are readable by an administrator (semi-public community).',
     'messages.community_admin_note':
       'Semi-public community: messages can be read by an administrator.',
-    'messages.search_user_placeholder': 'Search for someone (@ for the handle)…',
+    'messages.search_user_placeholder':
+      'Search for someone (@ for the handle)…',
     'messages.search_community_placeholder': 'Search for a community…',
     'messages.no_users': 'No user found.',
     'messages.no_communities': 'No community found.',
@@ -1235,6 +1637,7 @@ export const messages: Record<Locale, Messages> = {
     'messages.receipt_delivered': 'Sent',
     'messages.receipt_read': 'Opened',
     'messages.deleted': 'Message deleted',
+    'messages.deleted_by_moderation': 'This message was removed by moderation',
     'messages.actions': 'Message actions',
     'messages.peer_not_activated': "This person hasn't enabled messaging yet",
     'messages.delete_confirm': 'Delete this message for everyone?',
@@ -1266,9 +1669,12 @@ export const messages: Record<Locale, Messages> = {
       'Too simple: aim for at least 10 characters and a mix of words/numbers/symbols.',
     'messages.passphrase.mismatch': 'The two passphrases do not match.',
     'messages.passphrase.wrong': 'Incorrect passphrase.',
-    'messages.passphrase.setup_failed': 'Could not save the passphrase. Please try again.',
-    'messages.passphrase.unlock_failed': 'Could not unlock. Check your passphrase.',
-    'messages.passphrase.warning': 'Keep it safe: without it, your messages stay inaccessible elsewhere.',
+    'messages.passphrase.setup_failed':
+      'Could not save the passphrase. Please try again.',
+    'messages.passphrase.unlock_failed':
+      'Could not unlock. Check your passphrase.',
+    'messages.passphrase.warning':
+      'Keep it safe: without it, your messages stay inaccessible elsewhere.',
     'messages.no_messages_title': 'No messages',
     'messages.no_messages_desc': 'Send the first message 👋',
     'messages.new_messages_divider': 'New messages',
@@ -1314,12 +1720,154 @@ export const messages: Record<Locale, Messages> = {
     'admin.action_unban': 'Reinstate',
     'admin.you': 'You',
     'admin.role_changed': 'Role updated: {role}',
+    'admin.change_role': 'Change role',
     'admin.banned_toast': 'Account banned.',
     'admin.unbanned_toast': 'Account reinstated.',
     'admin.action_failed': 'Action failed.',
     'admin.access_denied': 'Access denied',
     'admin.access_denied_desc': 'This page is restricted to administrators.',
-    'admin.role_note': 'A role change takes effect the next time the user signs in (token refresh).',
+    'admin.role_note':
+      'A role change takes effect the next time the user signs in (token refresh).',
+
+    // ── Report (reusable form) ──
+    'report.action': 'Report',
+    'report.profile_action': 'Report this profile',
+    'report.message_action': 'Report message',
+    'report.title': 'Report this content',
+    'report.title_bug': 'Report a bug',
+    'report.subtitle': 'Help us keep Breezy healthy. Your report stays confidential.',
+    'report.subtitle_target': 'Reporting {target}. Your report stays confidential.',
+    'report.reason_label': 'Reason',
+    'report.text_label': 'Details',
+    'report.text_placeholder': 'Describe the issue (optional)…',
+    'report.reason.inappropriate': 'Inappropriate behaviour',
+    'report.reason.offensive': 'Offensive language',
+    'report.reason.bug': 'Technical bug',
+    'report.reason.spam': 'Spam / advertising',
+    'report.reason.other': 'Other',
+    'report.attachment_add': 'Add an image',
+    'report.attachment_hint': 'Optional image, 5 MB maximum.',
+    'report.attachment_type_error': 'Only images are allowed.',
+    'report.attachment_size_error': 'Image too large (5 MB maximum).',
+    'report.submit': 'Send report',
+    'report.success': 'Thank you, your report has been sent.',
+    'report.error': 'Could not send the report.',
+    'report.already': 'You have already reported this item.',
+    'report.locked': 'This item was approved by moderation: it can no longer be reported.',
+    'report.disclose_notice':
+      'This message is encrypted: by reporting it, you share this copy with moderation (the server cannot read it on its own).',
+    'report.disclose_empty': '(empty or undecryptable message)',
+
+    // ── Report tabs (moderation + admin) ──
+    'moderation.tab_reports': 'Reports',
+    'admin.tab_reports': 'Reports (bugs)',
+    'admin.tab_settings': 'Settings',
+    'admin.tab_infra': 'Infrastructure',
+    'admin.settings.auto_hide_title': 'Auto-hide reported posts',
+    'admin.settings.auto_hide_desc':
+      'Beyond this number of reports, a post is automatically hidden and held pending a moderator decision. 0 disables auto-hiding.',
+    'admin.settings.auto_hide_label': 'Report threshold',
+    'admin.settings.saved': 'Settings saved.',
+    'admin.settings.save_failed': 'Could not save settings.',
+    'admin.settings.invalid': 'Invalid value (integer ≥ 0 expected).',
+    'admin.settings.error': 'Could not load settings.',
+
+    // ── Tickets ──
+    'tickets.empty': 'No report tickets.',
+    'tickets.empty_bug': 'No bug reports.',
+    'tickets.error': 'Could not load tickets.',
+    'tickets.reports_count': '{count} report(s)',
+    'tickets.last_report': 'Last: {when}',
+    'tickets.reason_tags': 'Reasons',
+    'tickets.status.open': 'Open',
+    'tickets.status.closed': 'Closed',
+    'tickets.status.reopened': 'Reopened',
+    'tickets.status.approved': 'Approved',
+    'tickets.entity.post': 'Post',
+    'tickets.entity.message': 'Direct message',
+    'tickets.entity.group_message': 'Group message',
+    'tickets.entity.profile': 'Profile',
+    'tickets.entity.app': 'Application',
+    'tickets.detail_title': 'Ticket',
+    'tickets.original_content': 'Reported content',
+    'tickets.content_unavailable': 'Content unavailable (already removed or deleted).',
+    'tickets.content_encrypted':
+      'End-to-end encrypted message: the server cannot read it. The copy shared by the reporter (recipient) appears in the thread below.',
+    'tickets.disclosed_content': 'Message disclosed by the reporter',
+    'tickets.open_entity': 'View reported item',
+    'tickets.thread_title': 'Report thread ({count})',
+    'tickets.actions_title': 'Action log',
+    'tickets.by_moderator': 'by {who}',
+    'tickets.reply_placeholder': 'Internal reply (visible to moderation)…',
+    'tickets.reply_submit': 'Reply',
+    'tickets.reply_added': 'Reply added.',
+    'tickets.action.reply': 'Internal reply',
+    'tickets.action.status_change': 'Status changed → {status}',
+    'tickets.action.transfer': 'Transferred to moderation',
+    'tickets.action.auto_reopen': 'Automatically reopened (re-report threshold reached)',
+    'tickets.action.content_removed': 'Reported content removed by moderation',
+    'tickets.action.auto_hidden': 'Post automatically hidden (report threshold reached)',
+    'tickets.action.approved': 'Item deemed compliant by moderation (reporting locked)',
+    'tickets.action.warned': 'Author warned by moderation',
+    'tickets.system': 'System',
+    'tickets.set_open': 'Reopen',
+    'tickets.set_closed': 'Close',
+    'tickets.approve': 'Approve (compliant)',
+    'tickets.approved': 'Item approved: it is visible again and can no longer be reported.',
+    'tickets.approved_locked':
+      'Item approved by moderation: visible again, it can no longer be reported (final decision).',
+    'tickets.transfer': 'Transfer to moderation',
+    'tickets.transferred': 'Ticket transferred to moderation.',
+    'tickets.post_removed': 'Post removed and moved to “Deleted tweets”.',
+    'tickets.delete_message': 'Delete message',
+    'tickets.message_removed': 'Message removed by moderation in the conversation.',
+    'tickets.action_failed': 'Action failed.',
+    'tickets.warn': 'Warn the author',
+    'tickets.cannot_approve_actioned': 'Cannot approve: a sanction has already been applied.',
+    // ── Targeted user risk profile ──
+    'tickets.target_user': 'Targeted user',
+    'tickets.warning_count': 'Warned {count} time(s)',
+    'tickets.ban_user': 'Ban',
+    'tickets.user_banned': 'User banned.',
+    'tickets.ban_confirm_title': 'Ban this user?',
+    'tickets.ban_confirm_desc': '{name} will no longer be able to sign in. You can reactivate them from the accounts directory.',
+    // ── Content removal + warning (atomic: remove → warn → close) ──
+    'tickets.warn_after_delete_post': 'Your post was removed by moderation. Reason: ',
+    'tickets.warn_after_delete_message': 'Your message was removed by moderation. Reason: ',
+    'tickets.delete_warn_title': 'Remove and warn the author',
+    'tickets.delete_warn_desc':
+      'The content will be removed, the author warned of the reason, and the ticket closed. Nothing is removed until you confirm.',
+    'tickets.delete_and_warn': 'Remove and warn',
+    'tickets.removed_and_closed': 'Content removed, author warned, ticket closed.',
+    // ── Close guard (no action taken) ──
+    'tickets.close_confirm_title': 'Close without action?',
+    'tickets.close_confirm_desc': 'No action has been taken on this ticket. Close it as an unfounded report?',
+    'tickets.close_confirm_submit': 'Close as unfounded',
+    // ── Ticket filters (stackable) ──
+    'tickets.filters': 'Filters',
+    'tickets.filter_status': 'Status',
+    'tickets.filter_status_all': 'All',
+    'tickets.filter_min_reports': 'Min. reports',
+    'tickets.filter_since': 'Since',
+    'tickets.filter_until': 'Until',
+    'tickets.filter_reset': 'Reset',
+
+    // ── Warnings (warns) ──
+    'warn.title': 'Warn the user',
+    'warn.desc': 'The user will see this warning on their next sign-in or action.',
+    'warn.placeholder': 'Warning message…',
+    'warn.submit': 'Send warning',
+    'warn.sent': 'Warning sent.',
+    'warn.error': 'Could not send the warning.',
+    'warn.modal_title': 'Moderation warning',
+    'warn.modal_ack': 'I understand',
+
+    // ── Account filters ──
+    'accounts.actions': 'Actions',
+    'accounts.filter_all': 'All',
+    'accounts.filter_banned': 'Banned',
+    'accounts.filter_moderators': 'Moderators',
+    'accounts.filter_admins': 'Administrators',
     'moderation.heading': 'Moderation center',
     'moderation.desc': 'Reports and moderation actions will show up here.',
     'moderation.subtitle': 'Keep order on Breezy: removed tweets and accounts.',
@@ -1328,6 +1876,13 @@ export const messages: Record<Locale, Messages> = {
     'moderation.posts_empty': 'No tweets in the trash.',
     'moderation.posts_error': 'Could not load the trash.',
     'moderation.restore': 'Restore',
+    // ── Trash: filters (author + removal date) + pagination ──
+    'moderation.search_user': 'Search a user…',
+    'moderation.filter_since': 'Removed since',
+    'moderation.filter_until': 'Removed until',
+    'moderation.filter_reset': 'Reset',
+    'moderation.no_match': 'No deleted tweet matches the filters.',
+    'moderation.load_more': 'Load more',
     'moderation.purge': 'Delete permanently',
     'moderation.purge_title': 'Permanently delete this tweet?',
     'moderation.purge_desc':
@@ -1338,17 +1893,22 @@ export const messages: Record<Locale, Messages> = {
     'moderation.restored_toast': 'Tweet restored.',
     'moderation.purged_toast': 'Tweet permanently deleted.',
     'moderation.access_denied': 'Access denied',
-    'moderation.access_denied_desc': 'This page is reserved for moderators and administrators.',
+    'moderation.access_denied_desc':
+      'This page is reserved for moderators and administrators.',
     'moderation.ban_restricted': 'A moderator can only ban a user.',
     'moderation.banned_since': 'Banned {when}',
     'moderation.account_delete': 'Delete account',
-    'moderation.account_delete_soon': 'Permanent account deletion (GDPR) — coming soon.',
+    'moderation.account_delete_soon':
+      'Permanent account deletion (GDPR) — coming soon.',
     'moderation.account_delete_title': 'Permanently delete this account?',
     'moderation.account_delete_desc':
       'Irreversible GDPR erasure: profile, tweets, messages, media and relationships will be deleted across all services. Type “{username}” to confirm.',
     'moderation.account_delete_confirm_label': 'Username to confirm',
     'moderation.account_deleted_toast': 'Account permanently deleted.',
-    'moderation.account_delete_failed': 'Deletion failed (partial erasure possible).',
+    'moderation.account_delete_failed':
+      'Deletion failed (partial erasure possible).',
+    'moderation.role_label': 'Role',
+    'moderation.account_actions': 'Account actions',
     'admin.infra_subtitle': 'Infrastructure and service monitoring.',
     'admin.infra_heading': 'Service status',
     'admin.infra_desc':
@@ -1415,7 +1975,8 @@ export const messages: Record<Locale, Messages> = {
     'auth.login.demo.joined_sub': "Discover tonight's rising topics.",
     'auth.login.demo.rank': '#{n} on Breezy',
     'auth.login.demo.interactions': '17 new interactions',
-    'auth.login.demo.interactions_sub': 'Your feed is waiting, fresh and alive.',
+    'auth.login.demo.interactions_sub':
+      'Your feed is waiting, fresh and alive.',
     'auth.login.badge': 'Sign in to the network',
     'auth.login.title': 'Pick up your feed where you left off.',
     'auth.login.subtitle':
@@ -1434,6 +1995,7 @@ export const messages: Record<Locale, Messages> = {
 
     // — OAuth —
     'auth.oauth.loading': 'Signing in…',
+    'auth.oauth.continue_with': 'Continue with {provider}',
     'auth.oauth.error': 'Sign-in failed. Try again from the sign-in page.',
     'auth.oauth.back_to_login': 'Back to sign in',
 
@@ -1453,7 +2015,8 @@ export const messages: Record<Locale, Messages> = {
     'auth.register.demo.comm2': 'CESI Campus',
     'auth.register.demo.comm3': 'Distributed Dev',
     'auth.register.demo.alive': 'Your account comes to life',
-    'auth.register.demo.alive_sub': 'Profile, posts and conversations in seconds.',
+    'auth.register.demo.alive_sub':
+      'Profile, posts and conversations in seconds.',
     'auth.register.badge': 'New Breezy profile',
     'auth.register.title': 'Join Breezy and start posting.',
     'auth.register.subtitle':
@@ -1472,13 +2035,19 @@ export const messages: Record<Locale, Messages> = {
     'auth.register.hide_password_confirm': 'Hide password confirmation',
     'auth.register.password_help':
       '8 chars min., uppercase, lowercase, number and special character.',
+    'auth.register.terms_prefix': 'I accept the',
+    'auth.register.terms_link': 'Terms of Use',
+    'auth.register.terms_locked':
+      'Read the Terms of Use to the bottom to unlock this checkbox.',
+    'auth.register.terms_unlocked':
+      'You can now check this box to continue.',
     'auth.register.submit': 'Create my account',
     'auth.register.submitting': 'Creating account…',
     'auth.register.or': 'Or create my account with',
     'auth.register.have_account': 'Already have an account?',
     'auth.register.err.username_required': 'Username is required.',
     'auth.register.err.username_format':
-      '3 to 24 characters: letters, numbers and underscore (_) only.',
+      '3 to 24 characters: letters, numbers, underscore (_) and dot (.); dot not at the start/end or doubled.',
     'auth.register.err.username_max': 'Username is limited to 24 characters.',
     'auth.register.err.username_reserved': "This username isn't allowed.",
     'auth.register.err.username_taken': 'This username is already taken.',
@@ -1486,24 +2055,33 @@ export const messages: Record<Locale, Messages> = {
       "Couldn't check the username. Try again in a moment.",
     'auth.register.err.birthdate_required': 'Date of birth is required.',
     'auth.register.err.birthdate_invalid': 'Enter a valid date of birth.',
-    'auth.register.err.birthdate_future': "Date of birth can't be in the future.",
+    'auth.register.err.birthdate_future':
+      "Date of birth can't be in the future.",
     'auth.register.err.age': 'You must be at least 13 to sign up.',
     'auth.register.err.gender_required': 'Choose a gender.',
     'auth.register.err.password_max': 'Password is limited to 250 characters.',
     'auth.register.err.password_format':
       'At least 8 characters, one uppercase, one lowercase, one number and one special character.',
     'auth.register.err.confirm_required': 'Confirm your password.',
-    'auth.register.err.confirm_max': 'The confirmation is limited to 250 characters.',
+    'auth.register.err.confirm_max':
+      'The confirmation is limited to 250 characters.',
     'auth.register.err.confirm_mismatch': "Passwords don't match.",
-    'auth.register.err.failed': 'Sign-up failed. Check the information entered.',
+    'auth.register.err.terms_required':
+      'You must accept the Terms of Use to create your account.',
+    'auth.register.err.terms_read_required':
+      'Read the Terms of Use all the way through before accepting them.',
+    'auth.register.err.failed':
+      'Sign-up failed. Check the information entered.',
 
     // — Onboarding (finalize OAuth accounts without a profile) —
     'onboarding.title': 'Welcome to Breezy 👋',
     'onboarding.subtitle':
       'Pick your username and enter your date of birth to finish setting up your account.',
+    'onboarding.oauth_subtitle':
+      'Finish your sign-up with {email}. No Breezy account is created before this step.',
     'onboarding.username_label': 'Username',
     'onboarding.username_placeholder': 'e.g. felipe',
-    'onboarding.username_hint': '3 to 24 characters: letters, numbers and underscore (_).',
+    'onboarding.username_hint': '3 to 24 characters: letters, numbers, underscore (_) and dot (.).',
     'onboarding.username_checking': 'Checking availability…',
     'onboarding.username_available': 'Available ✓',
     'onboarding.birthdate_label': 'Date of birth',
@@ -1511,6 +2089,8 @@ export const messages: Record<Locale, Messages> = {
       "Under 18, sensitive (NSFW) content will be hidden. Your date of birth can't be changed after confirmation.",
     'onboarding.submit': 'Confirm and continue',
     'onboarding.submitting': 'Saving…',
+    'onboarding.accept_terms': 'Accept the Terms',
+    'onboarding.terms_accepted': 'Terms accepted',
     'onboarding.err.generic': 'Something went wrong. Try again in a moment.',
 
     // — Admin account creation —
@@ -1530,7 +2110,8 @@ export const messages: Record<Locale, Messages> = {
     'admin.create.hide_password': 'Hide password',
     'admin.create.submit': 'Create account',
     'admin.create.submitting': 'Creating…',
-    'admin.create.success': 'Account created. Temporary password sent to {email}.',
+    'admin.create.success':
+      'Account created. Temporary password sent to {email}.',
     'admin.create.success_suffixed':
       'Account created as @{username} (the requested name was taken). Password sent to {email}.',
     'admin.create.err.email_taken': 'This email address is already in use.',
@@ -1551,7 +2132,8 @@ export const messages: Record<Locale, Messages> = {
     'account.password_change.err.current': 'Invalid temporary password.',
     'account.password_change.err.same':
       'The new password must be different from the temporary one.',
-    'account.password_change.err.generic': 'Could not change the password. Try again.',
+    'account.password_change.err.generic':
+      'Could not change the password. Try again.',
 
     // — Provisional username (assigned by an admin) —
     'account.username_pending.title': 'Choose a username',
@@ -1579,8 +2161,18 @@ export const messages: Record<Locale, Messages> = {
     'auth.verify.resend_done':
       'If an unverified account matches this address, an email has just been sent.',
     'auth.verify.resend_label': 'Your email address',
+    'auth.mfa.title': 'Two-step verification',
+    'auth.mfa.subtitle':
+      'Enter the 6-digit code shown in your authenticator app.',
+    'auth.mfa.code_label': 'Verification code',
+    'auth.mfa.verify': 'Verify',
+    'auth.mfa.verifying': 'Verifying…',
+    'auth.mfa.back': 'Back to sign in',
+    'auth.mfa.error_code': 'Invalid code. Try again.',
+    'auth.mfa.error_challenge': 'Your sign-in session expired. Please sign in again.',
     'auth.verify.loading_title': 'Verifying…',
-    'auth.verify.loading_desc': 'One moment, we are confirming your email address.',
+    'auth.verify.loading_desc':
+      'One moment, we are confirming your email address.',
     'auth.verify.success_title': 'Email verified!',
     'auth.verify.success_desc':
       'Your account is active and you are now signed in. Welcome to Breezy!',
@@ -1640,7 +2232,8 @@ export const messages: Record<Locale, Messages> = {
     'feed.hashtag_tab_recent': 'Recent',
     'feed.hashtag_tab_media': 'Media',
     'feed.hashtag_no_media_title': 'No media for this hashtag',
-    'feed.hashtag_no_media_msg': 'Images and videos attached to this hashtag will appear here.',
+    'feed.hashtag_no_media_msg':
+      'Images and videos attached to this hashtag will appear here.',
     'feed.hashtag_media_open': 'Open the media post',
 
     // — Composer —
@@ -1654,6 +2247,8 @@ export const messages: Record<Locale, Messages> = {
     'composer.poll_choice': 'Choice {number}',
     'composer.poll_add_choice': 'Add choice',
     'composer.poll_remove_choice': 'Remove this choice',
+    'composer.poll_choice_image': 'Add an image to choice {number}',
+    'composer.poll_choice_image_remove': 'Remove image',
     'composer.poll_duration': 'Question duration',
     'composer.poll_days': 'Days',
     'composer.poll_hours': 'Hours',
@@ -1668,7 +2263,8 @@ export const messages: Record<Locale, Messages> = {
     'composer.poll_remove': 'Remove question',
     'composer.pin_profile': 'Pin to my profile',
     'composer.post_failed': "Couldn't post",
-    'composer.dialog_desc': 'Write and publish a new post (280 characters max).',
+    'composer.dialog_desc':
+      'Write and publish a new post (280 characters max).',
     'emoji.aria': 'Emoji {emoji}',
 
     // — Post (card) —
@@ -1689,14 +2285,29 @@ export const messages: Record<Locale, Messages> = {
     'post.poll_close': 'Close poll',
     'post.poll_close_failed': "Couldn't close poll",
     'post.share': 'Share',
+    'share.title': 'Share',
+    'share.post_desc': 'Send this post in a private message, share it, or copy the link.',
+    'share.profile_desc': 'Send this profile in a private message, share it, or copy the link.',
+    'share.send_dm': 'Send in a private message',
+    'share.send_dm_hint': 'Pick someone to send the link to.',
+    'share.recent': 'Recent',
+    'share.via': 'Share via…',
+    'share.copy': 'Copy link',
+    'share.copied': 'Link copied',
+    'share.sent': 'Sent in a private message',
+    'share.send_failed': 'Could not send',
+    'share.login_required': 'Sign in to send a private message.',
+    'share.post_message_prefix': 'Check out this post:',
     'post.deleted': 'Post deleted',
     'post.private_account_tooltip': 'This account is private',
 
     // — Comments —
+    'comment.like': 'Like',
     'comment.reply': 'Reply',
     'comment.placeholder': 'Write a comment…',
     'comment.reply_placeholder': 'Write a reply…',
-    'comment.restricted_followers': "Only the author's followers can reply to this post.",
+    'comment.restricted_followers':
+      "Only the author's followers can reply to this post.",
     'comment.load_error': "Couldn't load comments.",
     'comment.empty': 'No comments yet. Be the first to react.',
     'comment.hide_replies': 'Hide replies',
@@ -1715,7 +2326,8 @@ export const messages: Record<Locale, Messages> = {
     'profil.save_failed': "The profile couldn't be saved.",
     'profil.unavailable': 'Profile unavailable',
     'profil.banned_title': 'Account banned',
-    'profil.banned_desc': 'This account has been banned by an administrator and is no longer available.',
+    'profil.banned_desc':
+      'This account has been banned by an administrator and is no longer available.',
     'profil.back_aria': 'Back to feed',
     'profil.posts_count_one': '{count} post',
     'profil.posts_count_other': '{count} posts',
@@ -1728,7 +2340,8 @@ export const messages: Record<Locale, Messages> = {
     'profil.replies_deleted_parent': 'Original post unavailable.',
     'profil.empty_likes': 'Posts you like will show up here.',
     'profil.likes_private_title': "@{username}'s likes are private",
-    'profil.likes_private_message': 'This user has chosen to keep their likes private.',
+    'profil.likes_private_message':
+      'This user has chosen to keep their likes private.',
     'profil.private_title': 'This account is private',
     'profil.private_message':
       'Follow this profile to see their posts, replies, and likes.',
@@ -1776,17 +2389,25 @@ export const messages: Record<Locale, Messages> = {
     'editprofil.desc': 'Update the information shown on your public profile.',
     'editprofil.change_banner': 'Change banner',
     'editprofil.change_avatar': 'Change profile picture',
+    'editprofil.reset_banner': 'Restore default banner',
+    'editprofil.reset_avatar': 'Restore default profile picture',
     'editprofil.upload_failed': 'Image upload failed.',
+    'editprofil.username_label': 'Username',
+    'editprofil.username_hint': '3 to 24 characters: letters, numbers, underscore (_) and dot (.).',
+    'editprofil.username_cooldown': 'Username changed too recently, try again later.',
+    'editprofil.username_error': 'Failed to update the username.',
     'editprofil.name_label': 'Name',
     'editprofil.name_placeholder': 'Your name',
     'editprofil.name_max': '{count} characters max.',
+    'editprofil.name_invalid': 'Use only letters, numbers, spaces, dots, hyphens or underscores.',
     'editprofil.name_locked': 'Your handle can be changed on {date}.',
     'editprofil.bio_label': 'Bio',
     'editprofil.bio_placeholder': 'Tell us about yourself in a few words…',
     'editprofil.location_label': 'Location',
     'editprofil.location_placeholder': 'City, country',
     'editprofil.website_label': 'Website',
-    'editprofil.birthdate_locked': "Your date of birth can't be changed once set.",
+    'editprofil.birthdate_locked':
+      "Your date of birth can't be changed once set.",
     'editprofil.gender_locked': "Gender can't be changed once set.",
     'editprofil.gender_none': 'Not specified',
     'editprofil.nationality_label': 'Nationality',
@@ -1800,7 +2421,8 @@ export const messages: Record<Locale, Messages> = {
     // — Explore —
     'explorer.search_placeholder': 'Search for an account or #hashtag',
     'explorer.hint_before': 'Tip: start with',
-    'explorer.hint_after': 'to search a hashtag. Accounts work with or without @.',
+    'explorer.hint_after':
+      'to search a hashtag. Accounts work with or without @.',
     'explorer.hashtag_result': 'View posts for this hashtag',
     'explorer.search_failed_title': 'Search failed',
     'explorer.search_failed_msg': 'Try again in a moment.',
@@ -1831,6 +2453,9 @@ export const messages: Record<Locale, Messages> = {
     'explorer.filter_title': 'Filter',
     'explorer.filter_publications': 'Posts',
     'explorer.filter_users': 'Users',
+    'explorer.filter_required': 'At least one filter required',
+    'explorer.at_least_one_filter_publications': 'At least one result type must be active. Please enable users before disabling posts.',
+    'explorer.at_least_one_filter_users': 'At least one result type must be active. Please enable posts before disabling users.',
     'explorer.no_publications_for': 'No posts match “{q}”.',
     'explorer.no_users_for': 'No users match “{q}”.',
 

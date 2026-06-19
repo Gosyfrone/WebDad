@@ -35,6 +35,11 @@ type Profil struct {
 	UpdatedAt       time.Time  `json:"updated_at"            bson:"updated_at"`
 	Visibility      string     `json:"visibility"       bson:"visibility,omitempty"`
 	LikesVisibility string     `json:"likes_visibility"  bson:"likes_visibility,omitempty"`
+	// ActivityVisibility contrôle l'affichage public de last_login_at. Un profil
+	// privé ne l'expose qu'au propriétaire et aux abonnés acceptés.
+	ActivityVisibility string     `json:"activity_visibility" bson:"activity_visibility,omitempty"`
+	LastLoginAt        *time.Time `json:"last_login_at,omitempty" bson:"last_login_at,omitempty"`
+	IsOnline           bool       `json:"is_online" bson:"is_online,omitempty"`
 	// DisplayNameChangedAt : date du dernier changement EFFECTIF de display_name
 	// (nil = jamais changé depuis le provisioning). Enregistrée dès aujourd'hui
 	// pour servir de base à un cooldown « X jours entre deux changements de nom »
@@ -68,15 +73,16 @@ type AdminCreateProfilRequest struct {
 // birth_date est settable UNE SEULE FOIS : une fois posée, toute tentative de
 // la changer est refusée (cf. service).
 type UpdateProfilRequest struct {
-	DisplayName     *string    `json:"display_name" binding:"omitempty,max=100"`
-	Bio             *string    `json:"bio"          binding:"omitempty,max=160"`
-	AvatarURL       *string    `json:"avatar_url"   binding:"omitempty"`
-	BannerURL       *string    `json:"banner_url"   binding:"omitempty"`
-	Website         *string    `json:"website"      binding:"omitempty"`
-	Location        *string    `json:"location"     binding:"omitempty"`
-	BirthDate       *time.Time `json:"birth_date"   binding:"omitempty"`
-	Gender          *string    `json:"gender"       binding:"omitempty,oneof=male female"`
-	Nationality     *string    `json:"nationality"  binding:"omitempty,iso3166_1_alpha2"`
-	Visibility      *string    `json:"visibility"        binding:"omitempty,oneof=public private"`
-	LikesVisibility *string    `json:"likes_visibility"   binding:"omitempty,oneof=public private"`
+	DisplayName        *string    `json:"display_name" binding:"omitempty,max=100"`
+	Bio                *string    `json:"bio"          binding:"omitempty,max=160"`
+	AvatarURL          *string    `json:"avatar_url"   binding:"omitempty"`
+	BannerURL          *string    `json:"banner_url"   binding:"omitempty"`
+	Website            *string    `json:"website"      binding:"omitempty"`
+	Location           *string    `json:"location"     binding:"omitempty"`
+	BirthDate          *time.Time `json:"birth_date"   binding:"omitempty"`
+	Gender             *string    `json:"gender"       binding:"omitempty,oneof=male female"`
+	Nationality        *string    `json:"nationality"  binding:"omitempty,iso3166_1_alpha2"`
+	Visibility         *string    `json:"visibility"        binding:"omitempty,oneof=public private"`
+	LikesVisibility    *string    `json:"likes_visibility"   binding:"omitempty,oneof=public private"`
+	ActivityVisibility *string    `json:"activity_visibility" binding:"omitempty,oneof=public private"`
 }

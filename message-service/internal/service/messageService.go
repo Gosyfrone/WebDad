@@ -757,8 +757,10 @@ func (s *MessageService) ListMessages(ctx context.Context, conversationID, userI
 // SendMessage persiste un message chiffré (membre + droit d'écriture requis) et
 // renvoie le message créé ainsi que les ids des membres (pour la diffusion WS).
 //
+// Un événement `message` est envoyé aux autres membres des DM/groupes privés
+// (pas aux communautés), agrégé côté notification-service par expéditeur unique.
 // `mentionedIDs` (fournis par le client : ids des membres mentionnés @handle —
-// le serveur ne lit pas le contenu chiffré) déclenchent une notification
+// le serveur ne lit pas le contenu chiffré) déclenchent aussi une notification
 // `message_mention` par membre réellement présent (hors l'expéditeur).
 func (s *MessageService) SendMessage(ctx context.Context, conversationID, senderID, ciphertext, nonce string, mentionedIDs []string) (*models.Message, []string, error) {
 	member, err := s.requireMember(ctx, conversationID, senderID)
@@ -790,6 +792,19 @@ func (s *MessageService) SendMessage(ctx context.Context, conversationID, sender
 	if err != nil {
 		// Le message est persisté ; l'échec de diffusion n'est pas fatal.
 		memberIDs = nil
+	}
+
+	if oid, perr := parseID(conversationID); perr == nil {
+		if conv, cerr := s.repo.GetConversation(ctx, oid); cerr == nil && conv.Type != models.TypeCommunity {
+			for _, rid := range messageTargets(memberIDs, senderID) {
+				s.notifier.Emit(notifier.Event{
+					Type:           notifier.TypeMessage,
+					ActorID:        senderID,
+					RecipientID:    rid,
+					ConversationID: conversationID,
+				})
+			}
+		}
 	}
 
 	// Notifie les membres mentionnés (best-effort, fire-and-forget). On ne
@@ -894,6 +909,37 @@ func (s *MessageService) DeleteMessage(ctx context.Context, conversationID, mess
 	return updated, memberIDs, nil
 }
 
+// ModerateDeleteMessage supprime « pour tout le monde » un message signalé, à la
+// demande de la MODÉRATION DE PLATEFORME (rôle mod/admin, garde au niveau route).
+// Identifié par son seul id (la modération ne connaît pas la conversation et n'en
+// est pas membre). Tombstone marqué `deleted_by_moderation`. Le serveur reste
+// aveugle (E2EE) : il ne lit pas le contenu, il ne fait que le marquer supprimé.
+// Renvoie le message tombstoné + les ids des membres (diffusion WS).
+func (s *MessageService) ModerateDeleteMessage(ctx context.Context, messageID string) (*models.Message, []string, error) {
+	oid, err := parseID(messageID)
+	if err != nil {
+		return nil, nil, err
+	}
+	msg, err := s.repo.GetMessageByID(ctx, oid)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return nil, nil, ErrMessageNotFound
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+
+	updated, err := s.repo.ModerateSoftDelete(ctx, oid, time.Now())
+	if err != nil {
+		return nil, nil, translateNotFound(err)
+	}
+
+	memberIDs, err := s.repo.MemberIDs(ctx, msg.ConversationID)
+	if err != nil {
+		memberIDs = nil
+	}
+	return updated, memberIDs, nil
+}
+
 // canDeleteMessage : règle d'autorisation de la suppression d'un message
 // (fonction PURE, testée). L'auteur peut toujours supprimer le sien ; dans un
 // groupe ou une communauté, l'owner et l'admin peuvent supprimer ceux des autres
@@ -922,6 +968,22 @@ func mentionedTargets(mentioned, memberIDs []string, senderID string) []string {
 	out := make([]string, 0, len(mentioned))
 	for _, id := range mentioned {
 		if id == "" || id == senderID || seen[id] || !members[id] {
+			continue
+		}
+		seen[id] = true
+		out = append(out, id)
+	}
+	return out
+}
+
+// messageTargets renvoie tous les membres à notifier pour un nouveau message,
+// hors expéditeur. Les doublons ne sont pas attendus dans `memberIDs`, mais on
+// déduplique par prudence.
+func messageTargets(memberIDs []string, senderID string) []string {
+	seen := make(map[string]bool, len(memberIDs))
+	out := make([]string, 0, len(memberIDs))
+	for _, id := range memberIDs {
+		if id == "" || id == senderID || seen[id] {
 			continue
 		}
 		seen[id] = true

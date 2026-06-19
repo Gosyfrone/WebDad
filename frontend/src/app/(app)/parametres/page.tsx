@@ -1,7 +1,11 @@
+import { FeedOverlay } from '@/components/feed/feed-overlay'
 import { SettingsView } from '@/components/settings/settings-view'
 
-// Accès direct / refresh → rendu normal (pas d'overlay).
-// Navigation soft depuis l'app → intercepting route @modal/(.)parametres.
+// Paramètres, en overlay au-dessus du feed persistant du layout.
 export default function ParametresPage() {
-  return <SettingsView />
+  return (
+    <FeedOverlay>
+      <SettingsView />
+    </FeedOverlay>
+  )
 }

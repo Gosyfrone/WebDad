@@ -33,6 +33,9 @@ import { playAppSound } from '@/lib/sounds'
 interface MessagesContextValue {
   /** Nombre de conversations ayant au moins un message non lu (le badge). */
   unreadCount: number
+  /** Conversation actuellement ouverte (`null` = aucune / liste). Exposé pour
+   *  l'UI (ex. masquer l'en-tête mobile global au profit de celui du ChatPane). */
+  activeConversationId: string | null
   /** Déclare la conversation actuellement ouverte (null en quittant la page) :
    *  ses messages entrants sont marqués lus automatiquement. */
   setActiveConversation: (conversationId: string | null) => void
@@ -58,8 +61,11 @@ export function useMessages(): MessagesContextValue {
 
 export function MessagesProvider({ children }: { children: React.ReactNode }) {
   const [unreadCount, setUnreadCount] = useState(0)
+  // State (≠ ref) : l'UI réagit à l'ouverture/fermeture d'une conversation.
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null)
 
   const myId = useRef<string>('')
+  // Ref miroir : lue dans le handler WS (closure stable, pas de re-souscription).
   const activeConvId = useRef<string | null>(null)
   const msgSubs = useRef<Set<(raw: RawMessage) => void>>(new Set())
   const evtSubs = useRef<Set<(evt: RealtimeEvent) => void>>(new Set())
@@ -87,6 +93,7 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
 
   const setActiveConversation = useCallback((conversationId: string | null) => {
     activeConvId.current = conversationId
+    setActiveConversationId(conversationId)
   }, [])
 
   const subscribeMessages = useCallback((cb: (raw: RawMessage) => void) => {
@@ -138,6 +145,7 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
     <MessagesContext.Provider
       value={{
         unreadCount,
+        activeConversationId,
         setActiveConversation,
         markRead,
         subscribeMessages,

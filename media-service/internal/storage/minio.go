@@ -9,6 +9,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -63,6 +64,12 @@ func (s *Store) Put(ctx context.Context, id string, r io.Reader, size int64, con
 	return err
 }
 
+// PutVariant range une variante dérivée d'un média. Les variantes vivent sous
+// un préfixe lié à l'id original afin de pouvoir les purger ensemble.
+func (s *Store) PutVariant(ctx context.Context, originalID, variant string, r io.Reader, size int64, contentType, ownerID string) error {
+	return s.Put(ctx, VariantKey(originalID, variant), r, size, contentType, ownerID)
+}
+
 // Open ouvre l'objet en lecture et renvoie son ObjectInfo. L'appel à Stat()
 // matérialise un éventuel 404 (objet absent) → ErrNotFound. L'objet retourné
 // est un io.ReadSeekCloser (compatible http.ServeContent pour les Range).
@@ -99,6 +106,23 @@ func (s *Store) Remove(ctx context.Context, id string) error {
 	return s.client.RemoveObject(ctx, s.bucket, id, minio.RemoveObjectOptions{})
 }
 
+// RemoveMediaSet supprime l'original et toutes ses variantes connues/présentes.
+func (s *Store) RemoveMediaSet(ctx context.Context, id string) error {
+	if err := s.Remove(ctx, id); err != nil {
+		return err
+	}
+	prefix := id + "/"
+	for obj := range s.client.ListObjects(ctx, s.bucket, minio.ListObjectsOptions{Prefix: prefix, Recursive: true}) {
+		if obj.Err != nil {
+			return obj.Err
+		}
+		if err := s.Remove(ctx, obj.Key); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // RemoveByOwner supprime TOUS les objets appartenant à `ownerID` (effacement
 // RGPD). Parcourt le bucket (scan O(n)) et lit la métadonnée propriétaire via
 // Stat (fiable, contrairement à la métadonnée parfois absente du listing).
@@ -131,6 +155,12 @@ func (s *Store) RemoveByOwner(ctx context.Context, ownerID string) (int, error) 
 // OwnerOf extrait l'id du propriétaire depuis les métadonnées d'un ObjectInfo.
 func OwnerOf(info minio.ObjectInfo) string {
 	return info.Metadata.Get("X-Amz-Meta-" + ownerMetaKey)
+}
+
+// VariantKey construit la clé objet d'une variante. Le nom de variante est
+// borné à un segment simple pour éviter toute traversée de préfixe.
+func VariantKey(originalID, variant string) string {
+	return originalID + "/" + strings.Trim(variant, "/")
 }
 
 // isNotFound reconnaît l'erreur « clé inexistante » de MinIO.

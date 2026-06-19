@@ -20,6 +20,7 @@ type Config struct {
 	MongoURI  string
 	MongoDB   string
 	JWTSecret string // secret partagé (validation des tokens émis par auth)
+	UserURL   string // URL user-service utilisée pour lire le graphe social interne
 
 	// DisplayNameCooldown : délai minimal imposé entre deux changements de
 	// display_name. 0 = désactivé (défaut) — le timestamp est tout de même
@@ -45,6 +46,7 @@ func Load() *Config {
 		MongoURI:            buildMongoURI(),
 		MongoDB:             getEnv("MONGO_INITDB_DATABASE", "webdad_profil"),
 		JWTSecret:           os.Getenv("JWT_SECRET"),
+		UserURL:             getEnv("USER_SERVICE_URL", defaultUserServiceURL()),
 		DisplayNameCooldown: parseDuration("DISPLAY_NAME_CHANGE_COOLDOWN", 0),
 	}
 
@@ -53,6 +55,13 @@ func Load() *Config {
 	}
 
 	return cfg
+}
+
+func defaultUserServiceURL() string {
+	if os.Getenv("DOCKERIZED") == "true" {
+		return "http://user-service:8082"
+	}
+	return "http://localhost:8082"
 }
 
 // buildMongoURI assemble l'URI à partir des variables d'env. MONGO_HOST est

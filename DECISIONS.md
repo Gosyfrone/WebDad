@@ -6,9 +6,87 @@
 
 ---
 
+## Store utilisateur connecté (front, 18/06/2026)
+
+- **Un `CurrentUserProvider` (Context React), pas zustand.** L'identité JWT était déjà centralisée (`lib/session.ts`) mais le **profil** du user connecté (username/display_name/avatar/rôle) était refetché indépendamment par chaque composant visible (sidebar + header + composer = 6 requêtes au boot), et `useSession()` était instancié 10+ fois (chacun son listener + décodage JWT). Le store fait **un seul** `getMyProfil()`+`getMe()` au montage, écoute `SESSION_CHANGED` une seule fois et `subscribeProfilUpdated` (MAJ sans refetch), et expose `useCurrentUser()` (`session`, `profil`, `isAdmin`/`isModerator`, `usernamePending`, `preferredLocale`, `refresh`). **Context plutôt que zustand** : cohérent avec les providers existants (`LanguageProvider`, `NotificationsProvider`, `MessagesProvider`…), zéro dépendance ajoutée. Monté en tête de `(app)/layout.tsx` (espace authentifié) → gère le visiteur (`null`). `lib/session.ts` reste la source sync (libs non-React comme `posts.ts`/`messages.ts` lisent `currentUserId()` ; les définitions dupliquées y réexportent désormais celle de `session.ts`). `language-provider` (root layout, parent du provider) garde son `getMe()` propre.
+
 ## Observability
 
 - **Structured logging — slog + X-Request-Id (user-service pilote, 13/06/2026).** `log/slog` stdlib (Go 1.21+, aucune dépendance externe). Format JSON en `release`, texte en `debug/test` (lisible humain). Niveau depuis `LOG_LEVEL`. Trois middlewares Gin dédiés : `RequestID` (lit ou génère un UUID hex 16 B, propagé dans la réponse), `Recovery` (panic → `slog.Error` + 500 sans stack exposée), `RequestLogger` (une ligne/requête avec method, path sans query, status, latency_ms, client_ip, request_id, user_id). `JWTAuth` pose `user_id` dans le contexte Gin pour que `RequestLogger` corrèle l'utilisateur. `gin.Default()` remplacé par `gin.New()` + chaîne explicite. Ce motif sera répliqué à l'identique sur les autres services.
+
+## Moderation & reporting
+
+- **Domaine « tickets de signalement » = nouveau `report-service` dédié (16/06/2026).** Un signalement
+  porte sur une entité possédée par un AUTRE service (post, message, profil) → il n'appartient à aucun
+  d'eux. Plutôt que de polluer post/message/profil (entorse à « une donnée = un service »), un service
+  autonome (Go+MongoDB, port 8090, préfixe gateway `/reports`) possède les tickets et avertissements.
+  Renforce la cohérence microservices (critère de notation « architecture cohérente »).
+- **Agrégation : un ticket parent par entité (modération), bug autonome.** Index Mongo **unique partiel**
+  `(entity_type, entity_id)` filtré sur `category=moderation` → les N signalements d'un même contenu sont
+  empilés dans `reports[]` d'un seul ticket (`report_count` + `reason_tags` dénormalisés via `$inc`,
+  upsert atomique). Les rapports de **bug** (motif « Bug technique ») sont des **tickets autonomes**
+  (`entity_type=app`, pas de clé d'entité à dédupliquer) — décision produit validée avec l'utilisateur.
+- **Auto-masquage des posts trop signalés (17/06/2026).** Un POST de modération qui atteint un **seuil** de
+  signalements est automatiquement masqué (sort des fils, en attente d'une décision de modérateur) ; les
+  **bugs** (onglet admin) en sont **exemptés** (déjà des tickets autonomes). Le report-service détient le
+  compteur mais la visibilité est la responsabilité du post-service → **appel serveur-à-serveur off-gateway**
+  `POST /internal/posts/:id/auto-hide` authentifié par `X-Internal-Secret` (même secret partagé et même esprit
+  best-effort fire-and-forget que l'émission de notifications ; échecs **loggés** car la visibilité est
+  sécurité-sensible). Nouveau champ post `auto_hidden` **distinct de `is_hidden`** (retrait manuel → corbeille) :
+  un post auto-masqué n'apparaît PAS dans la corbeille de modération. Idempotent (action `auto_hidden` journalisée
+  une fois). Le masquage réel s'applique côté post-service (barrière serveur), jamais sur la foi du front (§6).
+- **Verrou de validation : statut terminal `approved` (17/06/2026).** Quand le modérateur juge l'entité
+  **conforme** (« ne doit pas être signalée »), le ticket passe au statut **terminal `approved`** : le post est
+  démasqué (`auto-unhide`) ET tout nouveau signalement est **refusé** (`ErrReportingLocked` → 409). Distinct de
+  `closed` (qui peut se rouvrir au seuil) : `approved` est **définitif** (choix produit validé). Le verrou vit
+  **dans report-service** (vérif `GetModerationByEntity` avant l'upsert) → pas de dépendance cross-service pour
+  bloquer. Action front « Valider (conforme) » séparée de « Clôturer »/« Retirer ».
+- **Seuil d'auto-masquage réglable par l'admin (17/06/2026).** Le seuil n'est pas une constante mais une
+  **config runtime** : collection **singleton `settings`** du report-service (`_id="global"`,
+  `auto_hide_threshold` int32, **0 = désactivé**, défaut **5**), seedée au boot par `$setOnInsert` idempotent
+  (ne **réécrase jamais** un seuil déjà réglé au redémarrage — règle 5b). Lecture mod+admin, écriture **admin
+  seul** (`PATCH /reports/settings`), réglée dans **Admin › Paramètres**. Le service propriétaire de la logique
+  de signalement reste la seule source de vérité du seuil (pas de duplication).
+- **Réouverture automatique à seuil (16/06/2026).** Un ticket clôturé ne doit pas être rouvert par un unique
+  re-signalement (sinon la décision du modérateur est triviale à défaire), mais une récidive soutenue doit le
+  rouvrir. Compteur `reports_since_closed` (`$inc` à chaque signalement, remis à 0 à **chaque** changement de
+  statut) ; quand il atteint `ReopenThreshold` (=2) sur un ticket `closed`, réouverture auto (statut `reopened`,
+  action `auto_reopen` « Système »). Couplé à « un signalement par utilisateur », il faut **2 personnes
+  distinctes nouvelles** → un même compte ne peut pas rouvrir en spammant.
+- **Un seul signalement par (utilisateur, entité) (16/06/2026).** Le `$push` du signalement enfant est
+  conditionné par un filtre `reports.reporter_id $ne <moi>` ; si le rapporteur est déjà présent, l'upsert
+  tente un insert → rejeté par l'index unique partiel (E11000) → **409 `ErrAlreadyReported`**. Une E11000
+  peut aussi venir d'une course (deux 1ers signalements simultanés) → **retry unique** qui distingue course
+  (empile) et vrai doublon (409). Atomique, sans lecture-puis-écriture vulnérable aux races.
+- **Catégorie déduite du MOTIF, formulaire unique.** « Bug technique » est un motif du même `ReportDialog` :
+  le choisir bascule en catégorie `bug` (limite **500**, onglet Administration) ; les autres motifs →
+  `moderation` (limite **255**, onglet Modération). Un seul formulaire partout (posts/profils/messages),
+  conforme à l'énoncé. Motifs **bornés** (enum fermé) car `reason_tags.<motif>` est une clé Mongo
+  (anti-injection de champs arbitraires) ; longueur comptée en **runes** (caractères, pas octets).
+- **Le ticket conserve l'entité, même pour un bug (16/06/2026).** Un bug signalé SUR un post/profil garde
+  `entity_type`+`entity_id` (au lieu de retomber sur `app`) → le détail affiche le contenu réel (post embarqué,
+  carte profil cliquable) pour que mod/admin puissent juger et investiguer. `app` n'est utilisé que pour un bug
+  applicatif sans entité.
+- **Messages E2EE : divulgation par le signaleur, pas déchiffrement serveur (16/06/2026).** Le serveur de
+  messagerie reste **aveugle** (DM/groupes admin-proof). Pour modérer un message privé (ex. haine), le **signaleur,
+  qui en est destinataire**, joint **volontairement** la copie en clair (`disclosed_content`) de CE message au
+  signalement (avis de transmission affiché). Le serveur ne déchiffre jamais de lui-même et ne peut pas lire un
+  message arbitraire — seul un participant peut révéler un message précis, pour ce signalement. Conforme à l'E2EE
+  (analogue au « report » de WhatsApp/Signal) tout en permettant l'action de modération.
+- **Suppression d'un message signalé par la modération (16/06/2026).** Nouvel endpoint message-service
+  `DELETE /messages/moderation/:messageId` (mod/admin, garde de route), qui tombstone le message **par son seul
+  id** — la modération n'est pas membre de la conversation et le ticket ne stocke que l'id du message. Le message
+  porte `deleted_by_moderation=true` ; les participants reçoivent l'événement WS `message_updated` et voient
+  « Ce message a été supprimé par la modération ». **E2EE intact** : le serveur ne lit pas le contenu, il pose juste
+  le tombstone (vide `ciphertext`/`nonce`, comme la suppression « pour tous » existante).
+- **Réutilisation maximale de l'existant.** « Tweets supprimés » (soft-delete post-service `is_hidden`),
+  bannissement (auth `is_active` + visibilité user) et rôles/gating (mod ne peut bannir/supprimer un
+  admin) **préexistaient** — la modération s'y branche (retrait = soft-delete, transfert = changement de
+  `category`) au lieu de les réimplémenter.
+- **Avertissement asynchrone = pull (poll), pas push.** Un Warn est persisté côté `report-service` ;
+  `WarningsGate` (layout `(app)`) interroge `GET /reports/warnings/pending` au montage **et au retour de
+  focus**, et affiche une **modale bloquante** acquittée par `POST .../ack`. Simple, robuste (pas de WS
+  dédié), et « intercepte la prochaine requête/connexion » comme demandé.
 
 ## Platform & frontend
 
@@ -19,10 +97,20 @@
 - **`apiUrl()` client vs server base:** client = `NEXT_PUBLIC_API_URL` (published port);
   server (in-container route handlers) = `API_INTERNAL_URL` (Docker service name). In a container
   `localhost` is the container itself, so server fetches must target the Docker service name.
+- **Profile activity belongs to profil-service, not user-service.** The “online / last connection”
+  signal is a public profile decoration with a user-controlled privacy switch, so it lives beside
+  `visibility` and `likes_visibility` in Mongo. That lets profil-service enforce the public read
+  rule before returning a profile: `last_login_at`/`is_online` are omitted when
+  `activity_visibility=private`, and private profiles reveal activity only to the owner or accepted
+  followers. Private profile updates do **not** mutate the activity preference; privacy is enforced
+  at read time so the switch remains an independent choice. Login/OAuth/email-verification BFF
+  handlers mark activity best-effort via `PATCH /profils/me/activity` after a real session entry;
+  logout calls `PATCH /profils/me/activity/offline` before clearing the access token; refresh does
+  not count as a new connection.
 
 ## Auth
 
-- **Access (15m) localStorage + refresh (24h) httpOnly cookie via BFF.** Assumed trade-off:
+- **Access (5m) localStorage + refresh (24h) httpOnly cookie via BFF.** Assumed trade-off:
   access is XSS-exposed but short-lived; refresh is non-stealable. BFF-managed cookie (same-origin)
   avoids cross-origin CORS/SameSite complexity. Refresh is **single-flight** to avoid refresh storms on simultaneous 401s.
 - **Admin-created accounts = temporary password + provisional username (forced fixups via JWT/`/users/me`).**
@@ -56,9 +144,35 @@
   absent or explicit-`false` value is rejected (Google always sends it).
   *(Microsoft/Entra support — multi-tenant `common` issuer with manual `tid` verification — was implemented then
   removed on owner's request; only Google remains. See CHANGELOG 10/06/2026.)*
-- **Generic provider registry** (`internal/oauth`, map `{google}` = issuer + scopes): adding a provider is
-  one map entry + env vars; a provider with no `CLIENT_ID` is skipped (→ 404). Providers are **lazily** built
-  (OIDC discovery at first use, not at boot) so the service starts offline-resilient.
+- **Generic provider registry, two families** (`internal/oauth`, map `defs`): adding a provider is one map entry +
+  env vars; a provider with no `CLIENT_ID` is skipped (→ 404). Two `kind`s behind the same `AuthURL`/`Exchange`
+  interface: **`kindOIDC`** (Google) — OIDC discovery + `id_token` verification (lazy discovery at first
+  use, not at boot → offline-resilient); **`kindOAuth2`** (GitHub, Facebook, Spotify) — plain OAuth2 (no `id_token`):
+  code→`access_token`, then a **userinfo** call (`api.github.com/user`, `graph.facebook.com/me?fields=id,email`,
+  `api.spotify.com/v1/me`) mapped to `Identity{Subject,Email}` via a per-provider `userInfoMap`. This keeps non-OIDC
+  providers as config, not code.
+  *(LinkedIn — initially planned as a second `kindOIDC` provider — was dropped: its dev app requires an attached
+  company Page, heavy for a project. Replaced by GitHub.)*
+- **GitHub specifics within `kindOAuth2`.** GitHub's `/user` returns `email:null` when the address is private, so an
+  optional `emailsURL` fallback (`/user/emails`, scope `user:email`) fetches the **primary verified** address (no
+  provisioning on an unverified email). Its `id` is a JSON number (helper `idField`), and `api.github.com` requires a
+  `User-Agent` header (set by the shared `authedGetJSON`). These three points are the only provider-specific code;
+  everything else stays in `defs`.
+- **OAuth2 (non-OIDC) email is trusted as verified.** GitHub/Facebook/Spotify expose no `email_verified` claim; since
+  the provider authenticated the user and returns a confirmed address (for GitHub we explicitly pick a *verified*
+  one), `EmailVerified=true` is set for them (the handler still rejects an **absent** email). OIDC providers keep the
+  strict `email_verified` check (added/explicit-`true`).
+- **CGU acceptance gate lives in the BFF/front, and new OAuth sign-up is pending until final submit.**
+  The legal read marker is local UX (`/cgu` scrolled to bottom → checkbox/button unlock) while the
+  Next BFF enforces `acceptedTerms=true` for classic `/api/auth/register`. For OAuth sign-up,
+  `/auth/oauth/:provider/exchange` verifies the provider identity but, when no account exists, writes only
+  a short `oauth_signup_tokens` row and returns `onboarding_required + pending_token + email` — **no
+  credential, no user/profile, no JWT**. The callback stores the pending data in `sessionStorage` and
+  redirects to the blocking public `/auth/oauth/terms` page (back navigation trapped, unload warned) which
+  collects username/date/CGU; only then
+  `POST /auth/oauth/:provider/complete` consumes the pending token in a transaction to create the
+  credential and issue the first session; the BFF provisions user-service/profil-service immediately
+  after. Existing OAuth logins still issue tokens directly.
 - **Account reconciliation by email:** existing account → connect + fill `provider_subject` (only if unset, no
   hijack); absent → create with `password NULL`. Classic login on a password-less account is refused with a clear
   409 (`ErrNoLocalPassword`) steering the user to the external provider. Schema migrated via idempotent `ALTER`
@@ -122,6 +236,44 @@
 - **Dev sans SMTP configuré = transport console** : le mailer logge le mail + le lien sur stdout au
   lieu d'envoyer (zéro dépendance Gmail en dev, on clique le lien depuis les logs).
 
+## MFA (double authentification TOTP, 18/06/2026)
+
+- **TOTP seul, opt-in, sans codes de secours (tranché avec l'utilisateur).** RFC 6238 via `pquerna/otp`,
+  compatible Microsoft/Google Authenticator/Authy. La MFA est **facultative** : un compte sans MFA conserve
+  le login inchangé. Périmètre volontairement réduit au TOTP — **pas de codes de secours** pour livrer/tester
+  vite. *Limite assumée :* perte du téléphone = verrouillage (la désactivation exige une session, donc un code) ;
+  un échappatoire (codes de secours, ou reset admin) est une évolution ultérieure.
+- **Secret TOTP chiffré at-rest (AES-256-GCM), clé hors-DB.** `credentials.mfa_secret` stocke le secret
+  **chiffré** sous `MFA_ENCRYPTION_KEY` (base64 32 o, `.env` racine, jamais en dur — règle 5). Une fuite de la
+  table ne livre donc aucun secret sans la clé. **Pattern « nil = MFA off »** (symétrique du mailer) : clé absente
+  → `mfaCipher` nil → endpoints `/auth/mfa/*` en 503, auth reste bootable. Schéma rétro-compatible (règle 5b) :
+  `mfa_enabled BOOL DEFAULT false` (aucun backfill) + `mfa_secret` nullable. États portés par le couple
+  (secret présent + `mfa_enabled`) : setup non confirmé / actif / désactivé (secret NULL).
+- **QR généré côté serveur (data URI), pas côté front.** `node_modules` du front est root-owned → interdiction
+  d'ajouter une dépendance npm (même contrainte que la roue chromatique maison). `key.Image()` de `pquerna/otp`
+  (via `boombuler/barcode`) rend le PNG ; `/auth/mfa/setup` renvoie `{secret, otpauth_url, qr_data_uri}` et le
+  front pose juste un `<img>`. Le `secret` permet la saisie manuelle si le QR n'est pas scannable.
+- **Login en deux temps via un challenge court, réutilisant `account_tokens`.** Quand `mfa_enabled`, le login
+  valide le mot de passe (et `email_verified`) mais **n'émet aucun JWT** : il crée un jeton `purpose='mfa_challenge'`
+  (TTL 5 min, opaque haché, même infra que verify/reset/email_change — CHECK étendu idempotemment) et renvoie
+  `{mfa_required, challenge}`. `POST /auth/mfa/verify` (**publique** : le challenge, preuve que le mot de passe est
+  déjà passé, tient lieu d'auth) valide le TOTP **avant** de consommer le challenge (lecture `FOR UPDATE`, validation,
+  puis `used_at` dans une transaction) → **un code faux ne brûle pas le challenge**, l'utilisateur réessaie dans la
+  fenêtre. `Login`/`LoginByUserID` renvoient désormais un `LoginOutcome` (session OU challenge) au lieu du quadruplet.
+- **Désactivation par code OU mot de passe ; activation confirmée par un code.** `enable` valide un premier TOTP
+  (preuve que le secret est bien enrôlé) avant `mfa_enabled=true`. `disable` accepte un TOTP courant **ou** le mot de
+  passe du compte (un compte OAuth sans mot de passe ne peut donc se désactiver qu'au TOTP). Validation TOTP avec
+  **skew ±1** (dérive d'horloge) et trim des espaces (saisie).
+- **MFA = login par mot de passe uniquement.** Les comptes OAuth s'authentifient via leur provider (2FA propre au
+  provider) et ne passent pas par `/auth/login` → la MFA Breezy ne s'y interpose pas. Cohérent avec « un datum, un
+  service » : le second facteur vit dans auth-service à côté des credentials.
+- **Front :** section « Sécurité » dans `/parametres` **au-dessus du mot de passe** (`MfaSettings` dans
+  `UserAccountSettings`), pilotée par un **interrupteur on/off style iOS** (markup partagé avec `visibility-settings`) :
+  off→on déploie le QR + le champ code, on→off déploie la confirmation (code/mot de passe) ; l'état coché ne bascule
+  qu'après confirmation côté serveur. Client `lib/mfa.ts` sur `apiFetch` (appels authentifiés directs à la gateway, aucun cookie
+  touché). Seuls login + `mfa/verify` passent par le BFF (cookie refresh) : `verify` pose le cookie et provisionne
+  comme le login normal. Écran de challenge intégré à la page login (bascule mot de passe → code). i18n FR/EN.
+
 ## Gateway
 
 - **Thin reverse proxy (stdlib).** Prefix→URL table, transparent forward, preserves prefix. Mince + "we built it"
@@ -137,17 +289,10 @@
 - **Profil: `POST` = the ONLY creation (`display_name` required); `GET /profils/me` is read-only (404 if absent).**
   No write-on-GET, no guessed display_name. Front handles the 404 (POST-if-absent). profil-service never calls
   user-service at runtime; the BFF aligns `display_name = username` at register.
-- **OAuth first-login onboarding gate (front).** A Google sign-up creates `credentials` (auth) + lazily a
-  `users` row (derived handle via `GET /users/me`) but **no profil** → invisible in Explorer (`/profils/search`)
-  though mentionable via `@` (`/users/search`). Rather than auto-deriving a profil silently, the **profil-absent
-  signal** (`GET /profils/me` 404) drives a **blocking modal** mounted in the `(app)` layout (`OnboardingGate`):
-  present on every authenticated page, non-dismissible (ESC/outside/close disabled), re-checked each load. The
-  user picks a username (pre-filled with the derived handle, availability-checked, kept = treated as available)
-  and a birth date (≥13 age parity with register), then **`PATCH /users/me`** (rename only if it differs from the
-  derived handle — first rename never hits the cooldown, `username_changed_at` nil) **+ `POST /profils`**
-  (`display_name`=username, `birth_date`). Frontend-only, **zero backend change** (reuses existing endpoints).
-  Register users always have a profil → never gated. *Assumed limit:* it's a UX gate, not server-enforced (a
-  client could call APIs directly); a gateway-level barrier would be a separate effort.
+- **Legacy OAuth profil-absent onboarding gate (front).** Accounts created before the pending-token flow may still
+  have credentials/users but no profil. The **profil-absent signal** (`GET /profils/me` 404) still drives the
+  authenticated `(app)` `OnboardingGate` as a repair path. New OAuth sign-ups no longer enter this state: they stay
+  unauthenticated on `/auth/oauth/terms` and are provisioned only after username/date/CGU are submitted.
 
 ## Data ownership
 
@@ -183,6 +328,11 @@
   Counters are **calculated (COUNT)** on detail reads; denormalization deferred until load requires it.
 - **Identity cooldown architecture posed now, enforcement off by default.** `display_name_changed_at` /
   `username_changed_at` recorded only on real change; refusal (429) gated by env (`*_CHANGE_COOLDOWN`, default 0 = off).
+- **Profile display names use a restricted Unicode character set.** A newly created or genuinely changed
+  `display_name` accepts Unicode letters/combining marks, digits, ASCII spaces, `-` and `_` only. The same pure rule is
+  applied in the edit UI and profil-service (`POST /profils`, admin create and `PATCH /profils/me`), so bypassing the
+  browser cannot persist punctuation, `@`, `#` or emoji. Existing legacy names are not migrated or rejected when unchanged:
+  users can still edit their bio/avatar and must choose a compliant value only when they actually rename themselves.
   Capturing the baseline today avoids a contournable cooldown later; the timestamp is free, only refusal is config-driven.
 
 ## Posts
@@ -191,6 +341,19 @@
   visible; private → owner or accepted follower only. Security must not depend on the front.
 - **Denormalized `likes_count`/`comments_count` as `int32`** (`$inc`), idempotent likes via unique index.
   `int32` because the `$jsonSchema` validator declares `bsonType:"int"`.
+- **Comment likes reuse the same domain pattern as post likes (17/06/2026).**
+  A dedicated collection `comment_likes` stores the edges (`comment_id+user_id`
+  unique) while `comments.likes_count` remains denormalized on the comment
+  document itself (`int32`, `$inc`). Reads of comments/replies/profile-responses
+  accept optional auth and hydrate a transient `liked` flag directly, avoiding
+  a second “liked ids” endpoint just for comments. Counter refresh follows the
+  same project-scale trade-off as posts: batch polling via
+  `GET /posts/comments/stats?ids=...`, not WebSocket push. The new constrained
+  field is backfilled idempotently at boot (`EnsureSchema`) to stay compatible
+  with Mongo strict validation on legacy documents. Comment-like notifications
+  are intentionally deferred: the requested value was the action + animation +
+  auto-refresh, while a new notification type would widen the cross-service
+  contract with notification-service and the front.
 - **Pin:** `pinned_at` on the post, owner-only, one pin per profile; profile read sorts by it, but feeds return a
   copy **without** `pinned_at` so another's pin never personalizes the global feed (front exception `canPin` keeps
   instant visual feedback for the author).
@@ -355,9 +518,11 @@
   `reply:<rootComment>`, `mention:<source>`, `repost:<post>`, `quote:<...>`, `follow`,
   `follow_request:<actor>`, `follow_request_accepted:<actor>`,
   `follow_request_accept_confirm:<actor>`,
-  `message_mention:<conv>`), `$inc count`, `retract` decrements/deletes. O(1), no actor array (slight cosmetic
-  `last_actor` blur after retract, assumed).
+  `message`, `message_mention:<conv>`). Most types use `$inc count` and `retract` decrements/deletes. `message`
+  is the exception: optional `actor_ids` stores unique senders and `count = len(actor_ids)`, so several messages
+  from one person keep a single notification while messages from different people render "X and N others".
 - **Rules by type:** like/comment/repost/quote → post (or quoted) author; reply → ROOT author; mention → each mentioned;
+  private DM/group message → all other members, globally grouped per recipient and never emitted for communities;
   follow_request → private-profile owner (actionable); accepted request → persisted notification + WS decision
   to the requester, plus persisted confirmation in the owner's notification list; rejected request → no
   requester notification. Never to self.
@@ -425,8 +590,16 @@
   through the gateway"; presigned URLs would expose MinIO (public port, CORS, host unresolvable by the browser) and violate
   the principle defended at the oral. The stdlib proxy already streams → video is not a memory concern. MinIO = canonical
   microservices answer (ticks "containerization"), far better at defense than "blob in DB"/disk.
-- **Clear upload `POST /media`** (JWT, magic-byte MIME sniff, caps 5MB image / 50MB video) vs **`POST /media/encrypted`**
-  (opaque E2EE blob, no sniff). `GET /media/:id` is **public** (unguessable id), streamed with Range/seek + immutable cache + ETag.
+- **Clear upload `POST /media`** (JWT, magic-byte MIME sniff, caps **5MB image / 5MB video** for non-admins) vs **`POST /media/encrypted`**
+  (opaque E2EE blob, no sniff, own **5MB** cap `MEDIA_MAX_BLOB_BYTES`). `GET /media/:id` is **public** (unguessable id), streamed with Range/seek + immutable cache + ETag.
+- **Cap d'upload média (16/06/2026) :** plafond **uniforme 5 Mo** pour tous les types (image / vidéo / blob chiffré), aligné sur le
+  plus petit cap d'un service de référence (X.com photo = 5 Mo) → rien à descendre sous 5 Mo. **Administrateurs non plafonnés :**
+  `Upload`/`UploadEncrypted` bypassent tous les checks de taille quand `claims.Role == "admin"` (réutilise le claim déjà lu pour
+  `Delete`/purge RGPD). Choix « pas de cap admin » plutôt qu'un cap admin élevé configurable : un admin de confiance n'a pas besoin
+  d'un nombre arbitraire, et le streaming MinIO (buffer `MaxMultipartMemory`, reste sur disque temp) encaisse les gros fichiers.
+  Le défaut vidéo a été abaissé **50→5 Mo** (avant : asymétrie image/vidéo non justifiée par la demande). **La limite est appliquée
+  côté serveur** (§6) ; le front ne fait qu'une garde UX (`exceedsMediaLimit`, admin-aware) qui écarte les fichiers trop lourds **à la
+  sélection** pour un retour immédiat, sans jamais être l'autorité.
 - **Posts (Phase 2):** post-service carries `media []MediaRef`, stays agnostic (relative `/media/<id>` refs); `content`
   optional if ≥1 media. **Messages (Phase 3):** file encrypted client-side → opaque blob uploaded → id/nonce/mime in the
   **encrypted envelope** (`{v:1,text,media[]}`, else plain text → backward-compatible) → server blind, zero schema change.
@@ -479,12 +652,22 @@
   out, and an in-repo wheel is defense-friendlier. Color math is pure/tested (`lib/color.ts`); apply/persist logic pure where it
   matters (`buildCustomThemeVars` in `lib/custom-theme.ts`). **Persist both** source hexes (to reopen the editor) **and the
   pre-computed CSS-var map** in localStorage → a tiny inline `<head>` script applies the map before first paint (no FOUC, no color
-  math shipped in the blocking script). Palette button opens a `Dialog` held as a **sibling** of the dropdown/Sheet (not inside),
-  opened on a deferred `setTimeout(0)` to dodge the Radix close↔open focus race.
+  math shipped in the blocking script). `enabled:false` keeps the chosen colors but makes the inline script skip them. UX keeps
+  the light/dark switch and exposes custom as a separate appearance row: the label opens the existing `Dialog`, the small switch
+  toggles `enabled` without deleting colors, and the light/dark switch disables custom (`enabled:false`) while switching to the
+  selected Breezy base. The dialog is held as a **sibling** of the dropdown/Sheet (not inside), opened on a deferred
+  `setTimeout(0)` to dodge the Radix close↔open focus race.
 - **Responsive mobile-first, pivot `lg` (1024).** <lg: `MobileHeader` (left drawer Sheet) + bottom `MobileTabBar` + `ComposeFab`;
   ≥lg sidebar; ≥xl right column. Manual edge-swipe to open the drawer (Radix Sheet has no native swipe).
 - **Identity is clickable → profile everywhere** (`UserListItem` stretched link; the Follow button is raised `z-10`).
   Convention posed now so DM/notifications respect it (profile photo = minimal guaranteed anchor).
+- **Avatar fallback uses the first actual Unicode letter, globally.** Shared `initialOf(displayName, username)` skips
+  spaces, digits, separators and legacy punctuation, then falls back to the first letter of the username and finally `?`.
+  Feed, profile, navigation, search, moderation, notifications and messaging all use this helper, avoiding `_`/`-`/digits
+  as pseudo-initials. In profile editing, clearing avatar/banner stores an empty media reference and restores the existing
+  generated initial avatar or gradient banner; the old MinIO object is deliberately not deleted, matching media replacement.
+  The shared Avatar wrapper keys its Radix root by image identity because Radix otherwise retains `loaded` after a conditional
+  `AvatarImage` unmount and keeps the fallback hidden when an avatar URL is cleared.
 
 ## CI/CD
 
@@ -518,3 +701,13 @@
 - Le choix de fiabilité appartient au cas métier. Inscription, reset et création admin gardent leur comportement best-effort existant ; un changement d'adresse est strict, car annoncer un lien inexistant laisserait l'utilisateur sans moyen de terminer l'opération.
 - Après une erreur de remise, auth supprime dans une transaction uniquement le jeton `email_change` exact et efface `pending_email` seulement s'il correspond encore à la demande. Ces prédicats protègent une éventuelle demande concurrente plus récente.
 - L'API publique répond 503 `email_delivery_failed`; le front n'affiche le succès qu'après acceptation réelle par SMTP. Les secrets SMTP restent exclusivement dans `mail-service/.env`.
+
+## Feed en arrière-plan persistant (16/06/2026)
+
+- **Objectif** : garder le fil monté en fond façon X pendant qu'on consulte une autre section (scroll/posts/WebSocket préservés, retour instantané).
+- **Approche abandonnée — `@modal` (parallel + intercepting routes)** : un slot parallèle `@modal` + 11 intercepting routes `(.)` affichaient la section ciblée en overlay tandis que `children` « gardait » le feed. Fragile par conception : `children` est un slot unique qui contient la **page réelle**, pas « toujours le feed » ; l'illusion ne tenait que sur une nav soft *partie du feed*. D'où 4 bugs cumulés — 404 intermittent (résolution du slot), feed défilable derrière (pas de scroll-lock), blocage après refresh d'une sous-page (interception perdue → impossible de revenir au feed), admin/modération non couverts.
+- **Décision — feed au niveau du layout** : `FeedView` est monté **une seule fois** dans `(app)/layout.tsx` (colonne centrale, porte le scroll fenêtre). `(app)/feed/page.tsx` rend `null` (le fond transparaît). Les autres pages s'enveloppent dans `<FeedOverlay>` (`fixed inset-0 z-40`, `messages` en `wide`) et sont **rendues au niveau racine** du layout, hors de la colonne centrale : le `backdrop-blur` de cette colonne crée un bloc conteneur qui confinerait un `position:fixed` (même contrainte que les modales rendues via `createPortal`, cf. « Media viewer »).
+- **Scroll-lock** : `OverlayScrollLock` pose `overflow:hidden` sur `<html>` dès que `pathname ≠ /feed` → le feed se fige à sa position (préservée, `overflow:hidden` ne reset pas `scrollTop`) et ne défile plus derrière l'overlay.
+- **Feed gelé hors `/feed`** : comme `FeedView` reste monté, il **gèle** sa lecture des query params (`hashtag`/`tab`) via des refs quand on n'est pas sur `/feed`, pour ne pas refetcher / réinitialiser le contexte hashtag en arrière-plan quand un overlay s'ouvre.
+- **Conséquence** : refresh et deep-link suivent le **routing normal** (plus de distinction soft/hard) → les bugs 404 et refresh disparaissent par construction, admin/modération deviennent des overlays comme les autres. Suppression complète du dossier `@modal` et de `overlay-when-path.tsx`. La nav dure post-auth (`window.location.assign(/feed)` dans login/verify-email/callback) est conservée par choix « état d'app propre », non plus comme parade au 404.
+- **Coût assumé** : `FeedView` se monte sur tout deep-link `(app)` (même `/parametres`) → un fetch feed en fond, invisible. Prix du retour instantané au feed.

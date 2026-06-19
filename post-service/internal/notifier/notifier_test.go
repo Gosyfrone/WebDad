@@ -17,6 +17,8 @@ func TestParseMentions(t *testing.T) {
 		{"déduplication insensible à la casse", "@Bob @bob @BOB", []string{"Bob"}},
 		{"email non capté comme mention", "écris à jean@exemple.com", nil},
 		{"handle trop court ignoré", "@ab @bob", []string{"bob"}},
+		{"point interne capturé", "coucou @jean.dupont", []string{"jean.dupont"}},
+		{"point final exclu", "salut @bob.", []string{"bob"}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

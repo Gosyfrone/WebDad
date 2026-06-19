@@ -11,7 +11,13 @@ import { useFollow } from '@/lib/use-follow'
 import type { ProfilDetails, RelationUser } from '@/types'
 import { useLanguage } from '@/components/language-provider'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
+import { ActivityStatus } from '@/components/profil/activity-status'
+import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
 
 type AnchorProps = Omit<React.AnchorHTMLAttributes<HTMLAnchorElement>, 'href'>
 
@@ -23,10 +29,30 @@ interface ProfileHoverCardProps extends AnchorProps {
 }
 
 type LoadState =
-  | { status: 'idle'; profil: null; commonFollowers: RelationUser[]; commonLoading: false }
-  | { status: 'loading'; profil: null; commonFollowers: RelationUser[]; commonLoading: false }
-  | { status: 'ready'; profil: ProfilDetails; commonFollowers: RelationUser[]; commonLoading: boolean }
-  | { status: 'error'; profil: null; commonFollowers: RelationUser[]; commonLoading: false }
+  | {
+      status: 'idle'
+      profil: null
+      commonFollowers: RelationUser[]
+      commonLoading: false
+    }
+  | {
+      status: 'loading'
+      profil: null
+      commonFollowers: RelationUser[]
+      commonLoading: false
+    }
+  | {
+      status: 'ready'
+      profil: ProfilDetails
+      commonFollowers: RelationUser[]
+      commonLoading: boolean
+    }
+  | {
+      status: 'error'
+      profil: null
+      commonFollowers: RelationUser[]
+      commonLoading: false
+    }
 
 const profilePreviewCache = new Map<string, ProfilDetails>()
 const commonFollowersCache = new Map<string, RelationUser[]>()
@@ -74,17 +100,32 @@ export function ProfileHoverCard({
     let cancelled = false
     const seq = loadSeq.current + 1
     loadSeq.current = seq
-    setState({ status: 'loading', profil: null, commonFollowers: [], commonLoading: false })
+    setState({
+      status: 'loading',
+      profil: null,
+      commonFollowers: [],
+      commonLoading: false,
+    })
     ;(async () => {
       try {
         const profil = await withTimeout(getPublicProfil(author.username), 6000)
         profilePreviewCache.set(author.username, profil)
         if (cancelled || loadSeq.current !== seq) return
-        setState({ status: 'ready', profil, commonFollowers: [], commonLoading: true })
+        setState({
+          status: 'ready',
+          profil,
+          commonFollowers: [],
+          commonLoading: true,
+        })
         void loadCommonFollowers(profil)
       } catch {
         if (!cancelled && loadSeq.current === seq) {
-          setState({ status: 'error', profil: null, commonFollowers: [], commonLoading: false })
+          setState({
+            status: 'error',
+            profil: null,
+            commonFollowers: [],
+            commonLoading: false,
+          })
         }
       }
     })()
@@ -129,7 +170,10 @@ export function ProfileHoverCard({
     }
     const seq = loadSeq.current
     try {
-      const commonFollowers = await withTimeout(getCommonFollowers(profil.userId, 3), 5000)
+      const commonFollowers = await withTimeout(
+        getCommonFollowers(profil.userId, 3),
+        5000,
+      )
       commonFollowersCache.set(profil.userId, commonFollowers)
       if (loadSeq.current !== seq) return
       setState((current) =>
@@ -177,7 +221,8 @@ export function ProfileHoverCard({
     clearCloseTimer()
     clearOpenTimer()
     openTimer.current = setTimeout(() => {
-      if (triggerHovered.current && triggerRef.current?.matches(':hover')) setOpen(true)
+      if (triggerHovered.current && triggerRef.current?.matches(':hover'))
+        setOpen(true)
     }, 260)
   }
 
@@ -229,7 +274,10 @@ export function ProfileHoverCard({
           {...linkProps}
           ref={triggerRef}
           href={href}
-          className={cn('inline-flex rounded-sm focus:outline-none focus-visible:outline-none', className)}
+          className={cn(
+            'inline-flex rounded-sm focus:outline-none focus-visible:outline-none',
+            className,
+          )}
           onMouseEnter={scheduleOpen}
           onMouseLeave={scheduleTriggerClose}
           onPointerEnter={schedulePointerOpen}
@@ -266,7 +314,10 @@ export function ProfileHoverCard({
       >
         {state.status === 'loading' || state.status === 'idle' ? (
           <div className="flex h-36 items-center justify-center">
-            <Loader2 className="h-5 w-5 animate-spin text-[#5B6CFF]" aria-hidden />
+            <Loader2
+              className="h-5 w-5 animate-spin text-[#5B6CFF]"
+              aria-hidden
+            />
           </div>
         ) : state.status === 'error' ? (
           <div className="flex items-center gap-3 px-4 py-5 text-sm text-muted-foreground">
@@ -314,10 +365,18 @@ function ProfilePreview({
     <div className="p-4">
       <div className="flex items-start justify-between gap-3">
         <Avatar className="h-16 w-16 border-2 border-white shadow-[0_14px_34px_rgba(91,108,255,0.24)] dark:border-[#140c24]">
-          {profil.avatarUrl && <AvatarImage src={profil.avatarUrl} alt={profil.displayName} />}
+          {profil.avatarUrl && (
+            <AvatarImage src={profil.avatarUrl} alt={profil.displayName} />
+          )}
           <AvatarFallback className="bg-gradient-to-br from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] text-xl font-bold text-white">
-            {initialOf(profil.displayName)}
+            {initialOf(profil.displayName, profil.username)}
           </AvatarFallback>
+          <ActivityPresenceDot
+            userId={profil.userId}
+            initialLastLoginAt={profil.lastLoginAt}
+            initialIsOnline={profil.isOnline}
+            className="h-3.5 w-3.5"
+          />
         </Avatar>
         {!isSelf && (
           <button
@@ -345,12 +404,26 @@ function ProfilePreview({
       </div>
 
       <div className="mt-3 min-w-0">
-        <Link href={href} className="block truncate text-lg font-extrabold text-foreground hover:underline">
+        <Link
+          href={href}
+          className="block truncate text-lg font-extrabold text-foreground hover:underline"
+        >
           {profil.displayName}
         </Link>
-        <Link href={href} className="block truncate text-sm text-muted-foreground hover:underline">
-          @{profil.username}
-        </Link>
+        <div className="flex min-w-0 items-center gap-2">
+          <Link
+            href={href}
+            className="truncate text-sm text-muted-foreground hover:underline"
+          >
+            @{profil.username}
+          </Link>
+          <ActivityStatus
+            userId={profil.userId}
+            initialLastLoginAt={profil.lastLoginAt}
+            initialIsOnline={profil.isOnline}
+            className="shrink-0 text-xs"
+          />
+        </div>
       </div>
 
       {profil.bio && (
@@ -372,15 +445,21 @@ function ProfilePreview({
                 key={user.id}
                 className="h-7 w-7 border-2 border-white shadow-sm dark:border-[#140c24]"
               >
-                {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user.displayName} />}
+                {user.avatarUrl && (
+                  <AvatarImage src={user.avatarUrl} alt={user.displayName} />
+                )}
                 <AvatarFallback className="bg-gradient-to-br from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] text-[11px] font-bold text-white">
-                  {initialOf(user.displayName)}
+                  {initialOf(user.displayName, user.username)}
                 </AvatarFallback>
+                <ActivityPresenceDot userId={user.id} className="h-2.5 w-2.5" />
               </Avatar>
             ))}
             {commonLoading && commonFollowers.length === 0 && (
               <div className="grid h-7 w-7 place-items-center rounded-full border-2 border-white bg-white/80 shadow-sm backdrop-blur dark:border-[#140c24] dark:bg-white/10">
-                <Loader2 className="h-3.5 w-3.5 animate-spin text-[#5B6CFF]" aria-hidden />
+                <Loader2
+                  className="h-3.5 w-3.5 animate-spin text-[#5B6CFF]"
+                  aria-hidden
+                />
               </div>
             )}
           </div>
@@ -410,7 +489,9 @@ function toRelationUser(profil: ProfilDetails): RelationUser {
 function Stat({ value, label }: { value: number; label: string }) {
   return (
     <div className="flex gap-1">
-      <span className="font-extrabold text-foreground">{formatCount(value)}</span>
+      <span className="font-extrabold text-foreground">
+        {formatCount(value)}
+      </span>
       <span className="text-muted-foreground">{label}</span>
     </div>
   )

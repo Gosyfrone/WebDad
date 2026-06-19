@@ -84,13 +84,15 @@ var validators = map[string]bson.M{
 			"properties": bson.M{
 				"recipient_id":    bson.M{"bsonType": "string"},
 				"group_key":       bson.M{"bsonType": "string"},
-				"type":            bson.M{"bsonType": "string", "enum": bson.A{"like", "comment", "reply", "mention", "repost", "quote", "follow", "message_mention", "follow_request", "follow_request_accepted", "follow_request_accept_confirm", "post_purge_warning"}},
+				"type":            bson.M{"bsonType": "string", "enum": bson.A{"like", "comment_like", "comment", "reply", "mention", "repost", "quote", "follow", "message", "message_mention", "follow_request", "follow_request_accepted", "follow_request_accept_confirm", "post_purge_warning"}},
 				"post_id":         bson.M{"bsonType": bson.A{"string", "null"}},
 				"comment_id":      bson.M{"bsonType": bson.A{"string", "null"}},
 				"conversation_id": bson.M{"bsonType": bson.A{"string", "null"}},
 				"last_actor_id":   bson.M{"bsonType": "string"},
+				"actor_ids":       bson.M{"bsonType": "array", "items": bson.M{"bsonType": "string"}},
 				// count = nombre d'événements agrégés (likes, commentaires…). int32
-				// pour respecter le validateur Mongo (bsonType "int"), maintenu par $inc.
+				// pour respecter le validateur Mongo (bsonType "int"). Pour `message`,
+				// il représente les expéditeurs uniques (`actor_ids`) plutôt que les messages.
 				"count":      bson.M{"bsonType": "int"},
 				"is_read":    bson.M{"bsonType": "bool"},
 				"created_at": bson.M{"bsonType": "date"},

@@ -1,4 +1,7 @@
+'use client'
+
 import { cn } from '@/lib/utils'
+import { useKeyboardInset } from '@/hooks/use-keyboard-inset'
 
 /**
  * Coquille d'overlay rendue **pile au-dessus de la colonne centrale (le feed)**,
@@ -18,26 +21,64 @@ import { cn } from '@/lib/utils'
  * `wide` : pour les vues qui occupent aussi la zone de la sidebar droite (ex.
  * Messages, où `SidebarRight` se masque) → pas d'espaceur droit et c'est la vue
  * qui gère sa propre hauteur/défilement (pas de scroll ni `pb` imposés).
+ *
+ * `headerOffset` : réserve l'espace de l'en-tête mobile fixe (`pt-14`). À mettre
+ * à `false` pour les vues qui n'affichent pas cet en-tête (ex. profil, qui a son
+ * propre en-tête) afin d'éviter un vide de 56px en haut sur mobile.
  */
 export function FeedOverlay({
   children,
   wide = false,
+  headerOffset = true,
 }: {
   children: React.ReactNode
   wide?: boolean
+  headerOffset?: boolean
 }) {
+  // Clavier iOS (messagerie only) : remonte le composer au-dessus du clavier via
+  // le padding bas du panneau. Sur iOS, `position:fixed`/`dvh` ignorent le
+  // clavier (seul le visual viewport rétrécit) → sans ça le composer passe
+  // derrière le clavier et un décalage reste coincé. `inset` = 0 quand le clavier
+  // est fermé (et ~0 sur Android, qui redimensionne déjà le layout) → on retombe
+  // sur `pb-14` (hauteur de la tab bar).
+  const keyboardInset = useKeyboardInset(wide)
+
   return (
-    <div className="pointer-events-none fixed inset-0 z-40 flex justify-center">
+    <div
+      className={cn(
+        'pointer-events-none fixed z-40 flex justify-center',
+        // Vue « large » (messagerie) : sur mobile, le panneau utilise EXACTEMENT
+        // le même ancrage bas que la tab bar — `bottom-0` — et non `bottom-14`.
+        // Crucial sur iOS : `fixed; bottom:0` est calé sur le bas VISIBLE (comme
+        // la tab bar), alors qu'un `bottom:Npx` se mesure depuis le bas du LAYOUT
+        // viewport → les deux se désynchronisent quand la barre d'adresse bouge
+        // (le décalage au swipe). En partageant `bottom-0`, panneau et tab bar
+        // restent collés. Le composer est ensuite décalé de la hauteur de la tab
+        // bar via le PADDING du panneau (cf. plus bas), pas via `bottom`.
+        // ≥ lg : ni en-tête ni tab bar mobiles → plein écran (`inset-0`).
+        wide ? 'inset-x-0 top-14 bottom-0 lg:inset-y-0' : 'inset-0',
+      )}
+    >
       <div className="flex w-full max-w-[1265px]">
         {/* Espaceur = SidebarLeft (w-[275px], visible ≥ lg) */}
         <div className="hidden w-[275px] shrink-0 lg:block" />
 
-        {/* Panneau central, opaque, aligné sur la colonne du feed */}
+        {/* Panneau central, opaque, aligné sur la colonne du feed.
+            pt-14 : dégage l'en-tête mobile fixe (masqué ≥ lg) rendu par-dessus. */}
         <div
           className={cn(
-            'bg-page pointer-events-auto flex min-w-0 flex-1 flex-col lg:border-x',
+            'bg-page pointer-events-auto flex min-w-0 flex-1 flex-col lg:border-x lg:pt-0',
+            headerOffset && 'pt-14',
             !wide && 'overflow-y-auto pb-16 lg:pb-0',
+            // Messagerie : padding bas = hauteur de la tab bar (h-14) → le
+            // composer se pose pile au-dessus d'elle (le panneau, lui, descend
+            // jusqu'à `bottom-0`). ≥ lg : pas de tab bar → pas de padding.
+            wide && 'pb-14 lg:pb-0',
           )}
+          // Clavier iOS ouvert : on remplace ce padding par la hauteur du clavier
+          // → le composer remonte juste au-dessus du clavier. Fermé (ou Android,
+          // ou desktop) : `inset` = 0 → on garde `pb-14`.
+          style={wide && keyboardInset > 0 ? { paddingBottom: keyboardInset } : undefined}
         >
           {children}
         </div>

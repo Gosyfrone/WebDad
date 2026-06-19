@@ -46,6 +46,14 @@ type Post struct {
 	IsHidden bool       `bson:"is_hidden,omitempty" json:"is_hidden,omitempty"`
 	HiddenBy string     `bson:"hidden_by,omitempty" json:"hidden_by,omitempty"`
 	HiddenAt *time.Time `bson:"hidden_at,omitempty" json:"hidden_at,omitempty"`
+	// AutoHidden : masquage AUTOMATIQUE déclenché par le report-service quand le
+	// post dépasse le seuil de signalements (en attente d'une décision de
+	// modération). Distinct de is_hidden (retrait manuel → corbeille) : il sort
+	// des fils publics mais N'apparaît PAS dans la corbeille de modération ; un
+	// modérateur le rétablit (validation « conforme ») ou le retire (is_hidden).
+	// `omitempty` ⇒ jamais de `false` persité ; absent sur un vieux doc = visible
+	// (pas de migration de données nécessaire).
+	AutoHidden bool `bson:"auto_hidden,omitempty" json:"auto_hidden,omitempty"`
 	// PurgeWarnedAt : date d'envoi du préavis de purge RGPD (évite de re-notifier).
 	PurgeWarnedAt *time.Time `bson:"purge_warned_at,omitempty" json:"-"`
 	// PurgeAt : date prévue de purge définitive (transient = hidden_at + rétention),
@@ -100,6 +108,10 @@ type PollChoice struct {
 	ID         string `bson:"id" json:"id"`
 	Label      string `bson:"label" json:"label"`
 	VotesCount int32  `bson:"votes_count" json:"votes_count"`
+	// ImageURL (optionnel) : illustration du choix, chemin relatif `/media/<id>`
+	// servi par le media-service via la gateway (le post-service reste agnostique
+	// du contenu). Vide = choix texte seul (les choix mixtes sont autorisés).
+	ImageURL string `bson:"image_url,omitempty" json:"image_url,omitempty"`
 }
 
 type PollVote struct {
@@ -152,9 +164,19 @@ type Comment struct {
 	AuthorID   string        `bson:"author_id" json:"author_id"`
 	Content    string        `bson:"content" json:"content"`
 	Media      []MediaRef    `bson:"media,omitempty" json:"media,omitempty"`
+	LikesCount int32         `bson:"likes_count" json:"likes_count"`
 	ReplyCount int32         `bson:"reply_count" json:"reply_count"`
+	Liked      bool          `bson:"-" json:"liked"`
 	CreatedAt  time.Time     `bson:"created_at" json:"created_at"`
 	UpdatedAt  time.Time     `bson:"updated_at" json:"updated_at"`
+}
+
+// CommentStat — compteur dénormalisé d'un commentaire (likes uniquement) sans
+// le contenu. Sert au polling batch léger côté front pour rafraîchir les cœurs
+// des commentaires visibles sans recharger le thread.
+type CommentStat struct {
+	ID         string `json:"id"`
+	LikesCount int32  `json:"likes_count"`
 }
 
 // CommentWithPost enrichit un Comment du post parent visible (hydraté par la
@@ -193,9 +215,17 @@ type CreatePostRequest struct {
 }
 
 type CreatePollRequest struct {
-	Choices         []string `json:"choices" binding:"min=2,max=4,dive,min=1,max=80"`
-	DurationMinutes int64    `json:"duration_minutes" binding:"required,min=1,max=10080"`
-	Audience        string   `json:"audience" binding:"omitempty,oneof=everyone followers"`
+	Choices         []CreatePollChoiceRequest `json:"choices" binding:"min=2,max=4,dive"`
+	DurationMinutes int64                     `json:"duration_minutes" binding:"required,min=1,max=10080"`
+	Audience        string                    `json:"audience" binding:"omitempty,oneof=everyone followers"`
+}
+
+// CreatePollChoiceRequest : un choix de sondage à la création. `image_url`
+// (optionnel) référence un média déjà uploadé (chemin relatif `/media/<id>`) ;
+// les choix mixtes (certains avec image, d'autres non) sont autorisés.
+type CreatePollChoiceRequest struct {
+	Label    string `json:"label" binding:"required,min=1,max=80"`
+	ImageURL string `json:"image_url" binding:"omitempty,max=512"`
 }
 
 type VotePollRequest struct {

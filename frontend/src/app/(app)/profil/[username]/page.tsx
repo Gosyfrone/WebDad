@@ -1,3 +1,4 @@
+import { FeedOverlay } from '@/components/feed/feed-overlay'
 import { ProfilView } from '@/components/profil/profil-view'
 
 interface PublicProfilPageProps {
@@ -6,6 +7,11 @@ interface PublicProfilPageProps {
   }
 }
 
+// Profil public, en overlay au-dessus du feed persistant du layout.
 export default function PublicProfilPage({ params }: PublicProfilPageProps) {
-  return <ProfilView username={params.username} />
+  return (
+    <FeedOverlay headerOffset={false}>
+      <ProfilView username={params.username} />
+    </FeedOverlay>
+  )
 }

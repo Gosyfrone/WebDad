@@ -11,7 +11,6 @@ import {
   LogOut,
   Mail,
   MoreHorizontal,
-  Palette,
   Search,
   Settings,
   Settings2,
@@ -19,20 +18,20 @@ import {
   User,
 } from 'lucide-react'
 
-import { cn } from '@/lib/utils'
-import { getAccessToken, logout } from '@/lib/auth-client'
-import { getMyProfil, subscribeProfilUpdated } from '@/lib/profil-client'
-import { useSession } from '@/lib/session'
+import { cn, initialOf } from '@/lib/utils'
+import { logout } from '@/lib/auth-client'
 import { ROUTES } from '@/lib/routes'
 import { getSearchPath, isSearchSectionPath } from '@/lib/search-tab'
+import { useCurrentUser } from '@/components/current-user-provider'
 import { useAuthGate } from '@/components/auth-prompt-provider'
 import { useNotifications } from '@/components/notifications-provider'
 import { useMessages } from '@/components/messages-provider'
 import { useT } from '@/components/language-provider'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { CustomThemeDialog } from '@/components/custom-theme-dialog'
-import type { ProfilDetails, UserRole } from '@/types'
+import type { UserRole } from '@/types'
 import { CreatePostDialog } from '@/components/feed/create-post-dialog'
+import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import {
@@ -76,19 +75,14 @@ const NAV_ITEMS: NavItem[] = [
 export function SidebarLeft() {
   const t = useT()
   const pathname = usePathname()
-  const session = useSession()
+  const { session, profil } = useCurrentUser()
   const { isVisitor } = useAuthGate()
   const { unreadCount } = useNotifications()
   const { unreadCount: msgUnread } = useMessages()
   const [themeDialogOpen, setThemeDialogOpen] = useState(false)
-  const [account, setAccount] = useState({
-    displayName: '',
-    username: '',
-    avatarUrl: '',
-  })
 
-  // Rôle réel issu du JWT (cf. lib/session). `null` au 1er rendu (hydratation),
-  // puis renseigné au montage → les liens Modération/Admin apparaissent ensuite.
+  // Rôle issu du JWT : `null` au 1er rendu (hydratation), puis renseigné →
+  // les liens Modération/Admin apparaissent ensuite.
   const role = session?.role ?? null
   // Visiteur : seul « Accueil » (le fil public) reste accessible — les autres
   // entrées (recherche, notifications, messages, signets, profil, modération…)
@@ -106,46 +100,11 @@ export function SidebarLeft() {
     setSearchHref(isSearchSectionPath(pathname) ? ROUTES.explorer : getSearchPath())
   }, [pathname])
 
-  const fallbackInitial = (account.displayName || account.username || 'U')
-    .charAt(0)
-    .toUpperCase()
+  const fallbackInitial = initialOf(profil?.displayName, profil?.username)
   // Avant le chargement du profil (username vide) on affiche un libellé traduit.
-  const shownName = account.username ? account.displayName : t('common.user')
-  const handle = account.username ? `@${account.username}` : `@${t('common.username_fallback')}`
+  const shownName = profil?.username ? profil.displayName : t('common.user')
+  const handle = profil?.username ? `@${profil.username}` : `@${t('common.username_fallback')}`
   const displayedRole = role
-
-  useEffect(() => {
-    let cancelled = false
-
-    function applyProfil(profil: ProfilDetails) {
-      setAccount({
-        displayName: profil.displayName,
-        username: profil.username,
-        avatarUrl: profil.avatarUrl,
-      })
-    }
-
-    async function loadAccount() {
-      // Visiteur (pas de token) : pas de profil à charger (et `/profils/me`
-      // renverrait 401 → redirection forcée vers /login).
-      if (!getAccessToken()) return
-      try {
-        const profil = await getMyProfil()
-        if (!cancelled) {
-          applyProfil(profil)
-        }
-      } catch {
-        // Le layout reste utilisable avec le fallback pendant une session expirée.
-      }
-    }
-
-    const unsubscribe = subscribeProfilUpdated(applyProfil)
-    void loadAccount()
-    return () => {
-      cancelled = true
-      unsubscribe()
-    }
-  }, [])
 
   return (
     <aside className="sticky top-0 hidden h-screen w-[275px] flex-col justify-between overflow-y-auto px-3 py-4 lg:flex">
@@ -246,10 +205,11 @@ export function SidebarLeft() {
           <DropdownMenuTrigger asChild>
             <button className="panel flex w-full items-center gap-3 rounded-full border p-3 shadow-sm transition hover:shadow-[0_14px_34px_rgba(91,108,255,0.16)]">
               <Avatar className="h-10 w-10 shrink-0">
-                {account.avatarUrl && (
-                  <AvatarImage src={account.avatarUrl} alt={account.displayName} />
+                {profil?.avatarUrl && (
+                  <AvatarImage src={profil.avatarUrl} alt={profil.displayName} />
                 )}
                 <AvatarFallback>{fallbackInitial}</AvatarFallback>
+                <ActivityPresenceDot userId={profil?.userId ?? ''} />
               </Avatar>
               <div className="flex min-w-0 flex-1 flex-col text-left">
                 <span className="truncate text-sm font-bold">{shownName}</span>
@@ -270,17 +230,13 @@ export function SidebarLeft() {
               </span>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <ThemeToggle />
-            <DropdownMenuItem
-              onSelect={() => {
+            <ThemeToggle
+              onCustomize={() => {
                 // Laisse le menu se fermer, puis ouvre la popup au tick suivant
                 // (évite la course de focus Radix dropdown ↔ dialog).
                 setTimeout(() => setThemeDialogOpen(true), 0)
               }}
-            >
-              <Palette className="mr-2 h-4 w-4" />
-              {t('theme.customize')}
-            </DropdownMenuItem>
+            />
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
               <Link href={ROUTES.parametres} scroll={false}>

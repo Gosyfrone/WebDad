@@ -12,10 +12,14 @@ import (
 	"github.com/joho/godotenv"
 )
 
-// Tailles maximales par défaut (octets). Surchargées par l'env.
+// Tailles maximales par défaut (octets), appliquées aux utilisateurs NON-admin.
+// Surchargées par l'env. Alignées sur le plus petit cap d'un service de
+// référence (X.com : photo 5 Mo) → 5 Mo uniforme. Les administrateurs ne sont
+// PAS plafonnés (bypass au niveau du handler) : aucun cap admin à configurer.
 const (
-	defaultMaxImageBytes = 5 * 1024 * 1024  // 5 Mo
-	defaultMaxVideoBytes = 50 * 1024 * 1024 // 50 Mo
+	defaultMaxImageBytes = 5 * 1024 * 1024 // 5 Mo
+	defaultMaxVideoBytes = 5 * 1024 * 1024 // 5 Mo
+	defaultMaxBlobBytes  = 5 * 1024 * 1024 // 5 Mo (pièces jointes E2EE chiffrées)
 )
 
 // Config regroupe la configuration runtime du service.
@@ -33,9 +37,11 @@ type Config struct {
 	MinioUseSSL    bool
 	MinioBucket    string
 
-	// Caps de taille d'upload, par nature de média.
+	// Caps de taille d'upload (utilisateurs non-admin), par nature de média.
+	// Les administrateurs bypassent ces caps (cf. handler.Upload).
 	MaxImageBytes int64
 	MaxVideoBytes int64
+	MaxBlobBytes  int64 // pièces jointes chiffrées E2EE (POST /media/encrypted)
 }
 
 // Load construit la config. Charge les .env best-effort (ignorés s'ils
@@ -60,6 +66,7 @@ func Load() *Config {
 		MinioBucket:    getEnv("MINIO_BUCKET", "breezy-media"),
 		MaxImageBytes:  getInt64("MEDIA_MAX_IMAGE_BYTES", defaultMaxImageBytes),
 		MaxVideoBytes:  getInt64("MEDIA_MAX_VIDEO_BYTES", defaultMaxVideoBytes),
+		MaxBlobBytes:   getInt64("MEDIA_MAX_BLOB_BYTES", defaultMaxBlobBytes),
 	}
 
 	if cfg.JWTSecret == "" {

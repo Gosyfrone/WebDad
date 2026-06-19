@@ -46,6 +46,7 @@ jobs:
           - { name: post-service,        context: ./post-service }
           - { name: message-service,     context: ./message-service }
           - { name: notification-service, context: ./notification-service }
+          - { name: report-service,      context: ./report-service }
           - { name: media-service,       context: ./media-service }
           - { name: mail-service,        context: ./mail-service }
           - { name: api-gateway,         context: ./api-gateway }
@@ -100,6 +101,7 @@ jobs:
         with:
           host:     ${{ secrets.OVH_HOST }}
           username: ${{ secrets.OVH_USER }}
+          port:     2222
           key:      ${{ secrets.OVH_SSH_KEY }}
           script: |
             cd /opt/breezy

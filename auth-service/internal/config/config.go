@@ -38,6 +38,11 @@ type Config struct {
 	// destinataire). Défaut rétro-compatible : AppBaseURL/logo_breezy.png.
 	MailLogoURL string
 
+	// MFAEncryptionKey : clé base64 (32 octets) chiffrant le secret TOTP at-rest
+	// (AES-256-GCM). Absente → la MFA est désactivée (endpoints 503), auth reste
+	// bootable. Jamais en dur : vient du .env racine (règle 5).
+	MFAEncryptionKey string
+
 	// AdminCreateAutoVerify : raccourci de DEV/LOCAL. Quand true, un compte créé
 	// par un admin est marqué vérifié d'office (email_verified=true) → la
 	// vérification d'e-mail est court-circuitée et l'utilisateur peut se connecter
@@ -58,12 +63,18 @@ type Config struct {
 	AccountPurgeAfter         time.Duration
 	AccountPurgeSweepInterval time.Duration
 
-	// OAuth OIDC (Login with Google). Un provider sans ClientID est simplement
-	// ignoré (endpoints → 404). Le redirect URI front est dérivé de
-	// OAuthRedirectBaseURL : <base>/auth/callback/<provider>.
+	// OAuth (Login with Google / GitHub / Facebook / Spotify). Un provider
+	// sans ClientID est simplement ignoré (endpoints → 404). Le redirect URI
+	// front est dérivé de OAuthRedirectBaseURL : <base>/auth/callback/<provider>.
 	OAuthRedirectBaseURL string
 	GoogleClientID       string
 	GoogleClientSecret   string
+	GitHubClientID       string
+	GitHubClientSecret   string
+	FacebookClientID     string
+	FacebookClientSecret string
+	SpotifyClientID      string
+	SpotifyClientSecret  string
 }
 
 // Load construit la config. Charge les .env best-effort (ignorés s'ils
@@ -89,7 +100,7 @@ func Load() *Config {
 		log.Fatal("[config] JWT_SECRET manquant (à définir dans le .env racine)")
 	}
 
-	cfg.JWTExpiry = mustParseDuration("JWT_EXPIRY", "15m")
+	cfg.JWTExpiry = mustParseDuration("JWT_EXPIRY", "5m")
 	cfg.RefreshExpiry = mustParseDuration("REFRESH_EXPIRY", "24h")
 
 	cfg.MailServiceURL = getEnv("MAIL_SERVICE_URL", "http://localhost:8089")
@@ -99,6 +110,7 @@ func Load() *Config {
 	// DEV/LOCAL : court-circuite la vérification d'e-mail des comptes créés par
 	// un admin (l'envoi de mail réel se fait en ligne). À laisser false en prod.
 	cfg.AdminCreateAutoVerify = getEnv("ADMIN_CREATE_AUTO_VERIFY", "false") == "true"
+	cfg.MFAEncryptionKey = os.Getenv("MFA_ENCRYPTION_KEY")
 
 	cfg.SeedAdmin = getEnv("SEED_DEFAULT_ADMIN", "false") == "true"
 	cfg.SeedAdminEmail = getEnv("SEED_ADMIN_EMAIL", "admin@webdad.local")
@@ -118,6 +130,12 @@ func Load() *Config {
 	cfg.OAuthRedirectBaseURL = getEnv("OAUTH_REDIRECT_BASE_URL", "http://localhost:3000")
 	cfg.GoogleClientID = os.Getenv("GOOGLE_CLIENT_ID")
 	cfg.GoogleClientSecret = os.Getenv("GOOGLE_CLIENT_SECRET")
+	cfg.GitHubClientID = os.Getenv("GITHUB_CLIENT_ID")
+	cfg.GitHubClientSecret = os.Getenv("GITHUB_CLIENT_SECRET")
+	cfg.FacebookClientID = os.Getenv("FACEBOOK_CLIENT_ID")
+	cfg.FacebookClientSecret = os.Getenv("FACEBOOK_CLIENT_SECRET")
+	cfg.SpotifyClientID = os.Getenv("SPOTIFY_CLIENT_ID")
+	cfg.SpotifyClientSecret = os.Getenv("SPOTIFY_CLIENT_SECRET")
 
 	return cfg
 }

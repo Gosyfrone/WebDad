@@ -47,6 +47,7 @@ var (
 	ErrInvalidCurrentPassword = errors.New("mot de passe actuel invalide")
 	ErrSameEmail              = errors.New("cette adresse e-mail est déjà celle du compte")
 	ErrEmailDelivery          = errors.New("envoi de l'e-mail de confirmation impossible")
+	ErrOAuthAccountExists     = errors.New("ce compte Google existe déjà")
 )
 
 // Usages des account_tokens + TTL de la vérification d'e-mail.
@@ -57,7 +58,17 @@ const (
 	verifyTokenTTL      = 24 * time.Hour
 	resetTokenTTL       = 1 * time.Hour
 	emailChangeTokenTTL = 24 * time.Hour
+	oauthSignupTokenTTL = 15 * time.Minute
 )
+
+type OAuthResult struct {
+	Token              string
+	RefreshToken       string
+	User               *models.User
+	OnboardingRequired bool
+	PendingToken       string
+	Email              string
+}
 
 // defaultAdminID : UUID figé de l'admin par défaut, partagé avec les autres
 // services (user-init.sql, profil-init.js) pour désigner le même compte.
@@ -94,11 +105,20 @@ type AuthService struct {
 	// adminCreateAutoVerify : DEV/LOCAL — marque les comptes créés par un admin
 	// comme vérifiés d'office (court-circuit de la vérif e-mail). False en prod.
 	adminCreateAutoVerify bool
+	// mfaCipher : chiffre le secret TOTP at-rest. nil = MFA non configurée
+	// (MFA_ENCRYPTION_KEY absente) → les endpoints MFA répondent 503.
+	mfaCipher *secretCipher
 }
 
 // New construit le service. mailer peut être nil (mail non configuré) : l'envoi
 // devient alors un no-op loggé et auth reste pleinement fonctionnel.
-func New(db *sql.DB, jwtSecret string, jwtExpiry, refreshExpiry time.Duration, mailer Mailer, appBaseURL, mailLogoURL string, adminCreateAutoVerify bool) *AuthService {
+// mfaEncryptionKey vide → MFA désactivée (cf. mfaCipher). Renvoie une erreur
+// uniquement si la clé est présente mais invalide (config erronée = échec boot).
+func New(db *sql.DB, jwtSecret string, jwtExpiry, refreshExpiry time.Duration, mailer Mailer, appBaseURL, mailLogoURL string, adminCreateAutoVerify bool, mfaEncryptionKey string) (*AuthService, error) {
+	cipher, err := newSecretCipher(mfaEncryptionKey)
+	if err != nil {
+		return nil, err
+	}
 	return &AuthService{
 		db:                    db,
 		jwtSecret:             []byte(jwtSecret),
@@ -108,7 +128,8 @@ func New(db *sql.DB, jwtSecret string, jwtExpiry, refreshExpiry time.Duration, m
 		appBaseURL:            appBaseURL,
 		mailLogoURL:           mailLogoURL,
 		adminCreateAutoVerify: adminCreateAutoVerify,
-	}
+		mfaCipher:             cipher,
+	}, nil
 }
 
 // Register crée un compte (role=user), puis connecte l'utilisateur dans la
@@ -489,11 +510,21 @@ func (s *AuthService) sendAdminWelcomeMail(u *models.User, username, tempPasswor
 	}
 }
 
-// Login vérifie les credentials et retourne un access token + un refresh
-// token + l'utilisateur.
-func (s *AuthService) Login(email, password string) (string, string, *models.User, error) {
+// LoginOutcome porte le résultat d'un login par mot de passe. Soit une session
+// directe (Token/Refresh/User remplis), soit — quand la MFA est active — une
+// demande de second facteur (MFARequired=true + Challenge), sans aucun JWT émis.
+type LoginOutcome struct {
+	Token       string
+	Refresh     string
+	User        *models.User
+	MFARequired bool
+	Challenge   string // jeton court à présenter à VerifyMFA (TTL mfaChallengeTTL)
+}
+
+// Login vérifie les credentials et retourne soit une session, soit un challenge MFA.
+func (s *AuthService) Login(email, password string) (*LoginOutcome, error) {
 	const q = `
-		SELECT id, email, password, role, is_active, email_verified, must_change_password, created_at
+		SELECT id, email, password, role, is_active, email_verified, must_change_password, mfa_enabled, created_at
 		FROM credentials WHERE email = $1`
 
 	return s.loginWithQuery(q, email, password)
@@ -501,81 +532,97 @@ func (s *AuthService) Login(email, password string) (string, string, *models.Use
 
 // LoginByUserID vérifie les credentials à partir de l'id auth. Utilisé par le
 // BFF après résolution d'un username dans user-service.
-func (s *AuthService) LoginByUserID(userID, password string) (string, string, *models.User, error) {
+func (s *AuthService) LoginByUserID(userID, password string) (*LoginOutcome, error) {
 	const q = `
-		SELECT id, email, password, role, is_active, email_verified, must_change_password, created_at
+		SELECT id, email, password, role, is_active, email_verified, must_change_password, mfa_enabled, created_at
 		FROM credentials WHERE id = $1`
 
 	return s.loginWithQuery(q, userID, password)
 }
 
-func (s *AuthService) loginWithQuery(query, identifier, password string) (string, string, *models.User, error) {
+func (s *AuthService) loginWithQuery(query, identifier, password string) (*LoginOutcome, error) {
 	u := &models.User{}
 	var pwHash sql.NullString // NULL pour les comptes OAuth (sans mot de passe)
 	err := s.db.QueryRow(query, identifier).
-		Scan(&u.ID, &u.Email, &pwHash, &u.Role, &u.IsActive, &u.EmailVerified, &u.MustChangePassword, &u.CreatedAt)
+		Scan(&u.ID, &u.Email, &pwHash, &u.Role, &u.IsActive, &u.EmailVerified, &u.MustChangePassword, &u.MFAEnabled, &u.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
-		return "", "", nil, ErrInvalidCredentials
+		return nil, ErrInvalidCredentials
 	}
 	if err != nil {
-		return "", "", nil, fmt.Errorf("lecture utilisateur : %w", err)
+		return nil, fmt.Errorf("lecture utilisateur : %w", err)
 	}
 
 	if !u.IsActive {
-		return "", "", nil, ErrUserInactive
+		return nil, ErrUserInactive
 	}
 	// Compte sans mot de passe local (créé via OAuth) : login classique refusé
 	// avec un message clair plutôt qu'un 401 générique.
 	if !pwHash.Valid || pwHash.String == "" {
-		return "", "", nil, ErrNoLocalPassword
+		return nil, ErrNoLocalPassword
 	}
 	if bcrypt.CompareHashAndPassword([]byte(pwHash.String), []byte(password)) != nil {
-		return "", "", nil, ErrInvalidCredentials
+		return nil, ErrInvalidCredentials
 	}
 	// Blocage dur : un compte non vérifié ne peut pas se connecter (aucun token
 	// émis). Vérifié APRÈS le bcrypt pour ne pas révéler l'existence du compte.
 	if !u.EmailVerified {
-		return "", "", nil, ErrEmailNotVerified
+		return nil, ErrEmailNotVerified
 	}
 
-	return s.issueTokens(u)
+	// MFA active : mot de passe OK mais on n'émet PAS de JWT. On crée un challenge
+	// court ; le second facteur est validé par VerifyMFA contre ce challenge.
+	if u.MFAEnabled {
+		challenge, err := s.createAccountToken(u.ID, purposeMFAChallenge, mfaChallengeTTL)
+		if err != nil {
+			return nil, err
+		}
+		return &LoginOutcome{MFARequired: true, Challenge: challenge, User: u}, nil
+	}
+
+	token, refresh, user, err := s.issueTokens(u)
+	if err != nil {
+		return nil, err
+	}
+	return &LoginOutcome{Token: token, Refresh: refresh, User: user}, nil
 }
 
 // LoginWithOAuth connecte un utilisateur à partir d'une identité OIDC vérifiée
 // (email + subject du provider). Rapprochement par email :
 //   - compte existant → on le connecte et on renseigne provider_subject s'il
 //     n'est pas déjà lié (le compte local conserve son mot de passe) ;
-//   - aucun compte → création d'un compte (role=user) SANS mot de passe
-//     (password NULL), avec provider + provider_subject renseignés.
+//   - aucun compte → aucun credential n'est créé ; un token opaque court est
+//     renvoyé pour finaliser l'inscription après username/date/CGU côté front.
 //
-// Émet ensuite NOS tokens (access + refresh), exactement comme Login.
-func (s *AuthService) LoginWithOAuth(provider, subject, email string) (string, string, *models.User, error) {
+// Émet des tokens uniquement pour un compte existant.
+func (s *AuthService) LoginWithOAuth(provider, subject, email string) (*OAuthResult, error) {
 	u := &models.User{}
 
 	const sel = `
-		SELECT id, email, role, is_active, created_at, provider
-		FROM credentials WHERE email = $1`
-	err := s.db.QueryRow(sel, email).
-		Scan(&u.ID, &u.Email, &u.Role, &u.IsActive, &u.CreatedAt, &u.Provider)
+		SELECT id, email, role, is_active, must_change_password, created_at, provider
+		FROM credentials
+		WHERE email = $1 OR (provider = $2 AND provider_subject = $3)
+		LIMIT 1`
+	err := s.db.QueryRow(sel, email, provider, subject).
+		Scan(&u.ID, &u.Email, &u.Role, &u.IsActive, &u.MustChangePassword, &u.CreatedAt, &u.Provider)
 
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
-		// Création : compte OAuth sans mot de passe local.
-		const ins = `
-			INSERT INTO credentials (email, password, role, provider, provider_subject)
-			VALUES ($1, NULL, $2, $3, $4)
-			RETURNING id, email, role, is_active, created_at, provider`
-		if err := s.db.QueryRow(ins, email, models.RoleUser, provider, subject).
-			Scan(&u.ID, &u.Email, &u.Role, &u.IsActive, &u.CreatedAt, &u.Provider); err != nil {
-			return "", "", nil, fmt.Errorf("création compte OAuth : %w", err)
+		pending, err := s.createOAuthSignupToken(provider, subject, email)
+		if err != nil {
+			return nil, err
 		}
+		return &OAuthResult{
+			OnboardingRequired: true,
+			PendingToken:       pending,
+			Email:              email,
+		}, nil
 
 	case err != nil:
-		return "", "", nil, fmt.Errorf("lecture utilisateur : %w", err)
+		return nil, fmt.Errorf("lecture utilisateur : %w", err)
 
 	default:
 		if !u.IsActive {
-			return "", "", nil, ErrUserInactive
+			return nil, ErrUserInactive
 		}
 		// Rapprochement : renseigne provider_subject uniquement s'il est absent
 		// (on ne réécrase pas un lien existant → pas de prise de contrôle via un
@@ -584,8 +631,78 @@ func (s *AuthService) LoginWithOAuth(provider, subject, email string) (string, s
 			UPDATE credentials SET provider_subject = $1
 			WHERE id = $2 AND provider_subject IS NULL`
 		if _, err := s.db.Exec(upd, subject, u.ID); err != nil {
-			return "", "", nil, fmt.Errorf("rapprochement compte OAuth : %w", err)
+			return nil, fmt.Errorf("rapprochement compte OAuth : %w", err)
 		}
+	}
+
+	token, refresh, user, err := s.issueTokens(u)
+	if err != nil {
+		return nil, err
+	}
+	return &OAuthResult{Token: token, RefreshToken: refresh, User: user}, nil
+}
+
+// CompleteOAuthSignup consomme un token d'inscription OAuth en attente puis
+// crée le credential. C'est le seul endroit où un nouveau compte Google est
+// effectivement écrit après acceptation CGU/onboarding côté front.
+func (s *AuthService) CompleteOAuthSignup(provider, rawToken string) (string, string, *models.User, error) {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return "", "", nil, fmt.Errorf("transaction OAuth signup : %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	const readToken = `
+		SELECT id, provider::text, provider_subject, email, expires_at, used_at
+		FROM oauth_signup_tokens
+		WHERE token_hash = $1
+		FOR UPDATE`
+	var id, tokenProvider, subject, email string
+	var expiresAt time.Time
+	var usedAt sql.NullTime
+	err = tx.QueryRow(readToken, hashToken(rawToken)).
+		Scan(&id, &tokenProvider, &subject, &email, &expiresAt, &usedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", "", nil, ErrInvalidToken
+	}
+	if err != nil {
+		return "", "", nil, fmt.Errorf("lecture token OAuth signup : %w", err)
+	}
+	if tokenProvider != provider || usedAt.Valid || time.Now().After(expiresAt) {
+		return "", "", nil, ErrInvalidToken
+	}
+
+	const exists = `
+		SELECT 1 FROM credentials
+		WHERE email = $1 OR (provider = $2 AND provider_subject = $3)
+		LIMIT 1`
+	var one int
+	err = tx.QueryRow(exists, email, provider, subject).Scan(&one)
+	if err == nil {
+		return "", "", nil, ErrOAuthAccountExists
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return "", "", nil, fmt.Errorf("vérification compte OAuth existant : %w", err)
+	}
+
+	u := &models.User{}
+	const ins = `
+		INSERT INTO credentials (email, password, role, provider, provider_subject, email_verified)
+		VALUES ($1, NULL, $2, $3, $4, true)
+		RETURNING id, email, role, is_active, email_verified, must_change_password, created_at, provider`
+	if err := tx.QueryRow(ins, email, models.RoleUser, provider, subject).
+		Scan(&u.ID, &u.Email, &u.Role, &u.IsActive, &u.EmailVerified, &u.MustChangePassword, &u.CreatedAt, &u.Provider); err != nil {
+		if isUniqueViolation(err) {
+			return "", "", nil, ErrOAuthAccountExists
+		}
+		return "", "", nil, fmt.Errorf("création compte OAuth : %w", err)
+	}
+
+	if _, err := tx.Exec(`UPDATE oauth_signup_tokens SET used_at = NOW() WHERE id = $1`, id); err != nil {
+		return "", "", nil, fmt.Errorf("consommation token OAuth signup : %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return "", "", nil, fmt.Errorf("commit OAuth signup : %w", err)
 	}
 
 	return s.issueTokens(u)
@@ -879,6 +996,29 @@ func (s *AuthService) consumeAccountToken(rawToken, purpose string) (string, err
 		return "", fmt.Errorf("consommation account token : %w", err)
 	}
 	return userID, nil
+}
+
+func (s *AuthService) createOAuthSignupToken(provider, subject, email string) (string, error) {
+	raw, err := randomToken()
+	if err != nil {
+		return "", err
+	}
+
+	if _, err := s.db.Exec(
+		`DELETE FROM oauth_signup_tokens
+		 WHERE used_at IS NULL AND (email = $1 OR (provider = $2 AND provider_subject = $3))`,
+		email, provider, subject,
+	); err != nil {
+		return "", fmt.Errorf("invalidation anciens tokens OAuth signup : %w", err)
+	}
+
+	const q = `
+		INSERT INTO oauth_signup_tokens (provider, provider_subject, email, token_hash, expires_at)
+		VALUES ($1, $2, $3, $4, $5)`
+	if _, err := s.db.Exec(q, provider, subject, email, hashToken(raw), time.Now().Add(oauthSignupTokenTTL)); err != nil {
+		return "", fmt.Errorf("création token OAuth signup : %w", err)
+	}
+	return raw, nil
 }
 
 // issueTokens signe un access token (court) et crée un refresh token (long,

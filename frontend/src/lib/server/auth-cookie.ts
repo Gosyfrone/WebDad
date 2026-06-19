@@ -6,7 +6,7 @@ import type { NextResponse } from 'next/server'
  * Le refresh token (24 h) vit dans ce cookie httpOnly same-origin : invisible
  * au JS client (pas de vol via XSS) et renvoyé automatiquement par le
  * navigateur sur `/api/auth/{refresh,logout}`. L'access token, lui, est court
- * (15 min) et vit en localStorage côté client (cf. lib/auth-client).
+ * (5 min) et vit en localStorage côté client (cf. lib/auth-client).
  */
 
 export const REFRESH_COOKIE = 'breezy-refresh'

@@ -10,6 +10,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log/slog"
 	"regexp"
 	"strings"
 	"time"
@@ -23,7 +24,7 @@ import (
 var (
 	ErrUserNotFound          = errors.New("utilisateur introuvable")
 	ErrUsernameTaken         = errors.New("nom d'utilisateur déjà utilisé")
-	ErrInvalidUsername       = errors.New("nom d'utilisateur invalide (3-50 caractères : lettres, chiffres, _)")
+	ErrInvalidUsername       = errors.New("nom d'utilisateur invalide (3-50 caractères : lettres, chiffres, _ et . ; le point ni en début/fin ni doublé)")
 	ErrSelfFollow            = errors.New("impossible de se suivre soi-même")
 	ErrUsernameCooldown      = errors.New("nom d'utilisateur modifié trop récemment")
 	ErrFollowRequestNotFound = errors.New("demande de suivi introuvable")
@@ -35,8 +36,10 @@ const (
 	FollowStatusPending   = "pending"
 )
 
-// usernamePattern : charset autorisé pour un username (3-50, alphanum + _).
-var usernamePattern = regexp.MustCompile(`^[a-zA-Z0-9_]{3,50}$`)
+// usernamePattern : structure d'un username — alphanum + _, avec un point
+// INTERNE autorisé (ni en début/fin, ni doublé). La longueur (3-50) est
+// contrôlée à part car RE2 n'a pas de lookahead.
+var usernamePattern = regexp.MustCompile(`^[a-zA-Z0-9_]+(?:\.[a-zA-Z0-9_]+)*$`)
 
 var supportedLocales = map[string]bool{
 	"fr": true, "en": true, "zh": true, "es": true, "pt": true, "ru": true,
@@ -369,6 +372,33 @@ func (s *UserService) AcceptFollowRequest(ownerID, followerID string) error {
 	return nil
 }
 
+// AcceptAllFollowRequests accepte en masse toutes les demandes d'abonnement
+// entrantes de `ownerID`. Appelé par profil-service quand un compte privé
+// repasse public : toute demande en attente est convertie en abonnement (les
+// notifications d'acceptation sont émises par demandeur, comme une acceptation
+// manuelle). Tolérant : une erreur sur une demande n'interrompt pas les autres.
+func (s *UserService) AcceptAllFollowRequests(ownerID string) error {
+	requesters, err := s.repo.IncomingFollowRequestFollowerIDs(ownerID)
+	if err != nil {
+		return fmt.Errorf("demandes follow entrantes : %w", err)
+	}
+	accepted := 0
+	for _, followerID := range requesters {
+		if err := s.AcceptFollowRequest(ownerID, followerID); err != nil &&
+			!errors.Is(err, ErrFollowRequestNotFound) {
+			// Best-effort : on log et on continue (course possible avec une
+			// acceptation/rejet manuel concurrent).
+			slog.Warn("acceptation en masse : demande ignorée",
+				"owner_id", ownerID, "follower_id", followerID, "error", err)
+		} else if err == nil {
+			accepted++
+		}
+	}
+	slog.Info("acceptation en masse des demandes de suivi",
+		"owner_id", ownerID, "pending", len(requesters), "accepted", accepted)
+	return nil
+}
+
 func (s *UserService) RejectFollowRequest(ownerID, followerID string) error {
 	exists, err := s.repo.HasFollowRequest(followerID, ownerID)
 	if err != nil {
@@ -513,6 +543,9 @@ func mapDetails(d *models.UserDetails, err error) (*models.UserDetails, error) {
 
 // validateUsername vérifie le charset et les mots réservés.
 func validateUsername(username string) error {
+	if len(username) < 3 || len(username) > 50 {
+		return ErrInvalidUsername
+	}
 	if !usernamePattern.MatchString(username) {
 		return ErrInvalidUsername
 	}

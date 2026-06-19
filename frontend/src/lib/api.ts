@@ -98,6 +98,29 @@ export async function updatePreferredLocale(preferredLocale: string): Promise<vo
   )
 }
 
+/** Issue d'un changement de username (mappe les codes HTTP du user-service). */
+export type UsernameUpdateResult =
+  | { ok: true }
+  | { ok: false; reason: 'taken' | 'cooldown' | 'invalid' | 'generic' }
+
+/**
+ * Change le username du compte courant (`PATCH /users/me`). Ne lève pas : renvoie
+ * un résultat typé pour que l'appelant affiche l'erreur adaptée (409 = déjà pris,
+ * 429 = cooldown actif, 400 = format invalide refusé côté serveur).
+ */
+export async function updateMyUsername(username: string): Promise<UsernameUpdateResult> {
+  const res = await apiFetch('/users/me', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username }),
+  })
+  if (res.ok) return { ok: true }
+  if (res.status === 409) return { ok: false, reason: 'taken' }
+  if (res.status === 429) return { ok: false, reason: 'cooldown' }
+  if (res.status === 400) return { ok: false, reason: 'invalid' }
+  return { ok: false, reason: 'generic' }
+}
+
 /** Décoratif du profil de l'utilisateur courant (`GET /profils/me`). */
 export interface MyProfil {
   displayName: string

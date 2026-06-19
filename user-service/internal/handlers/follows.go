@@ -200,3 +200,17 @@ func (h *Handler) PendingFollowRequests(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"data": ids})
 }
+
+// AcceptAllFollowRequests : POST /internal/users/:ownerId/accept-all-follow-requests
+// Appel server-to-server (groupe /internal, non routé par la gateway), émis par
+// profil-service quand un compte privé repasse public → toutes les demandes
+// d'abonnement en attente sont acceptées d'un coup.
+func (h *Handler) AcceptAllFollowRequests(c *gin.Context) {
+	ownerID := c.Param("ownerId")
+	if err := h.users.AcceptAllFollowRequests(ownerID); err != nil {
+		respondUserError(c, err)
+		return
+	}
+	logging.FromGin(c).Info("acceptation en masse des demandes de suivi", "owner_id", ownerID)
+	c.JSON(http.StatusOK, gin.H{"data": gin.H{"status": "accepted"}})
+}

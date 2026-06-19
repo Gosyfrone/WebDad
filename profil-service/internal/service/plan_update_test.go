@@ -40,6 +40,45 @@ func TestPlanUpdate_DisplayNameChange(t *testing.T) {
 	}
 }
 
+func TestValidDisplayName(t *testing.T) {
+	valid := []string{"Jean Dupont", "Élodie_75", "Anne-Marie", "山田 太郎", "Мария-2", "Jean.Dupont", "J.R.R. Tolkien", "Jr."}
+	for _, name := range valid {
+		if !validDisplayName(name) {
+			t.Errorf("nom valide refusé : %q", name)
+		}
+	}
+
+	invalid := []string{"", "Jean@Dupont", "#Jean", "O'Connor", "Jean 😊", "Jean\tDupont"}
+	for _, name := range invalid {
+		if validDisplayName(name) {
+			t.Errorf("nom invalide accepté : %q", name)
+		}
+	}
+}
+
+func TestPlanUpdate_DisplayNameValidationPreservesLegacyNames(t *testing.T) {
+	now := time.Now().UTC()
+	current := &models.Profil{DisplayName: "O'Connor"}
+
+	set, err := planUpdate(current, models.UpdateProfilRequest{
+		DisplayName: ptr("O'Connor"),
+		Bio:         ptr("Nouvelle bio"),
+	}, now, 0)
+	if err != nil {
+		t.Fatalf("nom legacy inchangé refusé : %v", err)
+	}
+	if _, ok := set["display_name"]; ok {
+		t.Fatal("le nom legacy inchangé ne doit pas être réécrit")
+	}
+	if set["bio"] != "Nouvelle bio" {
+		t.Fatalf("la bio doit rester modifiable, obtenu %v", set["bio"])
+	}
+
+	if _, err := planUpdate(current, models.UpdateProfilRequest{DisplayName: ptr("Jean@Dupont")}, now, 0); !errors.Is(err, ErrInvalidDisplayName) {
+		t.Fatalf("attendu ErrInvalidDisplayName, obtenu %v", err)
+	}
+}
+
 // TestPlanUpdate_Cooldown : avec un cooldown actif, un changement trop proche
 // du précédent est refusé ; passé le délai il est autorisé ; cooldown=0 ne
 // refuse jamais.
@@ -103,7 +142,7 @@ func TestPlanUpdate_BirthDateSetOnce(t *testing.T) {
 
 func TestPlanUpdate_Visibility(t *testing.T) {
 	now := time.Now().UTC()
-	current := &models.Profil{Visibility: models.VisibilityPublic}
+	current := &models.Profil{Visibility: models.VisibilityPublic, ActivityVisibility: models.VisibilityPublic}
 
 	set, err := planUpdate(current, models.UpdateProfilRequest{Visibility: ptr(models.VisibilityPrivate)}, now, 0)
 	if err != nil {
@@ -112,6 +151,9 @@ func TestPlanUpdate_Visibility(t *testing.T) {
 	if set["visibility"] != models.VisibilityPrivate {
 		t.Fatalf("visibility = %v, attendu %s", set["visibility"], models.VisibilityPrivate)
 	}
+	if _, ok := set["activity_visibility"]; ok {
+		t.Fatal("passer le profil en privé ne doit pas modifier la préférence d'activité")
+	}
 
 	set, err = planUpdate(current, models.UpdateProfilRequest{Visibility: ptr(models.VisibilityPublic)}, now, 0)
 	if err != nil {
@@ -119,6 +161,28 @@ func TestPlanUpdate_Visibility(t *testing.T) {
 	}
 	if _, ok := set["visibility"]; ok {
 		t.Fatal("visibility ne devrait pas être réécrite (valeur identique)")
+	}
+}
+
+func TestPlanUpdate_ActivityVisibility(t *testing.T) {
+	now := time.Now().UTC()
+	current := &models.Profil{Visibility: models.VisibilityPublic, ActivityVisibility: models.VisibilityPublic}
+
+	set, err := planUpdate(current, models.UpdateProfilRequest{ActivityVisibility: ptr(models.VisibilityPrivate)}, now, 0)
+	if err != nil {
+		t.Fatalf("err inattendue : %v", err)
+	}
+	if set["activity_visibility"] != models.VisibilityPrivate {
+		t.Fatalf("activity_visibility = %v, attendu %s", set["activity_visibility"], models.VisibilityPrivate)
+	}
+
+	current = &models.Profil{Visibility: models.VisibilityPrivate, ActivityVisibility: models.VisibilityPrivate}
+	set, err = planUpdate(current, models.UpdateProfilRequest{ActivityVisibility: ptr(models.VisibilityPublic)}, now, 0)
+	if err != nil {
+		t.Fatalf("err inattendue : %v", err)
+	}
+	if set["activity_visibility"] != models.VisibilityPublic {
+		t.Fatalf("activity_visibility = %v, attendu %s", set["activity_visibility"], models.VisibilityPublic)
 	}
 }
 

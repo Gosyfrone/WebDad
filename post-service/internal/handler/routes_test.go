@@ -33,7 +33,7 @@ func newTestRouter(t *testing.T) *gin.Engine {
 		repository.NewPostRepository(db),
 		service.WithBookmarkWindow(5*time.Minute),
 	)
-	RegisterRoutes(r, "post-service", svc, "test-secret", realtime.NewHub(), nil)
+	RegisterRoutes(r, "post-service", svc, "test-secret", realtime.NewHub(), nil, "test-internal-secret")
 	return r
 }
 
@@ -71,6 +71,8 @@ func TestProtectedRequiresToken(t *testing.T) {
 		{http.MethodDelete, "/posts/507f1f77bcf86cd799439011/like"},
 		{http.MethodPost, "/posts/507f1f77bcf86cd799439011/comments"},
 		{http.MethodDelete, "/posts/507f1f77bcf86cd799439011/comments/507f1f77bcf86cd799439012"},
+		{http.MethodPost, "/posts/507f1f77bcf86cd799439011/comments/507f1f77bcf86cd799439012/like"},
+		{http.MethodDelete, "/posts/507f1f77bcf86cd799439011/comments/507f1f77bcf86cd799439012/like"},
 		{http.MethodGet, "/posts/me/liked-ids"},
 		{http.MethodGet, "/posts/me/bookmarked-ids"},
 		{http.MethodGet, "/posts/bookmarks"},

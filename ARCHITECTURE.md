@@ -52,11 +52,16 @@ composed by the **caller** (front/BFF).
 
 - **Client → Gateway → Service.** Gateway forwards method/path/body/headers and returns the
   response intact; prefix is preserved (`/auth/...` → auth-service `/auth/...`).
-- **Auth:** access token (15m, localStorage, sent as `Authorization: Bearer` by the client
+- **Auth:** access token (5m, localStorage, sent as `Authorization: Bearer` by the client
   directly to the gateway) + refresh token (24h, httpOnly cookie `breezy-refresh`, managed by
   the Next BFF same-origin). Login accepts email directly; username login is resolved by the
   BFF through `GET /users/by-username/:username`, then auth-service checks credentials by
   `user_id`. Refresh is single-flight on 401.
+- **Registration gate:** local registration requires `acceptedTerms=true` in the Next BFF. OAuth
+  sign-up exchanges/verifies the provider code, then returns a short `pending_token` when no
+  account exists yet; the callback stores it in `sessionStorage` and redirects to the blocking
+  public `/auth/oauth/terms` page. That page collects username/date/CGU and only then creates
+  the auth credential, user row, profile and session.
 - **Credential settings:** password changes reuse the authenticated BFF route and rotate the session.
   Email changes use `pending_email` plus a one-use 24h token sent to the new address; confirmation
   atomically promotes it, revokes prior refresh tokens, and opens a session carrying the new email.
@@ -64,6 +69,11 @@ composed by the **caller** (front/BFF).
   user-service (follow status) to filter post visibility; clients have no-op fallbacks for autonomy.
 - **Notifications (server→server):** post/message/user-service POST best-effort fire-and-forget
   events to notification-service `/internal/events` (secret `INTERNAL_EVENT_SECRET`, off the gateway).
+- **Auto-moderation (server→server):** when a post crosses the admin-set report threshold, report-service
+  POSTs best-effort to post-service `/internal/posts/:id/auto-hide` (and `…/auto-unhide` on approval),
+  off the gateway, authenticated by `X-Internal-Secret` (same shared secret). Post-service owns the
+  `auto_hidden` visibility flag (server-side barrier); report-service owns the count and the validation
+  lock (terminal `approved` status). Bug tickets are exempt.
 - **Realtime:** WebSocket hubs per user for messages (`/messages/ws`) and notifications
   (`/notifications/ws`), plus a **broadcast** hub on post-service (`/posts/ws`) that pings all
   connected clients on each new public root post (id + author only → "X a posté" banner, content

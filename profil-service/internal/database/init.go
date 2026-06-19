@@ -38,8 +38,9 @@ func EnsureSchema(ctx context.Context, db *mongo.Database) error {
 	return ensureSeed(ctx, db)
 }
 
-// backfillVisibility remet à une valeur valide les champs `visibility` et
-// `likes_visibility` des documents écrits avant l'introduction de ces champs
+// backfillVisibility remet à une valeur valide les champs `visibility`,
+// `likes_visibility` et `activity_visibility` des documents écrits avant
+// l'introduction de ces champs
 // (ou avant leur valeur par défaut). Sans omitempty historique, la valeur zéro
 // a pu être persistée comme chaîne vide : `""` ne respecte pas l'enum
 // {public, private} du $jsonSchema, et la validation `strict` de Mongo rejette
@@ -51,7 +52,7 @@ func EnsureSchema(ctx context.Context, db *mongo.Database) error {
 // les documents corrigés (filtre sur champ absent OU chaîne vide).
 func backfillVisibility(ctx context.Context, db *mongo.Database) error {
 	coll := db.Collection("profiles")
-	for _, field := range []string{"visibility", "likes_visibility"} {
+	for _, field := range []string{"visibility", "likes_visibility", "activity_visibility"} {
 		filter := bson.M{"$or": bson.A{
 			bson.M{field: bson.M{"$exists": false}},
 			bson.M{field: ""},
@@ -156,17 +157,19 @@ func ensureSeed(ctx context.Context, db *mongo.Database) error {
 	filter := bson.M{"user_id": adminUserID}
 	update := bson.M{
 		"$setOnInsert": bson.M{
-			"user_id":          adminUserID,
-			"display_name":     "Administrateur Breezy",
-			"bio":              "Administrateur de Breezy",
-			"avatar_url":       "",
-			"banner_url":       "",
-			"website":          "",
-			"location":         "",
-			"visibility":       "public",
-			"likes_visibility": "public",
-			"created_at":       now,
-			"updated_at":       now,
+			"user_id":             adminUserID,
+			"display_name":        "Administrateur Breezy",
+			"bio":                 "Administrateur de Breezy",
+			"avatar_url":          "",
+			"banner_url":          "",
+			"website":             "",
+			"location":            "",
+			"visibility":          "public",
+			"likes_visibility":    "public",
+			"activity_visibility": "public",
+			"is_online":           false,
+			"created_at":          now,
+			"updated_at":          now,
 		},
 	}
 	_, err := db.Collection("profiles").UpdateOne(ctx, filter, update, options.UpdateOne().SetUpsert(true))
@@ -186,20 +189,23 @@ var validators = map[string]bson.M{
 			"bsonType": "object",
 			"required": bson.A{"user_id", "created_at"},
 			"properties": bson.M{
-				"user_id":          bson.M{"bsonType": "string"},
-				"display_name":     bson.M{"bsonType": "string", "maxLength": 100},
-				"bio":              bson.M{"bsonType": "string", "maxLength": 160},
-				"avatar_url":       bson.M{"bsonType": "string"},
-				"banner_url":       bson.M{"bsonType": "string"},
-				"website":          bson.M{"bsonType": "string"},
-				"location":         bson.M{"bsonType": "string"},
-				"visibility":       bson.M{"bsonType": "string", "enum": bson.A{"public", "private"}},
-				"likes_visibility": bson.M{"bsonType": "string", "enum": bson.A{"public", "private"}},
+				"user_id":             bson.M{"bsonType": "string"},
+				"display_name":        bson.M{"bsonType": "string", "maxLength": 100},
+				"bio":                 bson.M{"bsonType": "string", "maxLength": 160},
+				"avatar_url":          bson.M{"bsonType": "string"},
+				"banner_url":          bson.M{"bsonType": "string"},
+				"website":             bson.M{"bsonType": "string"},
+				"location":            bson.M{"bsonType": "string"},
+				"visibility":          bson.M{"bsonType": "string", "enum": bson.A{"public", "private"}},
+				"likes_visibility":    bson.M{"bsonType": "string", "enum": bson.A{"public", "private"}},
+				"activity_visibility": bson.M{"bsonType": "string", "enum": bson.A{"public", "private"}},
 				// Champs optionnels (validés uniquement s'ils sont présents).
+				"is_online":               bson.M{"bsonType": "bool"},
 				"birth_date":              bson.M{"bsonType": "date"},
 				"gender":                  bson.M{"bsonType": "string", "enum": bson.A{"male", "female"}},
 				"nationality":             bson.M{"bsonType": "string", "pattern": "^[A-Z]{2}$"},
 				"display_name_changed_at": bson.M{"bsonType": "date"},
+				"last_login_at":           bson.M{"bsonType": "date"},
 				"created_at":              bson.M{"bsonType": "date"},
 				"updated_at":              bson.M{"bsonType": "date"},
 			},

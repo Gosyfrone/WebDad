@@ -1,5 +1,7 @@
 # WebDad — Application distribuée en microservices
 
+[![codecov](https://codecov.io/gh/Gosyfrone/WebDad/branch/main/graph/badge.svg)](https://codecov.io/gh/Gosyfrone/WebDad)
+
 Application web distribuée construite en architecture microservices dans le cadre du projet FISA INFO A3.
 Le système se compose d'un frontend, d'une API Gateway et de quatre services backend indépendants,
 chacun avec sa propre base de données.

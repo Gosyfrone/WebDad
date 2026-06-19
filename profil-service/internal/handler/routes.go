@@ -12,6 +12,7 @@ import (
 // auth-service, même secret partagé).
 func RegisterRoutes(r *gin.Engine, serviceName string, profils *service.ProfilService, jwtSecret string) {
 	auth := middleware.JWTAuth(jwtSecret)
+	optionalAuth := middleware.OptionalJWTAuth(jwtSecret)
 	h := NewProfilHandler(profils)
 
 	r.GET("/health", Health(serviceName))
@@ -26,12 +27,15 @@ func RegisterRoutes(r *gin.Engine, serviceName string, profils *service.ProfilSe
 		p.POST("/admin", auth, h.AdminCreate)
 		p.GET("/me", auth, h.GetMe)
 		p.PATCH("/me", auth, h.UpdateMe)
+		p.PATCH("/me/activity", auth, h.TouchActivity)
+		p.PATCH("/me/activity/offline", auth, h.TouchActivityOffline)
 
 		// Lecture publique.
 		p.GET("/search", h.Search) // ?q= : recherche par display_name
 		p.GET("/:userId/visibility", h.GetVisibility)
 		p.GET("/:userId/likes-visibility", h.GetLikesVisibility)
-		p.GET("/:userId", h.GetByUserID)
+		p.GET("/:userId/activity", optionalAuth, h.GetActivity)
+		p.GET("/:userId", optionalAuth, h.GetByUserID)
 		p.DELETE("/:userId", auth, h.Delete) // admin (vérifié dans le handler)
 	}
 }

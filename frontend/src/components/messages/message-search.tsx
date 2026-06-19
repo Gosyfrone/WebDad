@@ -10,8 +10,10 @@ import {
   type Conversation,
 } from '@/lib/messages'
 import { useResolvedUser } from '@/lib/use-resolved-user'
+import { initialOf } from '@/lib/utils'
 import { useLanguage } from '@/components/language-provider'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
 
 /**
  * Recherche de messages DANS une conversation (DM / groupe / communauté).
@@ -103,8 +105,9 @@ function SearchResult({ message, query }: { message: ChatMessage; query: string 
       <Avatar className="h-8 w-8 shrink-0">
         {sender?.avatarUrl && <AvatarImage src={sender.avatarUrl} alt={sender.displayName} />}
         <AvatarFallback className="text-xs">
-          {(sender?.displayName.charAt(0) || '?').toUpperCase()}
+          {initialOf(sender?.displayName, sender?.username)}
         </AvatarFallback>
+        <ActivityPresenceDot userId={sender?.id} className="h-2.5 w-2.5" />
       </Avatar>
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex items-baseline justify-between gap-2">

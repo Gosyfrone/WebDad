@@ -4,7 +4,7 @@ import { useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 
 import { rememberLegalOrigin } from '@/lib/legal-origin'
-import { isSearchSectionPath, rememberSearchPath } from '@/lib/search-tab'
+import { noteSearchNavigation } from '@/lib/search-tab'
 
 /**
  * Enregistre en continu la dernière page « Breezy » (non légale) visitée, pour
@@ -12,7 +12,10 @@ import { isSearchSectionPath, rememberSearchPath } from '@/lib/search-tab'
  * légales ne touche pas l'origine (elles sont ignorées par `rememberLegalOrigin`).
  *
  * Mémorise aussi le dernier chemin de la « section recherche » (Explorer +
- * profils) pour la mémoire de navigation de la loupe (cf. lib/search-tab). On lit
+ * profils atteints DEPUIS la recherche) pour la mémoire de navigation de la
+ * loupe (cf. lib/search-tab). Un profil ouvert depuis le fil / les notifs /
+ * les messages n'y est PAS rangé : `noteSearchNavigation` n'enregistre un
+ * profil que s'il prolonge une navigation déjà dans la section. On lit
  * `window.location.search` pour conserver la requête `?q=` (les changements de
  * query SANS changement de pathname sont gérés en plus dans l'Explorer lui-même).
  *
@@ -25,9 +28,7 @@ export function RouteOriginTracker() {
   useEffect(() => {
     if (!pathname) return
     rememberLegalOrigin(pathname)
-    if (isSearchSectionPath(pathname)) {
-      rememberSearchPath(pathname + window.location.search)
-    }
+    noteSearchNavigation(pathname, pathname + window.location.search)
   }, [pathname])
 
   return null

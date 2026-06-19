@@ -5,7 +5,7 @@ import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { CircleAlert, KeyRound, Loader2, Lock } from 'lucide-react'
 
 import { getAccessToken, setAccessToken } from '@/lib/auth-client'
-import { useSession } from '@/lib/session'
+import { useCurrentUser } from '@/components/current-user-provider'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useT } from '@/components/language-provider'
@@ -24,7 +24,7 @@ import { useT } from '@/components/language-provider'
  */
 export function PasswordChangeGate() {
   const t = useT()
-  const session = useSession()
+  const { session } = useCurrentUser()
 
   const [current, setCurrent] = React.useState('')
   const [next, setNext] = React.useState('')

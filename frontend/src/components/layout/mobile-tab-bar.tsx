@@ -4,13 +4,12 @@ import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Bell, LogIn, Mail, Search } from 'lucide-react'
+import { LogIn, Mail, Search } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import { ROUTES } from '@/lib/routes'
 import { getSearchPath, isSearchSectionPath } from '@/lib/search-tab'
 import { useAuthGate } from '@/components/auth-prompt-provider'
-import { useNotifications } from '@/components/notifications-provider'
 import { useMessages } from '@/components/messages-provider'
 import { useT } from '@/components/language-provider'
 
@@ -25,7 +24,6 @@ interface TabItem {
 const TABS: TabItem[] = [
   { href: ROUTES.feed, labelKey: 'nav.home', icon: null },
   { href: ROUTES.explorer, labelKey: 'nav.search', icon: Search },
-  { href: ROUTES.notifications, labelKey: 'nav.notifications', icon: Bell },
   { href: ROUTES.messages, labelKey: 'nav.messages', icon: Mail },
 ]
 
@@ -53,7 +51,6 @@ export function MobileTabBar() {
   useEffect(() => {
     setSearchHref(isSearchSectionPath(pathname) ? ROUTES.explorer : getSearchPath())
   }, [pathname])
-  const { unreadCount } = useNotifications()
   const { unreadCount: msgUnread } = useMessages()
   const tabs = isVisitor ? VISITOR_TABS : TABS
 
@@ -65,17 +62,9 @@ export function MobileTabBar() {
       {tabs.map((tab) => {
         const active = pathname === tab.href
         const Icon = tab.icon
-        const badgeCount =
-          tab.href === ROUTES.notifications
-            ? unreadCount
-            : tab.href === ROUTES.messages
-              ? msgUnread
-              : 0
+        const badgeCount = tab.href === ROUTES.messages ? msgUnread : 0
         const showBadge = badgeCount > 0
-        const badgeAria =
-          tab.href === ROUTES.messages
-            ? t('messages.badge_aria', { count: badgeCount })
-            : t('notifications.unread_aria', { count: badgeCount })
+        const badgeAria = t('messages.badge_aria', { count: badgeCount })
 
         return (
           <Link

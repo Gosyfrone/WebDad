@@ -1,16 +1,8 @@
 'use client'
 
-import { MoreHorizontal } from 'lucide-react'
-
 import { cn } from '@/lib/utils'
 import { useT } from '@/components/language-provider'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+import { useToast } from '@/hooks/use-toast'
 
 export function ExplorerFilterCard({
   showPublications,
@@ -20,8 +12,8 @@ export function ExplorerFilterCard({
 }: {
   showPublications: boolean
   showUsers: boolean
-  onTogglePublications: () => void
-  onToggleUsers: () => void
+  onTogglePublications: () => void | boolean
+  onToggleUsers: () => void | boolean
 }) {
   const t = useT()
   return (
@@ -48,8 +40,8 @@ export function FilterControls({
 }: {
   showPublications: boolean
   showUsers: boolean
-  onTogglePublications: () => void
-  onToggleUsers: () => void
+  onTogglePublications: () => void | boolean
+  onToggleUsers: () => void | boolean
 }) {
   const t = useT()
   return (
@@ -57,21 +49,28 @@ export function FilterControls({
       <FilterRow
         label={t('explorer.filter_publications')}
         checked={showPublications}
-        disabled={showPublications && !showUsers}
+        locked={showPublications && !showUsers}
         onChange={onTogglePublications}
+        filterType="publications"
       />
       <div className="border-t border-border/50" />
       <FilterRow
         label={t('explorer.filter_users')}
         checked={showUsers}
-        disabled={showUsers && !showPublications}
+        locked={showUsers && !showPublications}
         onChange={onToggleUsers}
+        filterType="users"
       />
     </div>
   )
 }
 
-export function MobileFilterMenu({
+/**
+ * Filtres mobiles : deux pastilles toggle toujours visibles (Publications /
+ * Utilisateurs). Au moins une doit rester active ; tenter de désactiver la
+ * dernière active déclenche un toast explicatif.
+ */
+export function MobileFilterButtons({
   showPublications,
   showUsers,
   onTogglePublications,
@@ -79,47 +78,64 @@ export function MobileFilterMenu({
 }: {
   showPublications: boolean
   showUsers: boolean
-  onTogglePublications: () => void
-  onToggleUsers: () => void
+  onTogglePublications: () => void | boolean
+  onToggleUsers: () => void | boolean
 }) {
   const t = useT()
+  const { toast } = useToast()
+
+  const handle =
+    (toggle: () => void | boolean, filterType: 'publications' | 'users') => () => {
+      const success = toggle()
+      if (success === false) {
+        toast({
+          title: t('explorer.filter_required'),
+          description:
+            filterType === 'publications'
+              ? t('explorer.at_least_one_filter_publications')
+              : t('explorer.at_least_one_filter_users'),
+        })
+      }
+    }
+
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <ButtonLikeDots label={t('explorer.filter_title')} />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-64 overflow-hidden rounded-2xl p-0">
-        <DropdownMenuLabel className="px-4 py-3 text-base font-bold">
-          {t('explorer.filter_title')}
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator className="m-0" />
-        <MobileFilterRow
-          label={t('explorer.filter_publications')}
-          checked={showPublications}
-          disabled={showPublications && !showUsers}
-          onChange={onTogglePublications}
-        />
-        <DropdownMenuSeparator className="m-0" />
-        <MobileFilterRow
-          label={t('explorer.filter_users')}
-          checked={showUsers}
-          disabled={showUsers && !showPublications}
-          onChange={onToggleUsers}
-        />
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <div className="flex gap-2">
+      <FilterChip
+        label={t('explorer.filter_publications')}
+        active={showPublications}
+        onClick={handle(onTogglePublications, 'publications')}
+      />
+      <FilterChip
+        label={t('explorer.filter_users')}
+        active={showUsers}
+        onClick={handle(onToggleUsers, 'users')}
+      />
+    </div>
   )
 }
 
-function ButtonLikeDots({ label }: { label: string }) {
+function FilterChip({
+  label,
+  active,
+  onClick,
+}: {
+  label: string
+  active: boolean
+  onClick: () => void
+}) {
   return (
     <button
       type="button"
-      aria-label={label}
-      title={label}
-      className="grid h-9 w-9 place-items-center rounded-full border border-border bg-background text-muted-foreground shadow-sm transition hover:bg-accent hover:text-foreground"
+      onClick={onClick}
+      aria-pressed={active}
+      className={cn(
+        'rounded-full border px-4 py-1.5 text-sm font-bold transition-colors',
+        active
+          ? 'border-transparent bg-gradient-to-r from-[#8D3DFF] via-[#5B6CFF] to-[#47D9FF] text-white'
+          : 'border-border bg-background text-muted-foreground hover:bg-accent',
+      )}
     >
-      <MoreHorizontal className="h-5 w-5" aria-hidden />
+      {label}
     </button>
   )
 }
@@ -127,52 +143,44 @@ function ButtonLikeDots({ label }: { label: string }) {
 function FilterRow({
   label,
   checked,
-  disabled,
+  locked,
   onChange,
+  filterType,
 }: {
   label: string
   checked: boolean
-  disabled: boolean
-  onChange: () => void
+  /** Dernier filtre actif : grisé, mais cliquable pour afficher l'avertissement. */
+  locked: boolean
+  onChange: () => void | boolean
+  filterType?: 'publications' | 'users'
 }) {
+  const t = useT()
+  const { toast } = useToast()
+
+  const handleChange = () => {
+    const success = onChange()
+    if (success === false) {
+      toast({
+        title: t('explorer.filter_required'),
+        description:
+          filterType === 'publications'
+            ? t('explorer.at_least_one_filter_publications')
+            : t('explorer.at_least_one_filter_users'),
+      })
+    }
+  }
+
   return (
     <label
       className={cn(
         'flex cursor-pointer items-center justify-between px-4 py-3 transition-colors hover:bg-accent',
-        disabled && 'cursor-not-allowed opacity-60',
+        locked && 'opacity-60',
       )}
     >
       <span className="text-sm font-medium text-foreground">{label}</span>
-      <input type="checkbox" checked={checked} disabled={disabled} onChange={onChange} className="sr-only" />
+      <input type="checkbox" checked={checked} onChange={handleChange} className="sr-only" />
       <CircleIndicator checked={checked} />
     </label>
-  )
-}
-
-function MobileFilterRow({
-  label,
-  checked,
-  disabled,
-  onChange,
-}: {
-  label: string
-  checked: boolean
-  disabled: boolean
-  onChange: () => void
-}) {
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onChange}
-      className={cn(
-        'flex w-full items-center justify-between px-4 py-3 text-sm font-medium transition-colors hover:bg-accent',
-        disabled && 'cursor-not-allowed opacity-60',
-      )}
-    >
-      {label}
-      <CircleIndicator checked={checked} />
-    </button>
   )
 }
 

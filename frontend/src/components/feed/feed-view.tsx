@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeft, ImageIcon, Loader2, Search, Users } from 'lucide-react'
 
 import { cn, initialOf } from '@/lib/utils'
@@ -11,7 +11,7 @@ import {
   readMutedWords,
   subscribeMutedWords,
 } from '@/lib/content-filters'
-import { getFollowingIds, getMe } from '@/lib/api'
+import { getFollowingIds } from '@/lib/api'
 import { subscribeProfilUpdated } from '@/lib/profil-client'
 import { useInfiniteScroll } from '@/lib/use-infinite-scroll'
 import {
@@ -37,6 +37,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { useAuthGate } from '@/components/auth-prompt-provider'
 import { useT } from '@/components/language-provider'
 import { SearchSuggestionsDropdown } from '@/components/search/search-suggestions-dropdown'
+import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
 
 type FeedTab = 'for-you' | 'following'
 type HashtagTab = 'top' | 'recent' | 'media'
@@ -59,20 +60,30 @@ function applyPostUpdate(current: FeedPost[], updated: FeedPost): FeedPost[] {
   })
 }
 
-/**
- * Corps du fil d'actualité : en-tête sticky, onglets « Pour toi » /
- * « Abonnements », zone de composition, puis la liste de l'onglet actif.
- *
- * Les pages sont chargées au défilement (`useInfiniteScroll`). Un post
- * fraîchement publié est prépendu sans refetch (event `post-created`).
- */
+/** Fil d'actualité (onglets « Pour toi » / « Abonnements »), paginé au défilement ;
+ *  un post fraîchement publié est prépendu sans refetch. */
 export function FeedView() {
   const t = useT()
   const { isVisitor } = useAuthGate()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const selectedHashtag = (searchParams.get('hashtag') ?? '').trim().replace(/^#/, '')
-  const hashtagTab = normalizeHashtagTab(searchParams.get('tab'))
+  // Le feed reste monté en permanence (layout) derrière les overlays des autres
+  // sections. Hors `/feed`, on **gèle** sa lecture des query params (`hashtag`,
+  // `tab`) : sinon, naviguer vers `/profil` etc. les remettrait à zéro et
+  // déclencherait un refetch invisible, perdant le contexte hashtag et la
+  // position. On conserve donc la dernière valeur vue sur `/feed`.
+  const pathname = usePathname()
+  const onFeed = pathname === ROUTES.feed
+  const rawHashtag = (searchParams.get('hashtag') ?? '').trim().replace(/^#/, '')
+  const rawHashtagTab = normalizeHashtagTab(searchParams.get('tab'))
+  const frozenHashtag = useRef(rawHashtag)
+  const frozenHashtagTab = useRef(rawHashtagTab)
+  if (onFeed) {
+    frozenHashtag.current = rawHashtag
+    frozenHashtagTab.current = rawHashtagTab
+  }
+  const selectedHashtag = onFeed ? rawHashtag : frozenHashtag.current
+  const hashtagTab = onFeed ? rawHashtagTab : frozenHashtagTab.current
   const [hashtagInput, setHashtagInput] = useState(selectedHashtag ? `#${selectedHashtag}` : '')
   const [tab, setTab] = useState<FeedTab>('for-you')
   const [posts, setPosts] = useState<FeedPost[]>([])
@@ -240,32 +251,11 @@ export function FeedView() {
   }, [isVisitor])
 
   useEffect(() => {
-    let cancelled = false
-    let unsubscribe = () => {}
-
-    async function loadUserScopedFilters() {
-      let userId = currentUserId()
-      // Visiteur : pas de session → pas de filtres par utilisateur (et `getMe`
-      // renverrait 401 → redirection forcée vers /login).
-      if (!userId && getAccessToken()) {
-        try {
-          userId = (await getMe()).id
-        } catch {
-          userId = ''
-        }
-      }
-
-      if (cancelled) return
-      setViewerUserId(userId)
-      setMutedWords(readMutedWords(userId))
-      unsubscribe = subscribeMutedWords(userId, setMutedWords)
-    }
-
-    void loadUserScopedFilters()
-    return () => {
-      cancelled = true
-      unsubscribe()
-    }
+    // Visiteur : `currentUserId()` rend '' → pas de filtres par utilisateur.
+    const userId = currentUserId()
+    setViewerUserId(userId)
+    setMutedWords(readMutedWords(userId))
+    return subscribeMutedWords(userId, setMutedWords)
   }, [])
 
   // Un nouveau post (composer inline ou popup sidebar) est prépendu au fil.
@@ -330,7 +320,7 @@ export function FeedView() {
   return (
     <div className="flex flex-col">
       {/* En-tête : sticky sur desktop ; sur mobile l'en-tête global (logo) prend le relais */}
-      <div className="panel z-10 border-b lg:sticky lg:top-0">
+      <div className="panel z-30 border-b lg:sticky lg:top-0">
         {selectedHashtag ? (
           <>
             <form onSubmit={submitHashtagSearch} className="flex items-center gap-2 px-4 py-3">
@@ -411,6 +401,12 @@ export function FeedView() {
               <AvatarFallback className="bg-gradient-to-br from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] text-[10px] font-bold text-white">
                 {initialOf(bannerAuthor.displayName)}
               </AvatarFallback>
+              <ActivityPresenceDot
+                userId={bannerAuthor.id}
+                initialLastLoginAt={bannerAuthor.lastLoginAt}
+                initialIsOnline={bannerAuthor.isOnline}
+                className="h-2 w-2 border"
+              />
             </Avatar>
             <span>{t('feed.new_posts')}</span>
           </button>

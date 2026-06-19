@@ -5,12 +5,14 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
 	"github.com/webdad/post-service/internal/logging"
 	"github.com/webdad/post-service/internal/middleware"
 	"github.com/webdad/post-service/internal/models"
+	"github.com/webdad/post-service/internal/repository"
 	"github.com/webdad/post-service/internal/service"
 )
 
@@ -438,18 +440,49 @@ func (h *PostHandler) DeletePost(c *gin.Context) {
 
 // ListHidden : GET /posts/moderation/deleted — corbeille de modération (posts
 // retirés en suppression douce, partagée mod/admin). Réservé via ModeratorOnly.
+// Filtres cumulables : auteur (`author_id`) et plage de date de retrait
+// (`since`/`until`, RFC3339 sur `hidden_at`).
+// @Summary  Corbeille de modération (filtrable)
+// @Tags     posts
+// @Produce  json
+// @Security BearerAuth
+// @Param    author_id query string false "Filtrer par auteur"
+// @Param    since     query string false "RFC3339 — borne basse de la date de retrait"
+// @Param    until     query string false "RFC3339 — borne haute de la date de retrait"
+// @Param    limit     query int    false "Nb résultats"
+// @Param    offset    query int    false "Décalage (pagination)"
+// @Success  200 {object} map[string]interface{} "data: [posts]"
+// @Failure  401 {object} map[string]string
+// @Router   /posts/moderation/deleted [get]
 func (h *PostHandler) ListHidden(c *gin.Context) {
 	claims, ok := middleware.ClaimsFrom(c)
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "claims absents"})
 		return
 	}
-	posts, err := h.service.ListHiddenPosts(c.Request.Context(), claims.Role, pageLimit(c), pageOffset(c))
+	f := repository.HiddenFilter{
+		AuthorID: strings.TrimSpace(c.Query("author_id")),
+		Since:    parseQueryTime(c.Query("since")),
+		Until:    parseQueryTime(c.Query("until")),
+	}
+	posts, err := h.service.ListHiddenPosts(c.Request.Context(), claims.Role, f, pageLimit(c), pageOffset(c))
 	if err != nil {
 		respondPostError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"data": posts})
+}
+
+// parseQueryTime lit une date RFC3339 (filtres temporels). nil si vide/invalide.
+func parseQueryTime(s string) *time.Time {
+	if s == "" {
+		return nil
+	}
+	t, err := time.Parse(time.RFC3339, s)
+	if err != nil {
+		return nil
+	}
+	return &t
 }
 
 // RestorePost : POST /posts/:id/restore — restaure un post masqué depuis la

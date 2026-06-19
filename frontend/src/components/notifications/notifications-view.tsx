@@ -4,24 +4,27 @@ import { useEffect } from 'react'
 import Link from 'next/link'
 import { AtSign, Bell, Heart, MessageCircle, Quote, Repeat2, Reply, Send, Trash2, UserPlus } from 'lucide-react'
 
-import { cn, timeAgo } from '@/lib/utils'
+import { cn, initialOf, timeAgo } from '@/lib/utils'
 import { type AppNotification, type NotificationType, notificationHref } from '@/lib/notifications'
 import { acceptFollowRequest, rejectFollowRequest } from '@/lib/api'
 import { useLanguage } from '@/components/language-provider'
 import { useNotifications } from '@/components/notifications-provider'
 import { ProfilLink } from '@/components/profil/profil-link'
+import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 
 /** Icône (et couleur) par type de notification. */
 const TYPE_ICON: Record<NotificationType, { Icon: React.ElementType; className: string }> = {
   like: { Icon: Heart, className: 'text-rose-500' },
+  comment_like: { Icon: Heart, className: 'text-rose-500' },
   comment: { Icon: MessageCircle, className: 'text-[#5B6CFF] dark:text-[#9aa6ff]' },
   reply: { Icon: Reply, className: 'text-[#5B6CFF] dark:text-[#9aa6ff]' },
   mention: { Icon: AtSign, className: 'text-[#47D9FF]' },
   repost: { Icon: Repeat2, className: 'text-emerald-500' },
   quote: { Icon: Quote, className: 'text-[#8D3DFF]' },
   follow: { Icon: UserPlus, className: 'text-emerald-500' },
+  message: { Icon: Send, className: 'text-[#5B6CFF] dark:text-[#9aa6ff]' },
   message_mention: { Icon: Send, className: 'text-[#8D3DFF]' },
   follow_request: { Icon: UserPlus, className: 'text-emerald-500' },
   follow_request_accepted: { Icon: UserPlus, className: 'text-emerald-500' },
@@ -48,6 +51,10 @@ export function NotificationsView() {
         return count > 0
           ? t('notifications.like_other', { name, count })
           : t('notifications.like_one', { name })
+      case 'comment_like':
+        return count > 0
+          ? t('notifications.comment_like_other', { name, count })
+          : t('notifications.comment_like_one', { name })
       case 'comment':
         return count > 0
           ? t('notifications.comment_other', { name, count })
@@ -64,6 +71,10 @@ export function NotificationsView() {
         return t('notifications.mention', { name })
       case 'quote':
         return t('notifications.quote', { name })
+      case 'message':
+        return count > 0
+          ? t('notifications.message_other', { name, count })
+          : t('notifications.message_one', { name })
       case 'message_mention':
         return count > 0
           ? t('notifications.message_mention_other', { name, count })
@@ -80,12 +91,17 @@ export function NotificationsView() {
         return t('notifications.follow_request_accept_confirm', { name })
       case 'post_purge_warning':
         return t('notifications.post_purge_warning')
+      default:
+        // Type inconnu (notif legacy) : pas de texte descriptif, mais la ligne
+        // reste affichée (acteur + date) sans casser le rendu.
+        return ''
     }
   }
 
   return (
     <div className="flex flex-col">
-      <header className="panel sticky top-0 z-10 border-b px-4 py-3 backdrop-blur-2xl">
+      {/* En-tête desktop : sur mobile, le titre est porté par l'en-tête global. */}
+      <header className="panel sticky top-0 z-10 hidden border-b px-4 py-3 backdrop-blur-2xl lg:block">
         <h1 className="text-xl font-bold">{t('notifications.title')}</h1>
       </header>
 
@@ -97,8 +113,14 @@ export function NotificationsView() {
       ) : (
         <ul className="flex flex-col">
           {items.map((n) => {
-            const { Icon, className } = TYPE_ICON[n.type]
-            const fallback = (n.actor.displayName || 'U').charAt(0).toUpperCase()
+            // Garde défensive : un type inconnu (notif legacy d'avant l'ajout de
+            // l'enum côté base — validé à l'écriture, pas à la lecture) ne doit
+            // pas faire planter toute la page. Repli sur une icône neutre.
+            const { Icon, className } = TYPE_ICON[n.type] ?? {
+              Icon: Bell,
+              className: 'text-muted-foreground',
+            }
+            const fallback = initialOf(n.actor.displayName, n.actor.username)
             // Notification SYSTÈME (sans acteur) : préavis de purge RGPD. Pas de
             // lien profil, pas de navigation (le tweet masqué n'est pas visible).
             const isSystem = n.type === 'post_purge_warning'
@@ -133,6 +155,7 @@ export function NotificationsView() {
                             <AvatarImage src={n.actor.avatarUrl} alt={n.actor.displayName} />
                           )}
                           <AvatarFallback>{fallback}</AvatarFallback>
+                          <ActivityPresenceDot userId={n.actor.id} />
                         </Avatar>
                       </ProfilLink>
                       <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-background shadow">

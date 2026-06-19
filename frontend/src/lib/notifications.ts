@@ -23,12 +23,14 @@ import { resolveMediaUrl } from '@/lib/media'
 
 export type NotificationType =
   | 'like'
+  | 'comment_like'
   | 'comment'
   | 'reply'
   | 'mention'
   | 'repost'
   | 'quote'
   | 'follow'
+  | 'message'
   | 'message_mention'
   | 'follow_request'
   | 'follow_request_accepted'
@@ -181,7 +183,7 @@ async function toAppNotification(api: ApiNotification): Promise<AppNotification>
   return buildNotification(api, await resolveActor(api.last_actor_id))
 }
 
-/** Lien de navigation d'une notification : la conversation (mention en message),
+/** Lien de navigation d'une notification : la conversation (message / mention),
  *  le commentaire ciblé (réponse/commentaire) ou le post concerné. */
 export function notificationHref(n: {
   type: NotificationType
@@ -189,12 +191,13 @@ export function notificationHref(n: {
   commentId: string
   conversationId: string
 }): string {
-  if (n.type === 'message_mention') {
+  if (n.type === 'message' || n.type === 'message_mention') {
     return n.conversationId ? `/messages?conv=${encodeURIComponent(n.conversationId)}` : '/messages'
   }
   if (!n.postId) return '/feed'
-  // Commentaire/réponse : on cible directement le commentaire dans le thread.
-  if ((n.type === 'comment' || n.type === 'reply') && n.commentId) {
+  // Commentaire/réponse/like de commentaire : on cible directement le
+  // commentaire dans le thread.
+  if ((n.type === 'comment' || n.type === 'reply' || n.type === 'comment_like') && n.commentId) {
     return `/posts/${n.postId}?comment=${encodeURIComponent(n.commentId)}`
   }
   return `/posts/${n.postId}`

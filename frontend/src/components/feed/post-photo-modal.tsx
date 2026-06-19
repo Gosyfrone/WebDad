@@ -4,13 +4,14 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ChevronLeft, ChevronRight, LockOpen, X } from 'lucide-react'
 
-import { cn, timeAgo } from '@/lib/utils'
+import { cn, initialOf, timeAgo } from '@/lib/utils'
 import { currentUserId, type FeedPost } from '@/lib/posts'
 import { useLanguage } from '@/components/language-provider'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { CommentSection } from '@/components/feed/comment-section'
 import { PostActions } from '@/components/feed/post-actions'
 import { TranslatedContent } from '@/components/feed/translated-content'
+import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
 import { ProfilLink } from '@/components/profil/profil-link'
 
 interface PostPhotoModalProps {
@@ -116,8 +117,13 @@ export function PostPhotoModal({ post, index, onClose }: PostPhotoModalProps) {
             <Avatar className="h-10 w-10">
               {post.author.avatarUrl && <AvatarImage src={post.author.avatarUrl} alt="" />}
               <AvatarFallback className="bg-gradient-to-br from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] font-bold text-white">
-                {(post.author.displayName.charAt(0) || '?').toUpperCase()}
+                {initialOf(post.author.displayName, post.author.username)}
               </AvatarFallback>
+              <ActivityPresenceDot
+                userId={post.author.id}
+                initialLastLoginAt={post.author.lastLoginAt}
+                initialIsOnline={post.author.isOnline}
+              />
             </Avatar>
           </ProfilLink>
           <div className="flex min-w-0 flex-1 flex-col">

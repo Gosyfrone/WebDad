@@ -20,11 +20,12 @@ import (
 // hexadécimal (`post_id`, string) ; les compteurs dénormalisés vivent sur le
 // document `posts` et sont maintenus par `$inc`.
 type PostRepository struct {
-	posts     *mongo.Collection
-	likes     *mongo.Collection
-	comments  *mongo.Collection
-	reposts   *mongo.Collection
-	pollVotes *mongo.Collection
+	posts        *mongo.Collection
+	likes        *mongo.Collection
+	comments     *mongo.Collection
+	commentLikes *mongo.Collection
+	reposts      *mongo.Collection
+	pollVotes    *mongo.Collection
 	// Signets : collections + appartenances + préférences de rafale.
 	bookmarkCollections *mongo.Collection
 	bookmarks           *mongo.Collection
@@ -36,6 +37,7 @@ func NewPostRepository(db *mongo.Database) *PostRepository {
 		posts:               db.Collection("posts"),
 		likes:               db.Collection("likes"),
 		comments:            db.Collection("comments"),
+		commentLikes:        db.Collection("comment_likes"),
 		reposts:             db.Collection("reposts"),
 		pollVotes:           db.Collection("poll_votes"),
 		bookmarkCollections: db.Collection("bookmark_collections"),
@@ -46,11 +48,17 @@ func NewPostRepository(db *mongo.Database) *PostRepository {
 
 // --- Posts -------------------------------------------------------------------
 
-// notHidden renvoie la condition « post non masqué par la modération »
-// (is_hidden absent ou false). Fusionnée dans tous les filtres de lecture
-// publique pour que les posts retirés en suppression douce sortent des fils
-// sans être effacés. Une nouvelle map à chaque appel (pas d'aliasing).
-func notHidden() bson.M { return bson.M{"is_hidden": bson.M{"$ne": true}} }
+// notHidden renvoie la condition « post visible » : ni masqué par la modération
+// (is_hidden, retrait manuel → corbeille), ni AUTO-masqué (auto_hidden, seuil de
+// signalements atteint, en attente de décision). Fusionnée dans tous les filtres
+// de lecture publique pour que ces posts sortent des fils sans être effacés. Une
+// nouvelle map à chaque appel (pas d'aliasing).
+func notHidden() bson.M {
+	return bson.M{
+		"is_hidden":   bson.M{"$ne": true},
+		"auto_hidden": bson.M{"$ne": true},
+	}
+}
 
 func withHashtag(filter bson.M, hashtag string) bson.M {
 	if hashtag != "" {
@@ -130,9 +138,9 @@ func (r *PostRepository) GetByProfileHashtag(ctx context.Context, authorID, hash
 		if err != nil {
 			continue
 		}
-		// Un repost pointant un post masqué par la modération ne réapparaît pas
-		// par la bande sur le profil de celui qui l'a reposté.
-		if post.IsHidden {
+		// Un repost pointant un post masqué (modération ou auto-masquage) ne
+		// réapparaît pas par la bande sur le profil de celui qui l'a reposté.
+		if post.IsHidden || post.AutoHidden {
 			continue
 		}
 		if hashtag != "" && !postHasHashtag(post, hashtag) {
@@ -172,8 +180,9 @@ func (r *PostRepository) GetByAuthorsHashtag(ctx context.Context, authorIDs []st
 func (r *PostRepository) ListTopHashtags(ctx context.Context, limit int64) ([]models.HashtagTrend, error) {
 	pipeline := mongo.Pipeline{
 		{{Key: "$match", Value: bson.M{
-			"is_hidden": bson.M{"$ne": true},
-			"hashtags":  bson.M{"$exists": true, "$ne": bson.A{}},
+			"is_hidden":   bson.M{"$ne": true},
+			"auto_hidden": bson.M{"$ne": true},
+			"hashtags":    bson.M{"$exists": true, "$ne": bson.A{}},
 		}}},
 		{{Key: "$unwind", Value: "$hashtags"}},
 		{{Key: "$group", Value: bson.M{"_id": "$hashtags", "count": bson.M{"$sum": 1}}}},
@@ -210,7 +219,7 @@ func (r *PostRepository) StatsByIDs(ctx context.Context, oids []bson.ObjectID) (
 	if len(oids) == 0 {
 		return []models.Post{}, nil
 	}
-	filter := bson.M{"_id": bson.M{"$in": oids}, "is_hidden": bson.M{"$ne": true}}
+	filter := bson.M{"_id": bson.M{"$in": oids}, "is_hidden": bson.M{"$ne": true}, "auto_hidden": bson.M{"$ne": true}}
 	opts := options.Find().SetProjection(bson.M{
 		"author_id":      1,
 		"likes_count":    1,
@@ -311,8 +320,11 @@ func (r *PostRepository) Hide(ctx context.Context, id bson.ObjectID, byUserID st
 // RestoreHidden lève le masquage d'un post (retour dans les fils publics) et
 // efface les métadonnées de modération. Renvoie le document à jour.
 func (r *PostRepository) RestoreHidden(ctx context.Context, id bson.ObjectID) (*models.Post, error) {
+	// Lève aussi un éventuel auto-masquage : restaurer depuis la corbeille rend le
+	// post pleinement visible (sinon un post auto-masqué PUIS retiré resterait
+	// invisible par `auto_hidden` après restauration).
 	update := bson.M{
-		"$set":   bson.M{"is_hidden": false, "updated_at": time.Now()},
+		"$set":   bson.M{"is_hidden": false, "auto_hidden": false, "updated_at": time.Now()},
 		"$unset": bson.M{"hidden_by": "", "hidden_at": ""},
 	}
 	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
@@ -324,15 +336,54 @@ func (r *PostRepository) RestoreHidden(ctx context.Context, id bson.ObjectID) (*
 	return &post, nil
 }
 
+// SetAutoHidden (dé)pose le masquage AUTOMATIQUE d'un post (seuil de
+// signalements). `hidden=true` le sort des fils publics ; `false` le rétablit.
+// N'altère PAS is_hidden (retrait manuel de modération, indépendant).
+// mongo.ErrNoDocuments si le post est absent.
+func (r *PostRepository) SetAutoHidden(ctx context.Context, id bson.ObjectID, hidden bool) (*models.Post, error) {
+	update := bson.M{"$set": bson.M{"auto_hidden": hidden, "updated_at": time.Now()}}
+	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
+
+	var post models.Post
+	if err := r.posts.FindOneAndUpdate(ctx, bson.M{"_id": id}, update, opts).Decode(&post); err != nil {
+		return nil, err
+	}
+	return &post, nil
+}
+
+// HiddenFilter borne la corbeille de modération : auteur et/ou plage de date de
+// retrait (`hidden_at`). Champs vides/nil = pas de contrainte (corbeille entière).
+type HiddenFilter struct {
+	AuthorID string
+	Since    *time.Time
+	Until    *time.Time
+}
+
 // ListHidden renvoie les posts masqués (corbeille de modération, partagée
-// mod/admin), du plus récemment masqué au plus ancien, paginés.
-func (r *PostRepository) ListHidden(ctx context.Context, limit, skip int64) ([]models.Post, error) {
+// mod/admin), du plus récemment masqué au plus ancien, paginés et filtrés
+// (auteur + plage de date de retrait).
+func (r *PostRepository) ListHidden(ctx context.Context, f HiddenFilter, limit, skip int64) ([]models.Post, error) {
+	filter := bson.M{"is_hidden": true}
+	if f.AuthorID != "" {
+		filter["author_id"] = f.AuthorID
+	}
+	if f.Since != nil || f.Until != nil {
+		rng := bson.M{}
+		if f.Since != nil {
+			rng["$gte"] = *f.Since
+		}
+		if f.Until != nil {
+			rng["$lte"] = *f.Until
+		}
+		filter["hidden_at"] = rng
+	}
+
 	opts := options.Find().
 		SetSort(bson.D{{Key: "hidden_at", Value: -1}}).
 		SetLimit(limit).
 		SetSkip(skip)
 
-	cursor, err := r.posts.Find(ctx, bson.M{"is_hidden": true}, opts)
+	cursor, err := r.posts.Find(ctx, filter, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -403,6 +454,7 @@ func (r *PostRepository) PurgeByAuthor(ctx context.Context, userID string) (int6
 	}
 	_, _ = r.comments.DeleteMany(ctx, bson.M{"author_id": userID})
 	_, _ = r.likes.DeleteMany(ctx, bson.M{"user_id": userID})
+	_, _ = r.commentLikes.DeleteMany(ctx, bson.M{"user_id": userID})
 	_, _ = r.reposts.DeleteMany(ctx, bson.M{"user_id": userID})
 	_, _ = r.bookmarks.DeleteMany(ctx, bson.M{"user_id": userID})
 	_, _ = r.bookmarkCollections.DeleteMany(ctx, bson.M{"user_id": userID})
@@ -626,8 +678,9 @@ func (r *PostRepository) LikedPostsByUser(ctx context.Context, userID string, li
 	}
 
 	postCur, err := r.posts.Find(ctx, bson.M{
-		"_id":       bson.M{"$in": oids},
-		"is_hidden": bson.M{"$ne": true},
+		"_id":         bson.M{"$in": oids},
+		"is_hidden":   bson.M{"$ne": true},
+		"auto_hidden": bson.M{"$ne": true},
 	})
 	if err != nil {
 		return nil, err
@@ -735,6 +788,28 @@ func (r *PostRepository) AddComment(ctx context.Context, comment *models.Comment
 	return nil
 }
 
+// CommentStatsByIDs renvoie les compteurs de likes des commentaires demandés en
+// projection légère, sans leur contenu.
+func (r *PostRepository) CommentStatsByIDs(ctx context.Context, oids []bson.ObjectID) ([]models.Comment, error) {
+	if len(oids) == 0 {
+		return []models.Comment{}, nil
+	}
+	opts := options.Find().SetProjection(bson.M{
+		"likes_count": 1,
+	})
+	cursor, err := r.comments.Find(ctx, bson.M{"_id": bson.M{"$in": oids}}, opts)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = cursor.Close(ctx) }()
+
+	comments := []models.Comment{}
+	if err := cursor.All(ctx, &comments); err != nil {
+		return nil, err
+	}
+	return comments, nil
+}
+
 // ListComments renvoie les commentaires RACINE d'un post (parent_id absent/null),
 // du plus ancien au plus récent, paginés. Les réponses sont chargées à part
 // (ListReplies).
@@ -773,6 +848,19 @@ func (r *PostRepository) IncReplyCount(ctx context.Context, id bson.ObjectID, de
 	return err
 }
 
+// IncCommentCounter applique `$inc` sur un compteur dénormalisé d'un
+// commentaire (likes_count) et renvoie le document à jour.
+func (r *PostRepository) IncCommentCounter(ctx context.Context, id bson.ObjectID, field string, delta int32) (*models.Comment, error) {
+	update := bson.M{"$inc": bson.M{field: delta}}
+	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
+
+	var comment models.Comment
+	if err := r.comments.FindOneAndUpdate(ctx, bson.M{"_id": id}, update, opts).Decode(&comment); err != nil {
+		return nil, err
+	}
+	return &comment, nil
+}
+
 // DeleteRepliesByParent supprime toutes les réponses d'un commentaire racine
 // (cascade à la suppression). Renvoie le nombre de réponses supprimées.
 func (r *PostRepository) DeleteRepliesByParent(ctx context.Context, parentID string) (int64, error) {
@@ -781,6 +869,12 @@ func (r *PostRepository) DeleteRepliesByParent(ctx context.Context, parentID str
 		return 0, err
 	}
 	return res.DeletedCount, nil
+}
+
+// CommentIDsByParent renvoie tous les ids hexadécimaux des réponses d'un
+// commentaire racine. Sert au nettoyage en cascade des likes de réponses.
+func (r *PostRepository) CommentIDsByParent(ctx context.Context, parentID string) ([]string, error) {
+	return r.distinctStrings(ctx, r.comments, bson.M{"parent_id": parentID}, "_id")
 }
 
 // ListCommentsByAuthor renvoie tous les commentaires d'un auteur, du plus
@@ -825,6 +919,59 @@ func (r *PostRepository) DeleteComment(ctx context.Context, id bson.ObjectID) er
 	return nil
 }
 
+// AddCommentLike enregistre un like de commentaire, idempotent via l'index
+// unique comment_id+user_id.
+func (r *PostRepository) AddCommentLike(ctx context.Context, commentID, userID string) (bool, error) {
+	_, err := r.commentLikes.InsertOne(ctx, bson.M{
+		"comment_id": commentID,
+		"user_id":    userID,
+		"created_at": time.Now(),
+	})
+	if err != nil {
+		if mongo.IsDuplicateKeyError(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+
+// RemoveCommentLike supprime un like de commentaire.
+func (r *PostRepository) RemoveCommentLike(ctx context.Context, commentID, userID string) (bool, error) {
+	res, err := r.commentLikes.DeleteOne(ctx, bson.M{"comment_id": commentID, "user_id": userID})
+	if err != nil {
+		return false, err
+	}
+	return res.DeletedCount > 0, nil
+}
+
+// LikedCommentIDsByUser renvoie l'intersection entre les commentaires demandés
+// et les likes détenus par userID. Sert à hydrater l'état initial des cœurs.
+func (r *PostRepository) LikedCommentIDsByUser(ctx context.Context, userID string, commentIDs []string) ([]string, error) {
+	if userID == "" || len(commentIDs) == 0 {
+		return []string{}, nil
+	}
+	return r.distinctStrings(ctx, r.commentLikes, bson.M{
+		"user_id":    userID,
+		"comment_id": bson.M{"$in": commentIDs},
+	}, "comment_id")
+}
+
+// DeleteCommentLikesByComment purge les likes d'un commentaire supprimé.
+func (r *PostRepository) DeleteCommentLikesByComment(ctx context.Context, commentID string) error {
+	_, err := r.commentLikes.DeleteMany(ctx, bson.M{"comment_id": commentID})
+	return err
+}
+
+// DeleteCommentLikesByComments purge les likes d'un lot de commentaires.
+func (r *PostRepository) DeleteCommentLikesByComments(ctx context.Context, commentIDs []string) error {
+	if len(commentIDs) == 0 {
+		return nil
+	}
+	_, err := r.commentLikes.DeleteMany(ctx, bson.M{"comment_id": bson.M{"$in": commentIDs}})
+	return err
+}
+
 // DeleteCommentsByPost purge les commentaires d'un post (nettoyage à la suppression).
 func (r *PostRepository) DeleteCommentsByPost(ctx context.Context, postID string) error {
 	_, err := r.comments.DeleteMany(ctx, bson.M{"post_id": postID})
@@ -847,6 +994,10 @@ func (r *PostRepository) distinctStrings(ctx context.Context, coll *mongo.Collec
 	for _, d := range docs {
 		if v, ok := d[field].(string); ok {
 			ids = append(ids, v)
+			continue
+		}
+		if oid, ok := d[field].(bson.ObjectID); ok {
+			ids = append(ids, oid.Hex())
 		}
 	}
 	return ids, nil

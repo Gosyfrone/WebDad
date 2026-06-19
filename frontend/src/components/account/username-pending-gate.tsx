@@ -4,15 +4,14 @@ import * as React from 'react'
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { AtSign, CircleAlert, Loader2, UserCog } from 'lucide-react'
 
-import { getMe } from '@/lib/api'
 import { apiFetch, getAccessToken } from '@/lib/auth-client'
-import { useSession } from '@/lib/session'
+import { useCurrentUser } from '@/components/current-user-provider'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useT } from '@/components/language-provider'
 
 // Parité de validation username avec le register / l'onboarding.
-const usernamePattern = /^[a-zA-Z0-9_]{3,24}$/
+const usernamePattern = /^(?=.{3,24}$)[a-zA-Z0-9_]+(?:\.[a-zA-Z0-9_]+)*$/
 const reservedUsernames = new Set([
   'me',
   'admin',
@@ -42,7 +41,7 @@ type Availability = 'idle' | 'checking' | 'available' | 'taken'
  */
 export function UsernamePendingGate() {
   const t = useT()
-  const session = useSession()
+  const { session, usernamePending, profil } = useCurrentUser()
 
   const [status, setStatus] = React.useState<Status>('checking')
   const [currentUsername, setCurrentUsername] = React.useState('')
@@ -52,33 +51,20 @@ export function UsernamePendingGate() {
   const [formError, setFormError] = React.useState<string>()
   const [submitting, setSubmitting] = React.useState(false)
 
-  // Détection du besoin : username provisoire. On n'interroge /users/me qu'une
-  // fois le mot de passe temporaire réglé (sinon la modale mot de passe prime).
+  // Username provisoire (depuis le store) : on n'active la modale qu'une fois le
+  // mot de passe temporaire réglé (sinon la modale mot de passe prime).
   React.useEffect(() => {
     if (!getAccessToken() || session?.mustChangePassword) {
       setStatus('done')
       return
     }
-    let active = true
-    void (async () => {
-      try {
-        const me = await getMe()
-        if (!active) return
-        if (me.usernamePending) {
-          setCurrentUsername(me.username)
-          setStatus('needed')
-        } else {
-          setStatus('done')
-        }
-      } catch {
-        // Fail-open : on ne verrouille pas l'app sur une erreur réseau.
-        if (active) setStatus('done')
-      }
-    })()
-    return () => {
-      active = false
+    if (usernamePending) {
+      setCurrentUsername(profil?.username ?? '')
+      setStatus('needed')
+    } else {
+      setStatus('done')
     }
-  }, [session?.mustChangePassword])
+  }, [session?.mustChangePassword, usernamePending, profil?.username])
 
   // Disponibilité du username (débounce), même contrat que le register.
   React.useEffect(() => {

@@ -399,6 +399,8 @@ export function MessagesView() {
         // Le destinataire n'a pas activé sa messagerie → message dédié (pas rouge).
         if (err instanceof PeerKeyMissingError) {
           toast({ title: t('messages.peer_not_activated'), variant: 'brand' })
+        } else {
+          toast({ title: t('messages.dm_failed'), variant: 'destructive' })
         }
         cleanUrl()
       })
@@ -507,10 +509,13 @@ export function MessagesView() {
   const blurWhenGated = gated && 'pointer-events-none select-none blur-md'
 
   return (
-    <div className="relative flex h-[calc(100dvh-7.5rem)] overflow-hidden lg:h-screen">
+    <div className="relative flex min-h-0 flex-1 overflow-hidden">
       {/* Volet liste */}
       <div
         className={cn(
+          // Pas de pt-14 ici : l'overlay « wide » démarre déjà à `top-14`
+          // (cf. FeedOverlay) → le header global est déjà dégagé. Un pt-14
+          // ajouterait un 2ᵉ décalage de 56px (vide sous le header).
           'h-full w-full shrink-0 lg:w-[360px] lg:border-r',
           selectedId ? 'hidden lg:flex lg:flex-col' : 'flex flex-col',
           blurWhenGated,
@@ -534,7 +539,8 @@ export function MessagesView() {
         />
       </div>
 
-      {/* Volet chat */}
+      {/* Volet chat (mobile : occupe la vue dès le haut — l'en-tête global est
+          masqué sur une conversation ouverte, le ChatPane porte le sien). */}
       <div
         className={cn(
           'h-full min-w-0 flex-1',

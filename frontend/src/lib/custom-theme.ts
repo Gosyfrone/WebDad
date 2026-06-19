@@ -8,9 +8,9 @@
  *   - primary    : boutons d'action       -> --primary / --ring (+ --primary-foreground auto-contrasté)
  *
  * Persistance localStorage. On y stocke À LA FOIS les hex sources (pour rouvrir
- * l'éditeur sur la bonne couleur) ET la map de variables CSS pré-calculée
- * (`vars`), pour qu'un petit script inline (root layout) puisse l'appliquer
- * AVANT le premier paint sans embarquer la moindre conversion de couleur.
+ * l'éditeur sur la bonne couleur), un flag `enabled` et la map de variables CSS
+ * pré-calculée (`vars`), pour qu'un petit script inline (root layout) puisse
+ * l'appliquer AVANT le premier paint sans embarquer la moindre conversion.
  *
  * `buildCustomThemeVars` est pure (aucun DOM) -> testable. `applyCustomTheme`
  * n'est que l'application au documentElement de ce qu'elle calcule.
@@ -130,6 +130,7 @@ export function buildCustomThemeVars(theme: CustomTheme): Record<string, string>
 
 /** Forme persistée : couleurs sources + variables pré-calculées. */
 interface StoredCustomTheme extends CustomTheme {
+  enabled?: boolean
   vars: Record<string, string>
 }
 
@@ -155,16 +156,54 @@ export function readCustomTheme(): CustomTheme {
   }
 }
 
+/** Un thème a-t-il au moins une couleur personnalisée enregistrée ? */
+export function hasCustomThemeValues(theme: CustomTheme = readCustomTheme()): boolean {
+  return Boolean(theme.background || theme.text || theme.primary)
+}
+
+/** Lit uniquement l'état actif/inactif du thème personnalisé. */
+export function readCustomThemeEnabled(): boolean {
+  if (typeof window === 'undefined') return false
+  try {
+    const raw = window.localStorage.getItem(CUSTOM_THEME_STORAGE_KEY)
+    if (!raw) return false
+    const parsed = JSON.parse(raw) as Partial<StoredCustomTheme>
+    const theme: CustomTheme = {
+      background: isHexOrNull(parsed.background) ? parsed.background : null,
+      text: isHexOrNull(parsed.text) ? parsed.text : null,
+      primary: isHexOrNull(parsed.primary) ? parsed.primary : null,
+    }
+    // Les thèmes enregistrés avant l'ajout du flag restent activés.
+    return hasCustomThemeValues(theme) && parsed.enabled !== false
+  } catch {
+    return false
+  }
+}
+
 /** Persiste le thème (couleurs + vars pré-calculées) dans localStorage. */
-export function writeCustomTheme(theme: CustomTheme): void {
+export function writeCustomTheme(theme: CustomTheme, options: { enabled?: boolean } = {}): void {
   if (typeof window === 'undefined') return
-  const empty = !theme.background && !theme.text && !theme.primary
+  const empty = !hasCustomThemeValues(theme)
   if (empty) {
     window.localStorage.removeItem(CUSTOM_THEME_STORAGE_KEY)
+    window.dispatchEvent(new Event('breezy-custom-theme-change'))
     return
   }
-  const stored: StoredCustomTheme = { ...theme, vars: buildCustomThemeVars(theme) }
+  const stored: StoredCustomTheme = {
+    ...theme,
+    enabled: options.enabled ?? true,
+    vars: buildCustomThemeVars(theme),
+  }
   window.localStorage.setItem(CUSTOM_THEME_STORAGE_KEY, JSON.stringify(stored))
+  window.dispatchEvent(new Event('breezy-custom-theme-change'))
+}
+
+/** Active/désactive le thème personnalisé sans supprimer les couleurs choisies. */
+export function setCustomThemeEnabled(enabled: boolean): void {
+  const theme = readCustomTheme()
+  if (!hasCustomThemeValues(theme)) return
+  writeCustomTheme(theme, { enabled })
+  applyCustomTheme(enabled ? theme : EMPTY_CUSTOM_THEME)
 }
 
 /**
@@ -187,4 +226,4 @@ export function applyCustomTheme(theme: CustomTheme): void {
  * lit les `vars` pré-calculées et les pose, évitant tout flash de couleur.
  * Volontairement sans dépendance (pas de conversion de couleur ici).
  */
-export const CUSTOM_THEME_INLINE_SCRIPT = `(function(){try{var s=localStorage.getItem('${CUSTOM_THEME_STORAGE_KEY}');if(!s)return;var v=(JSON.parse(s)||{}).vars||{};var r=document.documentElement;for(var k in v){r.style.setProperty(k,v[k]);}}catch(e){}})();`
+export const CUSTOM_THEME_INLINE_SCRIPT = `(function(){try{var s=localStorage.getItem('${CUSTOM_THEME_STORAGE_KEY}');if(!s)return;var o=JSON.parse(s)||{};if(o.enabled===false)return;var v=o.vars||{};var r=document.documentElement;for(var k in v){r.style.setProperty(k,v[k]);}}catch(e){}})();`

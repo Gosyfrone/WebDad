@@ -2,8 +2,10 @@
  * Outils partagés pour les mentions @handle (posts, commentaires, messages).
  *
  * Règles alignées sur le back (`post-service/internal/notifier`) : un handle =
- * `[a-zA-Z0-9_]{3,50}` précédé d'un début de texte ou d'un caractère NON-mot
- * (évite de capturer la partie locale d'une adresse e-mail `jean@exemple.com`).
+ * lettres/chiffres/underscore avec un point INTERNE autorisé (≥ 3 caractères,
+ * premier et dernier = caractère-mot → un point final de ponctuation est exclu),
+ * précédé d'un début de texte ou d'un caractère NON-mot (évite de capturer la
+ * partie locale d'une adresse e-mail `jean@exemple.com`).
  *
  * Module PUR (aucun import client) → testable et réutilisable côté rendu comme
  * côté détection (calcul des ids mentionnés, « vous a mentionné »).
@@ -26,7 +28,7 @@ export type MentionSegment =
 // frontière consommée (début → '' ; sinon un caractère non-mot), le groupe 2 le
 // handle. `g` pour itérer ; on recrée le RegExp à chaque appel (lastIndex).
 function mentionRegex(): RegExp {
-  return /(^|[^\w@])@(\w{3,50})/g
+  return /(^|[^\w@])@(\w[\w.]+\w)/g
 }
 
 /**
@@ -95,7 +97,7 @@ export interface MentionTypingContext {
  */
 export function detectMentionTyping(value: string, caret: number): MentionTypingContext | null {
   const before = value.slice(0, caret)
-  const m = before.match(/(?:^|[^\w@])@(\w{0,50})$/)
+  const m = before.match(/(?:^|[^\w@])@([\w.]{0,50})$/)
   if (!m) return null
   const query = m[1]
   return { query, atIndex: caret - query.length - 1, caretEnd: caret }

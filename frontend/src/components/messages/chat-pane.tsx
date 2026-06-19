@@ -1,9 +1,32 @@
 'use client'
 
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, Check, CheckCheck, ImageOff, Info, Loader2, Lock, MoreHorizontal, Paperclip, Pencil, Send, Trash2, X } from 'lucide-react'
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
+import {
+  ArrowLeft,
+  Check,
+  CheckCheck,
+  Flag,
+  ImageOff,
+  Info,
+  Loader2,
+  Lock,
+  MoreHorizontal,
+  Paperclip,
+  Pencil,
+  Send,
+  Trash2,
+  X,
+} from 'lucide-react'
 
-import { cn } from '@/lib/utils'
+import { cn, initialOf } from '@/lib/utils'
+import { ReportDialog } from '@/components/moderation/report-dialog'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,6 +50,7 @@ import {
 import { extractMentionHandles, type MentionCandidate } from '@/lib/mentions'
 import { makeMemberFirstSearch } from '@/lib/mention-search'
 import { useMention } from '@/lib/use-mention'
+import { exceedsMediaLimit, MAX_MEDIA_MB } from '@/lib/media'
 import { resolveUsers } from '@/lib/user-cache'
 import { useResolvedUser } from '@/lib/use-resolved-user'
 import { useToast } from '@/hooks/use-toast'
@@ -35,8 +59,15 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { MentionAutocomplete } from '@/components/mention/mention-autocomplete'
 import { MentionMessageText } from '@/components/mention/mention-text'
+import { SharedLinkPreview } from '@/components/share/shared-link-preview'
+import { extractSharedRef } from '@/lib/share'
 import { MediaLightbox } from '@/components/ui/media-lightbox'
-import { ConversationAvatar, conversationTitle } from '@/components/messages/conversation-meta'
+import {
+  ConversationAvatar,
+  conversationTitle,
+} from '@/components/messages/conversation-meta'
+import { ActivityStatus } from '@/components/profil/activity-status'
+import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
 
 const PAGE = 30
 
@@ -61,21 +92,21 @@ interface ChatPaneProps {
 }
 
 /** Fusionne des messages plus anciens en tête, en dédupliquant par id. */
-function prependUnique(older: ChatMessage[], current: ChatMessage[]): ChatMessage[] {
+function prependUnique(
+  older: ChatMessage[],
+  current: ChatMessage[],
+): ChatMessage[] {
   const seen = new Set(current.map((m) => m.id))
   return [...older.filter((m) => !seen.has(m.id)), ...current]
 }
 
 /**
- * Volet de conversation : en-tête (interlocuteur / groupe), historique chiffré
- * (déchiffré localement) en défilement infini vers le HAUT (curseur `before`),
- * et zone de saisie. Les nouveaux messages arrivent par WebSocket (prop
- * `liveMessage`) ; l'envoi est géré ici (`sendMessage`).
+ * Volet de conversation : historique chiffré (déchiffré localement), défilement
+ * infini vers le haut, envoi, messages live par WebSocket.
  *
- * Cas particuliers gérés :
- *   - clé de contenu absente sur cet appareil (`contentKey === null`) → bandeau,
- *     lecture/écriture désactivées (identité créée sur un autre appareil) ;
- *   - communauté en lecture seule (`viewer`) → composer désactivé.
+ * Cas particuliers : clé de contenu absente sur cet appareil (`contentKey === null`,
+ * identité créée ailleurs) → lecture/écriture désactivées ; communauté en lecture
+ * seule (`viewer`) → composer désactivé.
  */
 export function ChatPane({
   conversation,
@@ -135,7 +166,8 @@ export function ChatPane({
   )
   const memberByUsername = useMemo(() => {
     const map = new Map<string, string>()
-    for (const m of members) if (m.username) map.set(m.username.toLowerCase(), m.id)
+    for (const m of members)
+      if (m.username) map.set(m.username.toLowerCase(), m.id)
     return map
   }, [members])
   const mentionSearch = useMemo(
@@ -150,7 +182,10 @@ export function ChatPane({
 
   // Accusés de réception (remis/ouvert) à placer sous MES messages, recalculés
   // quand les messages ou les curseurs des autres membres changent (temps réel).
-  const receiptMarks = useMemo(() => planReceipts(messages, conversation), [messages, conversation])
+  const receiptMarks = useMemo(
+    () => planReceipts(messages, conversation),
+    [messages, conversation],
+  )
 
   const keyMissing = conversation.contentKey === null
   const readOnly =
@@ -198,7 +233,8 @@ export function ChatPane({
         setDividerBeforeId(computeDivider(page.messages, dividerAnchor))
       })
       .catch(() => {
-        if (!cancelled) toast({ title: t('messages.load_failed'), variant: 'destructive' })
+        if (!cancelled)
+          toast({ title: t('messages.load_failed'), variant: 'destructive' })
       })
       .finally(() => {
         if (!cancelled) {
@@ -221,7 +257,11 @@ export function ChatPane({
     const el = scrollRef.current
     const prevHeight = el?.scrollHeight ?? 0
     try {
-      const page = await listMessagesPage(convRef.current, PAGE, oldestIdRef.current)
+      const page = await listMessagesPage(
+        convRef.current,
+        PAGE,
+        oldestIdRef.current,
+      )
       setMessages((prev) => prependUnique(page.messages, prev))
       setHasMore(page.hasMore)
       oldestIdRef.current = page.oldestId ?? oldestIdRef.current
@@ -253,15 +293,27 @@ export function ChatPane({
   useEffect(() => {
     if (!liveMessage || liveMessage.conversationId !== conversation.id) return
     const el = scrollRef.current
-    const nearBottom = el ? el.scrollHeight - el.scrollTop - el.clientHeight < 120 : true
-    setMessages((prev) => (prev.some((m) => m.id === liveMessage.id) ? prev : [...prev, liveMessage]))
+    const nearBottom = el
+      ? el.scrollHeight - el.scrollTop - el.clientHeight < 120
+      : true
+    setMessages((prev) =>
+      prev.some((m) => m.id === liveMessage.id) ? prev : [...prev, liveMessage],
+    )
     if (nearBottom) requestAnimationFrame(() => scrollToBottom('smooth'))
   }, [liveMessage, conversation.id, scrollToBottom])
 
   // Message modifié en temps réel : on remplace la version locale.
   useEffect(() => {
-    if (!liveUpdatedMessage || liveUpdatedMessage.conversationId !== conversation.id) return
-    setMessages((prev) => prev.map((m) => (m.id === liveUpdatedMessage.id ? liveUpdatedMessage : m)))
+    if (
+      !liveUpdatedMessage ||
+      liveUpdatedMessage.conversationId !== conversation.id
+    )
+      return
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === liveUpdatedMessage.id ? liveUpdatedMessage : m,
+      ),
+    )
   }, [liveUpdatedMessage, conversation.id])
 
   async function handleSubmit() {
@@ -296,7 +348,10 @@ export function ChatPane({
       setEditingMessage(null)
       requestAnimationFrame(() => scrollToBottom('smooth'))
     } catch {
-      toast({ title: t(isEditing ? 'messages.edit_failed' : 'messages.send_failed'), variant: 'destructive' })
+      toast({
+        title: t(isEditing ? 'messages.edit_failed' : 'messages.send_failed'),
+        variant: 'destructive',
+      })
     } finally {
       setSending(false)
     }
@@ -321,7 +376,9 @@ export function ChatPane({
     if (!window.confirm(t('messages.delete_confirm'))) return
     try {
       const deleted = await deleteMessage(convRef.current, message.id)
-      setMessages((prev) => prev.map((m) => (m.id === deleted.id ? deleted : m)))
+      setMessages((prev) =>
+        prev.map((m) => (m.id === deleted.id ? deleted : m)),
+      )
       if (editingMessage?.id === deleted.id) cancelEdit()
       onLocalMessage(deleted, true) // edited=true → met à jour l'aperçu si concerné
     } catch {
@@ -332,16 +389,29 @@ export function ChatPane({
   function handlePickFiles(e: React.ChangeEvent<HTMLInputElement>) {
     const picked = Array.from(e.target.files ?? [])
     e.target.value = ''
-    if (picked.length > 0) setAttachments((prev) => [...prev, ...picked])
+    if (picked.length === 0) return
+
+    // Garde UX : pièces jointes trop lourdes écartées avant chiffrement/upload
+    // (le cap est aussi appliqué côté serveur). Les admins ne sont pas plafonnés.
+    const allowed = picked.filter((f) => !exceedsMediaLimit(f.size))
+    if (allowed.length < picked.length) {
+      toast({ title: t('media.too_large', { max: MAX_MEDIA_MB }), variant: 'brand' })
+    }
+    if (allowed.length > 0) setAttachments((prev) => [...prev, ...allowed])
   }
 
   return (
     <div className="flex h-full min-h-0 flex-col">
       {/* En-tête */}
-      <ChatHeader conversation={conversation} myId={myId} onBack={onBack} onOpenInfo={onOpenInfo} />
+      <ChatHeader
+        conversation={conversation}
+        myId={myId}
+        onBack={onBack}
+        onOpenInfo={onOpenInfo}
+      />
 
       {/* Historique */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-4 sm:px-4">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 pb-6 pt-4 sm:px-4">
         <div ref={topSentinelRef} />
         {loadingOlder && (
           <div className="flex justify-center py-2">
@@ -362,14 +432,22 @@ export function ChatPane({
           </div>
         ) : messages.length === 0 && !keyMissing ? (
           <div className="flex flex-col items-center gap-1 py-16 text-center">
-            <p className="text-sm font-bold text-foreground">{t('messages.no_messages_title')}</p>
-            <p className="text-sm text-muted-foreground">{t('messages.no_messages_desc')}</p>
+            <p className="text-sm font-bold text-foreground">
+              {t('messages.no_messages_title')}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              {t('messages.no_messages_desc')}
+            </p>
           </div>
         ) : (
           <ul className="flex flex-col gap-1">
             {messages.map((m, i) => (
               <Fragment key={m.id}>
-                {m.id === dividerBeforeId && <NewMessagesDivider label={t('messages.new_messages_divider')} />}
+                {m.id === dividerBeforeId && (
+                  <NewMessagesDivider
+                    label={t('messages.new_messages_divider')}
+                  />
+                )}
                 <MessageBubble
                   message={m}
                   conversation={conversation}
@@ -395,14 +473,18 @@ export function ChatPane({
       <TypingIndicator conversation={conversation} userIds={typingUserIds} />
 
       {/* Composer */}
-      <div className="panel border-t px-3 py-2.5 sm:px-4">
+      <div className="panel sticky bottom-0 z-20 shrink-0 border-t px-3 pb-2.5 pt-2.5 shadow-[0_-14px_34px_rgba(91,108,255,0.10)] backdrop-blur-xl sm:px-4">
         {readOnly ? (
-          <p className="py-2 text-center text-sm text-muted-foreground">{t('messages.read_only')}</p>
+          <p className="py-2 text-center text-sm text-muted-foreground">
+            {t('messages.read_only')}
+          </p>
         ) : (
           <>
             {isEditing && (
               <div className="mb-2 flex items-center justify-between gap-2 rounded-xl border border-[#5B6CFF]/20 bg-[#5B6CFF]/10 px-3 py-2 text-xs text-foreground">
-                <span className="truncate font-semibold">{t('messages.editing')}</span>
+                <span className="truncate font-semibold">
+                  {t('messages.editing')}
+                </span>
                 <button
                   type="button"
                   onClick={cancelEdit}
@@ -416,7 +498,9 @@ export function ChatPane({
             {!isEditing && attachments.length > 0 && (
               <PendingAttachments
                 files={attachments}
-                onRemove={(i) => setAttachments((prev) => prev.filter((_, idx) => idx !== i))}
+                onRemove={(i) =>
+                  setAttachments((prev) => prev.filter((_, idx) => idx !== i))
+                }
                 removeLabel={t('composer.media_remove')}
               />
             )}
@@ -470,11 +554,23 @@ export function ChatPane({
                 type="button"
                 size="icon"
                 onClick={handleSubmit}
-                disabled={!canSend || sending || (isEditing ? !draft.trim() : !draft.trim() && attachments.length === 0)}
-                aria-label={t(isEditing ? 'messages.save_edit' : 'messages.send')}
+                disabled={
+                  !canSend ||
+                  sending ||
+                  (isEditing
+                    ? !draft.trim()
+                    : !draft.trim() && attachments.length === 0)
+                }
+                aria-label={t(
+                  isEditing ? 'messages.save_edit' : 'messages.send',
+                )}
                 className="h-11 w-11 shrink-0 rounded-full bg-gradient-to-r from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] text-white"
               >
-                {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                {sending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
               </Button>
             </div>
           </>
@@ -499,7 +595,7 @@ function ChatHeader({
   const { t } = useLanguage()
   const peerId =
     conversation.type === 'dm'
-      ? conversation.memberIds.find((id) => id !== myId) ?? null
+      ? (conversation.memberIds.find((id) => id !== myId) ?? null)
       : null
   const peer = useResolvedUser(peerId)
   const title = conversationTitle(conversation, peer, t)
@@ -523,11 +619,22 @@ function ChatHeader({
         <ArrowLeft className="h-5 w-5" />
       </Button>
 
-      <ConversationAvatar conversation={conversation} peer={peer} className="h-10 w-10" />
+      <ConversationAvatar
+        conversation={conversation}
+        peer={peer}
+        className="h-10 w-10"
+      />
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate text-sm font-bold text-foreground">{title}</span>
-        {subtitle && <span className="truncate text-xs text-muted-foreground">{subtitle}</span>}
+        <span className="truncate text-sm font-bold text-foreground">
+          {title}
+        </span>
+        {subtitle && (
+          <span className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+            <span className="truncate">{subtitle}</span>
+            {peerId && <ActivityStatus userId={peerId} className="shrink-0" />}
+          </span>
+        )}
       </div>
 
       <Button
@@ -572,33 +679,57 @@ function MessageBubble({
   const isDeleted = Boolean(message.deletedAt)
   const canEdit = message.mine && message.decrypted && !isDeleted
   const [showOriginal, setShowOriginal] = useState(false)
-  const hasOriginal = !isDeleted && message.decrypted && Boolean(message.originalText)
+  const hasOriginal =
+    !isDeleted && message.decrypted && Boolean(message.originalText)
+  // Signalement d'un message (hors message supprimé). Affiché aussi sur ses
+  // propres messages pour que l'action soit toujours visible ; sécurité côté
+  // back. Type d'entité selon la conversation : groupe/communauté → message de
+  // groupe, sinon message privé.
+  const canReport = !isDeleted
+  const [reportOpen, setReportOpen] = useState(false)
+  const reportEntityType =
+    conversation.type === 'group' || conversation.type === 'community' ? 'group_message' : 'message'
 
   // Message supprimé « pour tout le monde » (tombstone) : rendu sobre, sans média,
   // sans actions, sans accusé.
   if (isDeleted) {
     return (
-      <li className={cn('flex flex-col', message.mine ? 'items-end' : 'items-start')}>
+      <li
+        className={cn(
+          'flex flex-col',
+          message.mine ? 'items-end' : 'items-start',
+        )}
+      >
         <div className="mt-1 max-w-[78%] rounded-2xl border border-dashed border-border bg-background/40 px-3.5 py-2 text-sm italic text-muted-foreground">
           <span className="flex items-center gap-1.5">
             <Trash2 className="h-3.5 w-3.5" aria-hidden />
-            {t('messages.deleted')}
+            {message.deletedByModeration ? t('messages.deleted_by_moderation') : t('messages.deleted')}
           </span>
         </div>
-        <span className="mt-0.5 px-1 text-[11px] text-muted-foreground">{time}</span>
+        <span className="mt-0.5 px-1 text-[11px] text-muted-foreground">
+          {time}
+        </span>
       </li>
     )
   }
 
   return (
-    <li className={cn('flex flex-col', message.mine ? 'items-end' : 'items-start')}>
+    <li
+      className={cn(
+        'flex flex-col',
+        message.mine ? 'items-end' : 'items-start',
+      )}
+    >
       {showSender && (
         <div className="mb-0.5 ml-1 flex items-center gap-1.5">
           <Avatar className="h-5 w-5">
-            {sender?.avatarUrl && <AvatarImage src={sender.avatarUrl} alt={sender.displayName} />}
+            {sender?.avatarUrl && (
+              <AvatarImage src={sender.avatarUrl} alt={sender.displayName} />
+            )}
             <AvatarFallback className="text-[10px]">
-              {(sender?.displayName.charAt(0) || '?').toUpperCase()}
+              {initialOf(sender?.displayName, sender?.username)}
             </AvatarFallback>
+            <ActivityPresenceDot userId={sender?.id} className="h-2 w-2 border" />
           </Avatar>
           <span className="text-xs font-semibold text-muted-foreground">
             {sender?.displayName ?? '…'}
@@ -615,17 +746,28 @@ function MessageBubble({
             message.mine && 'flex-row-reverse',
           )}
         >
-          <div className={cn('flex flex-col gap-1.5', message.mine ? 'items-end' : 'items-start')}>
+          <div
+            className={cn(
+              'flex flex-col gap-1.5',
+              message.mine ? 'items-end' : 'items-start',
+            )}
+          >
             {message.media.map((att) => (
-              <AttachmentView key={att.id} contentKey={conversation.contentKey} att={att} />
+              <AttachmentView
+                key={att.id}
+                contentKey={conversation.contentKey}
+                att={att}
+              />
             ))}
           </div>
           {!message.text && (
             <MessageActionsMenu
               canEdit={canEdit}
               canDelete={canDelete}
+              canReport={canReport}
               onEdit={() => onEditStart(message)}
               onDelete={() => onDelete(message)}
+              onReport={() => setReportOpen(true)}
               className="mb-1"
             />
           )}
@@ -634,7 +776,12 @@ function MessageBubble({
 
       {/* Bulle texte : seulement s'il y a du texte, ou si le déchiffrement a échoué. */}
       {(!message.decrypted || message.text) && (
-        <div className={cn('group mt-1 flex max-w-[78%] items-end gap-1.5', message.mine && 'flex-row-reverse')}>
+        <div
+          className={cn(
+            'group mt-1 flex max-w-[78%] items-end gap-1.5',
+            message.mine && 'flex-row-reverse',
+          )}
+        >
           <div className="flex min-w-0 flex-col gap-1">
             {hasOriginal && (
               <button
@@ -683,12 +830,18 @@ function MessageBubble({
                 </p>
               )}
             </div>
+            {message.decrypted && (() => {
+              const ref = extractSharedRef(message.text)
+              return ref ? <SharedLinkPreview target={ref} /> : null
+            })()}
           </div>
           <MessageActionsMenu
             canEdit={canEdit}
             canDelete={canDelete}
+            canReport={canReport}
             onEdit={() => onEditStart(message)}
             onDelete={() => onDelete(message)}
+            onReport={() => setReportOpen(true)}
             className="mb-1"
           />
         </div>
@@ -697,31 +850,46 @@ function MessageBubble({
         <span>{time}</span>
         {receipt && <ReceiptIndicator receipt={receipt} />}
       </div>
+
+      {canReport && (
+        <ReportDialog
+          open={reportOpen}
+          onOpenChange={setReportOpen}
+          entityType={reportEntityType}
+          entityId={message.id}
+          entityOwnerId={message.senderId}
+          // E2EE : on transmet la copie EN CLAIR que CE destinataire a déchiffrée,
+          // pour que la modération puisse juger (le serveur, lui, reste aveugle).
+          disclosedContent={message.decrypted ? message.text || '' : ''}
+        />
+      )}
     </li>
   )
 }
 
 /**
- * Menu d'actions « … » d'un message (éditer / supprimer). Vrai `<button>` (Radix
- * DropdownMenu) → tap fiable sur iOS, contrairement à un `onClick` sur `<div>` ;
- * un seul menu ouvert à la fois. Toujours visible sur tactile ; révélé au survol
- * sur les appareils à survol réel (desktop). Rien si aucune action permise.
+ * Menu d'actions « … » d'un message (éditer / supprimer / signaler). Vrai `<button>`
+ * Radix → tap fiable sur iOS. Rien si aucune action permise.
  */
 function MessageActionsMenu({
   canEdit,
   canDelete,
+  canReport,
   onEdit,
   onDelete,
+  onReport,
   className,
 }: {
   canEdit: boolean
   canDelete: boolean
+  canReport: boolean
   onEdit: () => void
   onDelete: () => void
+  onReport: () => void
   className?: string
 }) {
   const { t } = useLanguage()
-  if (!canEdit && !canDelete) return null
+  if (!canEdit && !canDelete && !canReport) return null
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -742,9 +910,19 @@ function MessageActionsMenu({
           </DropdownMenuItem>
         )}
         {canDelete && (
-          <DropdownMenuItem onClick={onDelete} className="cursor-pointer text-red-500 focus:text-red-500">
+          <DropdownMenuItem
+            onClick={onDelete}
+            className="cursor-pointer text-red-500 focus:text-red-500"
+          >
             <Trash2 className="mr-2 h-4 w-4" />
             {t('messages.delete')}
+          </DropdownMenuItem>
+        )}
+        {/* Signalement placé SOUS l'option de suppression (exigence fonctionnelle). */}
+        {canReport && (
+          <DropdownMenuItem onClick={onReport} className="cursor-pointer">
+            <Flag className="mr-2 h-4 w-4" />
+            {t('report.message_action')}
           </DropdownMenuItem>
         )}
       </DropdownMenuContent>
@@ -766,7 +944,9 @@ function ReceiptIndicator({ receipt }: { receipt: ReceiptMark }) {
   const [showLabel, setShowLabel] = useState(false)
   const brand = 'text-[#5B6CFF] dark:text-[#9aa6ff]'
   const isRead = receipt.kind !== 'delivered'
-  const label = t(isRead ? 'messages.receipt_read' : 'messages.receipt_delivered')
+  const label = t(
+    isRead ? 'messages.receipt_read' : 'messages.receipt_delivered',
+  )
 
   return (
     <button
@@ -791,7 +971,12 @@ function ReceiptIndicator({ receipt }: { receipt: ReceiptMark }) {
         <CheckCheck className={cn('h-3.5 w-3.5', brand)} />
       )}
       {showLabel && (
-        <span className={cn('text-[11px] font-medium', isRead ? brand : 'text-muted-foreground')}>
+        <span
+          className={cn(
+            'text-[11px] font-medium',
+            isRead ? brand : 'text-muted-foreground',
+          )}
+        >
           {label}
         </span>
       )}
@@ -804,16 +989,25 @@ function ReceiptIndicator({ receipt }: { receipt: ReceiptMark }) {
  * « X écrit… » (ou « Plusieurs personnes écrivent… » à plusieurs). Rien si
  * personne ne tape. Éphémère : le parent gère l'expiration des signaux.
  */
-function TypingIndicator({ conversation, userIds }: { conversation: Conversation; userIds: string[] }) {
+function TypingIndicator({
+  conversation,
+  userIds,
+}: {
+  conversation: Conversation
+  userIds: string[]
+}) {
   const { t } = useLanguage()
   // Hook appelé inconditionnellement (règle des hooks) ; on ne résout le nom que
   // pour les groupes/communautés (DM = interlocuteur implicite).
-  const first = useResolvedUser(conversation.type !== 'dm' ? userIds[0] ?? null : null)
+  const first = useResolvedUser(
+    conversation.type !== 'dm' ? (userIds[0] ?? null) : null,
+  )
   if (userIds.length === 0) return null
 
   let label: string
   if (conversation.type === 'dm') label = t('messages.typing')
-  else if (userIds.length === 1) label = t('messages.typing_user', { name: first?.displayName ?? '…' })
+  else if (userIds.length === 1)
+    label = t('messages.typing_user', { name: first?.displayName ?? '…' })
   else label = t('messages.typing_several')
 
   return (
@@ -892,9 +1086,18 @@ function AttachmentView({
         <video src={url} controls playsInline className="max-h-80 max-w-full" />
       ) : (
         <>
-          <button type="button" onClick={() => setLightbox(true)} className="block" aria-label={t('messages.open_image')}>
+          <button
+            type="button"
+            onClick={() => setLightbox(true)}
+            className="block"
+            aria-label={t('messages.open_image')}
+          >
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={url} alt={att.name} className="max-h-80 max-w-full cursor-zoom-in object-contain" />
+            <img
+              src={url}
+              alt={att.name}
+              className="max-h-80 max-w-full cursor-zoom-in object-contain"
+            />
           </button>
           <MediaLightbox
             open={lightbox}
@@ -923,7 +1126,12 @@ function PendingAttachments({
   return (
     <div className="mb-2 flex flex-wrap gap-2">
       {files.map((file, i) => (
-        <PendingThumb key={`${file.name}-${i}`} file={file} onRemove={() => onRemove(i)} removeLabel={removeLabel} />
+        <PendingThumb
+          key={`${file.name}-${i}`}
+          file={file}
+          onRemove={() => onRemove(i)}
+          removeLabel={removeLabel}
+        />
       ))}
     </div>
   )
@@ -948,7 +1156,12 @@ function PendingThumb({
   return (
     <div className="group relative h-20 w-20 overflow-hidden rounded-xl border border-border bg-background/45">
       {file.type.startsWith('video/') ? (
-        <video src={url} className="h-full w-full object-cover" muted playsInline />
+        <video
+          src={url}
+          className="h-full w-full object-cover"
+          muted
+          playsInline
+        />
       ) : (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={url} alt="" className="h-full w-full object-cover" />
@@ -982,5 +1195,8 @@ function formatTime(iso: string, locale: string): string {
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) return ''
   const intl = locale === 'en' ? 'en-US' : 'fr-FR'
-  return new Intl.DateTimeFormat(intl, { hour: '2-digit', minute: '2-digit' }).format(date)
+  return new Intl.DateTimeFormat(intl, {
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date)
 }

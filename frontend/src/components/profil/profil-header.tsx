@@ -2,12 +2,12 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { CalendarDays, LinkIcon, Mail, MapPin } from 'lucide-react'
+import { CalendarDays, Flag, LinkIcon, Mail, MapPin, Share } from 'lucide-react'
 
-import { cn } from '@/lib/utils'
+import { cn, initialOf } from '@/lib/utils'
 import { countryFlag, countryName } from '@/lib/countries'
-import { ROUTES } from '@/lib/routes'
-import type { RelationKind } from '@/lib/api'
+import { ROUTES, profilHref } from '@/lib/routes'
+import type { RelationKind, UsernameUpdateResult } from '@/lib/api'
 import { useFollow } from '@/lib/use-follow'
 import type { ProfilDetails, ProfilEditableFields, RelationUser } from '@/types'
 import { useLanguage } from '@/components/language-provider'
@@ -24,6 +24,9 @@ import {
 } from '@/components/ui/dialog'
 import { EditProfilDialog } from '@/components/profil/edit-profil-dialog'
 import { RelationsDialog } from '@/components/profil/relations-dialog'
+import { ActivityStatus } from '@/components/profil/activity-status'
+import { ShareDialog } from '@/components/share/share-dialog'
+import { ReportDialog } from '@/components/moderation/report-dialog'
 
 interface ProfilHeaderProps {
   profil: ProfilDetails
@@ -32,6 +35,8 @@ interface ProfilHeaderProps {
   saving?: boolean
   /** Remontée des champs édités (consommée par le parent pour l'affichage live). */
   onEdit: (fields: ProfilEditableFields) => Promise<void>
+  /** Changement de username (service distinct) ; le parent recharge sur succès. */
+  onEditUsername: (username: string) => Promise<UsernameUpdateResult>
   onFollowChanged?: (following: boolean) => void
 }
 
@@ -45,19 +50,25 @@ export function ProfilHeader({
   isOwner,
   saving = false,
   onEdit,
+  onEditUsername,
   onFollowChanged,
 }: ProfilHeaderProps) {
   const { t, locale } = useLanguage()
-  const initials = profil.displayName.charAt(0).toUpperCase()
+  const initials = initialOf(profil.displayName, profil.username)
   const [relationsOpen, setRelationsOpen] = useState(false)
   const [relationsTab, setRelationsTab] = useState<RelationKind>('followers')
+  const [shareOpen, setShareOpen] = useState(false)
+  const [reportOpen, setReportOpen] = useState(false)
 
   // État de suivi (même hook que la recherche / les suggestions). Différé pour
   // le propriétaire (pas de bouton « Suivre » sur son propre profil).
-  const { currentUserId, isFollowing, isRequested, isPending, toggle } = useFollow(!isOwner)
-  const canFollow = !isOwner && currentUserId !== null && currentUserId !== profil.userId
+  const { currentUserId, isFollowing, isRequested, isPending, toggle } =
+    useFollow(!isOwner)
+  const canFollow =
+    !isOwner && currentUserId !== null && currentUserId !== profil.userId
   const followingProfile = isFollowing(profil.userId)
-  const relationsLocked = profil.visibility === 'private' && !isOwner && !followingProfile
+  const relationsLocked =
+    profil.visibility === 'private' && !isOwner && !followingProfile
 
   function openRelations(tab: RelationKind) {
     setRelationsTab(tab)
@@ -73,7 +84,11 @@ export function ProfilHeader({
           !profil.bannerUrl &&
             'bg-gradient-to-r from-[#8D3DFF]/35 via-[#EADCFF] to-[#47D9FF]/25 dark:from-[#8D3DFF]/45 dark:via-[#1c1338] dark:to-[#47D9FF]/35',
         )}
-        style={profil.bannerUrl ? { backgroundImage: `url(${profil.bannerUrl})` } : undefined}
+        style={
+          profil.bannerUrl
+            ? { backgroundImage: `url(${profil.bannerUrl})` }
+            : undefined
+        }
       />
 
       <div className="px-4 pb-3">
@@ -100,11 +115,13 @@ export function ProfilHeader({
                   gender: profil.gender,
                   nationality: profil.nationality,
                 }}
+                initialUsername={profil.username}
                 birthDateLocked={Boolean(profil.birthDate)}
                 genderLocked={Boolean(profil.gender)}
                 displayNameChangedAt={profil.displayNameChangedAt}
                 saving={saving}
                 onSave={onEdit}
+                onSaveUsername={onEditUsername}
               >
                 <Button
                   variant="outline"
@@ -116,6 +133,16 @@ export function ProfilHeader({
             ) : canFollow ? (
               <div className="flex items-center gap-2">
                 <Button
+                  variant="outline"
+                  size="icon"
+                  aria-label={t('share.title')}
+                  title={t('share.title')}
+                  onClick={() => setShareOpen(true)}
+                  className="rounded-full border-white/70 bg-white/80 shadow-sm backdrop-blur hover:bg-white dark:border-white/15 dark:bg-white/10 dark:hover:bg-white/20"
+                >
+                  <Share className="h-4 w-4" />
+                </Button>
+                <Button
                   asChild
                   variant="outline"
                   size="icon"
@@ -126,6 +153,16 @@ export function ProfilHeader({
                   <Link href={`${ROUTES.messages}?dm=${profil.userId}`}>
                     <Mail className="h-4 w-4" />
                   </Link>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  aria-label={t('report.profile_action')}
+                  title={t('report.profile_action')}
+                  onClick={() => setReportOpen(true)}
+                  className="rounded-full border-white/70 bg-white/80 shadow-sm backdrop-blur hover:bg-white dark:border-white/15 dark:bg-white/10 dark:hover:bg-white/20"
+                >
+                  <Flag className="h-4 w-4" />
                 </Button>
                 <FollowButton
                   following={followingProfile}
@@ -140,13 +177,26 @@ export function ProfilHeader({
                 />
               </div>
             ) : null}
+
+            {canFollow && (
+              <ReportDialog
+                open={reportOpen}
+                onOpenChange={setReportOpen}
+                entityType="profile"
+                entityId={profil.userId}
+                entityOwnerId={profil.userId}
+                targetLabel={profil.username ? `@${profil.username}` : undefined}
+              />
+            )}
           </div>
         </div>
 
         {/* Identité */}
         <div className="mt-3 flex flex-col gap-0.5">
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-xl font-extrabold text-foreground">{profil.displayName}</h1>
+            <h1 className="text-xl font-extrabold text-foreground">
+              {profil.displayName}
+            </h1>
             <Badge variant="secondary">{t(`role.${profil.role}`)}</Badge>
             {profil.gender && (
               <span
@@ -179,12 +229,22 @@ export function ProfilHeader({
               </span>
             )}
           </div>
-          <span className="text-sm text-muted-foreground">@{profil.username}</span>
+          <span className="text-sm text-muted-foreground">
+            @{profil.username}
+          </span>
+          <ActivityStatus
+            userId={profil.userId}
+            initialLastLoginAt={profil.lastLoginAt}
+            initialIsOnline={profil.isOnline}
+            className="text-xs"
+          />
         </div>
 
         {/* Bio */}
         {profil.bio && (
-          <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed">{profil.bio}</p>
+          <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed">
+            {profil.bio}
+          </p>
         )}
 
         <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm text-muted-foreground">
@@ -208,12 +268,16 @@ export function ProfilHeader({
           {profil.birthDate && (
             <span className="flex items-center gap-1.5">
               <CalendarDays className="h-4 w-4" aria-hidden />
-              {t('profil.born_on', { date: formatFullDate(profil.birthDate, locale) })}
+              {t('profil.born_on', {
+                date: formatFullDate(profil.birthDate, locale),
+              })}
             </span>
           )}
           <span className="flex items-center gap-1.5">
             <CalendarDays className="h-4 w-4" aria-hidden />
-            {t('profil.joined', { date: formatJoinedAt(profil.joinedAt, locale) })}
+            {t('profil.joined', {
+              date: formatJoinedAt(profil.joinedAt, locale),
+            })}
           </span>
         </div>
 
@@ -240,6 +304,14 @@ export function ProfilHeader({
         followersCount={profil.followersCount}
         followingCount={profil.followingCount}
         locked={relationsLocked}
+      />
+
+      <ShareDialog
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        url={profilHref(profil.username)}
+        kind="profile"
+        title={profil.displayName}
       />
     </header>
   )
@@ -306,8 +378,12 @@ function FollowButton({
           t('follow.requested')
         ) : following ? (
           <>
-            <span className="group-hover/btn:hidden">{t('follow.followed')}</span>
-            <span className="hidden group-hover/btn:inline">{t('follow.unfollow')}</span>
+            <span className="group-hover/btn:hidden">
+              {t('follow.followed')}
+            </span>
+            <span className="hidden group-hover/btn:inline">
+              {t('follow.unfollow')}
+            </span>
           </>
         ) : (
           t('follow.follow')
@@ -318,13 +394,19 @@ function FollowButton({
         <DialogContent className="panel top-32 translate-y-0 border shadow-[0_28px_80px_rgba(91,108,255,0.24)] sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>{t('follow.private_unfollow_title')}</DialogTitle>
-            <DialogDescription>{t('follow.private_unfollow_desc')}</DialogDescription>
+            <DialogDescription>
+              {t('follow.private_unfollow_desc')}
+            </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setConfirmOpen(false)}>
               {t('common.cancel')}
             </Button>
-            <Button variant="destructive" disabled={pending} onClick={() => void confirmUnfollow()}>
+            <Button
+              variant="destructive"
+              disabled={pending}
+              onClick={() => void confirmUnfollow()}
+            >
               {t('follow.private_unfollow_confirm')}
             </Button>
           </DialogFooter>
@@ -367,7 +449,10 @@ function formatJoinedAt(iso: string, locale: string): string {
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) return '—'
   const intl = locale === 'en' ? 'en-US' : 'fr-FR'
-  return new Intl.DateTimeFormat(intl, { month: 'long', year: 'numeric' }).format(date)
+  return new Intl.DateTimeFormat(intl, {
+    month: 'long',
+    year: 'numeric',
+  }).format(date)
 }
 
 function formatFullDate(iso: string, locale: string): string {

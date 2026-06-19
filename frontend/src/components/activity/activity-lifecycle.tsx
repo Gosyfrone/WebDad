@@ -1,0 +1,74 @@
+'use client'
+
+import { useEffect, useRef } from 'react'
+
+import { apiFetch, getAccessToken } from '@/lib/auth-client'
+
+const OFFLINE_ENDPOINT = '/api/activity/offline'
+const HEARTBEAT_MS = 25_000
+
+/**
+ * Synchronise la présence avec le cycle de vie de l'onglet :
+ * - montage / retour BFCache / retour premier plan : en ligne + heartbeat ;
+ * - arrière-plan, fermeture, refresh, navigation dure : hors ligne.
+ */
+export function ActivityLifecycle() {
+  const onlineInFlight = useRef(false)
+
+  useEffect(() => {
+    async function markOnline() {
+      if (onlineInFlight.current || !getAccessToken()) return
+      onlineInFlight.current = true
+      try {
+        await apiFetch('/profils/me/activity', { method: 'PATCH' })
+      } catch {
+        // Best-effort : le prochain chargement ou refresh d'activité rattrapera.
+      } finally {
+        onlineInFlight.current = false
+      }
+    }
+
+    function markOffline() {
+      const token = getAccessToken()
+      if (!token) return
+      void fetch(OFFLINE_ENDPOINT, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        keepalive: true,
+      }).catch(() => {})
+    }
+
+    void markOnline()
+    const heartbeat = window.setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        void markOnline()
+      }
+    }, HEARTBEAT_MS)
+
+    function handlePageShow() {
+      void markOnline()
+    }
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === 'visible') {
+        void markOnline()
+      } else {
+        markOffline()
+      }
+    }
+
+    window.addEventListener('pageshow', handlePageShow)
+    window.addEventListener('pagehide', markOffline)
+    window.addEventListener('freeze', markOffline)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => {
+      window.removeEventListener('pageshow', handlePageShow)
+      window.removeEventListener('pagehide', markOffline)
+      window.removeEventListener('freeze', markOffline)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.clearInterval(heartbeat)
+    }
+  }, [])
+
+  return null
+}

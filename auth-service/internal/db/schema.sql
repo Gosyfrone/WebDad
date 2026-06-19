@@ -42,6 +42,20 @@ ALTER TABLE credentials ADD COLUMN IF NOT EXISTS pending_email VARCHAR(255);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_credentials_pending_email
     ON credentials(pending_email) WHERE pending_email IS NOT NULL;
 
+-- MFA TOTP (optionnelle, opt-in). mfa_enabled a un DÉFAUT → rétro-compatible
+-- (aucun backfill requis, règle 5b) : en PostgreSQL, ADD COLUMN ... DEFAULT false
+-- pose la valeur sur TOUTES les lignes existantes au déploiement → tous les
+-- comptes déjà en prod démarrent avec la MFA DÉSACTIVÉE (aucun verrouillage
+-- possible). NB : surtout pas d'UPDATE inconditionnel ici, il réinitialiserait
+-- la MFA des comptes qui l'auront activée à chaque redémarrage.
+-- mfa_secret est NULLABLE et contient le
+-- secret TOTP CHIFFRÉ at-rest (AES-256-GCM, clé MFA_ENCRYPTION_KEY) :
+--   - setup non confirmé  → secret présent + mfa_enabled = false
+--   - MFA active          → secret présent + mfa_enabled = true
+--   - MFA désactivée      → secret NULL    + mfa_enabled = false
+ALTER TABLE credentials ADD COLUMN IF NOT EXISTS mfa_enabled BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE credentials ADD COLUMN IF NOT EXISTS mfa_secret TEXT;
+
 -- Refresh tokens (préparé pour la feature bonus).
 CREATE TABLE IF NOT EXISTS refresh_tokens (
     id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -58,7 +72,7 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
 CREATE TABLE IF NOT EXISTS account_tokens (
     id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id     UUID NOT NULL REFERENCES credentials(id) ON DELETE CASCADE,
-    purpose     VARCHAR(16) NOT NULL CHECK (purpose IN ('verify', 'reset', 'email_change')),
+    purpose     VARCHAR(16) NOT NULL CHECK (purpose IN ('verify', 'reset', 'email_change', 'mfa_challenge')),
     token_hash  TEXT NOT NULL UNIQUE,
     expires_at  TIMESTAMPTZ NOT NULL,
     used_at     TIMESTAMPTZ,                    -- NULL tant que non consommé
@@ -69,9 +83,9 @@ CREATE TABLE IF NOT EXISTS account_tokens (
 -- contrainte à deux valeurs. La remplacer au boot est idempotent.
 ALTER TABLE account_tokens DROP CONSTRAINT IF EXISTS account_tokens_purpose_check;
 ALTER TABLE account_tokens ADD CONSTRAINT account_tokens_purpose_check
-    CHECK (purpose IN ('verify', 'reset', 'email_change'));
+    CHECK (purpose IN ('verify', 'reset', 'email_change', 'mfa_challenge'));
 
--- ─── Connexion via fournisseurs OIDC (Login with Google / Microsoft) ──
+-- ─── Connexion via fournisseurs externes (Google / GitHub / Facebook / Spotify) ──
 -- ALTER idempotents : la base existante est migrée au boot sans script externe.
 DO $$
 BEGIN
@@ -79,6 +93,12 @@ BEGIN
         CREATE TYPE auth_provider AS ENUM ('local', 'google', 'microsoft');
     END IF;
 END$$;
+
+-- Nouveaux providers : ADD VALUE IF NOT EXISTS est idempotent et hors
+-- transaction (EnsureSchema applique le fichier en autocommit), donc sûr au boot.
+ALTER TYPE auth_provider ADD VALUE IF NOT EXISTS 'github';
+ALTER TYPE auth_provider ADD VALUE IF NOT EXISTS 'facebook';
+ALTER TYPE auth_provider ADD VALUE IF NOT EXISTS 'spotify';
 
 -- provider : origine du compte ('local' par défaut → comportement inchangé).
 ALTER TABLE credentials ADD COLUMN IF NOT EXISTS provider auth_provider NOT NULL DEFAULT 'local';
@@ -98,6 +118,26 @@ CREATE INDEX IF NOT EXISTS idx_refresh_tokens_token ON refresh_tokens(token);
 -- Lookup à la consommation (token_hash, déjà UNIQUE) + invalidation des tokens
 -- précédents d'un même usage pour un utilisateur.
 CREATE INDEX IF NOT EXISTS idx_account_tokens_user_purpose ON account_tokens(user_id, purpose);
+
+-- Inscription OAuth en attente : après validation de l'identité Google, aucun
+-- compte n'est créé tant que l'utilisateur n'a pas finalisé l'inscription côté
+-- front (username/date/CGU). Token opaque haché, usage unique, TTL court.
+CREATE TABLE IF NOT EXISTS oauth_signup_tokens (
+    id               UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    provider         auth_provider NOT NULL,
+    provider_subject TEXT NOT NULL,
+    email            VARCHAR(255) NOT NULL,
+    token_hash       TEXT NOT NULL UNIQUE,
+    expires_at       TIMESTAMPTZ NOT NULL,
+    used_at          TIMESTAMPTZ,
+    created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_oauth_signup_tokens_hash
+    ON oauth_signup_tokens(token_hash);
+CREATE INDEX IF NOT EXISTS idx_oauth_signup_tokens_provider_subject
+    ON oauth_signup_tokens(provider, provider_subject)
+    WHERE used_at IS NULL;
 
 -- Trigger updated_at automatique (CREATE OR REPLACE → idempotent, PG ≥ 14).
 CREATE OR REPLACE FUNCTION update_updated_at()

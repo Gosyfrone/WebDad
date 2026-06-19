@@ -8,8 +8,7 @@ import {
   saveMutedWords,
   subscribeMutedWords,
 } from '@/lib/content-filters'
-import { getMe } from '@/lib/api'
-import { currentUserId } from '@/lib/posts'
+import { currentUserId } from '@/lib/session'
 import { useT } from '@/components/language-provider'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -24,31 +23,11 @@ export function MutedWordsSettings() {
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
-    let cancelled = false
-    let unsubscribe = () => {}
-
-    async function loadUserScopedWords() {
-      let userId = currentUserId()
-      if (!userId) {
-        try {
-          userId = (await getMe()).id
-        } catch {
-          userId = ''
-        }
-      }
-
-      if (cancelled) return
-      setViewerUserId(userId)
-      setWords(readMutedWords(userId))
-      setReady(true)
-      unsubscribe = subscribeMutedWords(userId, setWords)
-    }
-
-    void loadUserScopedWords()
-    return () => {
-      cancelled = true
-      unsubscribe()
-    }
+    const userId = currentUserId()
+    setViewerUserId(userId)
+    setWords(readMutedWords(userId))
+    setReady(true)
+    return subscribeMutedWords(userId, setWords)
   }, [])
 
   const normalizedWords = useMemo(

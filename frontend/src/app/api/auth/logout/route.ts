@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 import { apiUrl } from '@/lib/config'
+import { markLogoutActivity } from '@/lib/provision'
 import { REFRESH_COOKIE, clearRefreshCookie } from '@/lib/server/auth-cookie'
 
 /**
@@ -10,6 +11,14 @@ import { REFRESH_COOKIE, clearRefreshCookie } from '@/lib/server/auth-cookie'
  */
 export async function POST(request: NextRequest) {
   const refreshToken = request.cookies.get(REFRESH_COOKIE)?.value
+  const authorization = request.headers.get('authorization')
+  const accessToken = authorization?.toLowerCase().startsWith('bearer ')
+    ? authorization.slice(7).trim()
+    : ''
+
+  if (accessToken) {
+    await markLogoutActivity(accessToken)
+  }
 
   if (refreshToken) {
     try {

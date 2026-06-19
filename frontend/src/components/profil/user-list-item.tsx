@@ -1,16 +1,19 @@
 'use client'
 
-import { cn } from '@/lib/utils'
+import { cn, initialOf } from '@/lib/utils'
 import type { RelationUser } from '@/types'
 import { useT } from '@/components/language-provider'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
+import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
 import { ProfilLink } from '@/components/profil/profil-link'
 
 interface UserListItemProps {
   user: RelationUser
   /** Vrai si l'utilisateur courant suit déjà cette personne. */
   isFollowing: boolean
+  /** Vrai si une demande de suivi est en attente (compte privé) → bouton « En attente ». */
+  isRequested?: boolean
   /** Vrai si cette ligne est l'utilisateur courant lui-même (pas de bouton). */
   isSelf?: boolean
   /** Désactive le bouton (action en cours). */
@@ -47,6 +50,7 @@ interface UserListItemProps {
 export function UserListItem({
   user,
   isFollowing,
+  isRequested = false,
   isSelf = false,
   pending = false,
   showBio = true,
@@ -58,7 +62,7 @@ export function UserListItem({
   onRemoveFollower,
 }: UserListItemProps) {
   const t = useT()
-  const initials = (user.displayName.charAt(0) || user.username.charAt(0) || '?').toUpperCase()
+  const initials = initialOf(user.displayName, user.username)
 
   return (
     <div
@@ -86,6 +90,7 @@ export function UserListItem({
         <Avatar className={cn(compact ? 'h-9 w-9' : 'h-10 w-10')}>
           {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user.displayName} />}
           <AvatarFallback>{initials}</AvatarFallback>
+          <ActivityPresenceDot userId={user.id} />
         </Avatar>
       </ProfilLink>
 
@@ -139,7 +144,7 @@ export function UserListItem({
         <Button
           size="sm"
           variant={isFollowing ? 'outline' : 'default'}
-          disabled={pending}
+          disabled={pending || isRequested}
           onClick={(e) => {
             // Empêche le clic du bouton de déclencher la navigation du lien étiré.
             e.preventDefault()
@@ -155,7 +160,9 @@ export function UserListItem({
               : 'bg-gradient-to-r from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] text-white',
           )}
         >
-          {isFollowing && !compact ? (
+          {isRequested ? (
+            t('follow.requested')
+          ) : isFollowing && !compact ? (
             <>
               <span className="group-hover/btn:hidden">{t('follow.followed')}</span>
               <span className="hidden group-hover/btn:inline">{t('follow.unfollow')}</span>

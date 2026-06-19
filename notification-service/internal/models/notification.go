@@ -9,7 +9,11 @@ import (
 
 // Types de notification (alignés sur l'enum du validateur Mongo).
 const (
-	TypeLike                       = "like"
+	TypeLike = "like"
+	// TypeCommentLike : like sur un commentaire / une réponse. Émis par
+	// post-service vers l'auteur du commentaire, agrégé par commentaire
+	// (`comment_like:<comment_id>`). Navigue vers le post + commentaire visé.
+	TypeCommentLike                = "comment_like"
 	TypeComment                    = "comment"
 	TypeReply                      = "reply"
 	TypeMention                    = "mention"
@@ -19,6 +23,11 @@ const (
 	TypeFollowRequest              = "follow_request"
 	TypeFollowRequestAccepted      = "follow_request_accepted"
 	TypeFollowRequestAcceptConfirm = "follow_request_accept_confirm"
+	// TypeMessage : nouveau message dans une conversation privée (DM / groupe).
+	// Émis par message-service avec `recipient_id` déjà résolu, agrégé
+	// globalement par destinataire (`message`) avec un compteur d'expéditeurs
+	// uniques via `actor_ids`.
+	TypeMessage = "message"
 	// TypeMessageMention : mention (@handle) DANS UN MESSAGE (DM / groupe /
 	// communauté). Émise par message-service avec les `recipient_id` déjà
 	// résolus (le serveur de messagerie connaît ses membres) ; agrégée par
@@ -45,8 +54,9 @@ const (
 // reconstruit à partir de `last_actor_id` + `count` ; les noms/avatars sont
 // résolus côté front (cache auteur), comme pour les posts.
 //
-// `count` est un `int32` (le validateur Mongo le déclare en `int`) maintenu par
-// `$inc`.
+// Pour les notifications classiques, `count` est un `int32` maintenu par `$inc`.
+// Pour `message`, il vaut le nombre d'expéditeurs uniques stockés dans
+// `actor_ids`, afin qu'une rafale d'une même personne ne crée qu'un seul groupe.
 type Notification struct {
 	ID          bson.ObjectID `bson:"_id,omitempty" json:"id"`
 	RecipientID string        `bson:"recipient_id" json:"recipient_id"`
@@ -57,6 +67,7 @@ type Notification struct {
 	// ConversationID : cible d'une mention en message (navigation vers la conv).
 	ConversationID string    `bson:"conversation_id,omitempty" json:"conversation_id,omitempty"`
 	LastActorID    string    `bson:"last_actor_id" json:"last_actor_id"`
+	ActorIDs       []string  `bson:"actor_ids,omitempty" json:"actor_ids,omitempty"`
 	Count          int32     `bson:"count" json:"count"`
 	IsRead         bool      `bson:"is_read" json:"is_read"`
 	CreatedAt      time.Time `bson:"created_at" json:"created_at"`
@@ -75,6 +86,8 @@ type Notification struct {
 //   - follow_request_accepted : `recipient_id` est le demandeur accepté ;
 //   - follow_request_accept_confirm : `recipient_id` est le propriétaire qui
 //     vient d'accepter la demande ;
+//   - message            : `recipient_id` + `conversation_id` sont fournis
+//     directement ; agrégation globale par expéditeur unique ;
 //   - message_mention    : `recipient_id` + `conversation_id` sont fournis
 //     directement (message-service connaît ses membres, et le contenu reste
 //     chiffré → la résolution du handle se fait côté client/messagerie) ;

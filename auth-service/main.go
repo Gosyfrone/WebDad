@@ -47,7 +47,16 @@ func main() {
 		slog.Warn("MAIL_INTERNAL_SECRET absent — envoi d'e-mails désactivé (no-op)")
 	}
 
-	auth := services.New(conn, cfg.JWTSecret, cfg.JWTExpiry, cfg.RefreshExpiry, mailer, cfg.AppBaseURL, cfg.MailLogoURL, cfg.AdminCreateAutoVerify)
+	auth, err := services.New(conn, cfg.JWTSecret, cfg.JWTExpiry, cfg.RefreshExpiry, mailer, cfg.AppBaseURL, cfg.MailLogoURL, cfg.AdminCreateAutoVerify, cfg.MFAEncryptionKey)
+	if err != nil {
+		slog.Error("init service auth", "error", err)
+		os.Exit(1)
+	}
+	if auth.MFAConfigured() {
+		slog.Info("MFA TOTP configurée")
+	} else {
+		slog.Warn("MFA_ENCRYPTION_KEY absente — double authentification désactivée")
+	}
 
 	if cfg.SeedAdmin {
 		if err := auth.EnsureDefaultAdmin(cfg.SeedAdminEmail, cfg.SeedAdminPassword); err != nil {
@@ -70,14 +79,27 @@ func main() {
 	})
 	go auth.RunAccountPurgeSweeper(sweepCtx, acctEraser, cfg.AccountPurgeAfter, cfg.AccountPurgeSweepInterval)
 
-	// Providers OAuth (Login with Google). Construction paresseuse :
-	// le discovery OIDC se fait au premier usage, pas au boot.
+	// Providers OAuth (Google, GitHub, Facebook, Spotify). Construction
+	// paresseuse : le discovery OIDC se fait au premier usage, pas au boot.
+	// Un provider sans ClientID est ignoré (endpoints → 404).
 	oauthReg := oauth.NewRegistry(context.Background(), oauth.Options{
 		RedirectBaseURL: cfg.OAuthRedirectBaseURL,
 		Providers: map[string]oauth.Credentials{
 			"google": {
 				ClientID:     cfg.GoogleClientID,
 				ClientSecret: cfg.GoogleClientSecret,
+			},
+			"github": {
+				ClientID:     cfg.GitHubClientID,
+				ClientSecret: cfg.GitHubClientSecret,
+			},
+			"facebook": {
+				ClientID:     cfg.FacebookClientID,
+				ClientSecret: cfg.FacebookClientSecret,
+			},
+			"spotify": {
+				ClientID:     cfg.SpotifyClientID,
+				ClientSecret: cfg.SpotifyClientSecret,
 			},
 		},
 	})

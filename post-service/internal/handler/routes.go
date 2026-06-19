@@ -14,11 +14,21 @@ import (
 // pour être atteignable par le front. jwtSecret protège les routes mutables
 // (validation locale du token émis par auth-service, secret partagé) ; la
 // lecture reste publique.
-func RegisterRoutes(r *gin.Engine, serviceName string, postService *service.PostService, jwtSecret string, hub *realtime.Hub, allowedOrigins []string) {
+func RegisterRoutes(r *gin.Engine, serviceName string, postService *service.PostService, jwtSecret string, hub *realtime.Hub, allowedOrigins []string, internalSecret string) {
 	auth := middleware.JWTAuth(jwtSecret)
 	optionalAuth := middleware.OptionalJWTAuth(jwtSecret)
 
 	r.GET("/health", Health(serviceName))
+
+	// Auto-modération serveur-à-serveur (report-service) : masque/démasque un
+	// post trop signalé. Hors `/posts` (donc hors gateway) et authentifié par
+	// secret partagé (X-Internal-Secret), pas de JWT.
+	internalH := NewInternalHandler(postService, internalSecret)
+	internal := r.Group("/internal/posts/:id")
+	{
+		internal.POST("/auto-hide", internalH.AutoHide)
+		internal.POST("/auto-unhide", internalH.AutoUnhide)
+	}
 	PostHandler := NewPostHandler(postService, serviceName)
 	LikeHandler := NewLikeHandler(postService, serviceName)
 	CommentHandler := NewCommentHandler(postService, serviceName)
@@ -53,6 +63,7 @@ func RegisterRoutes(r *gin.Engine, serviceName string, postService *service.Post
 		posts.GET("/stats", optionalAuth, PostHandler.PostStats)
 		// Réponses d'un auteur — route STATIQUE avant `/:id`.
 		posts.GET("/comments", optionalAuth, CommentHandler.ListCommentsByAuthor)
+		posts.GET("/comments/stats", CommentHandler.CommentStats)
 
 		// Modération — routes STATIQUES (`/posts/moderation/…`) placées avant le
 		// groupe `/:id`. Corbeille partagée mod/admin (tweets retirés en
@@ -111,10 +122,12 @@ func RegisterRoutes(r *gin.Engine, serviceName string, postService *service.Post
 
 			comment := post.Group("/comments")
 			{
-				comment.GET("", CommentHandler.ListPostComments)
+				comment.GET("", optionalAuth, CommentHandler.ListPostComments)
 				comment.POST("", auth, CommentHandler.CreatPostComment)
-				comment.GET("/:commentId/replies", CommentHandler.ListCommentReplies)
+				comment.GET("/:commentId/replies", optionalAuth, CommentHandler.ListCommentReplies)
 				comment.DELETE("/:commentId", auth, CommentHandler.DeletePostComment)
+				comment.POST("/:commentId/like", auth, CommentHandler.LikeComment)
+				comment.DELETE("/:commentId/like", auth, CommentHandler.UnlikeComment)
 			}
 		}
 	}

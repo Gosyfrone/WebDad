@@ -1,10 +1,13 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import {
-  BarChart2,
   Bookmark,
+  Clipboard,
+  Download,
+  Flag,
   Heart,
   Loader2,
   LockOpen,
@@ -35,7 +38,9 @@ import {
   type PostMedia,
   type PostPoll,
 } from '@/lib/posts'
+import { resolveMediaUrl } from '@/lib/media'
 import { quickBookmark, removeBookmarkEverywhere } from '@/lib/bookmarks'
+import { useLongPress } from '@/lib/use-long-press'
 import { BookmarkDialog } from '@/components/feed/bookmark-dialog'
 import { ToastAction } from '@/components/ui/toast'
 import { useToast } from '@/hooks/use-toast'
@@ -63,7 +68,11 @@ import { PostComposer } from '@/components/feed/post-composer'
 import { PostPhotoModal } from '@/components/feed/post-photo-modal'
 import { TranslatedContent } from '@/components/feed/translated-content'
 import { MentionText } from '@/components/mention/mention-text'
+import { ShareDialog } from '@/components/share/share-dialog'
+import { postHref } from '@/lib/routes'
+import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
 import { ProfilLink } from '@/components/profil/profil-link'
+import { ReportDialog } from '@/components/moderation/report-dialog'
 
 interface PostCardProps {
   post: FeedPost
@@ -88,13 +97,8 @@ interface PostCardProps {
   noNavigate?: boolean
 }
 
-/**
- * Carte d'un post : en-tête (auteur + horodatage + menu), contenu, barre
- * d'actions (commenter / liker / partager) et section commentaires repliable.
- *
- * Like et suppression sont câblés sur le post-service (optimistes + rollback).
- * Repost simple et citation sont câblés sur le post-service.
- */
+/** Carte de post : en-tête, contenu, barre d'actions (like, repost, signet, suppression
+ *  optimistes) et commentaires repliables. */
 export function PostCard({ post, showPinBadge = false, focusCommentId, embedded = false, onDeleted, onUpdated, defaultShowComments = false, onCommentClick, noNavigate = false }: PostCardProps) {
   const router = useRouter()
   const { toast } = useToast()
@@ -109,8 +113,14 @@ export function PostCard({ post, showPinBadge = false, focusCommentId, embedded 
   const [likeBurst, setLikeBurst] = useState(0)
   const [showComments, setShowComments] = useState(Boolean(focusCommentId) || defaultShowComments)
   const [deleting, setDeleting] = useState(false)
+  const [reportOpen, setReportOpen] = useState(false)
   // Index du média ouvert en vue photo plein écran (null = fermé).
   const [photoIndex, setPhotoIndex] = useState<number | null>(null)
+
+  // Signalement : ouvert à tout utilisateur connecté (le visiteur passe par la
+  // modale de connexion). On l'affiche aussi sur ses propres posts pour que
+  // l'action soit toujours visible ; la sécurité réelle vit côté back.
+  const canReport = !isVisitor && Boolean(currentUserId())
   const [poll, setPoll] = useState(post.poll)
   const pollClosed = poll ? isPollClosed(poll) : false
 
@@ -119,6 +129,7 @@ export function PostCard({ post, showPinBadge = false, focusCommentId, embedded 
   const [repostCount, setRepostCount] = useState(post.repostsCount)
   const [reposting, setReposting] = useState(false)
   const [repostMenuOpen, setRepostMenuOpen] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
   const [quoteOpen, setQuoteOpen] = useState(false)
 
   const [bookmarked, setBookmarked] = useState(post.bookmarked)
@@ -127,9 +138,8 @@ export function PostCard({ post, showPinBadge = false, focusCommentId, embedded 
   const displayPinBadge = isPinned && (showPinBadge || post.canPin)
   const showPrivateBadge =
     post.author.visibility === 'private' && post.author.id !== currentUserId()
-  // Détection de l'appui long (ouvre le sélecteur sans auto-classer).
-  const longPress = useRef(false)
-  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Appui long sur le signet → sélecteur de collection (sans auto-classer).
+  const bookmarkLongPress = useLongPress(() => setPickerOpen(true), { enabled: !isVisitor })
 
   useEffect(() => {
     setBookmarked(post.bookmarked)
@@ -159,9 +169,7 @@ export function PostCard({ post, showPinBadge = false, focusCommentId, embedded 
     setRepostCount(post.repostsCount)
   }, [post.reposted, post.repostedById, post.repostsCount])
 
-  // Compteurs rafraîchis dynamiquement (polling périodique côté fil/détail/profil) :
-  // on resynchronise l'affichage sur la prop. L'état « liked » par moi n'est PAS
-  // touché (le polling ne le modifie pas) — seul le nombre suit le serveur.
+  // Resync du compteur serveur (polling) sans toucher l'état local « liked ».
   useEffect(() => {
     setLikeCount(post.likesCount)
   }, [post.likesCount])
@@ -315,23 +323,6 @@ export function PostCard({ post, showPinBadge = false, focusCommentId, embedded 
     }
   }
 
-  function startLongPress() {
-    // Visiteur : pas de sélecteur de collection (signets réservés aux membres).
-    if (isVisitor) return
-    longPress.current = false
-    longPressTimer.current = setTimeout(() => {
-      longPress.current = true
-      setPickerOpen(true)
-    }, 500)
-  }
-
-  function cancelLongPress() {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current)
-      longPressTimer.current = null
-    }
-  }
-
   function handleCardClick(e: React.MouseEvent) {
     const target = e.target as HTMLElement
     if (target.closest('button, a, [role="button"], [data-no-nav]')) return
@@ -340,10 +331,7 @@ export function PostCard({ post, showPinBadge = false, focusCommentId, embedded 
 
   function handleBookmarkClick() {
     // Un appui long a déjà ouvert le sélecteur → on n'enchaîne pas le clic court.
-    if (longPress.current) {
-      longPress.current = false
-      return
-    }
+    if (bookmarkLongPress.consume()) return
     // Visiteur : invite à se connecter (signets réservés aux membres).
     if (isVisitor) {
       promptLogin()
@@ -368,8 +356,13 @@ export function PostCard({ post, showPinBadge = false, focusCommentId, embedded 
         <Avatar className="h-10 w-10">
           {post.author.avatarUrl && <AvatarImage src={post.author.avatarUrl} alt="" />}
           <AvatarFallback className="bg-gradient-to-br from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] font-bold text-white">
-            {initialOf(post.author.displayName)}
+            {initialOf(post.author.displayName, post.author.username)}
           </AvatarFallback>
+          <ActivityPresenceDot
+            userId={post.author.id}
+            initialLastLoginAt={post.author.lastLoginAt}
+            initialIsOnline={post.author.isOnline}
+          />
         </Avatar>
       </ProfilLink>
 
@@ -398,7 +391,7 @@ export function PostCard({ post, showPinBadge = false, focusCommentId, embedded 
             <span className="shrink-0 text-muted-foreground">{timeAgo(post.createdAt, locale)}</span>
           </div>
 
-          {post.canDelete && (
+          {(post.canDelete || canReport) && (
             <DropdownMenu>
               <DropdownMenuTrigger
                 aria-label={t('post.more_options')}
@@ -422,15 +415,49 @@ export function PostCard({ post, showPinBadge = false, focusCommentId, embedded 
                     {isPinned ? 'Désépingler du profil' : 'Épingler sur le profil'}
                   </DropdownMenuItem>
                 )}
-                <DropdownMenuItem
-                  onClick={handleDelete}
-                  className="cursor-pointer text-red-500 focus:text-red-500"
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  {t('post.delete')}
-                </DropdownMenuItem>
+                {canReport && (
+                  <DropdownMenuItem
+                    onClick={(e) => {
+                      // Empêche le clic de remonter à la carte (qui navigue vers
+                      // le détail du post) : on ouvre juste la modale, on reste au feed.
+                      e.stopPropagation()
+                      setReportOpen(true)
+                    }}
+                    className="cursor-pointer"
+                  >
+                    <Flag className="mr-2 h-4 w-4" />
+                    {t('report.action')}
+                  </DropdownMenuItem>
+                )}
+                {post.canDelete && (
+                  <DropdownMenuItem
+                    onClick={handleDelete}
+                    className="cursor-pointer text-red-500 focus:text-red-500"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    {t('post.delete')}
+                  </DropdownMenuItem>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
+          )}
+
+          {canReport && (
+            // Le contenu de la modale est porté (portal) mais reste enfant de la
+            // carte dans l'arbre React → ses clics y remontent. On les arrête ici
+            // pour ne jamais déclencher la navigation vers le détail du post.
+            // `display:contents` (classe `contents`) → ce span ne génère AUCUNE
+            // boîte : il ne compte pas comme un item flex (sinon il décale le « … »).
+            <span className="contents" onClick={(e) => e.stopPropagation()}>
+              <ReportDialog
+                open={reportOpen}
+                onOpenChange={setReportOpen}
+                entityType="post"
+                entityId={post.id}
+                entityOwnerId={post.author.id}
+                targetLabel={post.author.username ? `@${post.author.username}` : undefined}
+              />
+            </span>
           )}
         </div>
 
@@ -547,18 +574,12 @@ export function PostCard({ post, showPinBadge = false, focusCommentId, embedded 
             className="hover:text-red-500 hover:bg-red-500/10"
             activeClassName="text-red-500 fill-red-500"
           />
-          <ActionButton
-            icon={BarChart2}
-            count={0}
-            label={t('post.views')}
-            className="hover:text-primary hover:bg-primary/10"
-          />
           <button
             aria-label={bookmarked ? t('bookmarks.remove_aria') : t('bookmarks.add_aria')}
             onClick={handleBookmarkClick}
-            onPointerDown={startLongPress}
-            onPointerUp={cancelLongPress}
-            onPointerLeave={cancelLongPress}
+            onPointerDown={bookmarkLongPress.start}
+            onPointerUp={bookmarkLongPress.cancel}
+            onPointerLeave={bookmarkLongPress.cancel}
             onContextMenu={(e) => e.preventDefault()}
             className={cn(
               'rounded-full p-1.5 transition-colors hover:bg-primary/10 hover:text-primary',
@@ -573,11 +594,20 @@ export function PostCard({ post, showPinBadge = false, focusCommentId, embedded 
           </button>
           <button
             aria-label={t('post.share')}
+            onClick={() => setShareOpen(true)}
             className="rounded-full p-1.5 transition-colors hover:bg-primary/10 hover:text-primary"
           >
             <Share className="h-4 w-4" />
           </button>
         </div>
+
+        <ShareDialog
+          open={shareOpen}
+          onOpenChange={setShareOpen}
+          url={postHref(post.id)}
+          kind="post"
+          title={t('post.share')}
+        />
 
         {/* Commentaires (repliable) */}
         {showComments && (
@@ -652,66 +682,234 @@ function MediaGallery({
   onOpen?: (index: number) => void
   compact?: boolean
 }) {
+  const { t } = useLanguage()
+  const { toast } = useToast()
+  const [menu, setMenu] = useState<{ url: string; x: number; y: number } | null>(null)
+  // Sur tactile (iOS/Android), on laisse le menu natif du navigateur gérer
+  // l'appui long sur l'image ; le menu custom Breezy n'apparaît qu'au clic droit
+  // souris (desktop). On mémorise le dernier type de pointeur pour distinguer.
+  const lastPointerType = useRef<string>('mouse')
+
+  useEffect(() => {
+    if (!menu) return
+    function close() {
+      setMenu(null)
+    }
+    window.addEventListener('pointerdown', close)
+    window.addEventListener('scroll', close, true)
+    window.addEventListener('resize', close)
+    return () => {
+      window.removeEventListener('pointerdown', close)
+      window.removeEventListener('scroll', close, true)
+      window.removeEventListener('resize', close)
+    }
+  }, [menu])
+
+  function handleImageContextMenu(e: React.MouseEvent, url: string) {
+    // Tactile → menu natif du navigateur (« Enregistrer l'image »…). Le menu
+    // Breezy (copier/enregistrer) reste au clic droit souris uniquement.
+    if (lastPointerType.current !== 'mouse') return
+    e.preventDefault()
+    setMenu({ url, x: e.clientX, y: e.clientY })
+  }
+
+  async function copyImage(url: string) {
+    try {
+      await copyImageToClipboard(url)
+      toast({ title: t('media.copy_success') })
+    } catch {
+      toast({ title: t('media.copy_failed'), variant: 'destructive' })
+    } finally {
+      setMenu(null)
+    }
+  }
+
+  async function saveImage(url: string) {
+    try {
+      await downloadImage(url)
+      toast({ title: t('media.save_started') })
+    } catch {
+      toast({ title: t('media.save_failed'), variant: 'destructive' })
+    } finally {
+      setMenu(null)
+    }
+  }
+
   return (
-    <div
-      className={cn(
-        'mt-2 grid gap-1.5 overflow-hidden border border-border',
-        compact ? 'rounded-xl' : 'rounded-2xl',
-        media.length === 1 ? 'grid-cols-1' : 'grid-cols-2',
-      )}
-    >
-      {media.map((m, i) => {
-        const sizing = cn(
-          media.length === 1 ? (compact ? 'max-h-64' : 'max-h-[32rem]') : 'aspect-square',
-          media.length === 3 && i === 0 && 'row-span-2 aspect-auto',
-        )
-        // Cellule vidéo : un ratio défini est nécessaire (le `<video>` interne
-        // est en `h-full`). 1 média = 16:9 ; sinon carré (grille).
-        const videoCell = cn(
-          media.length === 1 ? 'aspect-video' : 'aspect-square',
-          media.length === 3 && i === 0 && 'row-span-2 aspect-auto',
-        )
-        // Vidéo : lecture auto en muet + boucle + vitesse (cf. FeedVideo), pas
-        // d'ouverture en vue photo. L'image s'ouvre en grand au clic.
-        if (m.type === 'video') {
-          return <FeedVideo key={m.url} src={m.url} className={videoCell} />
-        }
+    <>
+      <div
+        className={cn(
+          'mt-2 grid gap-1.5 overflow-hidden border border-border',
+          compact ? 'rounded-xl' : 'rounded-2xl',
+          media.length === 1 ? 'grid-cols-1' : 'grid-cols-2',
+        )}
+      >
+        {media.map((m, i) => {
+          const sizing = cn(
+            media.length === 1 ? (compact ? 'max-h-64' : 'max-h-[32rem]') : 'aspect-square',
+            media.length === 3 && i === 0 && 'row-span-2 aspect-auto',
+          )
+          // Cellule vidéo : un ratio défini est nécessaire (le `<video>` interne
+          // est en `h-full`). 1 média = 16:9 ; sinon carré (grille).
+          const videoCell = cn(
+            media.length === 1 ? 'aspect-video' : 'aspect-square',
+            media.length === 3 && i === 0 && 'row-span-2 aspect-auto',
+          )
+          // Vidéo : lecture auto en muet + boucle + vitesse (cf. FeedVideo), pas
+          // d'ouverture en vue photo. L'image s'ouvre en grand au clic.
+          if (m.type === 'video') {
+            return <FeedVideo key={m.url} src={m.url} className={videoCell} />
+          }
 
-        const image = (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={m.url}
-            alt=""
-            loading="lazy"
-            className={cn('h-full w-full object-cover transition group-hover:brightness-95', sizing)}
-          />
-        )
+          const image = (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={m.url}
+              alt=""
+              loading="lazy"
+              className={cn('h-full w-full object-cover transition group-hover:brightness-95', sizing)}
+            />
+          )
 
-        if (!onOpen) {
+          if (!onOpen) {
+            return (
+              <div
+                key={m.url}
+                data-no-nav
+                onPointerDown={(e) => (lastPointerType.current = e.pointerType)}
+                onContextMenu={(e) => handleImageContextMenu(e, m.url)}
+                className={cn('group relative block overflow-hidden', media.length === 3 && i === 0 && 'row-span-2')}
+              >
+                {image}
+              </div>
+            )
+          }
+
           return (
-            <div
+            <button
               key={m.url}
+              type="button"
+              data-no-nav
+              onClick={() => onOpen?.(i)}
+              onPointerDown={(e) => (lastPointerType.current = e.pointerType)}
+              onContextMenu={(e) => handleImageContextMenu(e, m.url)}
               className={cn('group relative block overflow-hidden', media.length === 3 && i === 0 && 'row-span-2')}
+              aria-label={t('media.open_image')}
             >
               {image}
-            </div>
+            </button>
           )
-        }
-
-        return (
-          <button
-            key={m.url}
-            type="button"
-            onClick={() => onOpen?.(i)}
-            className={cn('group relative block overflow-hidden', media.length === 3 && i === 0 && 'row-span-2')}
-            aria-label="Agrandir l'image"
-          >
-            {image}
-          </button>
-        )
-      })}
-    </div>
+        })}
+      </div>
+      {menu && (
+        <ImageActionMenu
+          x={menu.x}
+          y={menu.y}
+          onCopy={() => void copyImage(menu.url)}
+          onSave={() => void saveImage(menu.url)}
+          copyLabel={t('media.copy_image')}
+          saveLabel={t('media.save_image')}
+        />
+      )}
+    </>
   )
+}
+
+function ImageActionMenu({
+  x,
+  y,
+  onCopy,
+  onSave,
+  copyLabel,
+  saveLabel,
+}: {
+  x: number
+  y: number
+  onCopy: () => void
+  onSave: () => void
+  copyLabel: string
+  saveLabel: string
+}) {
+  if (typeof document === 'undefined') return null
+
+  const left = Math.min(Math.max(12, x - 88), window.innerWidth - 188)
+  const top = Math.min(Math.max(12, y + 14), window.innerHeight - 112)
+
+  return createPortal(
+    <div
+      data-no-nav
+      onPointerDown={(e) => e.stopPropagation()}
+      className="fixed z-[70] w-44 overflow-hidden rounded-xl border bg-popover p-1 text-popover-foreground shadow-2xl"
+      style={{ left, top }}
+      role="menu"
+    >
+      <button
+        type="button"
+        onClick={onCopy}
+        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors hover:bg-accent focus:bg-accent focus:outline-none"
+        role="menuitem"
+      >
+        <Clipboard className="h-4 w-4" />
+        {copyLabel}
+      </button>
+      <button
+        type="button"
+        onClick={onSave}
+        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors hover:bg-accent focus:bg-accent focus:outline-none"
+        role="menuitem"
+      >
+        <Download className="h-4 w-4" />
+        {saveLabel}
+      </button>
+    </div>,
+    document.body,
+  )
+}
+
+async function fetchImageBlob(url: string): Promise<Blob> {
+  const res = await fetch(url)
+  if (!res.ok) throw new Error('image_fetch_failed')
+  const blob = await res.blob()
+  if (!blob.type.startsWith('image/')) throw new Error('not_an_image')
+  return blob
+}
+
+async function copyImageToClipboard(url: string): Promise<void> {
+  if (!navigator.clipboard || typeof ClipboardItem === 'undefined') {
+    throw new Error('clipboard_unavailable')
+  }
+  const blob = await fetchImageBlob(url)
+  await navigator.clipboard.write([
+    new ClipboardItem({
+      [blob.type || 'image/png']: blob,
+    }),
+  ])
+}
+
+// Menu custom Breezy = desktop uniquement (clic droit) ; `<a download>` y est
+// fiable. Sur tactile, c'est le menu natif du navigateur qui gère l'image.
+async function downloadImage(url: string): Promise<void> {
+  const blob = await fetchImageBlob(url)
+  const objectUrl = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = objectUrl
+  a.download = imageFileName(url, blob.type)
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  setTimeout(() => URL.revokeObjectURL(objectUrl), 1000)
+}
+
+function imageFileName(url: string, mimeType: string): string {
+  const extFromMime = mimeType.split('/')[1]?.split(';')[0]
+  try {
+    const parsed = new URL(url, window.location.href)
+    const last = parsed.pathname.split('/').filter(Boolean).pop()
+    if (last && /\.[a-z0-9]+$/i.test(last)) return last
+  } catch {
+    // Fallback below.
+  }
+  return `breezy-image.${extFromMime || 'png'}`
 }
 
 function QuotedPost({ post }: { post: FeedPost }) {
@@ -826,6 +1024,11 @@ function PostPollCard({
           const percent = total > 0 ? Math.round((choice.votesCount / total) * 100) : 0
           const selected = poll.votedChoiceId === choice.id
           const winner = poll.winnerChoiceIds.includes(choice.id)
+          // Compte exact par choix visible seulement après avoir voté ou une fois le sondage terminé.
+          const showCounts = showResults && (Boolean(poll.votedChoiceId) || closed)
+          const resultText = showCounts
+            ? `${percent}% · ${t('post.poll_votes', { count: choice.votesCount })}`
+            : `${percent}%`
           return (
             <button
               key={choice.id}
@@ -849,15 +1052,24 @@ function PostPollCard({
                   style={{ width: `${percent}%` }}
                 />
               )}
-              <span className="relative z-10 min-w-0 truncate font-medium">{choice.label}</span>
+              <span className="relative z-10 flex min-w-0 items-center gap-2">
+                {choice.imageUrl && (
+                  <img
+                    src={resolveMediaUrl(choice.imageUrl)}
+                    alt=""
+                    className="h-8 w-8 shrink-0 rounded object-cover"
+                  />
+                )}
+                <span className="min-w-0 truncate font-medium">{choice.label}</span>
+              </span>
               <span className="relative z-10 ml-3 flex shrink-0 items-center gap-2 font-semibold">
                 {winner && <span className="text-xs text-primary">{t('post.poll_winner')}</span>}
                 {voting === choice.id ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : selected ? (
-                  t('post.poll_voted')
+                  showResults ? `${t('post.poll_voted')} · ${resultText}` : t('post.poll_voted')
                 ) : showResults ? (
-                  `${percent}%`
+                  resultText
                 ) : (
                   t('post.poll_vote')
                 )}

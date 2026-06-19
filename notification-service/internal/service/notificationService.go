@@ -81,7 +81,7 @@ func (s *NotificationService) HandleEvent(ctx context.Context, ev models.Event) 
 		}
 		return s.applyToGroup(ctx, ev.RecipientID, gk, ev)
 
-	case models.TypeLike, models.TypeComment, models.TypeReply, models.TypeRepost, models.TypeQuote, models.TypeFollow, models.TypeFollowRequest, models.TypeFollowRequestAcceptConfirm, models.TypePostPurgeWarning:
+	case models.TypeLike, models.TypeCommentLike, models.TypeComment, models.TypeReply, models.TypeRepost, models.TypeQuote, models.TypeFollow, models.TypeFollowRequest, models.TypeFollowRequestAcceptConfirm, models.TypePostPurgeWarning:
 		recipient := ev.RecipientID
 		if recipient == "" || recipient == ev.ActorID {
 			return nil // pas de notification à soi-même
@@ -91,6 +91,19 @@ func (s *NotificationService) HandleEvent(ctx context.Context, ev models.Event) 
 			return nil
 		}
 		return s.applyToGroup(ctx, recipient, gk, ev)
+
+	case models.TypeMessage:
+		// Nouveau message privé : agrégation globale par destinataire et par
+		// expéditeur unique, pour éviter une notification par message.
+		recipient := ev.RecipientID
+		if recipient == "" || recipient == ev.ActorID {
+			return nil
+		}
+		gk, ok := groupKeyFor(ev)
+		if !ok {
+			return nil
+		}
+		return s.applyUniqueActorToGroup(ctx, recipient, gk, ev)
 
 	case models.TypeMessageMention:
 		// `recipient_id` est déjà résolu par message-service (membre mentionné) ;
@@ -163,6 +176,29 @@ func (s *NotificationService) applyToGroup(ctx context.Context, recipient, group
 	}
 
 	saved, err := s.repo.Upsert(ctx, &models.Notification{
+		RecipientID:    recipient,
+		GroupKey:       groupKey,
+		Type:           ev.Type,
+		PostID:         ev.PostID,
+		CommentID:      ev.CommentID,
+		ConversationID: ev.ConversationID,
+		LastActorID:    ev.ActorID,
+	})
+	if err != nil {
+		return err
+	}
+	s.pushNotification(saved)
+	return nil
+}
+
+// applyUniqueActorToGroup agrège un événement sans incrémenter plusieurs fois le
+// même acteur. Les retracts ne sont pas supportés pour `message` : supprimer un
+// message ne doit pas retirer l'avertissement de conversation reçue.
+func (s *NotificationService) applyUniqueActorToGroup(ctx context.Context, recipient, groupKey string, ev models.Event) error {
+	if ev.Retract {
+		return nil
+	}
+	saved, err := s.repo.UpsertUniqueActor(ctx, &models.Notification{
 		RecipientID:    recipient,
 		GroupKey:       groupKey,
 		Type:           ev.Type,
@@ -255,6 +291,12 @@ func groupKeyFor(ev models.Event) (string, bool) {
 			return "", false
 		}
 		return "like:" + ev.PostID, true
+	case models.TypeCommentLike:
+		// Tous les likes d'un même commentaire s'agrègent.
+		if ev.CommentID == "" {
+			return "", false
+		}
+		return "comment_like:" + ev.CommentID, true
 	case models.TypeComment:
 		if ev.PostID == "" {
 			return "", false
@@ -291,6 +333,13 @@ func groupKeyFor(ev models.Event) (string, bool) {
 			return "", false
 		}
 		return "mention:" + src, true
+	case models.TypeMessage:
+		// Tous les nouveaux messages privés reçus se groupent dans une seule
+		// notification par destinataire ; count = expéditeurs uniques.
+		if ev.ConversationID == "" {
+			return "", false
+		}
+		return "message", true
 	case models.TypeMessageMention:
 		// Une mention en message s'agrège PAR CONVERSATION : plusieurs mentions
 		// dans la même conv = une notification (count) → pas de spam de chat.

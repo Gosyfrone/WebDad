@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { Loader2, Search } from 'lucide-react'
+import { Loader2, MoreHorizontal, Search } from 'lucide-react'
 
 import {
   hardDeleteUser,
@@ -10,9 +10,10 @@ import {
   updateUserRole,
   type AdminUser,
 } from '@/lib/admin'
-import { useSession } from '@/lib/session'
-import { timeAgo } from '@/lib/utils'
+import { useCurrentUser } from '@/components/current-user-provider'
+import { cn, initialOf, timeAgo } from '@/lib/utils'
 import { ProfilLink } from '@/components/profil/profil-link'
+import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
 import { useLanguage } from '@/components/language-provider'
 import { useToast } from '@/hooks/use-toast'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -31,6 +32,10 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import type { UserRole } from '@/types'
@@ -58,11 +63,14 @@ interface AccountsPanelProps {
 // sur les défauts serveur (ACCOUNT_PURGE_AFTER − PURGE_WARN_BEFORE).
 const ACCOUNT_PURGE_WARN_MS = (5 * 365 - 30) * 24 * 60 * 60 * 1000
 
+type AccountFilter = 'all' | 'banned' | 'moderators' | 'admins'
+
 export function AccountsPanel({ canGovern }: AccountsPanelProps) {
   const { t, locale } = useLanguage()
   const { toast } = useToast()
-  const session = useSession()
+  const { session } = useCurrentUser()
   const [query, setQuery] = useState('')
+  const [filter, setFilter] = useState<AccountFilter>('all')
   const [users, setUsers] = useState<AdminUser[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
@@ -140,9 +148,31 @@ export function AccountsPanel({ canGovern }: AccountsPanelProps) {
     }
   }
 
+  // Filtre par statut (cumulé à la recherche serveur, appliqué côté client sur
+  // la page chargée) : tous / bannis / modérateurs / administrateurs.
+  const visibleUsers = users.filter((u) => {
+    switch (filter) {
+      case 'banned':
+        return !u.isActive
+      case 'moderators':
+        return u.role === 'moderator'
+      case 'admins':
+        return u.role === 'administrator'
+      default:
+        return true
+    }
+  })
+
+  const filters: { key: AccountFilter; label: string }[] = [
+    { key: 'all', label: t('accounts.filter_all') },
+    { key: 'banned', label: t('accounts.filter_banned') },
+    { key: 'moderators', label: t('accounts.filter_moderators') },
+    { key: 'admins', label: t('accounts.filter_admins') },
+  ]
+
   return (
     <div className="px-4 py-4">
-      <div className="relative mb-4">
+      <div className="relative mb-3">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
         <Input
           value={query}
@@ -153,25 +183,47 @@ export function AccountsPanel({ canGovern }: AccountsPanelProps) {
         />
       </div>
 
+      {/* Filtres de statut */}
+      <div className="mb-4 flex flex-wrap gap-2">
+        {filters.map((f) => (
+          <button
+            key={f.key}
+            type="button"
+            onClick={() => setFilter(f.key)}
+            className={cn(
+              'rounded-full border px-3 py-1 text-xs font-semibold transition-colors',
+              filter === f.key
+                ? 'border-[#5B6CFF] bg-[#5B6CFF]/10 text-[#5B6CFF]'
+                : 'border-border text-muted-foreground hover:text-foreground',
+            )}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+
       {loading ? (
         <div className="flex items-center justify-center py-16 text-muted-foreground">
           <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
         </div>
       ) : error ? (
         <p className="py-16 text-center text-sm text-muted-foreground">{t('admin.error')}</p>
-      ) : users.length === 0 ? (
+      ) : visibleUsers.length === 0 ? (
         <p className="py-16 text-center text-sm text-muted-foreground">{t('admin.empty')}</p>
       ) : (
         <ul className="flex flex-col gap-2">
-          {users.map((user) => {
+          {visibleUsers.map((user) => {
             const isSelf = user.id === session?.userId
             const busy = busyId === user.id
             // Un modérateur ne peut bannir qu'un utilisateur simple (le back le
             // refuse aussi). Un admin agit sur tout le monde sauf lui-même.
             const banAllowed = !isSelf && (canGovern || user.role === 'user')
-            const initial = (user.displayName || user.username || user.email || 'U')
-              .charAt(0)
-              .toUpperCase()
+            // Gouvernance (rôle + effacement) = admin, sauf sur soi-même.
+            const canChangeRole = canGovern && !isSelf
+            const canErase = canGovern && !isSelf
+            // Au moins une action disponible → on affiche la bulle « … ».
+            const hasActions = canChangeRole || banAllowed || canErase
+            const initial = initialOf(user.displayName, user.username || user.email)
             return (
               <li
                 key={user.id}
@@ -181,6 +233,7 @@ export function AccountsPanel({ canGovern }: AccountsPanelProps) {
                   <Avatar className="h-10 w-10">
                     {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user.displayName} />}
                     <AvatarFallback>{initial}</AvatarFallback>
+                    <ActivityPresenceDot userId={user.id} />
                   </Avatar>
                 </ProfilLink>
 
@@ -209,69 +262,78 @@ export function AccountsPanel({ canGovern }: AccountsPanelProps) {
                   )}
                 </div>
 
+                {/* Rôle élevé en badge (utilisateur simple → juste le statut). */}
+                {user.role !== 'user' && (
+                  <Badge variant="outline" className="shrink-0 text-[10px]">
+                    {t(`role.${user.role}`)}
+                  </Badge>
+                )}
+
                 {/* État du compte */}
                 <Badge variant={user.isActive ? 'secondary' : 'destructive'} className="shrink-0">
                   {user.isActive ? t('admin.status_active') : t('admin.status_banned')}
                 </Badge>
 
-                {/* Changement de rôle — gouvernance (admin uniquement) */}
-                {canGovern && (
+                {/* Toutes les actions repliées dans une bulle « … » → ligne compacte
+                    sur mobile comme desktop (plus de débordement à droite). */}
+                {hasActions && (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={isSelf || busy}
-                        className="shrink-0"
+                        variant="ghost"
+                        size="icon"
+                        disabled={busy}
+                        className="h-8 w-8 shrink-0"
+                        aria-label={t('accounts.actions')}
                       >
-                        {t(`role.${user.role}`)}
+                        {busy ? (
+                          <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                        ) : (
+                          <MoreHorizontal className="h-4 w-4" aria-hidden />
+                        )}
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="panel border">
-                      {ROLES.map((role) => (
-                        <DropdownMenuItem
-                          key={role}
-                          disabled={role === user.role}
-                          onSelect={() => void onChangeRole(user, role)}
-                        >
-                          {t(`role.${role}`)}
+                      {/* Changement de rôle — gouvernance (admin) */}
+                      {canChangeRole && (
+                        <DropdownMenuSub>
+                          <DropdownMenuSubTrigger>{t('admin.change_role')}</DropdownMenuSubTrigger>
+                          <DropdownMenuSubContent className="panel border">
+                            {ROLES.map((role) => (
+                              <DropdownMenuItem
+                                key={role}
+                                disabled={role === user.role}
+                                onSelect={() => void onChangeRole(user, role)}
+                              >
+                                {t(`role.${role}`)}
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuSubContent>
+                        </DropdownMenuSub>
+                      )}
+
+                      {/* Bannir / réactiver — modération (mod + admin, cibles bornées) */}
+                      {banAllowed && (
+                        <DropdownMenuItem onSelect={() => void onToggleBan(user)}>
+                          {user.isActive ? t('admin.action_ban') : t('admin.action_unban')}
                         </DropdownMenuItem>
-                      ))}
+                      )}
+
+                      {/* Suppression définitive du compte (RGPD) — gouvernance admin,
+                          effacement cross-service avec confirmation par re-saisie. */}
+                      {canErase && (
+                        <>
+                          {(canChangeRole || banAllowed) && <DropdownMenuSeparator />}
+                          <DropdownMenuItem
+                            onSelect={() => openErase(user)}
+                            className="text-destructive focus:text-destructive"
+                          >
+                            {t('moderation.account_delete')}
+                          </DropdownMenuItem>
+                        </>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
-                )}
-
-                {/* Bannir / réactiver — modération (mod + admin, cibles bornées) */}
-                <Button
-                  variant={user.isActive ? 'destructive' : 'outline'}
-                  size="sm"
-                  disabled={!banAllowed || busy}
-                  onClick={() => void onToggleBan(user)}
-                  className="shrink-0"
-                  title={!banAllowed && !isSelf ? t('moderation.ban_restricted') : undefined}
-                >
-                  {busy ? (
-                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-                  ) : user.isActive ? (
-                    t('admin.action_ban')
-                  ) : (
-                    t('admin.action_unban')
-                  )}
-                </Button>
-
-                {/* Suppression définitive du compte (RGPD) — gouvernance admin,
-                    effacement cross-service avec confirmation par re-saisie. */}
-                {canGovern && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    disabled={isSelf || busy}
-                    onClick={() => openErase(user)}
-                    className="shrink-0 text-destructive hover:text-destructive"
-                    title={t('moderation.account_delete')}
-                  >
-                    {t('moderation.account_delete')}
-                  </Button>
                 )}
               </li>
             )

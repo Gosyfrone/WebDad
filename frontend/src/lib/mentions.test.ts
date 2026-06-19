@@ -34,6 +34,21 @@ describe('parseMentionSegments', () => {
     const segs = parseMentionSegments('hey @ab')
     expect(segs.every((s) => s.type === 'text')).toBe(true)
   })
+
+  it('capture un point interne au handle', () => {
+    const segs = parseMentionSegments('coucou @jean.dupont !')
+    expect(segs).toContainEqual({
+      type: 'mention',
+      handle: 'jean.dupont',
+      raw: '@jean.dupont',
+    })
+  })
+
+  it('exclut un point final de ponctuation', () => {
+    const segs = parseMentionSegments('salut @bob.')
+    expect(segs).toContainEqual({ type: 'mention', handle: 'bob', raw: '@bob' })
+    expect(segs).toContainEqual({ type: 'text', text: '.' })
+  })
 })
 
 describe('extractMentionHandles', () => {

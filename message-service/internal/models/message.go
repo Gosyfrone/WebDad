@@ -136,6 +136,10 @@ type Message struct {
 	// contenu chiffré a été effacé (ciphertext/nonce vidés) ; le client affiche
 	// « Message supprimé ». Métadonnée d'horodatage.
 	DeletedAt *time.Time `bson:"deleted_at,omitempty" json:"deleted_at,omitempty"`
+	// DeletedByModeration : true si la suppression a été faite par la modération
+	// de plateforme (et non par l'auteur ou un owner/admin de groupe) → le client
+	// affiche « supprimé par la modération » au lieu du libellé générique.
+	DeletedByModeration bool `bson:"deleted_by_moderation,omitempty" json:"deleted_by_moderation,omitempty"`
 }
 
 // ConversationView — vue renvoyée au client : la conversation + l'enveloppe de

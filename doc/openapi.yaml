@@ -126,7 +126,9 @@ paths:
           $ref: '#/definitions/models.LoginRequest'
       responses:
         '200':
-          description: 'Connexion réussie — data: {token, refresh_token, user}'
+          description: 'Connexion réussie — data: {token, refresh_token, user} ; si
+            MFA active : data: {mfa_required: true, challenge} (aucun token, appeler
+            /auth/mfa/verify)'
           schema:
             $ref: '#/definitions/models.AuthUser'
         '400':
@@ -187,6 +189,252 @@ paths:
             type: object
             additionalProperties:
               type: string
+  /auth/mfa/disable:
+    post:
+      security:
+      - BearerAuth: []
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      tags:
+      - auth
+      summary: Désactiver la MFA
+      parameters:
+      - description: Code TOTP courant OU mot de passe du compte
+        name: body
+        in: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.MFADisableRequest'
+      responses:
+        '200':
+          description: 'data: {enabled: false}'
+          schema:
+            type: object
+            additionalProperties:
+              type: boolean
+        '400':
+          description: 'Preuve invalide (code: invalid_mfa_code) ou MFA non active
+            (code: mfa_not_enabled)'
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '401':
+          description: Non authentifié
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '503':
+          description: MFA non configurée
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /auth/mfa/enable:
+    post:
+      security:
+      - BearerAuth: []
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      tags:
+      - auth
+      summary: Activer la MFA (confirmation du code)
+      parameters:
+      - description: Code TOTP affiché par l'app
+        name: body
+        in: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.MFAEnableRequest'
+      responses:
+        '200':
+          description: 'data: {enabled: true}'
+          schema:
+            type: object
+            additionalProperties:
+              type: boolean
+        '400':
+          description: 'Code invalide (code: invalid_mfa_code) ou aucun setup en attente
+            (code: mfa_not_pending)'
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '401':
+          description: Non authentifié
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '409':
+          description: MFA déjà activée
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '503':
+          description: MFA non configurée
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /auth/mfa/setup:
+    post:
+      security:
+      - BearerAuth: []
+      description: 'Génère un secret TOTP et renvoie un QR code (data URI) + l''URI
+        otpauth:// à scanner dans une app d''authentification. Le secret n''est PAS
+        encore actif : il faut le confirmer via /auth/mfa/enable.'
+      produces:
+      - application/json
+      tags:
+      - auth
+      summary: Démarrer la configuration MFA (TOTP)
+      responses:
+        '200':
+          description: 'data: {secret, otpauth_url, qr_data_uri}'
+          schema:
+            $ref: '#/definitions/models.MFASetupData'
+        '401':
+          description: Non authentifié
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '409':
+          description: MFA déjà activée
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '503':
+          description: 'MFA non configurée (code: mfa_not_configured)'
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /auth/mfa/status:
+    get:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - auth
+      summary: Statut MFA du compte
+      responses:
+        '200':
+          description: 'data: {enabled, configured}'
+          schema:
+            type: object
+            additionalProperties:
+              type: boolean
+        '401':
+          description: Non authentifié
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /auth/mfa/verify:
+    post:
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      tags:
+      - auth
+      summary: Valider le second facteur (login MFA)
+      parameters:
+      - description: Challenge (issu du login) + code TOTP
+        name: body
+        in: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.MFAVerifyRequest'
+      responses:
+        '200':
+          description: 'Connexion réussie — data: {token, refresh_token, user}'
+          schema:
+            $ref: '#/definitions/models.AuthUser'
+        '400':
+          description: 'Challenge invalide/expiré (code: invalid_challenge) ou code
+            TOTP faux (code: invalid_mfa_code)'
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '403':
+          description: Compte désactivé
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '503':
+          description: MFA non configurée
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /auth/oauth/{provider}/complete:
+    post:
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      tags:
+      - auth
+      summary: Créer un compte après onboarding OAuth
+      parameters:
+      - enum:
+        - google
+        - github
+        - facebook
+        - spotify
+        type: string
+        description: Fournisseur OAuth
+        name: provider
+        in: path
+        required: true
+      - description: Token d'inscription OAuth
+        name: body
+        in: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.OAuthCompleteRequest'
+      responses:
+        '200':
+          description: 'Compte créé — data: {token, refresh_token, user}'
+          schema:
+            $ref: '#/definitions/models.AuthUser'
+        '400':
+          description: Payload invalide
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '401':
+          description: Token invalide ou expiré
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '409':
+          description: Compte déjà créé
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '500':
+          description: Erreur interne
+          schema:
+            type: object
+            additionalProperties:
+              type: string
   /auth/oauth/{provider}/exchange:
     post:
       consumes:
@@ -195,12 +443,15 @@ paths:
       - application/json
       tags:
       - auth
-      summary: Finaliser une connexion OAuth (Google)
+      summary: Finaliser une connexion OAuth (Google, GitHub, Facebook, Spotify)
       parameters:
       - enum:
         - google
+        - github
+        - facebook
+        - spotify
         type: string
-        description: Fournisseur OIDC
+        description: Fournisseur OAuth
         name: provider
         in: path
         required: true
@@ -212,9 +463,9 @@ paths:
           $ref: '#/definitions/models.OAuthExchangeRequest'
       responses:
         '200':
-          description: 'Connexion réussie — data: {token, refresh_token, user}'
+          description: Connexion réussie ou inscription à finaliser
           schema:
-            $ref: '#/definitions/models.AuthUser'
+            $ref: '#/definitions/models.OAuthExchangeData'
         '400':
           description: Payload invalide
           schema:
@@ -251,12 +502,15 @@ paths:
       - application/json
       tags:
       - auth
-      summary: Démarrer une connexion OAuth (Google)
+      summary: Démarrer une connexion OAuth (Google, GitHub, Facebook, Spotify)
       parameters:
       - enum:
         - google
+        - github
+        - facebook
+        - spotify
         type: string
-        description: Fournisseur OIDC
+        description: Fournisseur OAuth
         name: provider
         in: path
         required: true
@@ -1568,6 +1822,58 @@ paths:
             type: object
             additionalProperties:
               type: string
+  /profils/me/activity:
+    patch:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - profils
+      summary: Marquer la dernière connexion du profil courant
+      responses:
+        '200':
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Profil'
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '404':
+          description: Not Found
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /profils/me/activity/offline:
+    patch:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - profils
+      summary: Marquer le profil courant hors ligne
+      responses:
+        '200':
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Profil'
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '404':
+          description: Not Found
+          schema:
+            type: object
+            additionalProperties:
+              type: string
   /profils/search:
     get:
       produces:
@@ -1651,6 +1957,31 @@ paths:
             type: object
             additionalProperties:
               type: string
+        '404':
+          description: Not Found
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /profils/{userId}/activity:
+    get:
+      produces:
+      - application/json
+      tags:
+      - profils
+      summary: Activité visible d'un profil
+      parameters:
+      - type: string
+        description: User ID
+        name: userId
+        in: path
+        required: true
+      responses:
+        '200':
+          description: last_login_at, is_online
+          schema:
+            type: object
+            additionalProperties: true
         '404':
           description: Not Found
           schema:
@@ -2042,6 +2373,32 @@ paths:
             type: object
             additionalProperties:
               type: string
+  /posts/comments/stats:
+    get:
+      produces:
+      - application/json
+      tags:
+      - comments
+      summary: Compteurs de commentaires (rafraîchissement)
+      parameters:
+      - type: string
+        description: IDs de commentaires séparés par des virgules (max 100)
+        name: ids
+        in: query
+        required: true
+      responses:
+        '200':
+          description: OK
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/models.CommentStat'
+        '500':
+          description: Internal Server Error
+          schema:
+            type: object
+            additionalProperties:
+              type: string
   /posts/liked:
     get:
       produces:
@@ -2142,6 +2499,48 @@ paths:
             type: array
             items:
               type: string
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /posts/moderation/deleted:
+    get:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - posts
+      summary: Corbeille de modération (filtrable)
+      parameters:
+      - type: string
+        description: Filtrer par auteur
+        name: author_id
+        in: query
+      - type: string
+        description: RFC3339 — borne basse de la date de retrait
+        name: since
+        in: query
+      - type: string
+        description: RFC3339 — borne haute de la date de retrait
+        name: until
+        in: query
+      - type: integer
+        description: Nb résultats
+        name: limit
+        in: query
+      - type: integer
+        description: Décalage (pagination)
+        name: offset
+        in: query
+      responses:
+        '200':
+          description: 'data: [posts]'
+          schema:
+            type: object
+            additionalProperties: true
         '401':
           description: Unauthorized
           schema:
@@ -2550,6 +2949,83 @@ paths:
               type: string
         '403':
           description: Forbidden
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '404':
+          description: Not Found
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /posts/{id}/comments/{commentId}/like:
+    post:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - comments
+      summary: Liker un commentaire
+      parameters:
+      - type: string
+        description: Post ID
+        name: id
+        in: path
+        required: true
+      - type: string
+        description: Comment ID
+        name: commentId
+        in: path
+        required: true
+      responses:
+        '200':
+          description: likes_count
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '404':
+          description: Not Found
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+    delete:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - comments
+      summary: Retirer son like d'un commentaire
+      parameters:
+      - type: string
+        description: Post ID
+        name: id
+        in: path
+        required: true
+      - type: string
+        description: Comment ID
+        name: commentId
+        in: path
+        required: true
+      responses:
+        '200':
+          description: likes_count
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '401':
+          description: Unauthorized
           schema:
             type: object
             additionalProperties:
@@ -3461,6 +3937,45 @@ paths:
             type: object
             additionalProperties:
               type: string
+  /messages/moderation/{messageId}:
+    delete:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - messages
+      summary: Supprimer un message par la modération
+      parameters:
+      - type: string
+        description: Message ID
+        name: messageId
+        in: path
+        required: true
+      responses:
+        '200':
+          description: Message tombstoné
+          schema:
+            type: object
+            additionalProperties: true
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '403':
+          description: Forbidden
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '404':
+          description: Not Found
+          schema:
+            type: object
+            additionalProperties:
+              type: string
   /messages/unread-count:
     get:
       security:
@@ -3629,6 +4144,424 @@ paths:
             type: object
             additionalProperties:
               type: string
+        '404':
+          description: Not Found
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /reports:
+    post:
+      security:
+      - BearerAuth: []
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      tags:
+      - reports
+      summary: Déposer un signalement
+      parameters:
+      - description: Signalement
+        name: body
+        in: body
+        required: true
+        schema:
+          $ref: '#/definitions/handler.createReportRequest'
+      responses:
+        '201':
+          description: 'data: ticket'
+          schema:
+            type: object
+            additionalProperties: true
+        '400':
+          description: Bad Request
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '409':
+          description: déjà signalé par cet utilisateur
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /reports/settings:
+    get:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - reports
+      summary: Configuration de la modération
+      responses:
+        '200':
+          description: 'data: settings'
+          schema:
+            type: object
+            additionalProperties: true
+    patch:
+      security:
+      - BearerAuth: []
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      tags:
+      - reports
+      summary: Régler le seuil d'auto-masquage
+      parameters:
+      - description: Configuration
+        name: body
+        in: body
+        required: true
+        schema:
+          $ref: '#/definitions/handler.settingsRequest'
+      responses:
+        '200':
+          description: 'data: settings'
+          schema:
+            type: object
+            additionalProperties: true
+        '400':
+          description: Bad Request
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /reports/tickets:
+    get:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - reports
+      summary: Lister les tickets (filtres cumulables)
+      parameters:
+      - type: string
+        description: moderation|bug
+        name: category
+        in: query
+      - type: string
+        description: open|closed|reopened
+        name: status
+        in: query
+      - type: integer
+        description: Nb minimal de signalements
+        name: min_reports
+        in: query
+      - type: string
+        description: RFC3339 — borne basse du dernier signalement
+        name: since
+        in: query
+      - type: string
+        description: RFC3339 — borne haute du dernier signalement
+        name: until
+        in: query
+      - type: integer
+        description: Nb résultats
+        name: limit
+        in: query
+      responses:
+        '200':
+          description: 'data: [tickets]'
+          schema:
+            type: object
+            additionalProperties: true
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /reports/tickets/{id}:
+    get:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - reports
+      summary: Détail d'un ticket
+      parameters:
+      - type: string
+        description: Ticket ID
+        name: id
+        in: path
+        required: true
+      responses:
+        '200':
+          description: 'data: ticket'
+          schema:
+            type: object
+            additionalProperties: true
+        '404':
+          description: Not Found
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /reports/tickets/{id}/approve:
+    post:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - reports
+      summary: Valider une entité signalée (conforme)
+      parameters:
+      - type: string
+        description: Ticket ID
+        name: id
+        in: path
+        required: true
+      responses:
+        '200':
+          description: 'data: ticket'
+          schema:
+            type: object
+            additionalProperties: true
+        '404':
+          description: Not Found
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '409':
+          description: une sanction a déjà été appliquée
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /reports/tickets/{id}/removal:
+    post:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - reports
+      summary: Journaliser le retrait du contenu
+      parameters:
+      - type: string
+        description: Ticket ID
+        name: id
+        in: path
+        required: true
+      responses:
+        '200':
+          description: 'data: ticket'
+          schema:
+            type: object
+            additionalProperties: true
+        '404':
+          description: Not Found
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /reports/tickets/{id}/replies:
+    post:
+      security:
+      - BearerAuth: []
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      tags:
+      - reports
+      summary: Réponse interne d'un modérateur
+      parameters:
+      - type: string
+        description: Ticket ID
+        name: id
+        in: path
+        required: true
+      - description: Réponse
+        name: body
+        in: body
+        required: true
+        schema:
+          $ref: '#/definitions/handler.replyRequest'
+      responses:
+        '200':
+          description: 'data: ticket'
+          schema:
+            type: object
+            additionalProperties: true
+        '400':
+          description: Bad Request
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /reports/tickets/{id}/status:
+    patch:
+      security:
+      - BearerAuth: []
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      tags:
+      - reports
+      summary: Changer le statut d'un ticket
+      parameters:
+      - type: string
+        description: Ticket ID
+        name: id
+        in: path
+        required: true
+      - description: Nouveau statut
+        name: body
+        in: body
+        required: true
+        schema:
+          $ref: '#/definitions/handler.statusRequest'
+      responses:
+        '200':
+          description: 'data: ticket'
+          schema:
+            type: object
+            additionalProperties: true
+        '400':
+          description: Bad Request
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /reports/tickets/{id}/transfer:
+    post:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - reports
+      summary: Transférer un ticket bug vers la modération
+      parameters:
+      - type: string
+        description: Ticket ID
+        name: id
+        in: path
+        required: true
+      responses:
+        '200':
+          description: 'data: ticket'
+          schema:
+            type: object
+            additionalProperties: true
+        '409':
+          description: Conflict
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /reports/users/{id}/warnings/count:
+    get:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - reports
+      summary: Nombre d'avertissements d'un utilisateur
+      parameters:
+      - type: string
+        description: User ID
+        name: id
+        in: path
+        required: true
+      responses:
+        '200':
+          description: 'data: { count }'
+          schema:
+            type: object
+            additionalProperties: true
+        '400':
+          description: Bad Request
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /reports/warnings:
+    post:
+      security:
+      - BearerAuth: []
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      tags:
+      - reports
+      summary: Émettre un avertissement
+      parameters:
+      - description: Avertissement
+        name: body
+        in: body
+        required: true
+        schema:
+          $ref: '#/definitions/handler.warningRequest'
+      responses:
+        '201':
+          description: 'data: warning'
+          schema:
+            type: object
+            additionalProperties: true
+        '400':
+          description: Bad Request
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /reports/warnings/pending:
+    get:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - reports
+      summary: Mes avertissements en attente
+      responses:
+        '200':
+          description: 'data: [warnings]'
+          schema:
+            type: object
+            additionalProperties: true
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /reports/warnings/{id}/ack:
+    post:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - reports
+      summary: Acquitter un avertissement
+      parameters:
+      - type: string
+        description: Warning ID
+        name: id
+        in: path
+        required: true
+      responses:
+        '204':
+          description: No Content
         '404':
           description: Not Found
           schema:
@@ -3843,6 +4776,67 @@ definitions:
         type: string
       user_id:
         type: string
+  models.MFADisableRequest:
+    type: object
+    properties:
+      code:
+        type: string
+      password:
+        type: string
+  models.MFAEnableRequest:
+    type: object
+    required:
+    - code
+    properties:
+      code:
+        type: string
+  models.MFASetupData:
+    type: object
+    properties:
+      otpauth_url:
+        type: string
+        example: otpauth://totp/Breezy:user@mail?secret=...&issuer=Breezy
+      qr_data_uri:
+        type: string
+        example: data:image/png;base64,iVBORw0KGgo...
+      secret:
+        type: string
+        example: JBSWY3DPEHPK3PXP
+  models.MFAVerifyRequest:
+    type: object
+    required:
+    - challenge
+    - code
+    properties:
+      challenge:
+        type: string
+      code:
+        type: string
+  models.OAuthCompleteRequest:
+    type: object
+    required:
+    - accepted_terms
+    - pending_token
+    properties:
+      accepted_terms:
+        type: boolean
+      pending_token:
+        type: string
+  models.OAuthExchangeData:
+    type: object
+    properties:
+      email:
+        type: string
+      onboarding_required:
+        type: boolean
+      pending_token:
+        type: string
+      refresh_token:
+        type: string
+      token:
+        type: string
+      user:
+        $ref: '#/definitions/models.AuthUser'
   models.OAuthExchangeRequest:
     type: object
     required:
@@ -4039,6 +5033,12 @@ definitions:
   models.Profil:
     type: object
     properties:
+      activity_visibility:
+        description: 'ActivityVisibility contrôle l''affichage public de last_login_at.
+          Un profil
+
+          privé ne l''expose qu''au propriétaire et aux abonnés acceptés.'
+        type: string
       avatar_url:
         type: string
       banner_url:
@@ -4070,6 +5070,10 @@ definitions:
       gender:
         description: '"male" | "female"'
         type: string
+      is_online:
+        type: boolean
+      last_login_at:
+        type: string
       likes_visibility:
         type: string
       location:
@@ -4088,6 +5092,11 @@ definitions:
   models.UpdateProfilRequest:
     type: object
     properties:
+      activity_visibility:
+        type: string
+        enum:
+        - public
+        - private
       avatar_url:
         type: string
       banner_url:
@@ -4160,6 +5169,10 @@ definitions:
         type: string
       id:
         type: string
+      liked:
+        type: boolean
+      likes_count:
+        type: integer
       media:
         type: array
         items:
@@ -4172,6 +5185,13 @@ definitions:
         type: integer
       updated_at:
         type: string
+  models.CommentStat:
+    type: object
+    properties:
+      id:
+        type: string
+      likes_count:
+        type: integer
   models.CommentWithPost:
     type: object
     properties:
@@ -4183,6 +5203,10 @@ definitions:
         type: string
       id:
         type: string
+      liked:
+        type: boolean
+      likes_count:
+        type: integer
       media:
         type: array
         items:
@@ -4220,6 +5244,18 @@ definitions:
           $ref: '#/definitions/models.MediaRef'
       parent_id:
         type: string
+  models.CreatePollChoiceRequest:
+    type: object
+    required:
+    - label
+    properties:
+      image_url:
+        type: string
+        maxLength: 512
+      label:
+        type: string
+        maxLength: 80
+        minLength: 1
   models.CreatePollRequest:
     type: object
     required:
@@ -4235,7 +5271,7 @@ definitions:
         maxItems: 4
         minItems: 2
         items:
-          type: string
+          $ref: '#/definitions/models.CreatePollChoiceRequest'
       duration_minutes:
         type: integer
         maximum: 10080
@@ -4313,6 +5349,14 @@ definitions:
     properties:
       id:
         type: string
+      image_url:
+        description: 'ImageURL (optionnel) : illustration du choix, chemin relatif
+          `/media/<id>`
+
+          servi par le media-service via la gateway (le post-service reste agnostique
+
+          du contenu). Vide = choix texte seul (les choix mixtes sont autorisés).'
+        type: string
       label:
         type: string
       votes_count:
@@ -4322,6 +5366,23 @@ definitions:
     properties:
       author_id:
         type: string
+      auto_hidden:
+        description: 'AutoHidden : masquage AUTOMATIQUE déclenché par le report-service
+          quand le
+
+          post dépasse le seuil de signalements (en attente d''une décision de
+
+          modération). Distinct de is_hidden (retrait manuel → corbeille) : il sort
+
+          des fils publics mais N''apparaît PAS dans la corbeille de modération ;
+          un
+
+          modérateur le rétablit (validation « conforme ») ou le retire (is_hidden).
+
+          `omitempty` ⇒ jamais de `false` persité ; absent sur un vieux doc = visible
+
+          (pas de migration de données nécessaire).'
+        type: boolean
       can_reply:
         description: 'CanReply : transient, hydraté par viewer — `true` si le lecteur
           courant peut
@@ -4604,9 +5665,68 @@ definitions:
           type: string
       nonce:
         type: string
+  handler.createReportRequest:
+    type: object
+    required:
+    - category
+    - reason
+    properties:
+      attachment_id:
+        type: string
+      category:
+        type: string
+      disclosed_content:
+        type: string
+      entity_id:
+        type: string
+      entity_owner_id:
+        type: string
+      entity_type:
+        type: string
+      reason:
+        type: string
+      text:
+        type: string
+  handler.replyRequest:
+    type: object
+    required:
+    - text
+    properties:
+      text:
+        type: string
+  handler.settingsRequest:
+    type: object
+    required:
+    - auto_hide_threshold
+    properties:
+      auto_hide_threshold:
+        description: 'AutoHideThreshold : seuil de signalements pour l''auto-masquage
+          (0 = désactivé).'
+        type: integer
+  handler.statusRequest:
+    type: object
+    required:
+    - status
+    properties:
+      status:
+        type: string
+  handler.warningRequest:
+    type: object
+    required:
+    - message
+    - target_user_id
+    properties:
+      message:
+        type: string
+      target_user_id:
+        type: string
+      ticket_id:
+        type: string
   handler.uploadResponse:
     type: object
     properties:
+      height:
+        type: integer
       id:
         type: string
       kind:
@@ -4617,5 +5737,24 @@ definitions:
         type: integer
       url:
         type: string
+      variants:
+        type: object
+        additionalProperties:
+          $ref: '#/definitions/handler.variantPayload'
+      width:
+        type: integer
+  handler.variantPayload:
+    type: object
+    properties:
+      height:
+        type: integer
+      mime:
+        type: string
+      size:
+        type: integer
+      url:
+        type: string
+      width:
+        type: integer
 host: localhost:8080
 basePath: /
