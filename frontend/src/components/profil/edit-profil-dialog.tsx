@@ -10,7 +10,7 @@ import {
   type CountryOption,
 } from '@/lib/countries'
 import { cn, initialOf } from '@/lib/utils'
-import { exceedsMediaLimit, MAX_MEDIA_MB, mediaUrl, uploadMedia } from '@/lib/media'
+import { exceedsMediaLimit, MAX_MEDIA_MB, uploadedMediaUrl, uploadMedia } from '@/lib/media'
 import { isValidDisplayName } from '@/lib/display-name'
 import type { UsernameUpdateResult } from '@/lib/api'
 import type { ProfilEditableFields } from '@/types'
@@ -653,8 +653,8 @@ function ImagePicker({ label, onPick, onError, onTooLarge, className, style, chi
 
     setUploading(true)
     try {
-      const { id } = await uploadMedia(file)
-      onPick(mediaUrl(id))
+      const uploaded = await uploadMedia(file)
+      onPick(uploadedMediaUrl(uploaded, 'medium'))
     } catch (err) {
       onError?.(err instanceof Error ? err.message : 'upload failed')
     } finally {

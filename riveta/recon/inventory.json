@@ -1,0 +1,29 @@
+{
+  "engagement": "riveta",
+  "target_frontend": "https://breezy.philippeluu.fr/",
+  "target_api_gateway": "https://api.breezy.philippeluu.fr",
+  "captured_at": "2026-06-12T20:27:00Z",
+  "tech_stack": {
+    "frontend": "Next.js (App Router), buildId o97-cNFXRiPoegZAxsnjU, served via Caddy",
+    "backend": "Go (Gin + go-playground/validator; error format leaked)",
+    "datastores_inferred": ["MongoDB (post IDs = ObjectIDs)", "PostgreSQL (user IDs = UUIDv4)"],
+    "architecture": "distributed microservices behind api-gateway"
+  },
+  "frontend_routes": ["/", "/login", "/register", "/feed", "/admin (307->login via middleware)", "/messages (307->login)", "/mentions-legales", "/cgu", "/confidentialite", "/explorer", "/check-email", "/verify-email", "/forgot-password", "/reset-password"],
+  "bff_routes_same_origin": ["POST /api/auth/refresh (401)", "POST /api/auth/logout (200)", "POST /api/translate (400)"],
+  "gateway_endpoints": {
+    "GET /health": "200 {service:api-gateway,status:ok}",
+    "GET /posts": "200 UNAUTH - full public timeline w/ author UUIDs",
+    "GET /posts/{id}": "200 UNAUTH",
+    "GET /posts/{id}/comments": "200 UNAUTH",
+    "GET /users": "200 UNAUTH - full user directory (username,uuid,is_active,timestamps), paginated 20/page",
+    "GET /users/by-username/{name}": "200 UNAUTH - profile + follower/following counts",
+    "GET /users/{non-uuid}": "500 erreur interne (improper input handling)",
+    "GET /users/me": "401 (gated, good)",
+    "GET /notifications": "401 (gated, good)",
+    "POST /auth/login": "400 validation / generic invalid-credential error (no user enum)",
+    "POST /auth/register": "400 requires Email+Password",
+    "POST /auth/refresh": "401"
+  },
+  "known_endpoint_inventory_from_bundle": ["/users/me","/users/by-username/","/users/follow-requests/","/users/me/follow-requests/outgoing","/users/me/followers/","/posts","/posts/bookmarks/collections","/posts/me/bookmarked-ids","/posts/me/liked-ids","/posts/me/reposted-ids","/comments","/like","/repost","/follow","/feed","/messages","/messages/conversations","/messages/keys","/messages/keys/backup","/messages/unread-count","/notifications","/notifications/read","/notifications/unread-count","/check-email","/verify-email","/forgot-password","/reset-password","/api/translate"]
+}

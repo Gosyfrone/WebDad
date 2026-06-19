@@ -17,7 +17,7 @@ import {
 } from 'lucide-react'
 
 import { cn, initialOf } from '@/lib/utils'
-import { exceedsMediaLimit, MAX_MEDIA_MB, resolveMediaUrl, uploadMedia } from '@/lib/media'
+import { exceedsMediaLimit, MAX_MEDIA_MB, resolveMediaUrl, uploadedMediaUrl, uploadMedia } from '@/lib/media'
 import {
   createPost,
   notifyPostCreated,
@@ -145,8 +145,8 @@ export function PostComposer({
     try {
       const uploaded = await Promise.all(
         files.slice(0, room).map(async (file) => {
-          const { url, kind } = await uploadMedia(file)
-          return { url, type: kind } as PostMedia
+          const uploaded = await uploadMedia(file)
+          return { url: uploadedMediaUrl(uploaded, 'large'), type: uploaded.kind } as PostMedia
         }),
       )
       setMedia((prev) => [...prev, ...uploaded])

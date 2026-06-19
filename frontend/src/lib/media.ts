@@ -42,6 +42,19 @@ export interface UploadedMedia {
   mime: string
   kind: 'image' | 'video'
   size: number
+  width?: number
+  height?: number
+  variants?: Partial<Record<MediaVariantName, UploadedMediaVariant>>
+}
+
+export type MediaVariantName = 'thumb' | 'small' | 'medium' | 'large'
+
+export interface UploadedMediaVariant {
+  url: string
+  mime: string
+  size: number
+  width: number
+  height: number
 }
 
 /**
@@ -51,6 +64,12 @@ export interface UploadedMedia {
  */
 export function mediaUrl(id: string): string {
   return `${API_URL}/media/${id}`
+}
+
+/** Choisit une variante uploadée si disponible, sinon l'original. */
+export function uploadedMediaUrl(media: UploadedMedia, preferred: MediaVariantName = 'large'): string {
+  if (media.kind !== 'image') return media.url
+  return media.variants?.[preferred]?.url ?? media.variants?.large?.url ?? media.variants?.medium?.url ?? media.url
 }
 
 /**
