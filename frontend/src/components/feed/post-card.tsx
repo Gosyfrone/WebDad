@@ -454,7 +454,7 @@ export function PostCard({ post, showPinBadge = false, focusCommentId, embedded 
           </div>
 
           {(post.canDelete || canReport || canBlock || post.canMarkNsfw) && (
-            <DropdownMenu>
+            <DropdownMenu modal={false}>
               <DropdownMenuTrigger
                 aria-label={t('post.more_options')}
                 disabled={deleting}
@@ -466,7 +466,7 @@ export function PostCard({ post, showPinBadge = false, focusCommentId, embedded 
                   <MoreHorizontal className="h-4 w-4" />
                 )}
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
+              <DropdownMenuContent align="end" className="z-40">
                 {post.canPin && (
                   <DropdownMenuItem onClick={togglePin} disabled={pinning} className="cursor-pointer">
                     {isPinned ? (

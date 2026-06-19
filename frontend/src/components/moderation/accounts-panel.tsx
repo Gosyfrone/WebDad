@@ -277,7 +277,7 @@ export function AccountsPanel({ canGovern }: AccountsPanelProps) {
                 {/* Toutes les actions repliées dans une bulle « … » → ligne compacte
                     sur mobile comme desktop (plus de débordement à droite). */}
                 {hasActions && (
-                  <DropdownMenu>
+                  <DropdownMenu modal={false}>
                     <DropdownMenuTrigger asChild>
                       <Button
                         variant="ghost"
@@ -293,7 +293,7 @@ export function AccountsPanel({ canGovern }: AccountsPanelProps) {
                         )}
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="panel border">
+                    <DropdownMenuContent align="end" className="panel border z-40">
                       {/* Changement de rôle — gouvernance (admin) */}
                       {canChangeRole && (
                         <DropdownMenuSub>

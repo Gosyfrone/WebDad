@@ -189,14 +189,14 @@ export function BookmarksView() {
             {t('bookmarks.title')}
           </h1>
           {activeCollection && !activeCollection.isDefault && (
-            <DropdownMenu>
+            <DropdownMenu modal={false}>
               <DropdownMenuTrigger
                 aria-label={t('bookmarks.manage')}
                 className="rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary focus:outline-none"
               >
                 <MoreHorizontal className="h-5 w-5" />
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
+              <DropdownMenuContent align="end" className="z-40">
                 <DropdownMenuItem onClick={() => openRename(activeCollection)} className="cursor-pointer">
                   <Pencil className="mr-2 h-4 w-4" />
                   {t('bookmarks.rename')}

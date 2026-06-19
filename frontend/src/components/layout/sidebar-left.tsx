@@ -201,7 +201,7 @@ export function SidebarLeft() {
       ) : (
       <div className="flex flex-col gap-2">
         {/* User menu : identité réelle chargée via profil-service */}
-        <DropdownMenu>
+        <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild>
             <button className="panel flex w-full items-center gap-3 rounded-full border p-3 shadow-sm transition hover:shadow-[0_14px_34px_rgba(91,108,255,0.16)]">
               <Avatar className="h-10 w-10 shrink-0">
@@ -221,7 +221,7 @@ export function SidebarLeft() {
           <DropdownMenuContent
             align="end"
             side="top"
-            className="panel w-56 border shadow-[0_18px_44px_rgba(91,108,255,0.18)]"
+            className="panel z-40 w-56 border shadow-[0_18px_44px_rgba(91,108,255,0.18)]"
           >
             <DropdownMenuLabel>
               <span className="block font-bold">{shownName}</span>

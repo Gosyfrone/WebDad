@@ -10,7 +10,7 @@
 > - Knowledge graph in `graphify-out/` — query it before reading source (Operating Rule 11).
 >
 > **Latest session work and suggested commit messages live in `CHANGELOG.md`, not here.**
-> **Session freshness:** current work log updated in `CHANGELOG.md` on 19/06/2026 (feat gateway/sécurité — validation + propagation du JWT au gateway : middleware global `PropagateJWT` « valider-si-présent », rejet 401 au plus tôt, strip anti-spoof + propagation `X-User-Id`/`X-User-Role`/`X-Email-Verified`, défense en profondeur conservée).
+> **Session freshness:** current work log updated in `CHANGELOG.md` on 20/06/2026 (fix ui — scroll d'arrière-plan bloqué quand un menu « 3 points » est ouvert : `modal={false}` sur les 7 `DropdownMenu` d'actions de l'app pour retirer le scroll-lock Radix par défaut).
 
 ---
 

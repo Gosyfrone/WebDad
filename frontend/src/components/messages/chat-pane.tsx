@@ -891,7 +891,7 @@ function MessageActionsMenu({
   const { t } = useLanguage()
   if (!canEdit && !canDelete && !canReport) return null
   return (
-    <DropdownMenu>
+    <DropdownMenu modal={false}>
       <DropdownMenuTrigger
         aria-label={t('messages.actions')}
         className={cn(
@@ -902,7 +902,14 @@ function MessageActionsMenu({
       >
         <MoreHorizontal className="h-4 w-4" />
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
+      <DropdownMenuContent
+        align="end"
+        // Le composer (sticky, dans l'overlay messages `z-40`) ne peut pas passer
+        // DEVANT ce menu en portail racine via le z-index ; on réserve sa hauteur
+        // en bas pour que Radix repositionne le menu et ne le glisse jamais dessous.
+        collisionPadding={{ bottom: 88 }}
+        className="z-40"
+      >
         {canEdit && (
           <DropdownMenuItem onClick={onEdit} className="cursor-pointer">
             <Pencil className="mr-2 h-4 w-4" />

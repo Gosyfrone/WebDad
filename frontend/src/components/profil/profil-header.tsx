@@ -333,7 +333,7 @@ function ProfileActionsMenu({
 }) {
   const { t } = useLanguage()
   return (
-    <DropdownMenu>
+    <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
         <Button
           variant="outline"
@@ -345,7 +345,7 @@ function ProfileActionsMenu({
           <MoreHorizontal className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
+      <DropdownMenuContent align="end" className="z-40">
         <DropdownMenuItem onClick={onShare} className="cursor-pointer">
           <Share className="mr-2 h-4 w-4" />
           {t('share.title')}

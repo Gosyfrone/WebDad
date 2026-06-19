@@ -299,7 +299,7 @@ function ConversationRow({
                 className="h-2.5 w-2.5 shrink-0 rounded-full bg-[#8D3DFF] shadow-[0_0_8px_rgba(141,61,255,0.6)]"
               />
             )}
-            <DropdownMenu>
+            <DropdownMenu modal={false}>
               <DropdownMenuTrigger asChild>
                 <Button
                   type="button"
@@ -312,7 +312,7 @@ function ConversationRow({
                   <MoreHorizontal className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+              <DropdownMenuContent align="end" className="z-40" onClick={(e) => e.stopPropagation()}>
                 <DropdownMenuItem onClick={onTogglePin}>
                   {pinned ? (
                     <>
