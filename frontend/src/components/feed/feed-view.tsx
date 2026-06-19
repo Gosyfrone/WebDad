@@ -409,10 +409,17 @@ export function FeedView() {
       </div>
 
       {/* Bandeau temps réel « a posté » : flotte sous l'en-tête dès qu'un autre
-          utilisateur a publié. Clic → révèle les nouveautés et remonte en haut.
+          utilisateur a publié et SUIT le scroll (sticky). Clic → révèle les
+          nouveautés et remonte en haut. Le wrapper est `h-0` (ne réserve pas de
+          hauteur dans le flux, le bouton déborde par-dessus le composer, z-20).
+          Ancrage : `top-16` sur mobile pour se poser SOUS le header mobile fixe
+          (`h-14`, sinon la pilule passerait dessous au scroll) ; `lg:top-[104px]`
+          sur desktop pour passer SOUS l'en-tête sticky du feed (titre `py-3` +
+          onglets `py-3` ≈ 97px, `z-30` > `z-20` : un offset trop court cacherait
+          la pilule derrière l'en-tête au scroll).
           (wrapper transparent aux clics, seul le bouton les capte). */}
       {!selectedHashtag && bannerAuthor && pendingPings.length > 0 && (
-        <div className="pointer-events-none sticky top-2 z-20 flex justify-center lg:top-[60px]">
+        <div className="pointer-events-none sticky top-16 z-20 flex h-0 items-start justify-center overflow-visible lg:top-[104px]">
           <button
             type="button"
             onClick={revealPending}

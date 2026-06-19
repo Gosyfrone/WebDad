@@ -10,7 +10,7 @@
 > - Knowledge graph in `graphify-out/` — query it before reading source (Operating Rule 11).
 >
 > **Latest session work and suggested commit messages live in `CHANGELOG.md`, not here.**
-> **Session freshness:** current work log updated in `CHANGELOG.md` on 19/06/2026 (fix #305 — colonne de droite explorer décalée/coupée à l'ouverture des filtres : carte de filtres compacte + scroll de l'`aside` revu `max-h-screen`).
+> **Session freshness:** current work log updated in `CHANGELOG.md` on 19/06/2026 (fix composer/feed — caret désaligné dans le champ de tweet : scrollbar du textarea masquée ; bandeau « a posté » passé en avant-plan `h-0` pour supprimer l'encart blanc sous le header).
 
 ---
 

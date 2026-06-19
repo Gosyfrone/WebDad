@@ -6,6 +6,31 @@
 
 ---
 
+## GIF GIPHY : capture serveur en MinIO, pas de hotlink (19/06/2026)
+
+> Le picker GIPHY renvoie des URL CDN giphy. Question : que stocke-t-on dans le post ?
+
+- **Le GIF choisi est capturé côté serveur et rangé dans MinIO** (`POST /gifs/capture`), le post
+  stocke `/media/<id>` — **jamais l'URL giphy externe**. *Pourquoi* : (1) règle non-négociable
+  « everything through the gateway, never external/presigned URLs » ; (2) le hotlink `media.giphy.com`
+  renvoyait des **403** non déterministes (le CDN refuse certaines URL originales nues) et des **404**
+  (entrées `fallbackGifCatalog` mortes) ; (3) la prod sert `CSP-Report-Only: default-src 'self'` →
+  en *enforce*, tout `img-src` externe sera bloqué. La capture rend le média same-origin, immutable-cachable
+  et immunisé au CDN giphy.
+- **Anti-SSRF par allowlist d'hôtes**, pas de fetch d'URL arbitraire : seuls `https://` + hôtes
+  `*.giphy.com` connus (`media.giphy.com`, `media0-4`, `i.giphy.com`) sont téléchargés. La taille est
+  bornée (`maxImageBytes`), le type revalidé par magic-bytes (`KindImage`), l'owner = l'utilisateur
+  capturant (suppression/RGPD identiques à un upload).
+- **Pas de génération de variantes** à la capture : un GIF animé re-encodé en variante perdrait
+  l'animation ; le post pointe sur l'original. Rejet d'Option B (proxy à la volée) : dépendance runtime
+  giphy à chaque vue + cache plus délicat.
+- **Résiduel assumé** : les vignettes du *picker* restent hotlinkées giphy (UI éphémère, popover
+  ouverte) — à proxifier seulement si la CSP passe en enforce.
+- Corollaire ops : `GIPHY_API_KEY` doit être posée en prod (sinon `fallbackGifCatalog`, dont des
+  entrées rottent → 404).
+
+---
+
 ## Contenu sensible (NSFW) & majorité (19/06/2026)
 
 > Filtre NSFW : posts marquables « sensibles », floutés pour les mineurs et pour les majeurs
