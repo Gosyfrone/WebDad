@@ -8,6 +8,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+
+	"github.com/webdad/user-service/internal/models"
 )
 
 const testSecret = "test-secret"
@@ -75,5 +77,113 @@ func TestJWTAuth(t *testing.T) {
 				t.Fatalf("status = %d, attendu %d (corps: %s)", w.Code, tc.wantStatus, w.Body.String())
 			}
 		})
+	}
+}
+
+// ─── AdminOnly ───────────────────────────────────────────────────────────────
+
+func injectClaims(role string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Set(contextKey, &Claims{UserID: "u1", Role: role})
+		c.Next()
+	}
+}
+
+func TestAdminOnly_SansClaims_401(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.GET("/a", AdminOnly(), func(c *gin.Context) { c.Status(http.StatusOK) })
+	req := httptest.NewRequest(http.MethodGet, "/a", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("sans claims = %d, attendu 401", w.Code)
+	}
+}
+
+func TestAdminOnly_RoleUser_403(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.GET("/a", injectClaims(models.RoleUser), AdminOnly(), func(c *gin.Context) { c.Status(http.StatusOK) })
+	req := httptest.NewRequest(http.MethodGet, "/a", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("role user = %d, attendu 403", w.Code)
+	}
+}
+
+func TestAdminOnly_RoleAdmin_200(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.GET("/a", injectClaims(models.RoleAdmin), AdminOnly(), func(c *gin.Context) { c.Status(http.StatusOK) })
+	req := httptest.NewRequest(http.MethodGet, "/a", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("role admin = %d, attendu 200", w.Code)
+	}
+}
+
+// ─── ModeratorOnly ───────────────────────────────────────────────────────────
+
+func TestModeratorOnly_RoleUser_403(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.GET("/m", injectClaims(models.RoleUser), ModeratorOnly(), func(c *gin.Context) { c.Status(http.StatusOK) })
+	req := httptest.NewRequest(http.MethodGet, "/m", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("role user = %d, attendu 403", w.Code)
+	}
+}
+
+func TestModeratorOnly_RoleModerator_200(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.GET("/m", injectClaims(models.RoleModerator), ModeratorOnly(), func(c *gin.Context) { c.Status(http.StatusOK) })
+	req := httptest.NewRequest(http.MethodGet, "/m", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("role moderator = %d, attendu 200", w.Code)
+	}
+}
+
+func TestModeratorOnly_RoleAdmin_200(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.GET("/m", injectClaims(models.RoleAdmin), ModeratorOnly(), func(c *gin.Context) { c.Status(http.StatusOK) })
+	req := httptest.NewRequest(http.MethodGet, "/m", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("role admin = %d, attendu 200", w.Code)
+	}
+}
+
+// ─── ClaimsFrom ─────────────────────────────────────────────────────────────
+
+func TestClaimsFrom_Absents(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	claims, ok := ClaimsFrom(c)
+	if ok || claims != nil {
+		t.Fatal("sans claims devrait retourner nil, false")
+	}
+}
+
+func TestClaimsFrom_Présents(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	want := &Claims{UserID: "xyz", Role: models.RoleAdmin}
+	c.Set(contextKey, want)
+	got, ok := ClaimsFrom(c)
+	if !ok || got == nil {
+		t.Fatal("avec claims devrait retourner true")
+	}
+	if got.UserID != want.UserID {
+		t.Fatalf("UserID = %q, attendu %q", got.UserID, want.UserID)
 	}
 }
