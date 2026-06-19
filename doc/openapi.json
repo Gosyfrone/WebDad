@@ -7369,6 +7369,62 @@
         }
       }
     },
+    "/gifs/search": {
+      "get": {
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "media"
+        ],
+        "summary": "Rechercher des GIFs via GIPHY",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "Recherche GIF (vide = tendances)",
+            "name": "q",
+            "in": "query"
+          },
+          {
+            "type": "integer",
+            "description": "Nombre de GIFs (1-50, défaut 20)",
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/handler.giphyListResponse"
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "503": {
+            "description": "GIPHY non configuré ou indisponible",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
     "/media": {
       "post": {
         "security": [
@@ -8951,6 +9007,40 @@
         },
         "ticket_id": {
           "type": "string"
+        }
+      }
+    },
+    "handler.giphyListResponse": {
+      "type": "object",
+      "properties": {
+        "data": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/handler.giphyResponse"
+          }
+        }
+      }
+    },
+    "handler.giphyResponse": {
+      "type": "object",
+      "properties": {
+        "height": {
+          "type": "integer"
+        },
+        "id": {
+          "type": "string"
+        },
+        "preview_url": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "width": {
+          "type": "integer"
         }
       }
     },

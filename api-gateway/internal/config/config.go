@@ -41,6 +41,7 @@ func Load() *Config {
 			"/messages":      getEnv("MESSAGE_SERVICE_URL", "http://localhost:8085"),
 			"/notifications": getEnv("NOTIFICATION_SERVICE_URL", "http://localhost:8086"),
 			"/media":         getEnv("MEDIA_SERVICE_URL", "http://localhost:8087"),
+			"/gifs":          getEnv("MEDIA_SERVICE_URL", "http://localhost:8087"),
 			"/reports":       getEnv("REPORT_SERVICE_URL", "http://localhost:8090"),
 		},
 	}
