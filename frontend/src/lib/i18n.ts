@@ -299,6 +299,8 @@ export const messages: Record<Locale, Messages> = {
     'nsfw.post_badge': 'NSFW',
     'nsfw.post_hidden_desc':
       'Ce contenu a été marqué comme NSFW. Rendez-vous dans les paramètres pour désactiver le filtre NSFW et visualiser le post.',
+    'nsfw.post_hidden_visitor':
+      'Ce contenu est masqué. Connectez-vous pour gérer l’affichage du contenu sensible.',
     'nsfw.mark': 'Marquer comme NSFW',
     'nsfw.unmark': 'Retirer le marquage NSFW',
     'nsfw.marked': 'Post marqué comme NSFW.',
@@ -1541,6 +1543,8 @@ export const messages: Record<Locale, Messages> = {
     'nsfw.post_badge': 'NSFW',
     'nsfw.post_hidden_desc':
       'This content has been marked as NSFW. Go to settings to turn off the NSFW filter and view the post.',
+    'nsfw.post_hidden_visitor':
+      'This content is hidden. Log in to manage how sensitive content is shown.',
     'nsfw.mark': 'Mark as NSFW',
     'nsfw.unmark': 'Remove NSFW mark',
     'nsfw.marked': 'Post marked as NSFW.',

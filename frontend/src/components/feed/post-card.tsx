@@ -164,10 +164,12 @@ export function PostCard({ post, showPinBadge = false, focusCommentId, embedded 
     setNsfw(post.nsfw)
   }, [post.nsfw])
 
-  // Floutage NSFW : un post marqué est masqué si le lecteur n'a pas la
-  // préférence/majorité pour le voir (nsfw_visible calculé serveur ; défaut
-  // `true` pour visiteur/profil non chargé, cohérent avec « adulte par défaut »).
-  const nsfwBlurred = nsfw && !(viewerProfil?.nsfwVisible ?? true)
+  // Floutage NSFW : un post marqué est masqué tant que le lecteur n'a pas la
+  // préférence/majorité pour le voir. Visiteur non connecté → toujours flouté
+  // (ni majorité ni consentement vérifiables). Connecté → `nsfw_visible`
+  // calculé serveur, défaut `true` le temps que le profil charge (évite un
+  // flash de floutage à chaque montage).
+  const nsfwBlurred = nsfw && (isVisitor || !(viewerProfil?.nsfwVisible ?? true))
 
   useEffect(() => {
     setPoll(post.poll)
@@ -607,8 +609,17 @@ export function PostCard({ post, showPinBadge = false, focusCommentId, embedded 
                 {t('nsfw.post_badge')}
               </span>
               <p className="max-w-xs text-xs font-medium text-foreground">
-                {t('nsfw.post_hidden_desc')}
+                {isVisitor ? t('nsfw.post_hidden_visitor') : t('nsfw.post_hidden_desc')}
               </p>
+              {isVisitor && (
+                <button
+                  type="button"
+                  onClick={promptLogin}
+                  className="mt-1 rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground transition hover:bg-primary/90"
+                >
+                  {t('visitor.login')}
+                </button>
+              )}
             </div>
           )}
         </div>
