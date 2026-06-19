@@ -3,6 +3,7 @@ package handlers
 import (
 	"errors"
 	"net/http"
+	"regexp"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -157,6 +158,13 @@ func (h *Handler) Suggestions(c *gin.Context) {
 // @Failure     404 {object} map[string]string
 // @Router      /users/{id} [get]
 func (h *Handler) GetByID(c *gin.Context) {
+	// RIV-007 : un id non-UUID partirait en DB (colonne `uuid`) et provoquerait
+	// un 500 « erreur interne ». On valide la forme en amont → 404 propre, sans
+	// divulguer de détail d'implémentation.
+	if !isUUID(c.Param("id")) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "utilisateur introuvable"})
+		return
+	}
 	user, err := h.users.GetDetailsByID(c.Param("id"))
 	if err != nil {
 		respondUserError(c, err)
@@ -320,6 +328,13 @@ func respondUserError(c *gin.Context, err error) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "erreur interne"})
 	}
 }
+
+// uuidRe valide la forme canonique d'un UUID (8-4-4-4-12 hex). Suffisant pour
+// éviter qu'une valeur arbitraire atteigne une colonne PostgreSQL `uuid`.
+var uuidRe = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
+
+// isUUID indique si `s` a la forme d'un UUID.
+func isUUID(s string) bool { return uuidRe.MatchString(s) }
 
 // paginate lit et borne les paramètres de pagination (?limit=&offset=).
 func paginate(c *gin.Context) (limit, offset int) {

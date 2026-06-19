@@ -18,9 +18,10 @@ const contextKey = "claims"
 // post-service ne signe pas de token, il se contente de les VALIDER avec le
 // même JWT_SECRET partagé.
 type Claims struct {
-	UserID string `json:"user_id"`
-	Email  string `json:"email"`
-	Role   string `json:"role"`
+	UserID        string `json:"user_id"`
+	Email         string `json:"email"`
+	Role          string `json:"role"`
+	EmailVerified bool   `json:"email_verified"`
 	jwt.RegisteredClaims
 }
 
@@ -78,6 +79,28 @@ func OptionalJWTAuth(secret string) gin.HandlerFunc {
 		if err == nil {
 			c.Set(contextKey, claims)
 			c.Set("user_id", claims.UserID)
+		}
+		c.Next()
+	}
+}
+
+// VerifiedOnly exige que l'adresse e-mail du compte soit vérifiée (claim
+// email_verified). À chaîner APRÈS JWTAuth. Garde la CRÉATION de contenu pour
+// qu'un compte non vérifié (ex. token émis à l'inscription, RIV-002) ne puisse
+// pas publier. 403 + code machine si non vérifié.
+func VerifiedOnly() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		claims, ok := ClaimsFrom(c)
+		if !ok {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "token manquant"})
+			return
+		}
+		if !claims.EmailVerified {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
+				"error": "adresse e-mail non vérifiée",
+				"code":  "email_not_verified",
+			})
+			return
 		}
 		c.Next()
 	}

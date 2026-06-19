@@ -7,12 +7,50 @@
 #   api.breezy.philippeluu.fr
 # ────────────────────────────────────────────────────────────────────
 
+# ── En-têtes de sécurité partagés (RIV-004 / BRZ-004) ───────────────
+# Importés dans chaque site. La CSP est servie en Report-Only d'abord
+# (le script de thème inline de layout.tsx serait sinon bloqué) : on
+# observe avant de basculer en enforce.
+(securite) {
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		X-Frame-Options "DENY"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "geolocation=(), microphone=(), camera=()"
+		# Masque la stack (complète poweredByHeader:false côté Next).
+		-Server
+		-X-Powered-By
+	}
+}
+
+# CSP en mode observation (Report-Only) pour le front. Le 'unsafe-inline'
+# de script-src ne s'applique QU'en report-only : il sert à mesurer
+# l'impact avant de poser un nonce/hash sur le script de thème inline,
+# puis de renommer l'en-tête en `Content-Security-Policy` (enforce).
+(csp_report_only) {
+	header {
+		Content-Security-Policy-Report-Only "default-src 'self'; img-src 'self' data: https://api.breezy.philippeluu.fr; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://api.breezy.philippeluu.fr; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+	}
+}
+
 # Frontend (Next.js)
 breezy.philippeluu.fr {
-	reverse_proxy frontend:3000
+	import securite
+	import csp_report_only
+	reverse_proxy frontend:3000 {
+		# RIV-005 : on réécrit X-Forwarded-For à l'IP TCP réelle du client et on
+		# jette toute valeur fournie par le client (défense en profondeur, en plus
+		# des proxies de confiance Gin côté gateway/auth).
+		header_up X-Forwarded-For {remote_host}
+	}
 }
 
 # API Gateway (appelée par le navigateur avec le Bearer token)
 api.breezy.philippeluu.fr {
-	reverse_proxy api-gateway:8080
+	import securite
+	reverse_proxy api-gateway:8080 {
+		# RIV-005 : voir ci-dessus — XFF = IP réelle, non spoofable.
+		header_up X-Forwarded-For {remote_host}
+	}
 }

@@ -6,6 +6,45 @@
 
 ---
 
+## Sécurité — durcissement post-pentest (18/06/2026)
+
+> Suite à un pentest boîte noire externe (« riveta ») + un audit boîte blanche interne complet
+> (rapport gitignoré `PENTEST.md`). Le cœur (contrôle d'accès, JWT, injections SQL/NoSQL, XSS,
+> upload, secrets at-rest, isolation réseau) tient ; les correctifs ci-dessous durcissent le
+> périmètre d'authentification et la configuration.
+
+- **Rate-limiting applicatif plutôt que Fail2Ban (RIV-001).** Limiteur en mémoire sans dépendance
+  (`auth-service/internal/middleware/ratelimit.go`), par IP cliente (`c.ClientIP()` lit le
+  X-Forwarded-For posé par Caddy puis la gateway). Login + `mfa/verify` = 10/5 min ; register +
+  forgot + resend = 5/15 min. *Pourquoi applicatif* : portable, indépendant de l'hôte, testable,
+  conscient du « par compte » à terme — là où Fail2Ban (edge, par IP) reste un filet réseau
+  complémentaire. In-memory suffit (une instance par service en compose ; backend Redis si on
+  passe multi-instances).
+- **Anti brute-force MFA : challenge brûlé après 5 codes faux (BRZ-001).** `VerifyMFA` ne consommait
+  pas le challenge sur code erroné (fenêtre 5 min) → 10⁶ codes brute-forçables même distribué. On
+  compte les échecs par challenge (en mémoire) et on invalide le challenge au 5ᵉ. Le rate-limit par
+  IP seul ne couvrirait pas un attaquant multi-IP.
+- **`email_verified` comme claim JWT + gate `VerifiedOnly` (RIV-002).** Le blocage de vérification
+  n'existait qu'au login ; le token émis à l'inscription accédait aux routes mutantes. Le claim est
+  désormais propagé sur **tous** les chemins d'émission (register=false, login/verify/refresh/oauth
+  = état réel/true) et un middleware `VerifiedOnly` garde la **création de contenu** (posts,
+  commentaires, conversations, messages). *Choix* : gater la création de contenu (abus = spam
+  public) plutôt que toutes les routes, pour ne pas casser le provisioning paresseux
+  (`POST /users`/`/profils`, `GET /users/me`) qui s'exécute avec un token non encore vérifié.
+  *Non-régression* : le refresh re-sélectionne `email_verified` en base, l'OAuth le force à true →
+  un utilisateur vérifié n'est jamais bloqué.
+- **Annuaire complet authentifié (RIV-003).** `GET /users` (énumération de toute la base) exige une
+  session. Les lookups ciblés (`/search`, `/suggestions`, `/by-username`, `/:id`) restent publics
+  car nécessaires au login (résolution username→id) et aux aperçus de profil ; `:id` valide
+  désormais la forme UUID (404 propre au lieu de 500, RIV-007).
+- **En-têtes de sécurité au reverse-proxy (RIV-004).** HSTS, X-Frame-Options:DENY, nosniff,
+  Referrer-Policy, Permissions-Policy posés par Caddy (`import securite`). **CSP en Report-Only
+  d'abord** : le script de thème inline (`layout.tsx`) serait bloqué par `script-src 'self'` ; on
+  observe avant de poser un nonce/hash puis de basculer en enforce. `X-Powered-By`/`Server` masqués
+  (Caddy + `poweredByHeader:false`).
+- **BRZ-002 écarté.** La prod utilise un vrai `JWT_SECRET` (hex), distinct du placeholder du `.env`
+  gabarit (gitignoré) → pas de forge de JWT. (Note durcissement : viser 32 hex / 256 bits.)
+
 ## Store utilisateur connecté (front, 18/06/2026)
 
 - **Un `CurrentUserProvider` (Context React), pas zustand.** L'identité JWT était déjà centralisée (`lib/session.ts`) mais le **profil** du user connecté (username/display_name/avatar/rôle) était refetché indépendamment par chaque composant visible (sidebar + header + composer = 6 requêtes au boot), et `useSession()` était instancié 10+ fois (chacun son listener + décodage JWT). Le store fait **un seul** `getMyProfil()`+`getMe()` au montage, écoute `SESSION_CHANGED` une seule fois et `subscribeProfilUpdated` (MAJ sans refetch), et expose `useCurrentUser()` (`session`, `profil`, `isAdmin`/`isModerator`, `usernamePending`, `preferredLocale`, `refresh`). **Context plutôt que zustand** : cohérent avec les providers existants (`LanguageProvider`, `NotificationsProvider`, `MessagesProvider`…), zéro dépendance ajoutée. Monté en tête de `(app)/layout.tsx` (espace authentifié) → gère le visiteur (`null`). `lib/session.ts` reste la source sync (libs non-React comme `posts.ts`/`messages.ts` lisent `currentUserId()` ; les définitions dupliquées y réexportent désormais celle de `session.ts`). `language-provider` (root layout, parent du provider) garde son `getMe()` propre.

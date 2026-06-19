@@ -21,6 +21,8 @@ func RegisterRoutes(
 	allowedOrigins []string,
 ) {
 	auth := middleware.JWTAuth(jwtSecret)
+	// RIV-002 : créer une conversation / envoyer un message exige un e-mail vérifié.
+	verified := middleware.VerifiedOnly()
 
 	r.GET("/health", Health(serviceName))
 
@@ -62,7 +64,7 @@ func RegisterRoutes(
 		conversations := messages.Group("/conversations", auth)
 		{
 			conversations.GET("", convH.ListConversations)
-			conversations.POST("", convH.CreateConversation)
+			conversations.POST("", verified, convH.CreateConversation)
 
 			conv := conversations.Group("/:id")
 			{
@@ -81,7 +83,7 @@ func RegisterRoutes(
 				conv.PUT("/read", convH.MarkRead)              // marquer lu (curseur de lecture)
 
 				conv.GET("/messages", convH.ListMessages)
-				conv.POST("/messages", convH.SendMessage)
+				conv.POST("/messages", verified, convH.SendMessage)
 				conv.PATCH("/messages/:messageId", convH.EditMessage)
 				conv.DELETE("/messages/:messageId", convH.DeleteMessage) // supprimer pour tous (auteur / owner / admin)
 

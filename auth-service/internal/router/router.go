@@ -22,6 +22,14 @@ var startedAt = time.Now()
 // New construit le routeur Gin avec toutes les routes du service.
 func New(auth *services.AuthService, oauthReg *oauth.Registry) *gin.Engine {
 	r := gin.New()
+	// Proxies de confiance (RIV-005) : seuls Caddy, la gateway et le réseau Docker
+	// interne peuvent renseigner X-Forwarded-For. Indispensable ici car les
+	// limiteurs anti brute-force ci-dessous indexent par `c.ClientIP()` : sans
+	// liste de confiance, Gin trusterait 0.0.0.0/0 et retiendrait la valeur la
+	// plus à gauche (spoofable par le client) → rate-limit contournable.
+	// 172.16.0.0/12 = plage des bridges Docker par défaut. CIDR littéraux valides
+	// → l'erreur ne peut survenir qu'à une faute de frappe, on la laisse paniquer.
+	_ = r.SetTrustedProxies([]string{"172.16.0.0/12", "127.0.0.0/8"})
 	r.Use(middleware.RequestID(), middleware.Recovery(), middleware.RequestLogger())
 	h := handlers.New(auth, oauthReg)
 
@@ -33,17 +41,24 @@ func New(auth *services.AuthService, oauthReg *oauth.Registry) *gin.Engine {
 		})
 	})
 
+	// Limiteurs anti brute-force / abus (RIV-001, BRZ-001), par IP cliente.
+	//   - credLimiter : tentatives sensibles (login, 2ᵉ facteur) — fenêtre courte.
+	//   - mailLimiter : endpoints qui déclenchent un e-mail / créent un compte
+	//     (register, forgot, resend) — anti mail-bombing/énumération scriptée.
+	credLimiter := middleware.NewRateLimiter(10, 5*time.Minute)
+	mailLimiter := middleware.NewRateLimiter(5, 15*time.Minute)
+
 	authGroup := r.Group("/auth")
 	{
-		authGroup.POST("/register", h.Register)
-		authGroup.POST("/login", h.Login)
+		authGroup.POST("/register", mailLimiter.Middleware(), h.Register)
+		authGroup.POST("/login", credLimiter.Middleware(), h.Login)
 		// Vérification d'e-mail (PUBLIQUES, pas de middleware JWT) :
 		// confirm consomme le token du lien ; request (re)envoie le mail.
 		authGroup.POST("/verify-email/confirm", h.ConfirmVerifyEmail)
-		authGroup.POST("/verify-email/request", h.RequestVerifyEmail)
+		authGroup.POST("/verify-email/request", mailLimiter.Middleware(), h.RequestVerifyEmail)
 		// Mot de passe oublié (PUBLIQUES, pas de middleware JWT) : forgot
 		// déclenche le mail (anti-énumération) ; reset consomme le token.
-		authGroup.POST("/password/forgot", h.ForgotPassword)
+		authGroup.POST("/password/forgot", mailLimiter.Middleware(), h.ForgotPassword)
 		authGroup.POST("/password/reset", h.ResetPassword)
 		// /auth/password/change : changement de mot de passe authentifié (volontaire
 		// ou imposé après création par un admin). Protégé par le JWT.
@@ -57,7 +72,7 @@ func New(auth *services.AuthService, oauthReg *oauth.Registry) *gin.Engine {
 		authGroup.POST("/mfa/enable", middleware.JWTAuth(auth), h.MFAEnable)
 		authGroup.POST("/mfa/disable", middleware.JWTAuth(auth), h.MFADisable)
 		authGroup.GET("/mfa/status", middleware.JWTAuth(auth), h.MFAStatus)
-		authGroup.POST("/mfa/verify", h.MFAVerify)
+		authGroup.POST("/mfa/verify", credLimiter.Middleware(), h.MFAVerify)
 		// /auth/refresh : échange le refresh token (cookie httpOnly relayé par
 		// le BFF) contre une nouvelle paire access+refresh (rotation).
 		authGroup.POST("/refresh", h.Refresh)

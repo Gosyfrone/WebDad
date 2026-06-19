@@ -26,6 +26,15 @@ func New(cfg *config.Config) (*gin.Engine, error) {
 	r.RedirectTrailingSlash = false
 	r.RedirectFixedPath = false
 
+	// Proxies de confiance (RIV-005) : seuls Caddy + le réseau Docker interne
+	// peuvent renseigner X-Forwarded-For. Sans ça, Gin fait confiance à TOUS les
+	// proxies (0.0.0.0/0) et `c.ClientIP()` retourne la valeur la plus à gauche
+	// de l'en-tête — donc spoofable par le client → contournement du rate-limit.
+	// 172.16.0.0/12 = plage des bridges Docker par défaut.
+	if err := r.SetTrustedProxies([]string{"172.16.0.0/12", "127.0.0.0/8"}); err != nil {
+		return nil, err
+	}
+
 	// Ordre : CORS en premier (pré-flight), puis RequestID, Recovery, RequestLogger.
 	r.Use(middleware.CORS(cfg.AllowedOrigins))
 	r.Use(middleware.RequestID())

@@ -84,6 +84,11 @@ type Claims struct {
 	// de passe bloquant (compte créé par un admin avec un mot de passe temporaire),
 	// sans appel supplémentaire. Effacé au prochain token après le changement.
 	MustChangePassword bool `json:"must_change_password,omitempty"`
+	// EmailVerified : propagé pour que les services en aval refusent les actions
+	// sensibles (création de contenu) tant que l'adresse n'est pas vérifiée
+	// (RIV-002). Le token émis à l'inscription porte donc false ; il devient true
+	// après vérification (lien e-mail), au login, et est re-propagé au refresh.
+	EmailVerified bool `json:"email_verified"`
 	jwt.RegisteredClaims
 }
 
@@ -108,6 +113,11 @@ type AuthService struct {
 	// mfaCipher : chiffre le secret TOTP at-rest. nil = MFA non configurée
 	// (MFA_ENCRYPTION_KEY absente) → les endpoints MFA répondent 503.
 	mfaCipher *secretCipher
+	// mfaAttempts : compteur d'essais TOTP par challenge (BRZ-001). Au-delà de
+	// maxMFAVerifyAttempts codes faux, le challenge est consommé → brute-force du
+	// code à 6 chiffres impossible même distribué (le rate-limit par IP ne
+	// couvrant que le mono-IP).
+	mfaAttempts *mfaAttemptTracker
 }
 
 // New construit le service. mailer peut être nil (mail non configuré) : l'envoi
@@ -129,6 +139,7 @@ func New(db *sql.DB, jwtSecret string, jwtExpiry, refreshExpiry time.Duration, m
 		mailLogoURL:           mailLogoURL,
 		adminCreateAutoVerify: adminCreateAutoVerify,
 		mfaCipher:             cipher,
+		mfaAttempts:           newMFAAttemptTracker(),
 	}, nil
 }
 
@@ -635,6 +646,9 @@ func (s *AuthService) LoginWithOAuth(provider, subject, email string) (*OAuthRes
 		}
 	}
 
+	// L'identité vient d'un provider qui a authentifié l'utilisateur : l'adresse
+	// est considérée vérifiée → le token porte email_verified=true (RIV-002).
+	u.EmailVerified = true
 	token, refresh, user, err := s.issueTokens(u)
 	if err != nil {
 		return nil, err
@@ -715,8 +729,10 @@ func (s *AuthService) CompleteOAuthSignup(provider, rawToken string) (string, st
 func (s *AuthService) Refresh(rawToken string) (string, string, *models.User, error) {
 	tokenHash := hashToken(rawToken)
 
+	// email_verified re-sélectionné : sans ça, un utilisateur vérifié perdrait le
+	// claim (→ false) au refresh et serait bloqué sur les actions gardées (RIV-002).
 	const q = `
-		SELECT c.id, c.email, c.role, c.is_active, c.must_change_password, c.created_at, rt.expires_at
+		SELECT c.id, c.email, c.role, c.is_active, c.must_change_password, c.email_verified, c.created_at, rt.expires_at
 		FROM refresh_tokens rt
 		JOIN credentials c ON c.id = rt.user_id
 		WHERE rt.token = $1`
@@ -724,7 +740,7 @@ func (s *AuthService) Refresh(rawToken string) (string, string, *models.User, er
 	u := &models.User{}
 	var expiresAt time.Time
 	err := s.db.QueryRow(q, tokenHash).
-		Scan(&u.ID, &u.Email, &u.Role, &u.IsActive, &u.MustChangePassword, &u.CreatedAt, &expiresAt)
+		Scan(&u.ID, &u.Email, &u.Role, &u.IsActive, &u.MustChangePassword, &u.EmailVerified, &u.CreatedAt, &expiresAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", "", nil, ErrInvalidRefreshToken
 	}
@@ -1217,7 +1233,7 @@ func (s *AuthService) ListBannedBefore(before time.Time, limit int) ([]models.Us
 // mintSystemAdminToken signe un JWT admin éphémère pour les appels
 // serveur-à-serveur du balayage (auth est l'émetteur de tokens).
 func (s *AuthService) mintSystemAdminToken() (string, error) {
-	return s.GenerateToken(&models.User{ID: systemActorID, Email: "system@auth", Role: models.RoleAdmin})
+	return s.GenerateToken(&models.User{ID: systemActorID, Email: "system@auth", Role: models.RoleAdmin, EmailVerified: true})
 }
 
 // SweepBannedAccounts efface (RGPD) les comptes bannis depuis plus de `after` :
@@ -1305,6 +1321,7 @@ func (s *AuthService) GenerateToken(u *models.User) (string, error) {
 		Email:              u.Email,
 		Role:               u.Role,
 		MustChangePassword: u.MustChangePassword,
+		EmailVerified:      u.EmailVerified,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   u.ID,
 			IssuedAt:  jwt.NewNumericDate(now),
