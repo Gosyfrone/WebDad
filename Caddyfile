@@ -38,11 +38,19 @@
 breezy.philippeluu.fr {
 	import securite
 	import csp_report_only
-	reverse_proxy frontend:3000
+	reverse_proxy frontend:3000 {
+		# RIV-005 : on réécrit X-Forwarded-For à l'IP TCP réelle du client et on
+		# jette toute valeur fournie par le client (défense en profondeur, en plus
+		# des proxies de confiance Gin côté gateway/auth).
+		header_up X-Forwarded-For {remote_host}
+	}
 }
 
 # API Gateway (appelée par le navigateur avec le Bearer token)
 api.breezy.philippeluu.fr {
 	import securite
-	reverse_proxy api-gateway:8080
+	reverse_proxy api-gateway:8080 {
+		# RIV-005 : voir ci-dessus — XFF = IP réelle, non spoofable.
+		header_up X-Forwarded-For {remote_host}
+	}
 }

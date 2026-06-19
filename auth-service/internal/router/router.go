@@ -22,6 +22,14 @@ var startedAt = time.Now()
 // New construit le routeur Gin avec toutes les routes du service.
 func New(auth *services.AuthService, oauthReg *oauth.Registry) *gin.Engine {
 	r := gin.New()
+	// Proxies de confiance (RIV-005) : seuls Caddy, la gateway et le réseau Docker
+	// interne peuvent renseigner X-Forwarded-For. Indispensable ici car les
+	// limiteurs anti brute-force ci-dessous indexent par `c.ClientIP()` : sans
+	// liste de confiance, Gin trusterait 0.0.0.0/0 et retiendrait la valeur la
+	// plus à gauche (spoofable par le client) → rate-limit contournable.
+	// 172.16.0.0/12 = plage des bridges Docker par défaut. CIDR littéraux valides
+	// → l'erreur ne peut survenir qu'à une faute de frappe, on la laisse paniquer.
+	_ = r.SetTrustedProxies([]string{"172.16.0.0/12", "127.0.0.0/8"})
 	r.Use(middleware.RequestID(), middleware.Recovery(), middleware.RequestLogger())
 	h := handlers.New(auth, oauthReg)
 
