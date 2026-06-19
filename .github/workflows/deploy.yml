@@ -101,6 +101,7 @@ jobs:
         with:
           host:     ${{ secrets.OVH_HOST }}
           username: ${{ secrets.OVH_USER }}
+          port:     2222
           key:      ${{ secrets.OVH_SSH_KEY }}
           script: |
             cd /opt/breezy
