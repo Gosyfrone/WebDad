@@ -650,7 +650,7 @@ func (s *AuthService) CompleteOAuthSignup(provider, rawToken string) (string, st
 	if err != nil {
 		return "", "", nil, fmt.Errorf("transaction OAuth signup : %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	const readToken = `
 		SELECT id, provider::text, provider_subject, email, expires_at, used_at
