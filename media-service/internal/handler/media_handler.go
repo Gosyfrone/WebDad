@@ -137,11 +137,11 @@ func (h *MediaHandler) SearchGiphy(c *gin.Context) {
 	limit := clampLimit(c.Query("limit"), 20, 1, 50)
 
 	if h.giphyAPIKey == "" {
-		c.JSON(http.StatusOK, gin.H{"data": fallbackGifs(q, limit)})
+		c.JSON(http.StatusOK, giphyListResponse{Data: fallbackGifs(q, limit)})
 		return
 	}
 	if isPublicBetaGiphyKey(h.giphyAPIKey) {
-		c.JSON(http.StatusOK, gin.H{"data": fallbackGifs(q, limit)})
+		c.JSON(http.StatusOK, giphyListResponse{Data: fallbackGifs(q, limit)})
 		return
 	}
 
@@ -165,19 +165,19 @@ func (h *MediaHandler) SearchGiphy(c *gin.Context) {
 	res, err := h.httpClient.Do(req)
 	if err != nil {
 		logging.FromGin(c).Warn("giphy indisponible", "error", err)
-		c.JSON(http.StatusOK, gin.H{"data": fallbackGifs(q, limit)})
+		c.JSON(http.StatusOK, giphyListResponse{Data: fallbackGifs(q, limit)})
 		return
 	}
 	defer func() { _ = res.Body.Close() }()
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
 		logging.FromGin(c).Warn("giphy a refusé la requête", "status", res.StatusCode)
-		c.JSON(http.StatusOK, gin.H{"data": fallbackGifs(q, limit)})
+		c.JSON(http.StatusOK, giphyListResponse{Data: fallbackGifs(q, limit)})
 		return
 	}
 
 	var body giphyAPIResponse
 	if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
-		c.JSON(http.StatusOK, gin.H{"data": fallbackGifs(q, limit)})
+		c.JSON(http.StatusOK, giphyListResponse{Data: fallbackGifs(q, limit)})
 		return
 	}
 
@@ -203,7 +203,7 @@ func (h *MediaHandler) SearchGiphy(c *gin.Context) {
 	if len(gifs) == 0 {
 		gifs = fallbackGifs(q, limit)
 	}
-	c.JSON(http.StatusOK, gin.H{"data": gifs})
+	c.JSON(http.StatusOK, giphyListResponse{Data: gifs})
 }
 
 // Upload : POST /media (multipart, champ `file`). Valide le type réel (magic
