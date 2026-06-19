@@ -1,9 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import {
   Bookmark,
+  Clipboard,
+  Download,
   Flag,
   Heart,
   Loader2,
@@ -679,66 +682,255 @@ function MediaGallery({
   onOpen?: (index: number) => void
   compact?: boolean
 }) {
+  const { t } = useLanguage()
+  const { toast } = useToast()
+  const [menu, setMenu] = useState<{ url: string; x: number; y: number } | null>(null)
+  const imageLongPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const imageLongPressed = useRef(false)
+
+  useEffect(() => {
+    if (!menu) return
+    function close() {
+      setMenu(null)
+    }
+    window.addEventListener('pointerdown', close)
+    window.addEventListener('scroll', close, true)
+    window.addEventListener('resize', close)
+    return () => {
+      window.removeEventListener('pointerdown', close)
+      window.removeEventListener('scroll', close, true)
+      window.removeEventListener('resize', close)
+    }
+  }, [menu])
+
+  function clearImageLongPress() {
+    if (!imageLongPressTimer.current) return
+    clearTimeout(imageLongPressTimer.current)
+    imageLongPressTimer.current = null
+  }
+
+  function startImageLongPress(e: React.PointerEvent, url: string) {
+    if (e.pointerType === 'mouse') return
+    clearImageLongPress()
+    imageLongPressed.current = false
+    const { clientX, clientY } = e
+    imageLongPressTimer.current = setTimeout(() => {
+      imageLongPressed.current = true
+      setMenu({ url, x: clientX, y: clientY })
+    }, 520)
+  }
+
+  function handleImageClick(e: React.MouseEvent, index: number) {
+    if (imageLongPressed.current) {
+      e.preventDefault()
+      e.stopPropagation()
+      imageLongPressed.current = false
+      return
+    }
+    onOpen?.(index)
+  }
+
+  async function copyImage(url: string) {
+    try {
+      await copyImageToClipboard(url)
+      toast({ title: t('media.copy_success') })
+    } catch {
+      toast({ title: t('media.copy_failed'), variant: 'destructive' })
+    } finally {
+      setMenu(null)
+    }
+  }
+
+  async function saveImage(url: string) {
+    try {
+      await downloadImage(url)
+      toast({ title: t('media.save_started') })
+    } catch {
+      toast({ title: t('media.save_failed'), variant: 'destructive' })
+    } finally {
+      setMenu(null)
+    }
+  }
+
   return (
-    <div
-      className={cn(
-        'mt-2 grid gap-1.5 overflow-hidden border border-border',
-        compact ? 'rounded-xl' : 'rounded-2xl',
-        media.length === 1 ? 'grid-cols-1' : 'grid-cols-2',
-      )}
-    >
-      {media.map((m, i) => {
-        const sizing = cn(
-          media.length === 1 ? (compact ? 'max-h-64' : 'max-h-[32rem]') : 'aspect-square',
-          media.length === 3 && i === 0 && 'row-span-2 aspect-auto',
-        )
-        // Cellule vidéo : un ratio défini est nécessaire (le `<video>` interne
-        // est en `h-full`). 1 média = 16:9 ; sinon carré (grille).
-        const videoCell = cn(
-          media.length === 1 ? 'aspect-video' : 'aspect-square',
-          media.length === 3 && i === 0 && 'row-span-2 aspect-auto',
-        )
-        // Vidéo : lecture auto en muet + boucle + vitesse (cf. FeedVideo), pas
-        // d'ouverture en vue photo. L'image s'ouvre en grand au clic.
-        if (m.type === 'video') {
-          return <FeedVideo key={m.url} src={m.url} className={videoCell} />
-        }
+    <>
+      <div
+        className={cn(
+          'mt-2 grid gap-1.5 overflow-hidden border border-border',
+          compact ? 'rounded-xl' : 'rounded-2xl',
+          media.length === 1 ? 'grid-cols-1' : 'grid-cols-2',
+        )}
+      >
+        {media.map((m, i) => {
+          const sizing = cn(
+            media.length === 1 ? (compact ? 'max-h-64' : 'max-h-[32rem]') : 'aspect-square',
+            media.length === 3 && i === 0 && 'row-span-2 aspect-auto',
+          )
+          // Cellule vidéo : un ratio défini est nécessaire (le `<video>` interne
+          // est en `h-full`). 1 média = 16:9 ; sinon carré (grille).
+          const videoCell = cn(
+            media.length === 1 ? 'aspect-video' : 'aspect-square',
+            media.length === 3 && i === 0 && 'row-span-2 aspect-auto',
+          )
+          // Vidéo : lecture auto en muet + boucle + vitesse (cf. FeedVideo), pas
+          // d'ouverture en vue photo. L'image s'ouvre en grand au clic.
+          if (m.type === 'video') {
+            return <FeedVideo key={m.url} src={m.url} className={videoCell} />
+          }
 
-        const image = (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={m.url}
-            alt=""
-            loading="lazy"
-            className={cn('h-full w-full object-cover transition group-hover:brightness-95', sizing)}
-          />
-        )
+          const image = (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={m.url}
+              alt=""
+              loading="lazy"
+              className={cn('h-full w-full object-cover transition group-hover:brightness-95', sizing)}
+            />
+          )
 
-        if (!onOpen) {
+          if (!onOpen) {
+            return (
+              <div
+                key={m.url}
+                data-no-nav
+                onPointerDown={(e) => startImageLongPress(e, m.url)}
+                onPointerUp={clearImageLongPress}
+                onPointerCancel={clearImageLongPress}
+                onPointerLeave={clearImageLongPress}
+                onContextMenu={(e) => e.preventDefault()}
+                className={cn('group relative block overflow-hidden', media.length === 3 && i === 0 && 'row-span-2')}
+              >
+                {image}
+              </div>
+            )
+          }
+
           return (
-            <div
+            <button
               key={m.url}
+              type="button"
+              data-no-nav
+              onClick={(e) => handleImageClick(e, i)}
+              onPointerDown={(e) => startImageLongPress(e, m.url)}
+              onPointerUp={clearImageLongPress}
+              onPointerCancel={clearImageLongPress}
+              onPointerLeave={clearImageLongPress}
+              onContextMenu={(e) => e.preventDefault()}
               className={cn('group relative block overflow-hidden', media.length === 3 && i === 0 && 'row-span-2')}
+              aria-label={t('media.open_image')}
             >
               {image}
-            </div>
+            </button>
           )
-        }
-
-        return (
-          <button
-            key={m.url}
-            type="button"
-            onClick={() => onOpen?.(i)}
-            className={cn('group relative block overflow-hidden', media.length === 3 && i === 0 && 'row-span-2')}
-            aria-label="Agrandir l'image"
-          >
-            {image}
-          </button>
-        )
-      })}
-    </div>
+        })}
+      </div>
+      {menu && (
+        <ImageActionMenu
+          x={menu.x}
+          y={menu.y}
+          onCopy={() => void copyImage(menu.url)}
+          onSave={() => void saveImage(menu.url)}
+          copyLabel={t('media.copy_image')}
+          saveLabel={t('media.save_image')}
+        />
+      )}
+    </>
   )
+}
+
+function ImageActionMenu({
+  x,
+  y,
+  onCopy,
+  onSave,
+  copyLabel,
+  saveLabel,
+}: {
+  x: number
+  y: number
+  onCopy: () => void
+  onSave: () => void
+  copyLabel: string
+  saveLabel: string
+}) {
+  if (typeof document === 'undefined') return null
+
+  const left = Math.min(Math.max(12, x - 88), window.innerWidth - 188)
+  const top = Math.min(Math.max(12, y + 14), window.innerHeight - 112)
+
+  return createPortal(
+    <div
+      data-no-nav
+      onPointerDown={(e) => e.stopPropagation()}
+      className="fixed z-[70] w-44 overflow-hidden rounded-xl border bg-popover p-1 text-popover-foreground shadow-2xl"
+      style={{ left, top }}
+      role="menu"
+    >
+      <button
+        type="button"
+        onClick={onCopy}
+        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors hover:bg-accent focus:bg-accent focus:outline-none"
+        role="menuitem"
+      >
+        <Clipboard className="h-4 w-4" />
+        {copyLabel}
+      </button>
+      <button
+        type="button"
+        onClick={onSave}
+        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors hover:bg-accent focus:bg-accent focus:outline-none"
+        role="menuitem"
+      >
+        <Download className="h-4 w-4" />
+        {saveLabel}
+      </button>
+    </div>,
+    document.body,
+  )
+}
+
+async function fetchImageBlob(url: string): Promise<Blob> {
+  const res = await fetch(url)
+  if (!res.ok) throw new Error('image_fetch_failed')
+  const blob = await res.blob()
+  if (!blob.type.startsWith('image/')) throw new Error('not_an_image')
+  return blob
+}
+
+async function copyImageToClipboard(url: string): Promise<void> {
+  if (!navigator.clipboard || typeof ClipboardItem === 'undefined') {
+    throw new Error('clipboard_unavailable')
+  }
+  const blob = await fetchImageBlob(url)
+  await navigator.clipboard.write([
+    new ClipboardItem({
+      [blob.type || 'image/png']: blob,
+    }),
+  ])
+}
+
+async function downloadImage(url: string): Promise<void> {
+  const blob = await fetchImageBlob(url)
+  const objectUrl = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = objectUrl
+  a.download = imageFileName(url, blob.type)
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  setTimeout(() => URL.revokeObjectURL(objectUrl), 1000)
+}
+
+function imageFileName(url: string, mimeType: string): string {
+  const extFromMime = mimeType.split('/')[1]?.split(';')[0]
+  try {
+    const parsed = new URL(url, window.location.href)
+    const last = parsed.pathname.split('/').filter(Boolean).pop()
+    if (last && /\.[a-z0-9]+$/i.test(last)) return last
+  } catch {
+    // Fallback below.
+  }
+  return `breezy-image.${extFromMime || 'png'}`
 }
 
 function QuotedPost({ post }: { post: FeedPost }) {
