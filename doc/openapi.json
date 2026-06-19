@@ -8575,6 +8575,9 @@
     "handler.uploadResponse": {
       "type": "object",
       "properties": {
+        "height": {
+          "type": "integer"
+        },
         "id": {
           "type": "string"
         },
@@ -8589,6 +8592,35 @@
         },
         "url": {
           "type": "string"
+        },
+        "variants": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/handler.variantPayload"
+          }
+        },
+        "width": {
+          "type": "integer"
+        }
+      }
+    },
+    "handler.variantPayload": {
+      "type": "object",
+      "properties": {
+        "height": {
+          "type": "integer"
+        },
+        "mime": {
+          "type": "string"
+        },
+        "size": {
+          "type": "integer"
+        },
+        "url": {
+          "type": "string"
+        },
+        "width": {
+          "type": "integer"
         }
       }
     }

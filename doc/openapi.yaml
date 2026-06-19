@@ -5645,6 +5645,8 @@ definitions:
   handler.uploadResponse:
     type: object
     properties:
+      height:
+        type: integer
       id:
         type: string
       kind:
@@ -5655,5 +5657,24 @@ definitions:
         type: integer
       url:
         type: string
+      variants:
+        type: object
+        additionalProperties:
+          $ref: '#/definitions/handler.variantPayload'
+      width:
+        type: integer
+  handler.variantPayload:
+    type: object
+    properties:
+      height:
+        type: integer
+      mime:
+        type: string
+      size:
+        type: integer
+      url:
+        type: string
+      width:
+        type: integer
 host: localhost:8080
 basePath: /
