@@ -80,6 +80,19 @@ CREATE TABLE IF NOT EXISTS follow_requests (
 CREATE INDEX IF NOT EXISTS idx_follow_requests_follower ON follow_requests(follower_id);
 CREATE INDEX IF NOT EXISTS idx_follow_requests_following ON follow_requests(following_id);
 
+-- Blocages utilisateur. Relation privée portée par user-service, utilisée par
+-- post-service pour masquer l'activité des comptes bloqués côté serveur.
+CREATE TABLE IF NOT EXISTS blocks (
+    blocker_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    blocked_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (blocker_id, blocked_id),
+    CONSTRAINT no_self_block CHECK (blocker_id != blocked_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_blocks_blocker ON blocks(blocker_id);
+CREATE INDEX IF NOT EXISTS idx_blocks_blocked ON blocks(blocked_id);
+
 -- Trigger updated_at automatique (CREATE OR REPLACE → idempotent, PG ≥ 14).
 CREATE OR REPLACE FUNCTION update_updated_at()
 RETURNS TRIGGER AS $$

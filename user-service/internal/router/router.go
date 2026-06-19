@@ -56,10 +56,13 @@ func New(users *service.UserService, jwtSecret string) *gin.Engine {
 		u.POST("/admin", auth, middleware.AdminOnly(), h.AdminCreate)
 		u.GET("/me", auth, h.GetMe)
 		u.PATCH("/me", auth, h.UpdateMe)
+		u.GET("/me/blocks", auth, h.BlockedUsers)
 		u.GET("/me/follow-requests/outgoing", auth, h.PendingFollowRequests)
 		u.DELETE("/me/followers/:id", auth, h.RemoveFollower)
 		u.POST("/:id/follow", auth, h.Follow)
 		u.DELETE("/:id/follow", auth, h.Unfollow)
+		u.POST("/:id/block", auth, h.Block)
+		u.DELETE("/:id/block", auth, h.Unblock)
 		u.POST("/follow-requests/:followerId/accept", auth, h.AcceptFollowRequest)
 		u.POST("/follow-requests/:followerId/reject", auth, h.RejectFollowRequest)
 
@@ -78,6 +81,7 @@ func New(users *service.UserService, jwtSecret string) *gin.Engine {
 	{
 		internal.GET("/:userId/is-following/:followingId", h.IsFollowing)
 		internal.GET("/follows/:userId/is-following/:followingId", h.IsFollowing)
+		internal.GET("/users/:blockerId/has-blocked/:blockedId", h.HasBlocked)
 		// Acceptation en masse (privé → public), émise par profil-service.
 		internal.POST("/users/:ownerId/accept-all-follow-requests", h.AcceptAllFollowRequests)
 	}

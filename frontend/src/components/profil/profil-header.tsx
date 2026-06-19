@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { CalendarDays, Flag, LinkIcon, Mail, MapPin, Share } from 'lucide-react'
+import { CalendarDays, Flag, LinkIcon, Mail, MapPin, MoreHorizontal, Share, UserCheck, UserX } from 'lucide-react'
 
 import { cn, initialOf } from '@/lib/utils'
 import { countryFlag, countryName } from '@/lib/countries'
@@ -14,6 +14,12 @@ import { useLanguage } from '@/components/language-provider'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import {
   Dialog,
   DialogContent,
@@ -38,6 +44,9 @@ interface ProfilHeaderProps {
   /** Changement de username (service distinct) ; le parent recharge sur succès. */
   onEditUsername: (username: string) => Promise<UsernameUpdateResult>
   onFollowChanged?: (following: boolean) => void
+  blocked?: boolean
+  blockPending?: boolean
+  onBlockToggle?: (blocked: boolean) => void | Promise<void>
 }
 
 /**
@@ -52,6 +61,9 @@ export function ProfilHeader({
   onEdit,
   onEditUsername,
   onFollowChanged,
+  blocked = false,
+  blockPending = false,
+  onBlockToggle,
 }: ProfilHeaderProps) {
   const { t, locale } = useLanguage()
   const initials = initialOf(profil.displayName, profil.username)
@@ -66,9 +78,9 @@ export function ProfilHeader({
     useFollow(!isOwner)
   const canFollow =
     !isOwner && currentUserId !== null && currentUserId !== profil.userId
-  const followingProfile = isFollowing(profil.userId)
+  const followingProfile = !blocked && isFollowing(profil.userId)
   const relationsLocked =
-    profil.visibility === 'private' && !isOwner && !followingProfile
+    (blocked || profil.visibility === 'private') && !isOwner && !followingProfile
 
   function openRelations(tab: RelationKind) {
     setRelationsTab(tab)
@@ -132,49 +144,36 @@ export function ProfilHeader({
               </EditProfilDialog>
             ) : canFollow ? (
               <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  aria-label={t('share.title')}
-                  title={t('share.title')}
-                  onClick={() => setShareOpen(true)}
-                  className="rounded-full border-white/70 bg-white/80 shadow-sm backdrop-blur hover:bg-white dark:border-white/15 dark:bg-white/10 dark:hover:bg-white/20"
-                >
-                  <Share className="h-4 w-4" />
-                </Button>
-                <Button
-                  asChild
-                  variant="outline"
-                  size="icon"
-                  aria-label={t('messages.message_action')}
-                  title={t('messages.message_action')}
-                  className="rounded-full border-white/70 bg-white/80 shadow-sm backdrop-blur hover:bg-white dark:border-white/15 dark:bg-white/10 dark:hover:bg-white/20"
-                >
-                  <Link href={`${ROUTES.messages}?dm=${profil.userId}`}>
-                    <Mail className="h-4 w-4" />
-                  </Link>
-                </Button>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  aria-label={t('report.profile_action')}
-                  title={t('report.profile_action')}
-                  onClick={() => setReportOpen(true)}
-                  className="rounded-full border-white/70 bg-white/80 shadow-sm backdrop-blur hover:bg-white dark:border-white/15 dark:bg-white/10 dark:hover:bg-white/20"
-                >
-                  <Flag className="h-4 w-4" />
-                </Button>
-                <FollowButton
-                  following={followingProfile}
-                  requested={isRequested(profil.userId)}
-                  pending={isPending(profil.userId)}
-                  privateProfile={profil.visibility === 'private'}
-                  onToggle={async (next) => {
-                    const result = await toggle(toRelationUser(profil), next)
-                    if (result === 'failed') return
-                    onFollowChanged?.(result === 'following')
-                  }}
+                <ProfileActionsMenu
+                  userId={profil.userId}
+                  onShare={() => setShareOpen(true)}
+                  onReport={() => setReportOpen(true)}
+                  onBlock={() => void onBlockToggle?.(true)}
+                  blocked={blocked}
                 />
+                {blocked ? (
+                  <Button
+                    disabled={blockPending}
+                    onClick={() => void onBlockToggle?.(false)}
+                    variant="outline"
+                    className="rounded-full border-white/70 bg-white/80 font-bold backdrop-blur hover:bg-white dark:border-white/15 dark:bg-white/10 dark:hover:bg-white/20"
+                  >
+                    <UserCheck className="mr-2 h-4 w-4" />
+                    {t('block.unblock_user')}
+                  </Button>
+                ) : (
+                  <FollowButton
+                    following={followingProfile}
+                    requested={isRequested(profil.userId)}
+                    pending={isPending(profil.userId)}
+                    privateProfile={profil.visibility === 'private'}
+                    onToggle={async (next) => {
+                      const result = await toggle(toRelationUser(profil), next)
+                      if (result === 'failed') return
+                      onFollowChanged?.(result === 'following')
+                    }}
+                  />
+                )}
               </div>
             ) : null}
 
@@ -232,12 +231,14 @@ export function ProfilHeader({
           <span className="text-sm text-muted-foreground">
             @{profil.username}
           </span>
-          <ActivityStatus
-            userId={profil.userId}
-            initialLastLoginAt={profil.lastLoginAt}
-            initialIsOnline={profil.isOnline}
-            className="text-xs"
-          />
+          {!blocked && (
+            <ActivityStatus
+              userId={profil.userId}
+              initialLastLoginAt={profil.lastLoginAt}
+              initialIsOnline={profil.isOnline}
+              className="text-xs"
+            />
+          )}
         </div>
 
         {/* Bio */}
@@ -314,6 +315,59 @@ export function ProfilHeader({
         title={profil.displayName}
       />
     </header>
+  )
+}
+
+function ProfileActionsMenu({
+  userId,
+  onShare,
+  onReport,
+  onBlock,
+  blocked,
+}: {
+  userId: string
+  onShare: () => void
+  onReport: () => void
+  onBlock: () => void
+  blocked: boolean
+}) {
+  const { t } = useLanguage()
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="outline"
+          size="icon"
+          aria-label={t('post.more_options')}
+          title={t('post.more_options')}
+          className="rounded-full border-white/70 bg-white/80 shadow-sm backdrop-blur hover:bg-white dark:border-white/15 dark:bg-white/10 dark:hover:bg-white/20"
+        >
+          <MoreHorizontal className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={onShare} className="cursor-pointer">
+          <Share className="mr-2 h-4 w-4" />
+          {t('share.title')}
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild className="cursor-pointer">
+          <Link href={`${ROUTES.messages}?dm=${userId}`}>
+            <Mail className="mr-2 h-4 w-4" />
+            {t('messages.message_action')}
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={onReport} className="cursor-pointer">
+          <Flag className="mr-2 h-4 w-4" />
+          {t('report.profile_action')}
+        </DropdownMenuItem>
+        {!blocked && (
+          <DropdownMenuItem onClick={onBlock} className="cursor-pointer text-red-500 focus:text-red-500">
+            <UserX className="mr-2 h-4 w-4" />
+            {t('block.block_user')}
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
 

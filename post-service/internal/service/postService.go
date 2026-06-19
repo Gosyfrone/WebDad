@@ -102,6 +102,7 @@ type profilVisibilityClient interface {
 
 type followStatusClient interface {
 	IsFollowing(ctx context.Context, followerID, followingID string) (bool, error)
+	HasBlocked(ctx context.Context, blockerID, blockedID string) (bool, error)
 }
 
 // feedBroadcaster diffuse en temps réel la création d'un post (ping WebSocket).
@@ -869,6 +870,13 @@ func (s *PostService) canReadAuthor(ctx context.Context, viewerID, authorID stri
 	if viewerID != "" && viewerID == authorID {
 		return true, nil
 	}
+	blocked, err := s.hasBlocked(ctx, viewerID, authorID)
+	if err != nil {
+		return false, err
+	}
+	if blocked {
+		return false, nil
+	}
 	if s.profilClient == nil {
 		return true, nil
 	}
@@ -889,6 +897,17 @@ func (s *PostService) canReadAuthor(ctx context.Context, viewerID, authorID stri
 		return false, fmt.Errorf("%w: vérification abonnement: %v", ErrDependencyUnavailable, err)
 	}
 	return isFollowing, nil
+}
+
+func (s *PostService) hasBlocked(ctx context.Context, viewerID, authorID string) (bool, error) {
+	if viewerID == "" || viewerID == authorID || s.followClient == nil {
+		return false, nil
+	}
+	blocked, err := s.followClient.HasBlocked(ctx, viewerID, authorID)
+	if err != nil {
+		return false, fmt.Errorf("%w: vérification blocage: %v", ErrDependencyUnavailable, err)
+	}
+	return blocked, nil
 }
 
 // LikePost enregistre un like de actorID sur un post et renvoie le nombre de
@@ -1080,6 +1099,11 @@ func (s *PostService) PostLikers(ctx context.Context, id string) ([]string, erro
 // Retourne ErrForbidden si les likes de authorID sont privés et que callerID
 // n'est pas authorID.
 func (s *PostService) ListLikedByUser(ctx context.Context, authorID, callerID string, limit, offset int64) ([]*models.Post, error) {
+	if blocked, err := s.hasBlocked(ctx, callerID, authorID); err != nil {
+		return nil, err
+	} else if blocked {
+		return []*models.Post{}, nil
+	}
 	if s.profilClient != nil && callerID != authorID {
 		lv, err := s.profilClient.LikesVisibility(ctx, authorID)
 		if err != nil {
@@ -1312,6 +1336,11 @@ func (s *PostService) postAuthor(ctx context.Context, id string) string {
 // de leur post parent, filtrés par la barrière de visibilité : les réponses
 // dont le post parent est masqué ou n'est pas lisible par viewerID sont exclues.
 func (s *PostService) ListCommentsByAuthor(ctx context.Context, authorID, viewerID string, limit, offset int64) ([]models.CommentWithPost, error) {
+	if blocked, err := s.hasBlocked(ctx, viewerID, authorID); err != nil {
+		return nil, err
+	} else if blocked {
+		return []models.CommentWithPost{}, nil
+	}
 	limit = clampLimit(limit)
 	offset = clampOffset(offset)
 

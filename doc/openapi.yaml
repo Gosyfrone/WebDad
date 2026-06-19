@@ -1363,6 +1363,28 @@ paths:
             type: object
             additionalProperties:
               type: string
+  /users/me/blocks:
+    get:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - users
+      summary: Lister mes blocages
+      responses:
+        '200':
+          description: Liste d'IDs bloqués
+          schema:
+            type: array
+            items:
+              type: string
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
   /users/me/follow-requests/outgoing:
     get:
       security:
@@ -1521,6 +1543,81 @@ paths:
               type: string
         '403':
           description: Réservé admin
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '404':
+          description: Not Found
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /users/{id}/block:
+    post:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - users
+      summary: Bloquer un utilisateur
+      parameters:
+      - type: string
+        description: ID de l'utilisateur à bloquer
+        name: id
+        in: path
+        required: true
+      responses:
+        '200':
+          description: 'status: blocked'
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '400':
+          description: Bad Request
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '404':
+          description: Not Found
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+    delete:
+      security:
+      - BearerAuth: []
+      produces:
+      - application/json
+      tags:
+      - users
+      summary: Débloquer un utilisateur
+      parameters:
+      - type: string
+        description: ID de l'utilisateur à débloquer
+        name: id
+        in: path
+        required: true
+      responses:
+        '204':
+          description: No Content
+        '400':
+          description: Bad Request
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '401':
+          description: Unauthorized
           schema:
             type: object
             additionalProperties:

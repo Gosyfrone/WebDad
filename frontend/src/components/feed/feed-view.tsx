@@ -11,7 +11,7 @@ import {
   readMutedWords,
   subscribeMutedWords,
 } from '@/lib/content-filters'
-import { getFollowingIds } from '@/lib/api'
+import { getBlockedUserIds, getFollowingIds } from '@/lib/api'
 import { subscribeProfilUpdated } from '@/lib/profil-client'
 import { useInfiniteScroll } from '@/lib/use-infinite-scroll'
 import {
@@ -31,6 +31,7 @@ import {
 } from '@/lib/posts'
 import { usePostStatsPolling } from '@/lib/use-post-stats-polling'
 import { ROUTES, hashtagHref, postHref, searchHref } from '@/lib/routes'
+import { BLOCK_CHANGE_EVENT, type BlockChangeDetail } from '@/lib/use-block'
 import { CreatePost } from '@/components/feed/create-post'
 import { PostCard } from '@/components/feed/post-card'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -106,6 +107,7 @@ export function FeedView() {
   const [bannerAuthor, setBannerAuthor] = useState<PostAuthor | null>(null)
   // Ensemble des comptes suivis (filtre du bandeau pour l'onglet « Abonnements »).
   const followingIdsRef = useRef<Set<string>>(new Set())
+  const blockedIdsRef = useRef<Set<string>>(new Set())
   // Miroirs des valeurs courantes pour le callback WS (monté une seule fois).
   const tabRef = useRef(tab)
   const selectedHashtagRef = useRef(selectedHashtag)
@@ -217,15 +219,34 @@ export function FeedView() {
   useEffect(() => {
     if (!viewerUserId) return
     let cancelled = false
-    void getFollowingIds(viewerUserId)
-      .then((set) => {
-        if (!cancelled) followingIdsRef.current = set
+    void Promise.all([getFollowingIds(viewerUserId), getBlockedUserIds()])
+      .then(([followingIds, blockedIds]) => {
+        if (!cancelled) {
+          followingIdsRef.current = followingIds
+          blockedIdsRef.current = blockedIds
+        }
       })
       .catch(() => {})
     return () => {
       cancelled = true
     }
   }, [viewerUserId])
+
+  useEffect(() => {
+    function onBlockChange(event: Event) {
+      const { userId, blocked } = (event as CustomEvent<BlockChangeDetail>).detail
+      if (blocked) {
+        blockedIdsRef.current.add(userId)
+        setPendingPings((prev) => prev.filter((ping) => ping.authorId !== userId))
+        setPosts((prev) => prev.filter((post) => post.author.id !== userId))
+        if (bannerAuthor?.id === userId) setBannerAuthor(null)
+        return
+      }
+      blockedIdsRef.current.delete(userId)
+    }
+    window.addEventListener(BLOCK_CHANGE_EVENT, onBlockChange)
+    return () => window.removeEventListener(BLOCK_CHANGE_EVENT, onBlockChange)
+  }, [bannerAuthor?.id])
 
   // Connexion WebSocket du fil (montée une seule fois ; visiteur exclu). À chaque
   // « ping », on filtre via les refs (pas mes posts, pas de filtre hashtag actif,
@@ -236,6 +257,7 @@ export function FeedView() {
     const handle = connectFeedRealtime((ping: NewPostPing) => {
       if (selectedHashtagRef.current) return
       if (ping.authorId === viewerRef.current) return
+      if (blockedIdsRef.current.has(ping.authorId)) return
       if (postsRef.current.some((p) => p.id === ping.postId)) return
       if (pendingRef.current.some((p) => p.postId === ping.postId)) return
       if (tabRef.current === 'following' && !followingIdsRef.current.has(ping.authorId)) return

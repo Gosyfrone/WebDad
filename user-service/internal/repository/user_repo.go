@@ -375,6 +375,85 @@ func (r *UserRepository) IsFollowing(followerID, followingID string) (bool, erro
 	return exists, err
 }
 
+// Block crée un blocage blockerID → blockedID. Idempotent. La transaction retire
+// aussi les relations/demandes de suivi dans les deux sens pour éviter qu'un
+// blocage conserve une relation sociale active.
+func (r *UserRepository) Block(blockerID, blockedID string) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if _, err := tx.Exec(`
+		DELETE FROM follows
+		WHERE (follower_id = $1 AND following_id = $2)
+		   OR (follower_id = $2 AND following_id = $1)`,
+		blockerID, blockedID,
+	); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`
+		DELETE FROM follow_requests
+		WHERE (follower_id = $1 AND following_id = $2)
+		   OR (follower_id = $2 AND following_id = $1)`,
+		blockerID, blockedID,
+	); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`
+		INSERT INTO blocks (blocker_id, blocked_id)
+		VALUES ($1, $2)
+		ON CONFLICT (blocker_id, blocked_id) DO NOTHING`,
+		blockerID, blockedID,
+	); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// Unblock supprime un blocage (idempotent).
+func (r *UserRepository) Unblock(blockerID, blockedID string) error {
+	_, err := r.db.Exec(`DELETE FROM blocks WHERE blocker_id = $1 AND blocked_id = $2`, blockerID, blockedID)
+	return err
+}
+
+// BlockedIDs renvoie les ids bloqués par blockerID, du plus récent au plus ancien.
+func (r *UserRepository) BlockedIDs(blockerID string) ([]string, error) {
+	rows, err := r.db.Query(`
+		SELECT blocked_id::text
+		FROM blocks
+		WHERE blocker_id = $1
+		ORDER BY created_at DESC`,
+		blockerID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	ids := make([]string, 0)
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
+func (r *UserRepository) HasBlocked(blockerID, blockedID string) (bool, error) {
+	var exists bool
+	err := r.db.QueryRow(`
+		SELECT EXISTS (
+			SELECT 1 FROM blocks
+			WHERE blocker_id = $1 AND blocked_id = $2
+		)`,
+		blockerID, blockedID,
+	).Scan(&exists)
+	return exists, err
+}
+
 // escapeLike neutralise les métacaractères LIKE (`%`, `_`, `\`) pour que la
 // saisie utilisateur soit traitée littéralement dans un motif ILIKE.
 func escapeLike(s string) string {

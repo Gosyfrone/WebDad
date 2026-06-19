@@ -268,6 +268,17 @@ export async function getUserByUsername(username: string): Promise<RelationUser 
   return enrichFromUser(body.data)
 }
 
+/** Résout un utilisateur par son ID, enrichi du décoratif. */
+export async function getUserById(userId: string): Promise<RelationUser | null> {
+  const id = userId.trim()
+  if (!id) return null
+  const res = await apiFetch(`/users/${encodeURIComponent(id)}`)
+  if (!res.ok) return null
+  const body = (await res.json().catch(() => null)) as { data?: ApiUser } | null
+  if (!body?.data) return null
+  return enrichFromUser(body.data)
+}
+
 /** Comptes les plus suivis (« Qui suivre »), enrichis du décoratif. */
 export async function getSuggestions(limit = 10): Promise<RelationUser[]> {
   const users = await unwrap<ApiUser[]>(
@@ -304,10 +315,25 @@ export async function getPendingFollowRequestIds(): Promise<Set<string>> {
   return new Set(ids ?? [])
 }
 
+export async function getBlockedUserIds(): Promise<Set<string>> {
+  const ids = await unwrap<string[]>(await apiFetch('/users/me/blocks'))
+  return new Set(ids ?? [])
+}
+
 /** Se désabonne (`DELETE /users/:id/follow`, idempotent côté API). */
 export async function unfollow(userId: string): Promise<void> {
   const res = await apiFetch(`/users/${userId}/follow`, { method: 'DELETE' })
   if (!res.ok) throw new ApiError('Désabonnement impossible', res.status)
+}
+
+export async function blockUser(userId: string): Promise<void> {
+  const res = await apiFetch(`/users/${userId}/block`, { method: 'POST' })
+  if (!res.ok) throw new ApiError('Blocage impossible', res.status)
+}
+
+export async function unblockUser(userId: string): Promise<void> {
+  const res = await apiFetch(`/users/${userId}/block`, { method: 'DELETE' })
+  if (!res.ok) throw new ApiError('Déblocage impossible', res.status)
 }
 
 export async function acceptFollowRequest(followerId: string): Promise<void> {

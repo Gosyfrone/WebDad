@@ -131,6 +131,84 @@ func (h *Handler) IsFollowing(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"isFollowing": isFollowing})
 }
 
+// Block : POST /users/:id/block — bloque un utilisateur.
+// @Summary     Bloquer un utilisateur
+// @Tags        users
+// @Produce     json
+// @Security    BearerAuth
+// @Param       id path string true "ID de l'utilisateur à bloquer"
+// @Success     200 {object} map[string]string "status: blocked"
+// @Failure     400 {object} map[string]string
+// @Failure     401 {object} map[string]string
+// @Failure     404 {object} map[string]string
+// @Router      /users/{id}/block [post]
+func (h *Handler) Block(c *gin.Context) {
+	claims, ok := middleware.ClaimsFrom(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "claims absents"})
+		return
+	}
+	if err := h.users.Block(claims.UserID, c.Param("id")); err != nil {
+		respondUserError(c, err)
+		return
+	}
+	logging.FromGin(c).Info("block", "target_id", c.Param("id"))
+	c.JSON(http.StatusOK, gin.H{"data": gin.H{"status": "blocked"}})
+}
+
+// Unblock : DELETE /users/:id/block — débloque un utilisateur.
+// @Summary     Débloquer un utilisateur
+// @Tags        users
+// @Produce     json
+// @Security    BearerAuth
+// @Param       id path string true "ID de l'utilisateur à débloquer"
+// @Success     204
+// @Failure     400 {object} map[string]string
+// @Failure     401 {object} map[string]string
+// @Failure     404 {object} map[string]string
+// @Router      /users/{id}/block [delete]
+func (h *Handler) Unblock(c *gin.Context) {
+	claims, ok := middleware.ClaimsFrom(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "claims absents"})
+		return
+	}
+	if err := h.users.Unblock(claims.UserID, c.Param("id")); err != nil {
+		respondUserError(c, err)
+		return
+	}
+	logging.FromGin(c).Info("unblock", "target_id", c.Param("id"))
+	c.Status(http.StatusNoContent)
+}
+
+// BlockedUsers : GET /users/me/blocks — ids bloqués par l'utilisateur courant.
+// @Summary     Lister mes blocages
+// @Tags        users
+// @Produce     json
+// @Security    BearerAuth
+// @Success     200 {array} string "Liste d'IDs bloqués"
+// @Failure     401 {object} map[string]string
+// @Router      /users/me/blocks [get]
+func (h *Handler) BlockedUsers(c *gin.Context) {
+	claims, ok := middleware.ClaimsFrom(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "claims absents"})
+		return
+	}
+	ids, err := h.users.BlockedIDs(claims.UserID)
+	if err != nil {
+		respondUserError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": ids})
+}
+
+func (h *Handler) HasBlocked(c *gin.Context) {
+	blockerID := c.Param("blockerId")
+	blockedID := c.Param("blockedId")
+	c.JSON(http.StatusOK, gin.H{"hasBlocked": h.users.HasBlocked(blockerID, blockedID)})
+}
+
 // AcceptFollowRequest : POST /users/follow-requests/:followerId/accept
 // @Summary     Accepter une demande d'abonnement
 // @Tags        users

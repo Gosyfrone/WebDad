@@ -272,14 +272,21 @@ func TestReplyAudienceOf(t *testing.T) {
 
 // stubFollow implémente followStatusClient pour les tests de la barrière.
 type stubFollow struct {
-	follows bool
-	err     error
-	calls   int
+	follows      bool
+	blocked      bool
+	err          error
+	calls        int
+	blockedCalls int
 }
 
 func (s *stubFollow) IsFollowing(context.Context, string, string) (bool, error) {
 	s.calls++
 	return s.follows, s.err
+}
+
+func (s *stubFollow) HasBlocked(context.Context, string, string) (bool, error) {
+	s.blockedCalls++
+	return s.blocked, s.err
 }
 
 // TestCanReplyTo : barrière « qui peut répondre ». everyone → toujours OK sans

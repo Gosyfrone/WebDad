@@ -318,7 +318,7 @@ func respondUserError(c *gin.Context, err error) {
 	case errors.Is(err, service.ErrUsernameTaken):
 		logging.FromGin(c).Warn("conflit de username", "reason", "username_taken")
 		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
-	case errors.Is(err, service.ErrInvalidUsername), errors.Is(err, service.ErrInvalidLocale), errors.Is(err, service.ErrSelfFollow):
+	case errors.Is(err, service.ErrInvalidUsername), errors.Is(err, service.ErrInvalidLocale), errors.Is(err, service.ErrSelfFollow), errors.Is(err, service.ErrSelfBlock):
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 	case errors.Is(err, service.ErrUsernameCooldown):
 		logging.FromGin(c).Warn("changement de username refusé", "reason", "cooldown")
