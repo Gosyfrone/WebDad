@@ -385,6 +385,18 @@
   (good for defense) vs per-endpoint BFF handlers (reserved for multi-service aggregation).
 - **No trailing-slash redirect:** each service exposed via 2 routes (bare prefix + `/*path`) so collection
   endpoints (`POST /users`) don't 307 into a route the service doesn't know.
+- **Validation + propagation JWT au gateway — premier filtre « valider-si-présent » (19/06/2026).** Middleware global
+  `PropagateJWT` (`api-gateway/internal/middleware/jwt.go`) appliqué AVANT le reverse proxy. Politique : aucun token →
+  passe-plat (login, refresh par cookie, vue visiteur publique) ; token présent mais mal formé / invalide / expiré →
+  **401 au plus tôt**, la requête n'atteint jamais le service (décharge les services, centralise le premier filtre) ;
+  token valide → injecte `X-User-Id` / `X-User-Role` / `X-Email-Verified` depuis les claims vers le service.
+  **Choix « valider-si-présent » plutôt qu'une allowlist publique ou une table de politique par route** : zéro config
+  par route au gateway, ne casse jamais les routes publiques / `OptionalJWTAuth` (vue visiteur), et n'oblige pas à
+  dupliquer le routage de chaque service (dérive). **Anti-spoof non négociable :** les en-têtes d'identité entrants
+  sont TOUJOURS strippés en premier (même sans token) — seul le gateway peut les renseigner, sinon un client les
+  usurpe. **Défense en profondeur conservée :** chaque service revalide le JWT lui-même (même `JWT_SECRET` partagé) ;
+  les en-têtes propagés sont posés pour usage futur, pas comme unique source de confiance. Le `claims` du gateway gagne
+  `email_verified` ; `AdminJWT` refactoré pour partager les helpers `parse`/`bearerToken`.
 
 ## Provisioning
 

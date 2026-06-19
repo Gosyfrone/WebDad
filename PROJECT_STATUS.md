@@ -69,7 +69,10 @@
 
 ## Open issues / TODO (active)
 
-- **Gateway JWT middleware** — protect prefixes at login (validate locally with shared `JWT_SECRET`).
+- [x] **Gateway JWT middleware (19/06/2026)** — `PropagateJWT` global, politique « valider-si-présent » :
+  rejet 401 au plus tôt d'un token invalide/expiré, strip anti-spoof des en-têtes d'identité, propagation
+  `X-User-Id`/`X-User-Role`/`X-Email-Verified` aux services (défense en profondeur : services revalident le JWT).
+  *Perspective :* faire consommer ces en-têtes par les services (remplacer leur revalidation) si on veut alléger.
 - **Real role / username (frontend)** — `(app)` layout still uses `PLACEHOLDER_ROLE = 'administrator'`;
   derive real `role`/`username` (via `/users/me` or JWT decode).
 - **Identity cooldowns** — architecture posed; activate by setting `DISPLAY_NAME_CHANGE_COOLDOWN` /

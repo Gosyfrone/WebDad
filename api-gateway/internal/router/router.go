@@ -35,11 +35,16 @@ func New(cfg *config.Config) (*gin.Engine, error) {
 		return nil, err
 	}
 
-	// Ordre : CORS en premier (pré-flight), puis RequestID, Recovery, RequestLogger.
+	// Ordre : CORS en premier (pré-flight), puis RequestID, Recovery, RequestLogger,
+	// puis PropagateJWT (premier filtre JWT, AVANT le proxy : strip anti-spoof des
+	// en-têtes d'identité, rejet 401 au plus tôt d'un token invalide, propagation
+	// des claims aux services). Politique « valider-si-présent » : sûr en global,
+	// les routes publiques sans token (login, /health) passent.
 	r.Use(middleware.CORS(cfg.AllowedOrigins))
 	r.Use(middleware.RequestID())
 	r.Use(middleware.Recovery())
 	r.Use(middleware.RequestLogger())
+	r.Use(middleware.PropagateJWT(cfg.JWTSecret))
 
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok", "service": serviceName})
@@ -53,8 +58,8 @@ func New(cfg *config.Config) (*gin.Engine, error) {
 	// Reverse proxy par préfixe vers le service cible. Deux routes par service :
 	//   - le préfixe nu (`/users`)        → endpoints collection (list, create)
 	//   - le préfixe + sous-chemin (`/users/*path`) → ressources (`/users/me`, …)
-	// (Routes publiques pour l'instant ; le middleware JWT viendra protéger les
-	// préfixes concernés quand on branchera le login.)
+	// Le filtre JWT global (PropagateJWT) s'est déjà appliqué en amont ; chaque
+	// service revalide ensuite le token et applique ses propres règles d'accès.
 	for prefix, target := range cfg.Services {
 		h, err := proxy.New(target)
 		if err != nil {

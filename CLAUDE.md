@@ -10,7 +10,7 @@
 > - Knowledge graph in `graphify-out/` — query it before reading source (Operating Rule 11).
 >
 > **Latest session work and suggested commit messages live in `CHANGELOG.md`, not here.**
-> **Session freshness:** current work log updated in `CHANGELOG.md` on 19/06/2026 (fix composer/feed — caret désaligné dans le champ de tweet : scrollbar du textarea masquée ; bandeau « a posté » passé en avant-plan `h-0` pour supprimer l'encart blanc sous le header).
+> **Session freshness:** current work log updated in `CHANGELOG.md` on 19/06/2026 (feat gateway/sécurité — validation + propagation du JWT au gateway : middleware global `PropagateJWT` « valider-si-présent », rejet 401 au plus tôt, strip anti-spoof + propagation `X-User-Id`/`X-User-Role`/`X-Email-Verified`, défense en profondeur conservée).
 
 ---
 
