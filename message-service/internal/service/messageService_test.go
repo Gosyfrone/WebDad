@@ -575,7 +575,7 @@ func TestCreateGroup_EmptyEnvelopeValue(t *testing.T) {
 	// Une enveloppe vide dans la map
 	_, err := svc.CreateGroup(context.TODO(), "u1", "titre", "nonce", map[string]string{
 		"u1": "env_creator",
-		"u2": "",       // enveloppe vide → ErrMissingEnvelope
+		"u2": "", // enveloppe vide → ErrMissingEnvelope
 		"u3": "env_u3",
 	})
 	if !errors.Is(err, ErrMissingEnvelope) {

@@ -56,8 +56,8 @@ type fakeSvcConn struct{ drv *fakeSvcDrv }
 func (c *fakeSvcConn) Prepare(_ string) (driver.Stmt, error) {
 	return &fakeSvcStmt{drv: c.drv}, nil
 }
-func (c *fakeSvcConn) Close() error                     { return nil }
-func (c *fakeSvcConn) Begin() (driver.Tx, error)        { return &fakeSvcTx{}, nil }
+func (c *fakeSvcConn) Close() error              { return nil }
+func (c *fakeSvcConn) Begin() (driver.Tx, error) { return &fakeSvcTx{}, nil }
 
 type fakeSvcTx struct{}
 

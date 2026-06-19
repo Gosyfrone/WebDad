@@ -274,9 +274,9 @@ func TestPageLimit_Valid(t *testing.T) {
 		{"10", 10},
 		{"50", 50},
 		{"100", 100},
-		{"", 0},       // valeur par défaut → 0 (le service applique le defaut)
-		{"abc", 0},    // invalide → 0
-		{"-5", -5},    // négatif passé tel quel (le service borne)
+		{"", 0},    // valeur par défaut → 0 (le service applique le defaut)
+		{"abc", 0}, // invalide → 0
+		{"-5", -5}, // négatif passé tel quel (le service borne)
 	}
 
 	for _, tc := range cases {

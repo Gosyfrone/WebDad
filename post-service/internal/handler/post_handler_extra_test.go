@@ -16,8 +16,8 @@ import (
 )
 
 const (
-	nilTestSecret   = "nil-test-secret"
-	nilInternalSec  = "nil-internal-secret"
+	nilTestSecret  = "nil-test-secret"
+	nilInternalSec = "nil-internal-secret"
 )
 
 // newNilRepoRouter monte les routes avec un PostService à repo nil + gin.Recovery().

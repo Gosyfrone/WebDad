@@ -96,7 +96,7 @@ func TestNewRegistry_PlusieursProviders(t *testing.T) {
 	reg := NewRegistry(context.Background(), Options{
 		RedirectBaseURL: "http://localhost:3000",
 		Providers: map[string]Credentials{
-			"google":   {ClientID: ""},         // ignoré
+			"google":   {ClientID: ""}, // ignoré
 			"github":   {ClientID: "gh-id", ClientSecret: "gh-secret"},
 			"facebook": {ClientID: "fb-id", ClientSecret: "fb-secret"},
 		},
