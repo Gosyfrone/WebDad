@@ -619,7 +619,7 @@ export default function LoginPage() {
                   <div className="h-px flex-1 bg-gradient-to-r from-transparent via-border to-transparent" />
                 </div>
 
-                <div className="grid grid-cols-4 gap-2.5">
+                <div className="grid grid-cols-2 gap-2.5">
                   {OAUTH_PROVIDERS.map((provider) => (
                     <button
                       key={provider.id}
@@ -628,13 +628,14 @@ export default function LoginPage() {
                       title={provider.label}
                       disabled={oauthLoading !== null || isSubmitting}
                       onClick={() => handleOAuth(provider.id)}
-                      className="flex h-11 items-center justify-center rounded-2xl border border-gray-300 bg-white transition hover:scale-[1.03] hover:bg-white hover:shadow-md disabled:cursor-not-allowed disabled:opacity-70"
+                      className="flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-gray-300 bg-white text-sm font-medium text-gray-700 transition hover:scale-[1.03] hover:bg-white hover:shadow-md disabled:cursor-not-allowed disabled:opacity-70"
                     >
                       {oauthLoading === provider.id ? (
                         <Loader2 className="h-4 w-4 animate-spin text-gray-500" />
                       ) : (
                         <Image src={provider.src} alt={provider.label} width={20} height={20} />
                       )}
+                      <span>{provider.label}</span>
                     </button>
                   ))}
                 </div>
