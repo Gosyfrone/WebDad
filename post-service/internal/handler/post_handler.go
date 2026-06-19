@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/gin-gonic/gin"
 
@@ -15,6 +16,26 @@ import (
 	"github.com/webdad/post-service/internal/repository"
 	"github.com/webdad/post-service/internal/service"
 )
+
+// defaultContentMaxChars : plafond de caractères pour un utilisateur standard.
+// Les modérateurs/admins en sont exemptés (garde-fou absolu posé par le tag
+// binding `max` des requêtes). Comptage en runes pour coller au validateur
+// go-playground (qui mesure la longueur d'une string en runes).
+const defaultContentMaxChars = 280
+
+// enforceContentLimit vérifie la longueur du contenu selon le rôle de l'appelant.
+// Renvoie false (et répond 400) si un utilisateur standard dépasse la limite ;
+// les modérateurs/admins passent toujours. À appeler après le bind.
+func enforceContentLimit(c *gin.Context, content, role string) bool {
+	if role == models.RoleModerator || role == models.RoleAdmin {
+		return true
+	}
+	if utf8.RuneCountInString(content) > defaultContentMaxChars {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "contenu trop long : 280 caractères maximum"})
+		return false
+	}
+	return true
+}
 
 type PostHandler struct {
 	service *service.PostService
@@ -54,6 +75,10 @@ func (h *PostHandler) CreatePost(c *gin.Context) {
 	// Un post doit porter du texte, au moins un média OU un sondage.
 	if strings.TrimSpace(req.Content) == "" && len(req.Media) == 0 && req.Poll == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "post vide : texte, média ou sondage requis"})
+		return
+	}
+	// 280 caractères max pour les utilisateurs standards ; modos/admins exemptés.
+	if !enforceContentLimit(c, req.Content, claims.Role) {
 		return
 	}
 
@@ -275,6 +300,10 @@ func (h *PostHandler) UpdatePost(c *gin.Context) {
 	var req models.UpdatePostRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "payload invalide : " + err.Error()})
+		return
+	}
+	// 280 caractères max pour les utilisateurs standards ; modos/admins exemptés.
+	if !enforceContentLimit(c, req.Content, claims.Role) {
 		return
 	}
 

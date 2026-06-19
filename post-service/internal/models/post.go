@@ -216,7 +216,9 @@ type MediaRef struct {
 // est optionnel SI au moins un média est joint (vérifié dans le handler) ;
 // jusqu'à 4 médias.
 type CreatePostRequest struct {
-	Content string             `json:"content" binding:"max=280"`
+	// max=4000 = garde-fou absolu ; les utilisateurs standards restent plafonnés
+	// à 280 dans le handler (enforceContentLimit), modos/admins exemptés.
+	Content string             `json:"content" binding:"max=4000"`
 	Media   []MediaRef         `json:"media" binding:"max=4,dive"`
 	Poll    *CreatePollRequest `json:"poll"`
 	// ReplyAudience (optionnel) : qui peut répondre — `everyone` (défaut) ou
@@ -254,7 +256,9 @@ type VotePollRequest struct {
 
 // UpdatePostRequest : corps de PATCH /posts/:id.
 type UpdatePostRequest struct {
-	Content string `json:"content" binding:"required,max=280"`
+	// max=4000 = garde-fou absolu ; plafond 280 réel appliqué par le handler
+	// (enforceContentLimit) sauf pour les modos/admins.
+	Content string `json:"content" binding:"required,max=4000"`
 }
 
 // CreateCommentRequest : corps de POST /posts/:id/comments. L'auteur est dérivé

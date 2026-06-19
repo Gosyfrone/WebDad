@@ -8380,8 +8380,9 @@
       "type": "object",
       "properties": {
         "content": {
+          "description": "max=4000 = garde-fou absolu ; les utilisateurs standards restent plafonnés\nà 280 dans le handler (enforceContentLimit), modos/admins exemptés.",
           "type": "string",
-          "maxLength": 280
+          "maxLength": 4000
         },
         "media": {
           "type": "array",
@@ -8625,8 +8626,9 @@
       ],
       "properties": {
         "content": {
+          "description": "max=4000 = garde-fou absolu ; plafond 280 réel appliqué par le handler\n(enforceContentLimit) sauf pour les modos/admins.",
           "type": "string",
-          "maxLength": 280
+          "maxLength": 4000
         }
       }
     },
