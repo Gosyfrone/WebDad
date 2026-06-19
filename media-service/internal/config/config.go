@@ -42,6 +42,10 @@ type Config struct {
 	MaxImageBytes int64
 	MaxVideoBytes int64
 	MaxBlobBytes  int64 // pièces jointes chiffrées E2EE (POST /media/encrypted)
+
+	// GIPHY (sélecteur de GIFs du composer). Optionnel : si absent, la route
+	// répond 503 au lieu de bloquer le service média.
+	GiphyAPIKey string
 }
 
 // Load construit la config. Charge les .env best-effort (ignorés s'ils
@@ -67,6 +71,7 @@ func Load() *Config {
 		MaxImageBytes:  getInt64("MEDIA_MAX_IMAGE_BYTES", defaultMaxImageBytes),
 		MaxVideoBytes:  getInt64("MEDIA_MAX_VIDEO_BYTES", defaultMaxVideoBytes),
 		MaxBlobBytes:   getInt64("MEDIA_MAX_BLOB_BYTES", defaultMaxBlobBytes),
+		GiphyAPIKey:    os.Getenv("GIPHY_API_KEY"),
 	}
 
 	if cfg.JWTSecret == "" {

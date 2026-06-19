@@ -41,7 +41,7 @@ social network built for the FISA INFO A3 "Distributed App Dev" project.
 | post-service | 8084 | MongoDB | Posts, hashtags/trends, comments (threaded 2 levels), likes, reposts/quotes, pins, polls/votes, bookmarks (collections), post media refs |
 | message-service | 8085 | MongoDB | E2EE messaging (DM/groups/communities), conversations, members, encrypted messages, WS |
 | notification-service | 8086 | MongoDB | Aggregated notifications (Instagram-style), ingest `/internal/events`, WS |
-| media-service | 8087 | MinIO | Opaque byte storage (avatar/banner, post media, encrypted attachments) |
+| media-service | 8087 | MinIO | Opaque byte storage (avatar/banner, post media, encrypted attachments) + GIPHY proxy (`/gifs/search`) |
 | frontend | 3000 | — | Next.js UI + BFF route handlers (`/api/auth/*`, `/api/translate`, `/api/countries`, provisioning) |
 
 **Data-ownership invariant:** one datum = one service. `username` lives in user-service,

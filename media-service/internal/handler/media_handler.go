@@ -4,9 +4,14 @@ import (
 	"bytes"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -38,6 +43,8 @@ type MediaHandler struct {
 	maxImageBytes int64
 	maxVideoBytes int64
 	maxBlobBytes  int64
+	giphyAPIKey   string
+	httpClient    *http.Client
 }
 
 // NewMediaHandler construit le handler avec ses caps de taille (appliqués aux
@@ -48,6 +55,8 @@ func NewMediaHandler(store *storage.Store, cfg *config.Config) *MediaHandler {
 		maxImageBytes: cfg.MaxImageBytes,
 		maxVideoBytes: cfg.MaxVideoBytes,
 		maxBlobBytes:  cfg.MaxBlobBytes,
+		giphyAPIKey:   cfg.GiphyAPIKey,
+		httpClient:    &http.Client{Timeout: 15 * time.Second},
 	}
 }
 
@@ -70,6 +79,131 @@ type variantPayload struct {
 	Size   int64  `json:"size"`
 	Width  int    `json:"width"`
 	Height int    `json:"height"`
+}
+
+// giphyResponse : réponse normalisée exposée au front. `url` est l'URL GIF
+// externe à stocker dans un post ; `preview_url` sert à la grille du picker.
+type giphyResponse struct {
+	ID         string `json:"id"`
+	Title      string `json:"title"`
+	URL        string `json:"url"`
+	PreviewURL string `json:"preview_url"`
+	Width      int    `json:"width"`
+	Height     int    `json:"height"`
+}
+
+type giphyListResponse struct {
+	Data []giphyResponse `json:"data"`
+}
+
+type giphyAPIResponse struct {
+	Data []struct {
+		ID     string `json:"id"`
+		Title  string `json:"title"`
+		Images struct {
+			Original struct {
+				URL    string `json:"url"`
+				Width  string `json:"width"`
+				Height string `json:"height"`
+			} `json:"original"`
+			Downsized struct {
+				URL    string `json:"url"`
+				Width  string `json:"width"`
+				Height string `json:"height"`
+			} `json:"downsized"`
+			FixedWidth struct {
+				URL    string `json:"url"`
+				Width  string `json:"width"`
+				Height string `json:"height"`
+			} `json:"fixed_width"`
+		} `json:"images"`
+	} `json:"data"`
+}
+
+// SearchGiphy : GET /gifs/search — proxy serveur vers GIPHY. Si `q` est
+// vide, renvoie les tendances GIPHY pour ouvrir le picker déjà rempli.
+// @Summary     Rechercher des GIFs via GIPHY
+// @Tags        media
+// @Produce     json
+// @Security    BearerAuth
+// @Param       q query string false "Recherche GIF (vide = tendances)"
+// @Param       limit query int false "Nombre de GIFs (1-50, défaut 20)"
+// @Success     200 {object} handler.giphyListResponse
+// @Failure     401 {object} map[string]string
+// @Failure     503 {object} map[string]string "GIPHY non configuré ou indisponible"
+// @Router      /gifs/search [get]
+func (h *MediaHandler) SearchGiphy(c *gin.Context) {
+	q := strings.TrimSpace(c.Query("q"))
+	limit := clampLimit(c.Query("limit"), 20, 1, 50)
+
+	if h.giphyAPIKey == "" {
+		c.JSON(http.StatusOK, giphyListResponse{Data: fallbackGifs(q, limit)})
+		return
+	}
+	if isPublicBetaGiphyKey(h.giphyAPIKey) {
+		c.JSON(http.StatusOK, giphyListResponse{Data: fallbackGifs(q, limit)})
+		return
+	}
+
+	endpoint := "https://api.giphy.com/v1/gifs/trending"
+	params := url.Values{}
+	params.Set("api_key", h.giphyAPIKey)
+	params.Set("limit", strconv.Itoa(limit))
+	params.Set("rating", "pg-13")
+	if q != "" {
+		endpoint = "https://api.giphy.com/v1/gifs/search"
+		params.Set("q", q)
+		params.Set("lang", "fr")
+	}
+
+	req, err := http.NewRequestWithContext(c.Request.Context(), http.MethodGet, endpoint+"?"+params.Encode(), nil)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "requête giphy invalide"})
+		return
+	}
+
+	res, err := h.httpClient.Do(req)
+	if err != nil {
+		logging.FromGin(c).Warn("giphy indisponible", "error", err)
+		c.JSON(http.StatusOK, giphyListResponse{Data: fallbackGifs(q, limit)})
+		return
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		logging.FromGin(c).Warn("giphy a refusé la requête", "status", res.StatusCode)
+		c.JSON(http.StatusOK, giphyListResponse{Data: fallbackGifs(q, limit)})
+		return
+	}
+
+	var body giphyAPIResponse
+	if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
+		c.JSON(http.StatusOK, giphyListResponse{Data: fallbackGifs(q, limit)})
+		return
+	}
+
+	gifs := make([]giphyResponse, 0, len(body.Data))
+	for _, item := range body.Data {
+		gifURL := firstNonEmpty(item.Images.Downsized.URL, item.Images.Original.URL, item.Images.FixedWidth.URL)
+		previewURL := firstNonEmpty(item.Images.FixedWidth.URL, item.Images.Downsized.URL, item.Images.Original.URL)
+		if gifURL == "" || previewURL == "" {
+			continue
+		}
+		width := atoiDefault(firstNonEmpty(item.Images.Downsized.Width, item.Images.Original.Width, item.Images.FixedWidth.Width))
+		height := atoiDefault(firstNonEmpty(item.Images.Downsized.Height, item.Images.Original.Height, item.Images.FixedWidth.Height))
+		gifs = append(gifs, giphyResponse{
+			ID:         item.ID,
+			Title:      item.Title,
+			URL:        gifURL,
+			PreviewURL: previewURL,
+			Width:      width,
+			Height:     height,
+		})
+	}
+
+	if len(gifs) == 0 {
+		gifs = fallbackGifs(q, limit)
+	}
+	c.JSON(http.StatusOK, giphyListResponse{Data: gifs})
 }
 
 // Upload : POST /media (multipart, champ `file`). Valide le type réel (magic
@@ -375,6 +509,292 @@ func validVariant(name string) bool {
 	default:
 		return false
 	}
+}
+
+func clampLimit(raw string, fallback, minValue, maxValue int) int {
+	n, err := strconv.Atoi(raw)
+	if err != nil {
+		return fallback
+	}
+	if n < minValue {
+		return minValue
+	}
+	if n > maxValue {
+		return maxValue
+	}
+	return n
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func atoiDefault(raw string) int {
+	n, err := strconv.Atoi(raw)
+	if err != nil {
+		return 0
+	}
+	return n
+}
+
+func isPublicBetaGiphyKey(key string) bool {
+	return strings.TrimSpace(key) == "dc6zaTOxFJmzC"
+}
+
+var fallbackGifCatalog = []giphyResponse{
+	{
+		ID:         "fallback-cat",
+		Title:      "Cat typing",
+		URL:        "https://media.giphy.com/media/JIX9t2j0ZTN9S/giphy.gif",
+		PreviewURL: "https://media.giphy.com/media/JIX9t2j0ZTN9S/200.gif",
+		Width:      480,
+		Height:     360,
+	},
+	{
+		ID:         "fallback-happy",
+		Title:      "Happy dance",
+		URL:        "https://media.giphy.com/media/26u4cqiYI30juCOGY/giphy.gif",
+		PreviewURL: "https://media.giphy.com/media/26u4cqiYI30juCOGY/200.gif",
+		Width:      480,
+		Height:     270,
+	},
+	{
+		ID:         "fallback-excited",
+		Title:      "Excited",
+		URL:        "https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif",
+		PreviewURL: "https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/200.gif",
+		Width:      480,
+		Height:     360,
+	},
+	{
+		ID:         "fallback-thumbs-up",
+		Title:      "Thumbs up",
+		URL:        "https://media.giphy.com/media/111ebonMs90YLu/giphy.gif",
+		PreviewURL: "https://media.giphy.com/media/111ebonMs90YLu/200.gif",
+		Width:      400,
+		Height:     300,
+	},
+	{
+		ID:         "fallback-wow",
+		Title:      "Wow reaction",
+		URL:        "https://media.giphy.com/media/5GoVLqeAOo6PK/giphy.gif",
+		PreviewURL: "https://media.giphy.com/media/5GoVLqeAOo6PK/200.gif",
+		Width:      480,
+		Height:     270,
+	},
+	{
+		ID:         "fallback-hello",
+		Title:      "Hello wave",
+		URL:        "https://media.giphy.com/media/ASd0Ukj0y3qMM/giphy.gif",
+		PreviewURL: "https://media.giphy.com/media/ASd0Ukj0y3qMM/200.gif",
+		Width:      480,
+		Height:     360,
+	},
+	{
+		ID:         "fallback-laugh",
+		Title:      "Laugh",
+		URL:        "https://media.giphy.com/media/10JhviFuU2gWD6/giphy.gif",
+		PreviewURL: "https://media.giphy.com/media/10JhviFuU2gWD6/200.gif",
+		Width:      480,
+		Height:     360,
+	},
+	{
+		ID:         "fallback-nope",
+		Title:      "Nope",
+		URL:        "https://media.giphy.com/media/3o7TKwmnDgQb5jemjK/giphy.gif",
+		PreviewURL: "https://media.giphy.com/media/3o7TKwmnDgQb5jemjK/200.gif",
+		Width:      480,
+		Height:     270,
+	},
+	{
+		ID:         "fallback-mind-blown",
+		Title:      "Mind blown",
+		URL:        "https://media.giphy.com/media/Um3ljJl8jrnHy/giphy.gif",
+		PreviewURL: "https://media.giphy.com/media/Um3ljJl8jrnHy/200.gif",
+		Width:      480,
+		Height:     360,
+	},
+	{
+		ID:         "fallback-party",
+		Title:      "Party celebration",
+		URL:        "https://media.giphy.com/media/3KC2jD2QcBOSc/giphy.gif",
+		PreviewURL: "https://media.giphy.com/media/3KC2jD2QcBOSc/200.gif",
+		Width:      480,
+		Height:     270,
+	},
+	{
+		ID:         "fallback-clap",
+		Title:      "Clap applause",
+		URL:        "https://media.giphy.com/media/l3q2XhfQ8oCkm1Ts4/giphy.gif",
+		PreviewURL: "https://media.giphy.com/media/l3q2XhfQ8oCkm1Ts4/200.gif",
+		Width:      480,
+		Height:     360,
+	},
+	{
+		ID:         "fallback-shrug",
+		Title:      "Shrug",
+		URL:        "https://media.giphy.com/media/3o7btPCcdNniyf0ArS/giphy.gif",
+		PreviewURL: "https://media.giphy.com/media/3o7btPCcdNniyf0ArS/200.gif",
+		Width:      480,
+		Height:     270,
+	},
+	{
+		ID:         "fallback-facepalm",
+		Title:      "Facepalm",
+		URL:        "https://media.giphy.com/media/3og0INyCmHlNylks9O/giphy.gif",
+		PreviewURL: "https://media.giphy.com/media/3og0INyCmHlNylks9O/200.gif",
+		Width:      480,
+		Height:     270,
+	},
+	{
+		ID:         "fallback-sad",
+		Title:      "Sad",
+		URL:        "https://media.giphy.com/media/OPU6wzx8JrHna/giphy.gif",
+		PreviewURL: "https://media.giphy.com/media/OPU6wzx8JrHna/200.gif",
+		Width:      480,
+		Height:     360,
+	},
+	{
+		ID:         "fallback-cry",
+		Title:      "Cry",
+		URL:        "https://media.giphy.com/media/d2lcHJTG5Tscg/giphy.gif",
+		PreviewURL: "https://media.giphy.com/media/d2lcHJTG5Tscg/200.gif",
+		Width:      480,
+		Height:     360,
+	},
+	{
+		ID:         "fallback-love",
+		Title:      "Love hearts",
+		URL:        "https://media.giphy.com/media/26FLdmIp6wJr91JAI/giphy.gif",
+		PreviewURL: "https://media.giphy.com/media/26FLdmIp6wJr91JAI/200.gif",
+		Width:      480,
+		Height:     360,
+	},
+	{
+		ID:         "fallback-ok",
+		Title:      "Ok good",
+		URL:        "https://media.giphy.com/media/xT0BKL21U5nnlW4m6k/giphy.gif",
+		PreviewURL: "https://media.giphy.com/media/xT0BKL21U5nnlW4m6k/200.gif",
+		Width:      480,
+		Height:     270,
+	},
+	{
+		ID:         "fallback-done",
+		Title:      "Done success",
+		URL:        "https://media.giphy.com/media/11sBLVxNs7v6WA/giphy.gif",
+		PreviewURL: "https://media.giphy.com/media/11sBLVxNs7v6WA/200.gif",
+		Width:      480,
+		Height:     360,
+	},
+	{
+		ID:         "fallback-coffee",
+		Title:      "Coffee",
+		URL:        "https://media.giphy.com/media/687qS11pXwjCM/giphy.gif",
+		PreviewURL: "https://media.giphy.com/media/687qS11pXwjCM/200.gif",
+		Width:      480,
+		Height:     360,
+	},
+	{
+		ID:         "fallback-working",
+		Title:      "Working typing",
+		URL:        "https://media.giphy.com/media/13HgwGsXF0aiGY/giphy.gif",
+		PreviewURL: "https://media.giphy.com/media/13HgwGsXF0aiGY/200.gif",
+		Width:      480,
+		Height:     360,
+	},
+	{
+		ID:         "fallback-dog",
+		Title:      "Dog excited",
+		URL:        "https://media.giphy.com/media/4Zo41lhzKt6iZ8xff9/giphy.gif",
+		PreviewURL: "https://media.giphy.com/media/4Zo41lhzKt6iZ8xff9/200.gif",
+		Width:      480,
+		Height:     270,
+	},
+	{
+		ID:         "fallback-dance",
+		Title:      "Dance",
+		URL:        "https://media.giphy.com/media/GeimqsH0TLDt4tScGw/giphy.gif",
+		PreviewURL: "https://media.giphy.com/media/GeimqsH0TLDt4tScGw/200.gif",
+		Width:      480,
+		Height:     480,
+	},
+	{
+		ID:         "fallback-yay",
+		Title:      "Yay",
+		URL:        "https://media.giphy.com/media/artj92V8o75VPL7AeQ/giphy.gif",
+		PreviewURL: "https://media.giphy.com/media/artj92V8o75VPL7AeQ/200.gif",
+		Width:      480,
+		Height:     480,
+	},
+	{
+		ID:         "fallback-fire",
+		Title:      "Fire",
+		URL:        "https://media.giphy.com/media/yr7n0u3qzO9nG/giphy.gif",
+		PreviewURL: "https://media.giphy.com/media/yr7n0u3qzO9nG/200.gif",
+		Width:      480,
+		Height:     360,
+	},
+	{
+		ID:         "fallback-popcorn",
+		Title:      "Popcorn",
+		URL:        "https://media.giphy.com/media/2UvAUplPi4ESnKa3W0/giphy.gif",
+		PreviewURL: "https://media.giphy.com/media/2UvAUplPi4ESnKa3W0/200.gif",
+		Width:      480,
+		Height:     270,
+	},
+	{
+		ID:         "fallback-please",
+		Title:      "Please",
+		URL:        "https://media.giphy.com/media/CT5Ye7uVJLFtu/giphy.gif",
+		PreviewURL: "https://media.giphy.com/media/CT5Ye7uVJLFtu/200.gif",
+		Width:      480,
+		Height:     360,
+	},
+	{
+		ID:         "fallback-thinking",
+		Title:      "Thinking",
+		URL:        "https://media.giphy.com/media/a5viI92PAF89q/giphy.gif",
+		PreviewURL: "https://media.giphy.com/media/a5viI92PAF89q/200.gif",
+		Width:      480,
+		Height:     360,
+	},
+	{
+		ID:         "fallback-sparkle",
+		Title:      "Sparkle magic",
+		URL:        "https://media.giphy.com/media/3o7aD2saalBwwftBIY/giphy.gif",
+		PreviewURL: "https://media.giphy.com/media/3o7aD2saalBwwftBIY/200.gif",
+		Width:      480,
+		Height:     270,
+	},
+}
+
+func fallbackGifs(query string, limit int) []giphyResponse {
+	q := strings.ToLower(strings.TrimSpace(query))
+	out := make([]giphyResponse, 0, min(limit, len(fallbackGifCatalog)))
+	for _, gif := range fallbackGifCatalog {
+		if q != "" && !strings.Contains(strings.ToLower(gif.Title), q) {
+			continue
+		}
+		out = append(out, gif)
+		if len(out) >= limit {
+			return out
+		}
+	}
+	if len(out) > 0 || q == "" {
+		return out
+	}
+	for _, gif := range fallbackGifCatalog {
+		out = append(out, gif)
+		if len(out) >= limit {
+			break
+		}
+	}
+	return out
 }
 
 // PurgeByOwner : DELETE /media/owners/:id — efface TOUS les objets d'un

@@ -1102,6 +1102,11 @@ export const messages: Record<Locale, Messages> = {
     // — Composer —
     'composer.placeholder': 'Ça breez ? 🌴',
     'composer.add_image': 'Ajouter une image ou une vidéo',
+    'composer.add_gif': 'Ajouter un GIF',
+    'composer.gif_search': 'Rechercher des GIFs',
+    'composer.gif_empty': 'Aucun GIF trouvé',
+    'composer.gif_failed': 'Impossible de charger les GIFs.',
+    'composer.gif_added': 'GIF ajouté.',
     'composer.media_failed': "Échec de l'envoi du média.",
     'composer.media_max': 'Maximum {count} médias par post.',
     'composer.media_remove': 'Retirer le média',
@@ -2320,6 +2325,11 @@ export const messages: Record<Locale, Messages> = {
     // — Composer —
     'composer.placeholder': "What's breezing? 🌴",
     'composer.add_image': 'Add an image or video',
+    'composer.add_gif': 'Add a GIF',
+    'composer.gif_search': 'Search GIFs',
+    'composer.gif_empty': 'No GIFs found',
+    'composer.gif_failed': "Couldn't load GIFs.",
+    'composer.gif_added': 'GIF added.',
     'composer.media_failed': 'Media upload failed.',
     'composer.media_max': 'Up to {count} media per post.',
     'composer.media_remove': 'Remove media',

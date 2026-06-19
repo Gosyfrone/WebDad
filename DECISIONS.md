@@ -698,13 +698,17 @@
   **Lazy-mount** via a second observer (`rootMargin:400px`) so a video far down an infinite feed is neither downloaded nor
   looped — the key to not loading N videos at once. Front-only, zero server cost. Autoplay mandates muted (browser policy).
 
-## GIFs (planned)
+## GIFs (GIPHY)
 
-- **BFF Next route, NOT a microservice** (mirrors translation): `/api/gifs/*` with the provider key server-side
-  (`GIF_API_URL`/`GIF_API_KEY`, Tenor/Giphy). A GIF = third-party API + key to hide = same case as translation, no new
-  container/DB. **Split by context:** posts (public) → external URL as `{url,type:'image'}`, zero backend; messages (E2EE) →
-  bytes fetched via the BFF (proxy hides key + bypasses CORS), then encrypted through the Phase-3 attachment pipeline (never
-  a third-party URL the recipient would fetch in clear).
+- **Proxy GIPHY porté par media-service via la gateway (`/gifs/search`)**. La clé `GIPHY_API_KEY` reste côté serveur,
+  jamais dans le navigateur. On rattache ce proxy au media-service plutôt qu'à une route BFF Next pour garder la doc Swagger
+  et le routage API au même endroit que les médias, sans ajouter de microservice ni de base.
+- **Posts = URL externe stockée comme média image.** Le post-service reste agnostique du contenu : il persiste déjà
+  `media[] {url,type}` et accepte les URLs `https:`. Aucun champ Mongo, aucun backfill. Le composer ajoute le GIF choisi
+  comme `{url,type:'image'}` et réutilise les previews/rendus média existants.
+- **Messages E2EE non couverts par cette phase.** Si les GIFs sont ajoutés aux messages plus tard, il faudra éviter de
+  faire charger une URL tierce en clair par le destinataire ; l'option prévue reste de rapatrier les octets puis de passer
+  par le pipeline de pièce jointe chiffrée.
 
 ## i18n / theming / responsive
 

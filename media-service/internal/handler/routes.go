@@ -21,6 +21,7 @@ func RegisterRoutes(r *gin.Engine, serviceName string, store *storage.Store, cfg
 
 	r.POST("/media", auth, h.Upload)                    // upload image/vidéo en clair (JWT)
 	r.POST("/media/encrypted", auth, h.UploadEncrypted) // blob chiffré E2EE (JWT)
+	r.GET("/gifs/search", auth, h.SearchGiphy)          // recherche/tendances GIFs (JWT, clé côté serveur)
 	r.GET("/media/:id/:variant", h.DownloadVariant)     // lecture publique d'une variante générée
 	r.GET("/media/:id", h.Download)                     // lecture publique (stream + Range)
 	r.DELETE("/media/:id", auth, h.Delete)              // suppression (propriétaire/admin)
