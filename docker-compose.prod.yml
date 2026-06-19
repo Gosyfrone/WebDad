@@ -164,7 +164,7 @@ services:
       GIN_MODE: release
       DB_HOST: postgres-auth
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET requis}
-      JWT_EXPIRY: ${JWT_EXPIRY:-15m}
+      JWT_EXPIRY: ${JWT_EXPIRY:-5m}
       MAIL_SERVICE_URL: http://mail-service:8089
       MAIL_INTERNAL_SECRET: ${MAIL_INTERNAL_SECRET:?MAIL_INTERNAL_SECRET requis}
       APP_BASE_URL: ${APP_BASE_URL:?APP_BASE_URL requis}

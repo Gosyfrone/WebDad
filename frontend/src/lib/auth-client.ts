@@ -1,7 +1,7 @@
 /**
  * Client d'authentification (navigateur).
  *
- * Modèle : access token court (15 min) en localStorage + refresh token (24 h)
+ * Modèle : access token court (5 min) en localStorage + refresh token (24 h)
  * en cookie httpOnly (géré par le BFF Next). Les appels API partent
  * directement vers l'API Gateway avec `Authorization: Bearer <access>`.
  *

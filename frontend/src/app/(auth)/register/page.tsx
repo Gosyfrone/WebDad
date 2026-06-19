@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import {
   Bell,
   CalendarDays,
+  Check,
   CircleAlert,
   CircleHelp,
   Eye,
@@ -32,6 +33,7 @@ const OAUTH_PROVIDERS = [
 ] as const
 
 import { Button } from '@/components/ui/button'
+import { useT } from '@/components/language-provider'
 import {
   Card,
   CardContent,
@@ -42,7 +44,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { LegalLinks } from '@/components/legal/legal-links'
 import { ROUTES } from '@/lib/routes'
-import { useT } from '@/components/language-provider'
+import { hasReadTerms } from '@/lib/terms-consent'
 
 type FormErrors = Partial<{
   username: string
@@ -51,6 +53,7 @@ type FormErrors = Partial<{
   email: string
   password: string
   passwordConfirmation: string
+  terms: string
   form: string
 }>
 
@@ -128,11 +131,27 @@ export default function RegisterPage() {
   const [errors, setErrors] = React.useState<FormErrors>({})
   const [isSubmitting, setIsSubmitting] = React.useState(false)
   const [oauthLoading, setOauthLoading] = React.useState<string | null>(null)
+  const [termsRead, setTermsRead] = React.useState(false)
+  const [acceptedTerms, setAcceptedTerms] = React.useState(false)
   const todayDate = React.useMemo(() => toDateInputValue(new Date()), [])
   const minimumAgeBirthDate = React.useMemo(() => {
     const date = new Date()
     date.setFullYear(date.getFullYear() - 13)
     return toDateInputValue(date)
+  }, [])
+
+  React.useEffect(() => {
+    const syncTermsRead = () => {
+      setTermsRead(hasReadTerms())
+    }
+
+    syncTermsRead()
+    window.addEventListener('focus', syncTermsRead)
+    window.addEventListener('storage', syncTermsRead)
+    return () => {
+      window.removeEventListener('focus', syncTermsRead)
+      window.removeEventListener('storage', syncTermsRead)
+    }
   }, [])
 
   const validate = React.useCallback((): FormErrors => {
@@ -188,8 +207,26 @@ export default function RegisterPage() {
       nextErrors.passwordConfirmation = t('auth.register.err.confirm_mismatch')
     }
 
+    if (!acceptedTerms) {
+      nextErrors.terms = termsRead
+        ? t('auth.register.err.terms_required')
+        : t('auth.register.err.terms_read_required')
+    }
+
     return nextErrors
-  }, [birthDate, email, gender, minimumAgeBirthDate, password, passwordConfirmation, todayDate, username, t])
+  }, [
+    acceptedTerms,
+    birthDate,
+    email,
+    gender,
+    minimumAgeBirthDate,
+    password,
+    passwordConfirmation,
+    termsRead,
+    todayDate,
+    username,
+    t,
+  ])
 
   const handleOAuth = async (provider: string) => {
     setOauthLoading(provider)
@@ -246,6 +283,7 @@ export default function RegisterPage() {
           gender,
           email: email.trim(),
           password,
+          acceptedTerms,
         }),
       })
 
@@ -804,6 +842,68 @@ export default function RegisterPage() {
                 ) : null}
               </div>
 
+              <div className="space-y-1">
+                <label
+                  htmlFor="terms"
+                  className={`flex items-start gap-3 rounded-2xl border px-3 py-2 text-xs shadow-sm transition ${
+                    termsRead
+                      ? 'border-white/70 bg-white/80 text-foreground/80 dark:border-white/15 dark:bg-white/10'
+                      : 'border-slate-200 bg-slate-100/80 text-muted-foreground opacity-80 dark:border-white/10 dark:bg-white/5'
+                  }`}
+                >
+                  <span className="relative mt-0.5 grid h-4 w-4 shrink-0 place-items-center">
+                    <input
+                      id="terms"
+                      name="terms"
+                      type="checkbox"
+                      checked={acceptedTerms}
+                      disabled={!termsRead}
+                      className="peer sr-only"
+                      onChange={(event) => {
+                        setAcceptedTerms(event.target.checked)
+                        if (errors.terms) {
+                          setErrors((current) => ({
+                            ...current,
+                            terms: undefined,
+                          }))
+                        }
+                      }}
+                      aria-invalid={Boolean(errors.terms)}
+                      aria-describedby="terms-help"
+                    />
+                    <span className="grid h-4 w-4 place-items-center rounded border border-slate-300 bg-white text-transparent transition peer-checked:border-[#5B6CFF] peer-checked:bg-[#5B6CFF] peer-checked:text-white peer-disabled:bg-slate-200 peer-disabled:text-transparent dark:border-white/25 dark:bg-white/10 dark:peer-disabled:bg-white/5">
+                      <Check className="h-3 w-3" />
+                    </span>
+                  </span>
+                  <span className="min-w-0 leading-4">
+                    {t('auth.register.terms_prefix')}{' '}
+                    <Link
+                      href={ROUTES.cgu}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-semibold text-[#5B6CFF] underline-offset-4 transition hover:text-[#8D3DFF] hover:underline"
+                    >
+                      {t('auth.register.terms_link')}
+                    </Link>
+                    .
+                    <span
+                      id="terms-help"
+                      className="block text-[11px] text-muted-foreground"
+                    >
+                      {termsRead
+                        ? t('auth.register.terms_unlocked')
+                        : t('auth.register.terms_locked')}
+                    </span>
+                  </span>
+                </label>
+
+                {errors.terms ? (
+                  <p className="text-[11px] leading-4 text-red-600">
+                    {errors.terms}
+                  </p>
+                ) : null}
+              </div>
+
               {errors.form ? (
                 <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50/90 px-4 py-2 text-xs text-red-700 shadow-sm dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
                   <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" />
@@ -814,7 +914,7 @@ export default function RegisterPage() {
               <Button
                 type="submit"
                 className="h-9 w-full rounded-2xl bg-gradient-to-r from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] text-sm font-semibold text-white shadow-[0_18px_44px_rgba(91,108,255,0.34)] transition duration-300 hover:scale-[1.015] hover:shadow-[0_24px_56px_rgba(91,108,255,0.42)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70"
-                disabled={isSubmitting}
+                disabled={isSubmitting || !acceptedTerms}
               >
                 {isSubmitting ? t('auth.register.submitting') : t('auth.register.submit')}
               </Button>

@@ -380,6 +380,61 @@ paths:
             type: object
             additionalProperties:
               type: string
+  /auth/oauth/{provider}/complete:
+    post:
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      tags:
+      - auth
+      summary: Créer un compte après onboarding OAuth
+      parameters:
+      - enum:
+        - google
+        - github
+        - facebook
+        - spotify
+        type: string
+        description: Fournisseur OAuth
+        name: provider
+        in: path
+        required: true
+      - description: Token d'inscription OAuth
+        name: body
+        in: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.OAuthCompleteRequest'
+      responses:
+        '200':
+          description: 'Compte créé — data: {token, refresh_token, user}'
+          schema:
+            $ref: '#/definitions/models.AuthUser'
+        '400':
+          description: Payload invalide
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '401':
+          description: Token invalide ou expiré
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '409':
+          description: Compte déjà créé
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '500':
+          description: Erreur interne
+          schema:
+            type: object
+            additionalProperties:
+              type: string
   /auth/oauth/{provider}/exchange:
     post:
       consumes:
@@ -408,9 +463,9 @@ paths:
           $ref: '#/definitions/models.OAuthExchangeRequest'
       responses:
         '200':
-          description: 'Connexion réussie — data: {token, refresh_token, user}'
+          description: Connexion réussie ou inscription à finaliser
           schema:
-            $ref: '#/definitions/models.AuthUser'
+            $ref: '#/definitions/models.OAuthExchangeData'
         '400':
           description: Payload invalide
           schema:
@@ -4757,6 +4812,31 @@ definitions:
         type: string
       code:
         type: string
+  models.OAuthCompleteRequest:
+    type: object
+    required:
+    - accepted_terms
+    - pending_token
+    properties:
+      accepted_terms:
+        type: boolean
+      pending_token:
+        type: string
+  models.OAuthExchangeData:
+    type: object
+    properties:
+      email:
+        type: string
+      onboarding_required:
+        type: boolean
+      pending_token:
+        type: string
+      refresh_token:
+        type: string
+      token:
+        type: string
+      user:
+        $ref: '#/definitions/models.AuthUser'
   models.OAuthExchangeRequest:
     type: object
     required:

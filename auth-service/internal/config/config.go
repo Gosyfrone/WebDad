@@ -100,7 +100,7 @@ func Load() *Config {
 		log.Fatal("[config] JWT_SECRET manquant (à définir dans le .env racine)")
 	}
 
-	cfg.JWTExpiry = mustParseDuration("JWT_EXPIRY", "15m")
+	cfg.JWTExpiry = mustParseDuration("JWT_EXPIRY", "5m")
 	cfg.RefreshExpiry = mustParseDuration("REFRESH_EXPIRY", "24h")
 
 	cfg.MailServiceURL = getEnv("MAIL_SERVICE_URL", "http://localhost:8089")

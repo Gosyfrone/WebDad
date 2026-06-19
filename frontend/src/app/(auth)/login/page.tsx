@@ -160,7 +160,7 @@ export default function LoginPage() {
         return
       }
 
-      // L'access token court (15 min) vit en localStorage ; le refresh token
+      // L'access token court (5 min) vit en localStorage ; le refresh token
       // a été posé en cookie httpOnly par le BFF (/api/auth/login).
       if (payload?.accessToken) {
         setAccessToken(payload.accessToken)
