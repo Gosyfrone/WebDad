@@ -15,7 +15,11 @@ coverage:
 
 comment:
   layout: "reach, diff, flags, files"
-  require_changes: true        # pas de commentaire si la couverture ne bouge pas
+  behavior: default
+  require_changes: false
+  require_base: false
+  require_head: true
+  hide_project_coverage: false
 
 flag_management:
   default_rules:

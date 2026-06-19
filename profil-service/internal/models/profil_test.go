@@ -65,3 +65,24 @@ func TestHydrateViewerPolicy(t *testing.T) {
 		t.Errorf("majeur+ON : is_adult=%v nsfw_visible=%v, attendu true/true", adult.IsAdult, adult.NsfwVisible)
 	}
 }
+
+func TestRoleConstants(t *testing.T) {
+	if RoleUser != "user" {
+		t.Fatalf("RoleUser = %q", RoleUser)
+	}
+	if RoleModerator != "moderator" {
+		t.Fatalf("RoleModerator = %q", RoleModerator)
+	}
+	if RoleAdmin != "admin" {
+		t.Fatalf("RoleAdmin = %q", RoleAdmin)
+	}
+}
+
+func TestVisibilityConstants(t *testing.T) {
+	if VisibilityPublic != "public" {
+		t.Fatalf("VisibilityPublic = %q", VisibilityPublic)
+	}
+	if VisibilityPrivate != "private" {
+		t.Fatalf("VisibilityPrivate = %q", VisibilityPrivate)
+	}
+}
