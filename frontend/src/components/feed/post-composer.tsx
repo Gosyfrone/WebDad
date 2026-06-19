@@ -29,7 +29,7 @@ import {
   type ReplyAudience,
 } from '@/lib/posts'
 import { usePollDraft, type PollChoiceDraft } from '@/lib/use-poll-draft'
-import { searchGifs, type GiphyGif } from '@/lib/giphy'
+import { captureGif, searchGifs, type GiphyGif } from '@/lib/giphy'
 import { useToast } from '@/hooks/use-toast'
 import { useMention } from '@/lib/use-mention'
 import { mentionSearchGlobal } from '@/lib/mention-search'
@@ -191,12 +191,23 @@ export function PostComposer({
     setMedia((prev) => prev.filter((_, i) => i !== index))
   }
 
-  function addGif(gif: GiphyGif) {
+  async function addGif(gif: GiphyGif) {
     if (media.length >= MAX_MEDIA) {
       toast({ title: t('composer.media_max', { count: MAX_MEDIA }), variant: 'destructive' })
       return
     }
-    setMedia((prev) => [...prev, { url: gif.url, type: 'image' }])
+    // Capture serveur → MinIO : on stocke `/media/<id>` (servi par la gateway),
+    // jamais l'URL giphy externe (hotlink 403/404, bloqué par la CSP).
+    setUploadingMedia(true)
+    try {
+      const captured = await captureGif(gif.url)
+      setMedia((prev) => [...prev, { url: uploadedMediaUrl(captured), type: 'image' }])
+      toast({ title: t('composer.gif_added') })
+    } catch {
+      toast({ title: t('composer.gif_failed'), variant: 'destructive' })
+    } finally {
+      setUploadingMedia(false)
+    }
   }
 
   /** Insère l'emoji à la position du curseur (ou à la fin) et restaure le focus. */
@@ -413,7 +424,6 @@ function GifPicker({
   onSelect: (gif: GiphyGif) => void
 }) {
   const t = useT()
-  const { toast } = useToast()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [gifs, setGifs] = useState<GiphyGif[]>([])
@@ -448,9 +458,10 @@ function GifPicker({
   }, [open, query])
 
   function choose(gif: GiphyGif) {
+    // Le toast succès/échec est émis par le parent (`addGif`) une fois la
+    // capture serveur terminée : on ferme juste la popover ici.
     onSelect(gif)
     setOpen(false)
-    toast({ title: t('composer.gif_added') })
   }
 
   return (

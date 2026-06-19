@@ -7369,6 +7369,89 @@
         }
       }
     },
+    "/gifs/capture": {
+      "post": {
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "media"
+        ],
+        "summary": "Capturer un GIF GIPHY dans le stockage média",
+        "parameters": [
+          {
+            "description": "URL du GIF GIPHY",
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/handler.captureRequest"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Created",
+            "schema": {
+              "$ref": "#/definitions/handler.uploadResponse"
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "413": {
+            "description": "GIF trop volumineux",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "415": {
+            "description": "Type de média non supporté",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "502": {
+            "description": "GIPHY indisponible ou stockage en échec",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
     "/gifs/search": {
       "get": {
         "security": [
@@ -9006,6 +9089,14 @@
           "type": "string"
         },
         "ticket_id": {
+          "type": "string"
+        }
+      }
+    },
+    "handler.captureRequest": {
+      "type": "object",
+      "properties": {
+        "url": {
           "type": "string"
         }
       }

@@ -96,6 +96,24 @@ type giphyListResponse struct {
 	Data []giphyResponse `json:"data"`
 }
 
+// captureRequest : corps de POST /gifs/capture. `url` doit pointer un CDN GIPHY.
+type captureRequest struct {
+	URL string `json:"url"`
+}
+
+// giphyHosts : allowlist des hôtes CDN GIPHY autorisés à la capture. Borne
+// stricte anti-SSRF : la capture ne fetch QUE ces hôtes, jamais une URL
+// arbitraire fournie par le client.
+var giphyHosts = map[string]bool{
+	"media.giphy.com":  true,
+	"media0.giphy.com": true,
+	"media1.giphy.com": true,
+	"media2.giphy.com": true,
+	"media3.giphy.com": true,
+	"media4.giphy.com": true,
+	"i.giphy.com":      true,
+}
+
 type giphyAPIResponse struct {
 	Data []struct {
 		ID     string `json:"id"`
@@ -204,6 +222,108 @@ func (h *MediaHandler) SearchGiphy(c *gin.Context) {
 		gifs = fallbackGifs(q, limit)
 	}
 	c.JSON(http.StatusOK, giphyListResponse{Data: gifs})
+}
+
+// CaptureGiphy : POST /gifs/capture — télécharge le GIF choisi depuis le CDN
+// GIPHY et le range dans MinIO (comme un upload), pour le servir ensuite via la
+// gateway (`/media/<id>`) plutôt qu'en hotlink externe. Évite les 403/404 du CDN
+// giphy et reste compatible CSP `default-src 'self'`. L'URL est bornée à la
+// liste d'hôtes GIPHY (anti-SSRF) ; le propriétaire est l'utilisateur capturant.
+// @Summary     Capturer un GIF GIPHY dans le stockage média
+// @Tags        media
+// @Accept      json
+// @Produce     json
+// @Security    BearerAuth
+// @Param       body body handler.captureRequest true "URL du GIF GIPHY"
+// @Success     201 {object} handler.uploadResponse
+// @Failure     400 {object} map[string]string
+// @Failure     401 {object} map[string]string
+// @Failure     413 {object} map[string]string "GIF trop volumineux"
+// @Failure     415 {object} map[string]string "Type de média non supporté"
+// @Failure     502 {object} map[string]string "GIPHY indisponible ou stockage en échec"
+// @Router      /gifs/capture [post]
+func (h *MediaHandler) CaptureGiphy(c *gin.Context) {
+	claims, ok := middleware.ClaimsFrom(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "non authentifié"})
+		return
+	}
+
+	var req captureRequest
+	if err := c.ShouldBindJSON(&req); err != nil || strings.TrimSpace(req.URL) == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "champ `url` manquant"})
+		return
+	}
+
+	parsed, err := url.Parse(strings.TrimSpace(req.URL))
+	if err != nil || parsed.Scheme != "https" || !giphyHosts[strings.ToLower(parsed.Hostname())] {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "url giphy invalide"})
+		return
+	}
+
+	greq, err := http.NewRequestWithContext(c.Request.Context(), http.MethodGet, parsed.String(), nil)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "url giphy invalide"})
+		return
+	}
+	res, err := h.httpClient.Do(greq)
+	if err != nil {
+		logging.FromGin(c).Warn("capture giphy : fetch échoué", "error", err)
+		c.JSON(http.StatusBadGateway, gin.H{"error": "giphy indisponible"})
+		return
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		logging.FromGin(c).Warn("capture giphy : statut inattendu", "status", res.StatusCode)
+		c.JSON(http.StatusBadGateway, gin.H{"error": "giphy indisponible"})
+		return
+	}
+
+	// Lecture bornée à maxImageBytes+1 : un octet de rab suffit à détecter le
+	// dépassement sans charger au-delà de la limite. La rendition `downsized`
+	// servie par le picker fait normalement < 2 Mo.
+	data, err := io.ReadAll(io.LimitReader(res.Body, h.maxImageBytes+1))
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": "lecture giphy impossible"})
+		return
+	}
+	if int64(len(data)) > h.maxImageBytes {
+		logging.FromGin(c).Warn("capture giphy refusée : trop volumineux", "size", len(data))
+		c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": validate.ErrTooLarge.Error()})
+		return
+	}
+
+	head := data
+	if len(head) > sniffLen {
+		head = head[:sniffLen]
+	}
+	mime, kind, err := validate.Detect(head)
+	if err != nil || kind != validate.KindImage {
+		logging.FromGin(c).Warn("capture giphy refusée : type non supporté", "mime", mime, "error", err)
+		c.JSON(http.StatusUnsupportedMediaType, gin.H{"error": "type de média non supporté"})
+		return
+	}
+
+	id, err := randomID()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "génération d'identifiant impossible"})
+		return
+	}
+
+	if err := h.store.Put(c.Request.Context(), id, bytes.NewReader(data), int64(len(data)), mime, claims.UserID); err != nil {
+		logging.FromGin(c).Error("échec stockage MinIO (capture giphy)", "error", err)
+		c.JSON(http.StatusBadGateway, gin.H{"error": "échec du stockage"})
+		return
+	}
+
+	logging.FromGin(c).Info("gif giphy capturé", "media_id", id, "mime", mime, "size", len(data))
+	c.JSON(http.StatusCreated, gin.H{"data": uploadResponse{
+		ID:   id,
+		URL:  "/media/" + id,
+		Mime: mime,
+		Kind: string(kind),
+		Size: int64(len(data)),
+	}})
 }
 
 // Upload : POST /media (multipart, champ `file`). Valide le type réel (magic
@@ -580,14 +700,6 @@ var fallbackGifCatalog = []giphyResponse{
 		Height:     300,
 	},
 	{
-		ID:         "fallback-wow",
-		Title:      "Wow reaction",
-		URL:        "https://media.giphy.com/media/5GoVLqeAOo6PK/giphy.gif",
-		PreviewURL: "https://media.giphy.com/media/5GoVLqeAOo6PK/200.gif",
-		Width:      480,
-		Height:     270,
-	},
-	{
 		ID:         "fallback-hello",
 		Title:      "Hello wave",
 		URL:        "https://media.giphy.com/media/ASd0Ukj0y3qMM/giphy.gif",
@@ -706,14 +818,6 @@ var fallbackGifCatalog = []giphyResponse{
 		PreviewURL: "https://media.giphy.com/media/13HgwGsXF0aiGY/200.gif",
 		Width:      480,
 		Height:     360,
-	},
-	{
-		ID:         "fallback-dog",
-		Title:      "Dog excited",
-		URL:        "https://media.giphy.com/media/4Zo41lhzKt6iZ8xff9/giphy.gif",
-		PreviewURL: "https://media.giphy.com/media/4Zo41lhzKt6iZ8xff9/200.gif",
-		Width:      480,
-		Height:     270,
 	},
 	{
 		ID:         "fallback-dance",
