@@ -19,6 +19,10 @@ const (
 	msgTestSecret = "msg-test-secret"
 	// UserID injecté dans tous les tokens de test.
 	msgTestUserID = "11111111-1111-1111-1111-111111111111"
+	// ObjectID valide (24 hex) : passe la validation d'ID et atteint le repo nil
+	// → panic récupérée par gin.Recovery() → 500.
+	msgTestConvID = "507f1f77bcf86cd799439011"
+	msgTestMsgID  = "507f1f77bcf86cd799439012"
 )
 
 // newNilSvcRouter monte les routes avec un MessageService à repo nil.
@@ -37,9 +41,10 @@ func makeMsgToken(t *testing.T, role string) string {
 	t.Helper()
 	now := time.Now()
 	claims := middleware.Claims{
-		UserID: msgTestUserID,
-		Email:  "user@breezy.dev",
-		Role:   role,
+		UserID:        msgTestUserID,
+		Email:         "user@breezy.dev",
+		EmailVerified: true,
+		Role:          role,
 		RegisteredClaims: jwt.RegisteredClaims{
 			IssuedAt:  jwt.NewNumericDate(now),
 			ExpiresAt: jwt.NewNumericDate(now.Add(time.Hour)),
@@ -102,7 +107,7 @@ func TestListConversations_NilRepo_500(t *testing.T) {
 func TestGetConversation_NilRepo_500(t *testing.T) {
 	r := newNilSvcRouter(t)
 	tok := makeMsgToken(t, "user")
-	req := httptest.NewRequest(http.MethodGet, "/messages/conversations/some-conv-id", nil)
+	req := httptest.NewRequest(http.MethodGet, "/messages/conversations/"+msgTestConvID, nil)
 	req.Header.Set("Authorization", "Bearer "+tok)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
@@ -116,7 +121,7 @@ func TestGetConversation_NilRepo_500(t *testing.T) {
 func TestListMessages_NilRepo_500(t *testing.T) {
 	r := newNilSvcRouter(t)
 	tok := makeMsgToken(t, "user")
-	req := httptest.NewRequest(http.MethodGet, "/messages/conversations/some-conv-id/messages", nil)
+	req := httptest.NewRequest(http.MethodGet, "/messages/conversations/"+msgTestConvID+"/messages", nil)
 	req.Header.Set("Authorization", "Bearer "+tok)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
@@ -160,7 +165,7 @@ func TestEditMessage_JSONInvalide_400(t *testing.T) {
 func TestDeleteMessage_NilRepo_500(t *testing.T) {
 	r := newNilSvcRouter(t)
 	tok := makeMsgToken(t, "user")
-	req := httptest.NewRequest(http.MethodDelete, "/messages/conversations/conv-id/messages/msg-id", nil)
+	req := httptest.NewRequest(http.MethodDelete, "/messages/conversations/"+msgTestConvID+"/messages/"+msgTestMsgID, nil)
 	req.Header.Set("Authorization", "Bearer "+tok)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
@@ -174,7 +179,7 @@ func TestDeleteMessage_NilRepo_500(t *testing.T) {
 func TestMarkRead_NilRepo_500(t *testing.T) {
 	r := newNilSvcRouter(t)
 	tok := makeMsgToken(t, "user")
-	req := httptest.NewRequest(http.MethodPut, "/messages/conversations/conv-id/read", nil)
+	req := httptest.NewRequest(http.MethodPut, "/messages/conversations/"+msgTestConvID+"/read", nil)
 	req.Header.Set("Authorization", "Bearer "+tok)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
@@ -216,7 +221,7 @@ func TestListCommunities_NilRepo_500(t *testing.T) {
 func TestListMembers_NilRepo_500(t *testing.T) {
 	r := newNilSvcRouter(t)
 	tok := makeMsgToken(t, "user")
-	req := httptest.NewRequest(http.MethodGet, "/messages/conversations/conv-id/members", nil)
+	req := httptest.NewRequest(http.MethodGet, "/messages/conversations/"+msgTestConvID+"/members", nil)
 	req.Header.Set("Authorization", "Bearer "+tok)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
@@ -332,7 +337,7 @@ func TestBackupStatus_NilRepo_500(t *testing.T) {
 func TestPinConversation_NilRepo_500(t *testing.T) {
 	r := newNilSvcRouter(t)
 	tok := makeMsgToken(t, "user")
-	req := httptest.NewRequest(http.MethodPatch, "/messages/conversations/conv-id/pin", nil)
+	req := httptest.NewRequest(http.MethodPatch, "/messages/conversations/"+msgTestConvID+"/pin", nil)
 	req.Header.Set("Authorization", "Bearer "+tok)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
@@ -344,7 +349,7 @@ func TestPinConversation_NilRepo_500(t *testing.T) {
 func TestMuteConversation_NilRepo_500(t *testing.T) {
 	r := newNilSvcRouter(t)
 	tok := makeMsgToken(t, "user")
-	req := httptest.NewRequest(http.MethodPatch, "/messages/conversations/conv-id/mute", nil)
+	req := httptest.NewRequest(http.MethodPatch, "/messages/conversations/"+msgTestConvID+"/mute", nil)
 	req.Header.Set("Authorization", "Bearer "+tok)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)

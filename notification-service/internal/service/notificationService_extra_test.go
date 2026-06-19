@@ -22,8 +22,8 @@ func TestList_EmptyBeforeCursor(t *testing.T) {
 	// before="" → pas de cursor → appel repo (nil → panic récupérée)
 	svc := NewNotificationService(nil, &capturePublisher{}, nil)
 	func() {
-		defer func() { recover() }()
-		svc.List(context.TODO(), "u1", 10, "")
+		defer func() { _ = recover() }()
+		_, _ = svc.List(context.TODO(), "u1", 10, "")
 	}()
 }
 

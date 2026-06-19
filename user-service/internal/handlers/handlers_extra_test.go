@@ -75,7 +75,7 @@ func TestSuggestions_NilRepo_500(t *testing.T) {
 
 func TestGetByID_NilRepo_500(t *testing.T) {
 	r := newFullRouter(t)
-	req := httptest.NewRequest(http.MethodGet, "/users/some-id", nil)
+	req := httptest.NewRequest(http.MethodGet, "/users/11111111-1111-1111-1111-111111111111", nil)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 	if w.Code != http.StatusInternalServerError {

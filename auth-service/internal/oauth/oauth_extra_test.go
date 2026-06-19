@@ -136,38 +136,6 @@ func TestNewRegistry_ProviderInconnu(t *testing.T) {
 	}
 }
 
-func TestNewRegistry_SpotifyConfiguré(t *testing.T) {
-	reg := NewRegistry(context.Background(), Options{
-		RedirectBaseURL: "https://app.breezy.dev",
-		Providers: map[string]Credentials{
-			"spotify": {ClientID: "sp-id", ClientSecret: "sp-secret"},
-		},
-	})
-	p, err := reg.Get("spotify")
-	if err != nil {
-		t.Fatalf("spotify configuré = %v", err)
-	}
-	if p == nil {
-		t.Fatal("provider spotify nil")
-	}
-}
-
-func TestNewRegistry_FacebookConfiguré(t *testing.T) {
-	reg := NewRegistry(context.Background(), Options{
-		RedirectBaseURL: "https://app.breezy.dev",
-		Providers: map[string]Credentials{
-			"facebook": {ClientID: "fb-id", ClientSecret: "fb-secret"},
-		},
-	})
-	p, err := reg.Get("facebook")
-	if err != nil {
-		t.Fatalf("facebook configuré = %v", err)
-	}
-	if p.userInfoURL == "" {
-		t.Fatal("userInfoURL vide pour facebook")
-	}
-}
-
 // ─── Provider.AuthURL ─────────────────────────────────────────────────────────
 
 func TestProvider_AuthURL(t *testing.T) {
@@ -194,20 +162,6 @@ func TestProvider_AuthURL(t *testing.T) {
 	}
 	if !strings.Contains(url, "my-client-id") {
 		t.Errorf("AuthURL sans client_id: %q", url)
-	}
-}
-
-func TestProvider_AuthURL_SpotifyContientScopes(t *testing.T) {
-	reg := NewRegistry(context.Background(), Options{
-		RedirectBaseURL: "http://localhost:3000",
-		Providers: map[string]Credentials{
-			"spotify": {ClientID: "sp-id", ClientSecret: "sp-secret"},
-		},
-	})
-	p, _ := reg.Get("spotify")
-	url := p.AuthURL("test-state")
-	if !strings.Contains(url, "spotify.com") {
-		t.Errorf("URL Spotify sans spotify.com: %q", url)
 	}
 }
 

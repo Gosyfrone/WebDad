@@ -37,9 +37,10 @@ func makePostToken(t *testing.T, role string) string {
 	t.Helper()
 	now := time.Now()
 	claims := middleware.Claims{
-		UserID: "11111111-1111-1111-1111-111111111111",
-		Email:  "alice@breezy.dev",
-		Role:   role,
+		UserID:        "11111111-1111-1111-1111-111111111111",
+		Email:         "alice@breezy.dev",
+		EmailVerified: true,
+		Role:          role,
 		RegisteredClaims: jwt.RegisteredClaims{
 			IssuedAt:  jwt.NewNumericDate(now),
 			ExpiresAt: jwt.NewNumericDate(now.Add(time.Hour)),

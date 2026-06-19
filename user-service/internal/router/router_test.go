@@ -55,7 +55,6 @@ func TestRoutesPubliques(t *testing.T) {
 	cases := []struct {
 		method, path string
 	}{
-		{http.MethodGet, "/users"},
 		{http.MethodGet, "/users/search?q=alice"},
 		{http.MethodGet, "/users/suggestions"},
 		{http.MethodGet, "/users/by-username/alice"},
@@ -80,6 +79,7 @@ func TestRoutesProtégées_SansToken(t *testing.T) {
 	cases := []struct {
 		method, path string
 	}{
+		{http.MethodGet, "/users"},
 		{http.MethodPost, "/users"},
 		{http.MethodGet, "/users/me"},
 		{http.MethodPatch, "/users/me"},

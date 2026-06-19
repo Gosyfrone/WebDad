@@ -17,7 +17,7 @@ func newPostSvc() *PostService { return NewPostService(nil) }
 
 func TestCreatePost_InvalidReplyAudience(t *testing.T) {
 	svc := newPostSvc()
-	_, err := svc.CreatePost(context.TODO(), "u1", "contenu", "", nil, nil, "invalid")
+	_, err := svc.CreatePost(context.TODO(), "u1", "contenu", "", nil, nil, "invalid", false)
 	if !errors.Is(err, ErrInvalidReplyAudience) {
 		t.Errorf("replyAudience invalide → %v, attendu ErrInvalidReplyAudience", err)
 	}
@@ -25,7 +25,7 @@ func TestCreatePost_InvalidReplyAudience(t *testing.T) {
 
 func TestCreatePost_InvalidReplyAudience_Random(t *testing.T) {
 	svc := newPostSvc()
-	_, err := svc.CreatePost(context.TODO(), "u1", "contenu", "", nil, nil, "moderators_only")
+	_, err := svc.CreatePost(context.TODO(), "u1", "contenu", "", nil, nil, "moderators_only", false)
 	if !errors.Is(err, ErrInvalidReplyAudience) {
 		t.Errorf("replyAudience 'moderators_only' → %v, attendu ErrInvalidReplyAudience", err)
 	}
