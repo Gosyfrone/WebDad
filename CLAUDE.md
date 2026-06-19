@@ -10,7 +10,7 @@
 > - Knowledge graph in `graphify-out/` — query it before reading source (Operating Rule 11).
 >
 > **Latest session work and suggested commit messages live in `CHANGELOG.md`, not here.**
-> **Session freshness:** current work log updated in `CHANGELOG.md` on 18/06/2026 (sécurité : pentest complet + durcissement — rate-limiting, MFA anti-brute-force, gate `email_verified`, annuaire authentifié, en-têtes Caddy ; rapport interne `PENTEST.md`, gitignoré).
+> **Session freshness:** current work log updated in `CHANGELOG.md` on 19/06/2026 (retrait propre de Facebook & Spotify des connexions sociales — il ne reste que Google + GitHub ; back/front/schema/swagger/docs).
 
 ---
 

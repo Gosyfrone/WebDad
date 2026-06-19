@@ -14,10 +14,10 @@ import (
 // OAuthURL : GET /auth/oauth/{provider}/url — renvoie l'URL d'autorisation OIDC
 // et un state anti-CSRF. Le front stocke le state, redirige l'utilisateur vers
 // `url`, puis revérifie le state au callback avant d'appeler /exchange.
-// @Summary     Démarrer une connexion OAuth (Google, GitHub, Facebook, Spotify)
+// @Summary     Démarrer une connexion OAuth (Google, GitHub)
 // @Tags        auth
 // @Produce     json
-// @Param       provider path string true "Fournisseur OAuth" Enums(google, github, facebook, spotify)
+// @Param       provider path string true "Fournisseur OAuth" Enums(google, github)
 // @Success     200 {object} models.OAuthURLData "data: {url, state}"
 // @Failure     404 {object} map[string]string "Provider non supporté/configuré"
 // @Failure     500 {object} map[string]string "Erreur interne"
@@ -45,11 +45,11 @@ func (h *Handler) OAuthURL(c *gin.Context) {
 //   - compte existant : émet NOS tokens (même format que /auth/login) ;
 //   - nouveau compte : renvoie un pending_token, sans créer de credential/JWT.
 //
-// @Summary     Finaliser une connexion OAuth (Google, GitHub, Facebook, Spotify)
+// @Summary     Finaliser une connexion OAuth (Google, GitHub)
 // @Tags        auth
 // @Accept      json
 // @Produce     json
-// @Param       provider path string true "Fournisseur OAuth" Enums(google, github, facebook, spotify)
+// @Param       provider path string true "Fournisseur OAuth" Enums(google, github)
 // @Param       body body models.OAuthExchangeRequest true "Code d'autorisation"
 // @Success     200 {object} models.OAuthExchangeData "Connexion réussie ou inscription à finaliser"
 // @Failure     400 {object} map[string]string "Payload invalide"
@@ -116,7 +116,7 @@ func (h *Handler) OAuthExchange(c *gin.Context) {
 // @Tags        auth
 // @Accept      json
 // @Produce     json
-// @Param       provider path string true "Fournisseur OAuth" Enums(google, github, facebook, spotify)
+// @Param       provider path string true "Fournisseur OAuth" Enums(google, github)
 // @Param       body body models.OAuthCompleteRequest true "Token d'inscription OAuth"
 // @Success     200 {object} models.AuthUser "Compte créé — data: {token, refresh_token, user}"
 // @Failure     400 {object} map[string]string "Payload invalide"

@@ -33,7 +33,7 @@ func TestRegistryGet_UnknownOrUnconfigured(t *testing.T) {
 		},
 	})
 
-	for _, name := range []string{"google", "facebook"} {
+	for _, name := range []string{"google", "inconnu"} {
 		if _, err := reg.Get(name); err != ErrUnknownProvider {
 			t.Errorf("Get(%q) : attendu ErrUnknownProvider, obtenu %v", name, err)
 		}

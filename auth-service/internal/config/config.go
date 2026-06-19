@@ -63,18 +63,14 @@ type Config struct {
 	AccountPurgeAfter         time.Duration
 	AccountPurgeSweepInterval time.Duration
 
-	// OAuth (Login with Google / GitHub / Facebook / Spotify). Un provider
-	// sans ClientID est simplement ignoré (endpoints → 404). Le redirect URI
-	// front est dérivé de OAuthRedirectBaseURL : <base>/auth/callback/<provider>.
+	// OAuth (Login with Google / GitHub). Un provider sans ClientID est
+	// simplement ignoré (endpoints → 404). Le redirect URI front est dérivé
+	// de OAuthRedirectBaseURL : <base>/auth/callback/<provider>.
 	OAuthRedirectBaseURL string
 	GoogleClientID       string
 	GoogleClientSecret   string
 	GitHubClientID       string
 	GitHubClientSecret   string
-	FacebookClientID     string
-	FacebookClientSecret string
-	SpotifyClientID      string
-	SpotifyClientSecret  string
 }
 
 // Load construit la config. Charge les .env best-effort (ignorés s'ils
@@ -132,10 +128,6 @@ func Load() *Config {
 	cfg.GoogleClientSecret = os.Getenv("GOOGLE_CLIENT_SECRET")
 	cfg.GitHubClientID = os.Getenv("GITHUB_CLIENT_ID")
 	cfg.GitHubClientSecret = os.Getenv("GITHUB_CLIENT_SECRET")
-	cfg.FacebookClientID = os.Getenv("FACEBOOK_CLIENT_ID")
-	cfg.FacebookClientSecret = os.Getenv("FACEBOOK_CLIENT_SECRET")
-	cfg.SpotifyClientID = os.Getenv("SPOTIFY_CLIENT_ID")
-	cfg.SpotifyClientSecret = os.Getenv("SPOTIFY_CLIENT_SECRET")
 
 	return cfg
 }

@@ -393,8 +393,6 @@ paths:
       - enum:
         - google
         - github
-        - facebook
-        - spotify
         type: string
         description: Fournisseur OAuth
         name: provider
@@ -443,13 +441,11 @@ paths:
       - application/json
       tags:
       - auth
-      summary: Finaliser une connexion OAuth (Google, GitHub, Facebook, Spotify)
+      summary: Finaliser une connexion OAuth (Google, GitHub)
       parameters:
       - enum:
         - google
         - github
-        - facebook
-        - spotify
         type: string
         description: Fournisseur OAuth
         name: provider
@@ -502,13 +498,11 @@ paths:
       - application/json
       tags:
       - auth
-      summary: Démarrer une connexion OAuth (Google, GitHub, Facebook, Spotify)
+      summary: Démarrer une connexion OAuth (Google, GitHub)
       parameters:
       - enum:
         - google
         - github
-        - facebook
-        - spotify
         type: string
         description: Fournisseur OAuth
         name: provider

@@ -5,7 +5,7 @@
 //   - kindOIDC   (Google) : flux OIDC Authorization Code. L'échange
 //     code→tokens renvoie un id_token signé que l'on VÉRIFIE ici, côté serveur
 //     (signature via JWKS, issuer, audience), puis on en lit les claims.
-//   - kindOAuth2 (Facebook, Spotify, GitHub) : OAuth2 « classique » sans
+//   - kindOAuth2 (GitHub) : OAuth2 « classique » sans
 //     id_token. On échange le code contre un access_token, puis on appelle
 //     l'endpoint userinfo du provider (Graph API, /v1/me, /user…) pour récupérer
 //     {sub, email}. L'email y est considéré comme vérifié : le provider a
@@ -94,26 +94,6 @@ var defs = map[string]providerDef{
 			return Identity{Subject: idField(m, "id"), Email: strField(m, "email"), EmailVerified: true}
 		},
 		emailsURL: "https://api.github.com/user/emails",
-	},
-	"facebook": {
-		kind:        kindOAuth2,
-		scopes:      []string{"email"},
-		authURL:     "https://www.facebook.com/v21.0/dialog/oauth",
-		tokenURL:    "https://graph.facebook.com/v21.0/oauth/access_token",
-		userInfoURL: "https://graph.facebook.com/me?fields=id,email",
-		userInfoMap: func(m map[string]any) Identity {
-			return Identity{Subject: strField(m, "id"), Email: strField(m, "email"), EmailVerified: true}
-		},
-	},
-	"spotify": {
-		kind:        kindOAuth2,
-		scopes:      []string{"user-read-email"},
-		authURL:     "https://accounts.spotify.com/authorize",
-		tokenURL:    "https://accounts.spotify.com/api/token",
-		userInfoURL: "https://api.spotify.com/v1/me",
-		userInfoMap: func(m map[string]any) Identity {
-			return Identity{Subject: strField(m, "id"), Email: strField(m, "email"), EmailVerified: true}
-		},
 	},
 }
 

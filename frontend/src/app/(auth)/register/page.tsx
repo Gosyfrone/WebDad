@@ -28,8 +28,6 @@ import * as React from 'react'
 const OAUTH_PROVIDERS = [
   { id: 'google', src: '/google-logo.jpg', label: 'Google' },
   { id: 'github', src: '/github.svg', label: 'GitHub' },
-  { id: 'facebook', src: '/facebook.svg', label: 'Facebook' },
-  { id: 'spotify', src: '/spotify.svg', label: 'Spotify' },
 ] as const
 
 import { Button } from '@/components/ui/button'
@@ -930,7 +928,7 @@ export default function RegisterPage() {
                   <div className="h-px flex-1 bg-gradient-to-r from-transparent via-border to-transparent" />
                 </div>
 
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 gap-2">
                   {OAUTH_PROVIDERS.map((provider) => (
                     <button
                       key={provider.id}
@@ -939,13 +937,14 @@ export default function RegisterPage() {
                       title={provider.label}
                       disabled={oauthLoading !== null || isSubmitting}
                       onClick={() => handleOAuth(provider.id)}
-                      className="flex h-9 items-center justify-center rounded-2xl border border-gray-300 bg-white transition hover:scale-[1.03] hover:bg-white hover:shadow-md disabled:cursor-not-allowed disabled:opacity-70"
+                      className="flex h-9 w-full items-center justify-center gap-2 rounded-2xl border border-gray-300 bg-white text-sm font-medium text-gray-700 transition hover:scale-[1.03] hover:bg-white hover:shadow-md disabled:cursor-not-allowed disabled:opacity-70"
                     >
                       {oauthLoading === provider.id ? (
                         <Loader2 className="h-4 w-4 animate-spin text-gray-500" />
                       ) : (
                         <Image src={provider.src} alt={provider.label} width={18} height={18} />
                       )}
+                      <span>{provider.label}</span>
                     </button>
                   ))}
                 </div>
