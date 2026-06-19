@@ -24,6 +24,7 @@ import {
   listNotifications,
   markAllRead,
 } from '@/lib/notifications'
+import { playAppSound } from '@/lib/sounds'
 
 interface NotificationsContextValue {
   unreadCount: number
@@ -63,6 +64,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
   const upsert = useCallback((n: AppNotification) => {
     setItems((prev) => [n, ...prev.filter((p) => p.id !== n.id)])
     if (!n.isRead && !unreadIds.current.has(n.id)) {
+      playAppSound('notification_received')
       unreadIds.current.add(n.id)
       setUnreadCount((c) => c + 1)
     }
