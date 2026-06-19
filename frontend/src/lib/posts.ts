@@ -33,6 +33,7 @@ export interface ApiPost {
   quote_post_id?: string
   reply_audience?: ReplyAudience
   can_reply?: boolean
+  nsfw?: boolean
   likes_count: number
   comments_count: number
   reposts_count?: number
@@ -146,6 +147,11 @@ export interface FeedPost {
   canDelete: boolean
   /** L'utilisateur courant peut-il épingler/désépingler ce post ? */
   canPin: boolean
+  /** Post marqué « contenu sensible » (NSFW). Le front le floute si le lecteur
+   * n'a pas le droit/la préférence de le voir (cf. viewer policy /profils/me). */
+  nsfw: boolean
+  /** L'utilisateur courant peut-il (dé)marquer ce post NSFW (modo/admin) ? */
+  canMarkNsfw: boolean
 }
 
 export type PollAudience = 'everyone' | 'followers'
@@ -251,6 +257,12 @@ function canDelete(authorId: string): boolean {
   if (!claims) return false
   const role = claims.role
   return claims.user_id === authorId || role === 'moderator' || role === 'admin'
+}
+
+/** L'utilisateur courant est-il modérateur ou admin (peut (dé)marquer NSFW) ? */
+function canModerate(): boolean {
+  const role = decodeClaims()?.role
+  return role === 'moderator' || role === 'admin'
 }
 
 // --- Résolution d'auteur (mémoïsée) -----------------------------------------
@@ -391,6 +403,8 @@ async function toFeedPost(
     bookmarked: bookmarkedIds.has(p.id),
     canDelete: !p.reposted_by_id && canDelete(p.author_id),
     canPin: currentUserId() === p.author_id,
+    nsfw: Boolean(p.nsfw),
+    canMarkNsfw: canModerate(),
   }
 }
 
@@ -583,12 +597,15 @@ export async function createPost(
   quotePostId?: string,
   poll?: CreatePollPayload,
   replyAudience: ReplyAudience = 'everyone',
+  nsfw = false,
 ): Promise<FeedPost> {
   const payload: Record<string, unknown> = { content }
   if (media.length > 0) payload.media = media
   if (quotePostId) payload.quote_post_id = quotePostId
   // `everyone` est le défaut serveur → n'envoyer le champ que s'il est restreint.
   if (replyAudience === 'followers') payload.reply_audience = replyAudience
+  // `false` est le défaut serveur → n'envoyer le champ que si l'auteur a marqué.
+  if (nsfw) payload.nsfw = true
   if (poll) {
     payload.poll = {
       choices: poll.choices.map((c) => ({
@@ -647,6 +664,19 @@ export async function pinPost(id: string): Promise<FeedPost> {
 export async function unpinPost(id: string): Promise<FeedPost> {
   const updated = await unwrap<ApiPost>(
     await apiFetch(`/posts/${id}/pin`, { method: 'DELETE' }),
+  )
+  const [likedIds, repostedIds, bookmarkedIds] = await getMyPostStates()
+  return toFeedPost(updated, likedIds, repostedIds, bookmarkedIds)
+}
+
+/** (Dé)marque un post comme NSFW (modo/admin côté back) ; renvoie le post à jour. */
+export async function setPostNsfw(id: string, nsfw: boolean): Promise<FeedPost> {
+  const updated = await unwrap<ApiPost>(
+    await apiFetch(`/posts/${id}/nsfw`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nsfw }),
+    }),
   )
   const [likedIds, repostedIds, bookmarkedIds] = await getMyPostStates()
   return toFeedPost(updated, likedIds, repostedIds, bookmarkedIds)

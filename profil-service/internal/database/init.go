@@ -35,7 +35,30 @@ func EnsureSchema(ctx context.Context, db *mongo.Database) error {
 	if err := backfillVisibility(ctx, db); err != nil {
 		return err
 	}
+	if err := backfillBirthDate(ctx, db); err != nil {
+		return err
+	}
 	return ensureSeed(ctx, db)
+}
+
+// backfillBirthDate pose une date de naissance par défaut (01/01/1999, traité
+// comme MAJEUR) sur les profils antérieurs au champ (date absente). Sans elle,
+// ces comptes seraient « mineurs par défaut » et verraient le contenu NSFW
+// masqué alors qu'ils en disposaient en prod : on préserve l'expérience
+// existante. Les nouveaux comptes (register Breezy + onboarding OAuth) saisissent
+// TOUJOURS leur vraie date. Idempotent : filtre sur birth_date absente.
+func backfillBirthDate(ctx context.Context, db *mongo.Database) error {
+	defaultBirthDate := time.Date(1999, time.January, 1, 0, 0, 0, 0, time.UTC)
+	filter := bson.M{"birth_date": bson.M{"$exists": false}}
+	res, err := db.Collection("profiles").UpdateMany(ctx, filter,
+		bson.M{"$set": bson.M{"birth_date": defaultBirthDate}})
+	if err != nil {
+		return fmt.Errorf("backfill birth_date : %w", err)
+	}
+	if res.ModifiedCount > 0 {
+		slog.Info("migration: birth_date legacy posée au défaut", "count", res.ModifiedCount, "default", "1999-01-01")
+	}
+	return nil
 }
 
 // backfillVisibility remet à une valeur valide les champs `visibility`,
@@ -201,6 +224,7 @@ var validators = map[string]bson.M{
 				"activity_visibility": bson.M{"bsonType": "string", "enum": bson.A{"public", "private"}},
 				// Champs optionnels (validés uniquement s'ils sont présents).
 				"is_online":               bson.M{"bsonType": "bool"},
+				"nsfw_enabled":            bson.M{"bsonType": "bool"},
 				"birth_date":              bson.M{"bsonType": "date"},
 				"gender":                  bson.M{"bsonType": "string", "enum": bson.A{"male", "female"}},
 				"nationality":             bson.M{"bsonType": "string", "pattern": "^[A-Z]{2}$"},

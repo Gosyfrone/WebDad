@@ -284,6 +284,29 @@ export const messages: Record<Locale, Messages> = {
     'visibility.saved': 'Visibilité mise à jour.',
     'visibility.load_failed': 'Impossible de charger la visibilité.',
     'visibility.save_failed': 'Impossible de modifier la visibilité.',
+    // — Contenu sensible (NSFW) —
+    'nsfw.title': 'Contenu sensible',
+    'nsfw.desc':
+      'Gère l’affichage des contenus marqués comme sensibles (NSFW).',
+    'nsfw.toggle_label': 'Afficher le contenu NSFW',
+    'nsfw.toggle_desc': 'Les posts marqués NSFW s’affichent sans floutage.',
+    'nsfw.toggle_aria': 'Activer ou désactiver l’affichage du contenu NSFW',
+    'nsfw.minor_locked':
+      'Réservé aux 18 ans et plus. Cet encart se débloquera automatiquement à votre majorité.',
+    'nsfw.saved': 'Préférence NSFW mise à jour.',
+    'nsfw.save_failed': 'Impossible de mettre à jour la préférence NSFW.',
+    'nsfw.load_failed': 'Impossible de charger la préférence NSFW.',
+    'nsfw.post_badge': 'NSFW',
+    'nsfw.post_hidden_desc':
+      'Ce contenu a été marqué comme NSFW. Rendez-vous dans les paramètres pour désactiver le filtre NSFW et visualiser le post.',
+    'nsfw.post_hidden_visitor':
+      'Ce contenu est masqué. Connectez-vous pour gérer l’affichage du contenu sensible.',
+    'nsfw.mark': 'Marquer comme NSFW',
+    'nsfw.unmark': 'Retirer le marquage NSFW',
+    'nsfw.marked': 'Post marqué comme NSFW.',
+    'nsfw.unmarked': 'Marquage NSFW retiré.',
+    'nsfw.action_failed': 'Action NSFW impossible.',
+    'nsfw.composer_tooltip': 'Ce contenu sera affiché comme NSFW',
     'visibility.likes_private_account': "J'aime privés",
     'visibility.likes_private_toggle_desc':
       "Activez pour masquer vos mentions J'aime aux autres utilisateurs.",
@@ -1506,6 +1529,28 @@ export const messages: Record<Locale, Messages> = {
     'visibility.saved': 'Visibility updated.',
     'visibility.load_failed': 'Could not load visibility.',
     'visibility.save_failed': 'Could not update visibility.',
+    // — Sensitive content (NSFW) —
+    'nsfw.title': 'Sensitive content',
+    'nsfw.desc': 'Manage how content flagged as sensitive (NSFW) is shown.',
+    'nsfw.toggle_label': 'Show NSFW content',
+    'nsfw.toggle_desc': 'Posts marked NSFW are shown without blurring.',
+    'nsfw.toggle_aria': 'Toggle NSFW content display',
+    'nsfw.minor_locked':
+      'Reserved for ages 18 and over. This panel unlocks automatically when you come of age.',
+    'nsfw.saved': 'NSFW preference updated.',
+    'nsfw.save_failed': 'Could not update NSFW preference.',
+    'nsfw.load_failed': 'Could not load NSFW preference.',
+    'nsfw.post_badge': 'NSFW',
+    'nsfw.post_hidden_desc':
+      'This content has been marked as NSFW. Go to settings to turn off the NSFW filter and view the post.',
+    'nsfw.post_hidden_visitor':
+      'This content is hidden. Log in to manage how sensitive content is shown.',
+    'nsfw.mark': 'Mark as NSFW',
+    'nsfw.unmark': 'Remove NSFW mark',
+    'nsfw.marked': 'Post marked as NSFW.',
+    'nsfw.unmarked': 'NSFW mark removed.',
+    'nsfw.action_failed': 'NSFW action failed.',
+    'nsfw.composer_tooltip': 'This content will be shown as NSFW',
     'visibility.likes_private_account': 'Private likes',
     'visibility.likes_private_toggle_desc':
       'Turn on to hide your likes from other users.',

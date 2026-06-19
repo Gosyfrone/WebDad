@@ -1,12 +1,21 @@
 'use client'
 
-import { EyeOff, Languages, Lock, Scale, Settings, UserX } from 'lucide-react'
+import {
+  EyeOff,
+  Languages,
+  Lock,
+  Scale,
+  Settings,
+  ShieldAlert,
+  UserX,
+} from 'lucide-react'
 
 import { useT } from '@/components/language-provider'
 import { LanguageSelector } from '@/components/language-selector'
 import { LegalLinks } from '@/components/legal/legal-links'
 import { BlockedUsersSettings } from '@/components/settings/blocked-users-settings'
 import { MutedWordsSettings } from '@/components/settings/muted-words-settings'
+import { NsfwSettings } from '@/components/settings/nsfw-settings'
 import { VisibilitySettings } from '@/components/settings/visibility-settings'
 import { UserAccountSettings } from '@/components/settings/user-account-settings'
 
@@ -68,6 +77,22 @@ export function SettingsView() {
               </div>
 
               <VisibilitySettings />
+            </div>
+
+            <div className="grid gap-4 px-4 py-4 md:grid-cols-[minmax(0,1fr)_minmax(260px,340px)] md:items-start">
+              <div className="flex items-start gap-3">
+                <span className="mt-1 text-primary">
+                  <ShieldAlert className="h-5 w-5" aria-hidden />
+                </span>
+                <div className="min-w-0">
+                  <h3 className="font-semibold text-foreground">{t('nsfw.title')}</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {t('nsfw.desc')}
+                  </p>
+                </div>
+              </div>
+
+              <NsfwSettings />
             </div>
 
             <div className="grid gap-4 px-4 py-4 md:grid-cols-[minmax(0,1fr)_minmax(260px,340px)] md:items-start">

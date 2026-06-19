@@ -6,6 +6,40 @@
 
 ---
 
+## Contenu sensible (NSFW) & majorité (19/06/2026)
+
+> Filtre NSFW : posts marquables « sensibles », floutés pour les mineurs et pour les majeurs
+> qui désactivent l'affichage. Feature de la branche #74 (date de naissance + interdiction NSFW).
+
+- **Majorité calculée serveur depuis `birth_date`, jamais stockée.** `IsAdultAt` (≥18 ans, calcul
+  calendaire exact) + `HydrateViewerPolicy` posent `is_adult` et `nsfw_visible` à la lecture de
+  `/profils/me` uniquement. *Pourquoi* : la majorité est **dynamique** (se débloque toute seule le
+  jour des 18 ans, sans job de migration) et le front ne peut pas se faire passer pour majeur
+  (calcul serveur = autoritaire, cf. Rule 6). Le seuil NSFW (18) est **distinct** de l'âge minimum
+  d'inscription (13, inchangé) : on ne bloque pas l'inscription des mineurs, on filtre le NSFW.
+- **Préférence `nsfw_enabled` à défaut ON, hors `$jsonSchema required`.** Un `*bool` omitempty +
+  helper `NsfwEnabledOf` (absent ⇒ true) ⇒ **pas de revalidation stricte Mongo** donc pas de
+  migration de la préférence (contraste avec `visibility`, cf. Rule 5b). Défaut ON = la prod
+  existante continue de voir tout le contenu. La valeur stockée d'un **mineur est inerte** :
+  `nsfw_visible = is_adult && nsfw_enabled` reste faux. La carte des paramètres est grisée+verrouillée
+  pour un mineur.
+- **DOB absente → backfill `1999-01-01` + traité adulte.** Migration boot `backfillBirthDate`
+  (idempotente) pour les profils antérieurs au champ et les comptes sans date. *Pourquoi adulte* :
+  ne pas casser l'expérience de la prod ni des comptes sociaux ; l'onboarding OAuth collecte de
+  toute façon la vraie date (bloquant) et le register Breezy aussi.
+- **Flou côté front, politique viewer autoritative serveur (pas de stripping).** Le post-service
+  **délivre** le post marqué (`nsfw: true`) ; le front le floute si `!nsfw_visible`. *Pourquoi pas
+  de stripping serveur pour les mineurs* : `nsfw_visible` est calculé serveur (le front ne triche
+  pas sur la majorité), le floutage est un filtre d'affichage façon X/Twitter, et ça évite de
+  complexifier le cache/feed. Le NSFW **n'est pas** une barrière de visibilité dure (le post reste
+  public, juste visuellement masqué) — distinct de `is_hidden`/`visibility`.
+- **Marquage : auteur à la création, modo/admin ensuite.** `nsfw` dans `CreatePostRequest` (l'auteur
+  pose via le bouton du composer) ; après publication, seule la modération (dé)marque via
+  `PATCH /posts/:id/nsfw` (`ModeratorOnly`). *Pourquoi* : simple, cohérent avec la modération
+  (miroir de `is_hidden`/`hidden_by`), et l'auteur ne peut pas retirer un marquage posé par un modo.
+
+---
+
 ## Sécurité — durcissement post-pentest (18/06/2026)
 
 > Suite à un pentest boîte noire externe (« riveta ») + un audit boîte blanche interne complet

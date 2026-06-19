@@ -109,6 +109,9 @@ func RegisterRoutes(r *gin.Engine, serviceName string, postService *service.Post
 			// corbeille ou effacer définitivement.
 			post.POST("/restore", auth, middleware.ModeratorOnly(), PostHandler.RestorePost)
 			post.DELETE("/purge", auth, middleware.ModeratorOnly(), PostHandler.PurgePost)
+			// Marquage NSFW d'un post (modo/admin) — l'auteur, lui, le pose à la
+			// création (bouton NSFW du composer).
+			post.PATCH("/nsfw", auth, middleware.ModeratorOnly(), PostHandler.SetNsfw)
 
 			post.GET("/likes", LikeHandler.ListPostLikes)
 			post.POST("/like", auth, LikeHandler.LikePost)

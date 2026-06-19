@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -119,7 +120,7 @@ func (h *ProfilHandler) GetMe(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "claims absents"})
 		return
 	}
-	profil, err := h.profils.GetByUserID(c.Request.Context(), claims.UserID)
+	profil, err := h.profils.GetMine(c.Request.Context(), claims.UserID)
 	if err != nil {
 		respondProfilError(c, err)
 		return
@@ -156,6 +157,9 @@ func (h *ProfilHandler) UpdateMe(c *gin.Context) {
 		respondProfilError(c, err)
 		return
 	}
+	// Vue privée du propriétaire : on renvoie la politique viewer à jour (le front
+	// s'en sert pour (dé)griser le toggle NSFW immédiatement après un PATCH).
+	models.HydrateViewerPolicy(profil, time.Now().UTC())
 	logging.FromGin(c).Info("profil modifié")
 	c.JSON(http.StatusOK, gin.H{"data": profil})
 }
@@ -379,6 +383,9 @@ func (h *ProfilHandler) sanitizePublicProfil(c *gin.Context, profil *models.Prof
 	if profil == nil {
 		return
 	}
+	// nsfw_enabled est une préférence privée : jamais exposée sur un profil public.
+	// (is_adult / nsfw_visible ne sont, eux, calculés que sur la vue /profils/me.)
+	profil.NsfwEnabled = nil
 	viewerID := ""
 	if claims, ok := middleware.ClaimsFrom(c); ok {
 		viewerID = claims.UserID

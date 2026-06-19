@@ -179,7 +179,7 @@ func (s *PostService) SetNotifier(n notifier.Notifier) {
 
 // CreatePost crée un post pour authorID (dérivé du JWT) et renvoie le document
 // créé (avec son id généré). Les compteurs sont posés à 0 explicitement.
-func (s *PostService) CreatePost(ctx context.Context, authorID, content, quotePostID string, media []models.MediaRef, pollReq *models.CreatePollRequest, replyAudience string) (*models.Post, error) {
+func (s *PostService) CreatePost(ctx context.Context, authorID, content, quotePostID string, media []models.MediaRef, pollReq *models.CreatePollRequest, replyAudience string, nsfw bool) (*models.Post, error) {
 	quotedAuthorID := "" // auteur du post cité (destinataire de la notif « citation »)
 	if quotePostID != "" {
 		quoteOID, err := parseID(quotePostID)
@@ -212,11 +212,17 @@ func (s *PostService) CreatePost(ctx context.Context, authorID, content, quotePo
 		Poll:          poll,
 		ReplyAudience: audience,
 		QuotePostID:   quotePostID,
+		Nsfw:          nsfw,
 		LikesCount:    0,
 		CommentsCount: 0,
 		RepostsCount:  0,
 		CreatedAt:     now,
 		UpdatedAt:     now,
+	}
+	// Auteur qui marque son propre post : trace la métadonnée de modération.
+	if nsfw {
+		post.NsfwBy = authorID
+		post.NsfwAt = &now
 	}
 	if err := s.repo.Create(ctx, post); err != nil {
 		return nil, err
@@ -575,6 +581,21 @@ func (s *PostService) RestorePost(ctx context.Context, id, actorRole string) (*m
 		return nil, err
 	}
 	post, err := s.repo.RestoreHidden(ctx, oid)
+	return post, translateNotFound(err)
+}
+
+// SetNsfw (dé)marque un post comme NSFW. Réservé aux modérateurs/admins (la
+// pose initiale par l'auteur passe, elle, par la création). Le post n'est PAS
+// masqué : le flag est exposé au front qui floute selon la politique du lecteur.
+func (s *PostService) SetNsfw(ctx context.Context, id, actorID, actorRole string, nsfw bool) (*models.Post, error) {
+	if !isModerator(actorRole) {
+		return nil, ErrForbidden
+	}
+	oid, err := parseID(id)
+	if err != nil {
+		return nil, err
+	}
+	post, err := s.repo.SetNsfw(ctx, oid, nsfw, actorID, time.Now())
 	return post, translateNotFound(err)
 }
 

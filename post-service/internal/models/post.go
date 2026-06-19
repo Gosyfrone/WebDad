@@ -38,6 +38,17 @@ type Post struct {
 	CommentsCount int32      `bson:"comments_count" json:"comments_count"`
 	RepostsCount  int32      `bson:"reposts_count" json:"reposts_count"`
 	PinnedAt      *time.Time `bson:"pinned_at,omitempty" json:"pinned_at,omitempty"`
+	// Nsfw : post marqué « contenu sensible ». Posé par l'AUTEUR à la création
+	// (bouton NSFW du composer) ou par un modérateur/admin après coup (PATCH
+	// /posts/:id/nsfw). Le post reste DÉLIVRÉ tel quel : c'est le front qui le
+	// floute si le lecteur n'a pas le droit/la préférence de voir le NSFW
+	// (nsfw_visible calculé serveur côté profil). `omitempty` ⇒ jamais de `false`
+	// persisté ; absent sur un vieux doc = non-NSFW (aucune migration nécessaire).
+	Nsfw bool `bson:"nsfw,omitempty" json:"nsfw,omitempty"`
+	// NsfwBy / NsfwAt : qui a marqué le post NSFW et quand (métadonnée de
+	// modération, non exposée au front).
+	NsfwBy string     `bson:"nsfw_by,omitempty" json:"-"`
+	NsfwAt *time.Time `bson:"nsfw_at,omitempty" json:"-"`
 	// Suppression « douce » par la modération : un modérateur/admin qui retire le
 	// post d'autrui le MASQUE (is_hidden) au lieu de l'effacer → il sort des fils
 	// publics mais reste restaurable depuis la corbeille de modération. HiddenAt
@@ -212,6 +223,15 @@ type CreatePostRequest struct {
 	// `followers`. Vide = `everyone`.
 	ReplyAudience string `json:"reply_audience" binding:"omitempty,oneof=everyone followers"`
 	QuotePostID   string `json:"quote_post_id"`
+	// Nsfw : l'auteur marque son propre post comme sensible dès la publication
+	// (bouton NSFW du composer). Modifiable ensuite uniquement par modo/admin.
+	Nsfw bool `json:"nsfw"`
+}
+
+// SetNsfwRequest : corps de PATCH /posts/:id/nsfw (modo/admin). Marque ou
+// dé-marque un post comme NSFW.
+type SetNsfwRequest struct {
+	Nsfw bool `json:"nsfw"`
 }
 
 type CreatePollRequest struct {

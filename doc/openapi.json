@@ -5073,6 +5073,87 @@
         }
       }
     },
+    "/posts/{id}/nsfw": {
+      "patch": {
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "posts"
+        ],
+        "summary": "Marquer/dé-marquer un post comme NSFW (modo/admin)",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "Post ID",
+            "name": "id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "description": "nsfw: true|false",
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/models.SetNsfwRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/models.Post"
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
     "/posts/{id}/pin": {
       "delete": {
         "security": [
@@ -7981,6 +8062,10 @@
           "description": "\"male\" | \"female\"",
           "type": "string"
         },
+        "is_adult": {
+          "description": "IsAdult / NsfwVisible : politique « viewer » TRANSIENTE (bson:\"-\", jamais\nstockée), calculée serveur depuis birth_date et exposée seulement sur la vue\nprivée /profils/me. IsAdult = ≥18 ans (dynamique : se débloque tout seul le\njour des 18 ans). NsfwVisible = IsAdult && NsfwEnabledOf : un mineur ne peut\npas se faire passer pour majeur (front non autoritatif, cf. Rule 6).",
+          "type": "boolean"
+        },
         "is_online": {
           "type": "boolean"
         },
@@ -7996,6 +8081,13 @@
         "nationality": {
           "description": "ISO 3166-1 alpha-2",
           "type": "string"
+        },
+        "nsfw_enabled": {
+          "description": "NsfwEnabled : préférence « afficher le contenu marqué NSFW ». Pointeur +\nomitempty : un document antérieur au champ (nil) vaut `true` (cf.\nNsfwEnabledOf) — défaut ON pour ne pas modifier l'expérience de la prod\nexistante. La valeur stockée d'un MINEUR est sans effet : la politique\neffective (NsfwVisible) la combine avec la majorité calculée serveur.",
+          "type": "boolean"
+        },
+        "nsfw_visible": {
+          "type": "boolean"
         },
         "updated_at": {
           "type": "string"
@@ -8057,6 +8149,10 @@
         },
         "nationality": {
           "type": "string"
+        },
+        "nsfw_enabled": {
+          "description": "NsfwEnabled : préférence « afficher le contenu NSFW » (toggle des paramètres).",
+          "type": "boolean"
         },
         "visibility": {
           "type": "string",
@@ -8294,6 +8390,10 @@
             "$ref": "#/definitions/models.MediaRef"
           }
         },
+        "nsfw": {
+          "description": "Nsfw : l'auteur marque son propre post comme sensible dès la publication\n(bouton NSFW du composer). Modifiable ensuite uniquement par modo/admin.",
+          "type": "boolean"
+        },
         "poll": {
           "$ref": "#/definitions/models.CreatePollRequest"
         },
@@ -8446,6 +8546,10 @@
             "$ref": "#/definitions/models.MediaRef"
           }
         },
+        "nsfw": {
+          "description": "Nsfw : post marqué « contenu sensible ». Posé par l'AUTEUR à la création\n(bouton NSFW du composer) ou par un modérateur/admin après coup (PATCH\n/posts/:id/nsfw). Le post reste DÉLIVRÉ tel quel : c'est le front qui le\nfloute si le lecteur n'a pas le droit/la préférence de voir le NSFW\n(nsfw_visible calculé serveur côté profil). `omitempty` ⇒ jamais de `false`\npersisté ; absent sur un vieux doc = non-NSFW (aucune migration nécessaire).",
+          "type": "boolean"
+        },
         "pinned_at": {
           "type": "string"
         },
@@ -8503,6 +8607,14 @@
         "name": {
           "type": "string",
           "maxLength": 60
+        }
+      }
+    },
+    "models.SetNsfwRequest": {
+      "type": "object",
+      "properties": {
+        "nsfw": {
+          "type": "boolean"
         }
       }
     },
