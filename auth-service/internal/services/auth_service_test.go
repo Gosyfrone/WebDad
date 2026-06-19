@@ -52,7 +52,7 @@ func TestHashToken_FormatHex(t *testing.T) {
 		t.Fatalf("hashToken len = %d, attendu 64 (SHA-256 hex)", len(h))
 	}
 	for _, c := range h {
-		if !('0' <= c && c <= '9') && !('a' <= c && c <= 'f') {
+		if !(('0' <= c && c <= '9') || ('a' <= c && c <= 'f')) {
 			t.Fatalf("hashToken contient un caractère non-hex : %c", c)
 		}
 	}

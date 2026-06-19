@@ -65,7 +65,7 @@ func TestRandomHex_Unicité(t *testing.T) {
 func TestRandomHex_FormatHex(t *testing.T) {
 	h := randomHex(8)
 	for _, c := range h {
-		if !('0' <= c && c <= '9') && !('a' <= c && c <= 'f') {
+		if !(('0' <= c && c <= '9') || ('a' <= c && c <= 'f')) {
 			t.Fatalf("randomHex contient %c (non-hex)", c)
 		}
 	}
