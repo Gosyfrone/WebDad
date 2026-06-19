@@ -27,6 +27,7 @@ import {
 import { updateMyUsername, type UsernameUpdateResult } from '@/lib/api'
 import { usePostStatsPolling } from '@/lib/use-post-stats-polling'
 import { FOLLOW_CHANGE_EVENT, type FollowChangeDetail } from '@/lib/use-follow'
+import { useBlock } from '@/lib/use-block'
 import { useToast } from '@/hooks/use-toast'
 import type { ProfilDetails, ProfilEditableFields } from '@/types'
 import { useT } from '@/components/language-provider'
@@ -96,17 +97,21 @@ export function ProfilView({ username }: ProfilViewProps) {
 
   const isOwner = !username
   const followState = useFollow(!isOwner && Boolean(profil?.userId))
+  const blockState = useBlock(!isOwner && Boolean(profil?.userId))
   const followsProfile = profil ? followOverride ?? followState.isFollowing(profil.userId) : false
+  const blockedProfile = profil ? blockState.isBlocked(profil.userId) : false
   const accessPending =
     Boolean(profil?.userId) &&
     profil?.visibility === 'private' &&
     !isOwner &&
+    !blockedProfile &&
     followOverride === null &&
     !followState.loaded
   const privateContentLocked =
     Boolean(profil?.userId) &&
     profil?.visibility === 'private' &&
     !isOwner &&
+    !blockedProfile &&
     !accessPending &&
     !followsProfile
 
@@ -154,6 +159,10 @@ export function ProfilView({ username }: ProfilViewProps) {
   // Posts de l'auteur (onglet « Posts »), chargés une fois le profil connu.
   useEffect(() => {
     if (!profil?.userId) return
+    if (blockedProfile) {
+      setPosts([])
+      return
+    }
     if (accessPending) return
     if (privateContentLocked) {
       setPosts([])
@@ -171,12 +180,16 @@ export function ProfilView({ username }: ProfilViewProps) {
     return () => {
       cancelled = true
     }
-  }, [accessPending, privateContentLocked, profil?.userId])
+  }, [accessPending, blockedProfile, privateContentLocked, profil?.userId])
 
   // Réponses de l'auteur (onglet « Réponses »), chargées au premier clic.
   useEffect(() => {
     if (tab !== 'replies') return
     if (!profil?.userId) return
+    if (blockedProfile) {
+      setReplies([])
+      return
+    }
     if (accessPending) return
     if (privateContentLocked) {
       setReplies([])
@@ -194,12 +207,16 @@ export function ProfilView({ username }: ProfilViewProps) {
     return () => {
       cancelled = true
     }
-  }, [tab, accessPending, privateContentLocked, profil?.userId])
+  }, [tab, accessPending, blockedProfile, privateContentLocked, profil?.userId])
 
   // Likes de l'auteur (onglet « J'aime »), chargés au premier clic.
   useEffect(() => {
     if (tab !== 'likes') return
     if (!profil?.userId) return
+    if (blockedProfile) {
+      setLikedPosts([])
+      return
+    }
     if (accessPending) return
     if (privateContentLocked) {
       setLikedPosts([])
@@ -222,7 +239,7 @@ export function ProfilView({ username }: ProfilViewProps) {
     return () => {
       cancelled = true
     }
-  }, [tab, accessPending, privateContentLocked, profil?.userId])
+  }, [tab, accessPending, blockedProfile, privateContentLocked, profil?.userId])
 
   useEffect(() => {
     function handleFollowChange(event: Event) {
@@ -346,6 +363,19 @@ export function ProfilView({ username }: ProfilViewProps) {
     else setPosts([])
   }
 
+  async function handleBlockChanged(blocked: boolean) {
+    if (!profil?.userId) return
+    await blockState.toggle(profil.userId, blocked)
+    if (blocked) {
+      setFollowOverride(false)
+      setPosts([])
+      setReplies([])
+      setLikedPosts([])
+    } else {
+      setFollowOverride(null)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex min-h-[45vh] items-center justify-center">
@@ -418,6 +448,9 @@ export function ProfilView({ username }: ProfilViewProps) {
         onEdit={handleEdit}
         onEditUsername={handleEditUsername}
         onFollowChanged={handleFollowChanged}
+        blocked={blockedProfile}
+        blockPending={profil ? blockState.isPending(profil.userId) : false}
+        onBlockToggle={handleBlockChanged}
       />
 
       {/* Onglets */}
@@ -434,7 +467,9 @@ export function ProfilView({ username }: ProfilViewProps) {
       </div>
 
       {/* Contenu de l'onglet */}
-      {accessPending ? (
+      {blockedProfile ? (
+        <BlockedTab />
+      ) : accessPending ? (
         <CenteredTab>
           <Loader2 className="h-6 w-6 animate-spin text-[#5B6CFF] dark:text-[#9aa6ff]" />
         </CenteredTab>
@@ -579,6 +614,19 @@ function PrivateTab() {
       <div className="max-w-sm space-y-1">
         <p className="text-sm font-semibold text-foreground">{t('profil.private_title')}</p>
         <p className="text-sm text-muted-foreground">{t('profil.private_message')}</p>
+      </div>
+    </CenteredTab>
+  )
+}
+
+function BlockedTab() {
+  const t = useT()
+  return (
+    <CenteredTab>
+      <ShieldAlert className="h-10 w-10 text-muted-foreground" aria-hidden />
+      <div className="max-w-sm space-y-1">
+        <p className="text-sm font-semibold text-foreground">{t('block.blocked_user')}</p>
+        <p className="text-sm text-muted-foreground">{t('block.blocked_profile_message')}</p>
       </div>
     </CenteredTab>
   )

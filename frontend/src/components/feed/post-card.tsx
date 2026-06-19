@@ -18,6 +18,7 @@ import {
   Repeat2,
   Share,
   Trash2,
+  UserX,
 } from 'lucide-react'
 
 import { cn, initialOf, timeAgo } from '@/lib/utils'
@@ -70,6 +71,8 @@ import { TranslatedContent } from '@/components/feed/translated-content'
 import { MentionText } from '@/components/mention/mention-text'
 import { ShareDialog } from '@/components/share/share-dialog'
 import { postHref } from '@/lib/routes'
+import { blockUser } from '@/lib/api'
+import { BLOCK_CHANGE_EVENT, emitBlockChange, type BlockChangeDetail } from '@/lib/use-block'
 import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
 import { ProfilLink } from '@/components/profil/profil-link'
 import { ReportDialog } from '@/components/moderation/report-dialog'
@@ -113,6 +116,7 @@ export function PostCard({ post, showPinBadge = false, focusCommentId, embedded 
   const [likeBurst, setLikeBurst] = useState(0)
   const [showComments, setShowComments] = useState(Boolean(focusCommentId) || defaultShowComments)
   const [deleting, setDeleting] = useState(false)
+  const [hiddenByBlock, setHiddenByBlock] = useState(false)
   const [reportOpen, setReportOpen] = useState(false)
   // Index du média ouvert en vue photo plein écran (null = fermé).
   const [photoIndex, setPhotoIndex] = useState<number | null>(null)
@@ -121,6 +125,7 @@ export function PostCard({ post, showPinBadge = false, focusCommentId, embedded 
   // modale de connexion). On l'affiche aussi sur ses propres posts pour que
   // l'action soit toujours visible ; la sécurité réelle vit côté back.
   const canReport = !isVisitor && Boolean(currentUserId())
+  const canBlock = canReport && currentUserId() !== post.author.id
   const [poll, setPoll] = useState(post.poll)
   const pollClosed = poll ? isPollClosed(poll) : false
 
@@ -178,6 +183,15 @@ export function PostCard({ post, showPinBadge = false, focusCommentId, embedded 
     setCommentCount(post.commentsCount)
   }, [post.commentsCount])
 
+  useEffect(() => {
+    function onBlockChange(event: Event) {
+      const { userId, blocked } = (event as CustomEvent<BlockChangeDetail>).detail
+      if (userId === post.author.id && blocked) setHiddenByBlock(true)
+    }
+    window.addEventListener(BLOCK_CHANGE_EVENT, onBlockChange)
+    return () => window.removeEventListener(BLOCK_CHANGE_EVENT, onBlockChange)
+  }, [post.author.id])
+
   async function toggleLike() {
     const next = !liked
     // Optimiste.
@@ -234,6 +248,17 @@ export function PostCard({ post, showPinBadge = false, focusCommentId, embedded 
     } catch {
       setDeleting(false)
       toast({ title: t('common.delete_failed'), variant: 'destructive' })
+    }
+  }
+
+  async function handleBlockAuthor() {
+    try {
+      await blockUser(post.author.id)
+      emitBlockChange({ userId: post.author.id, blocked: true })
+      setHiddenByBlock(true)
+      toast({ title: t('block.blocked') })
+    } catch {
+      toast({ title: t('block.block_failed'), variant: 'destructive' })
     }
   }
 
@@ -340,6 +365,8 @@ export function PostCard({ post, showPinBadge = false, focusCommentId, embedded 
     void quickToggleBookmark()
   }
 
+  if (hiddenByBlock) return null
+
   return (
     <article
       onClick={noNavigate ? undefined : handleCardClick}
@@ -391,7 +418,7 @@ export function PostCard({ post, showPinBadge = false, focusCommentId, embedded 
             <span className="shrink-0 text-muted-foreground">{timeAgo(post.createdAt, locale)}</span>
           </div>
 
-          {(post.canDelete || canReport) && (
+          {(post.canDelete || canReport || canBlock) && (
             <DropdownMenu>
               <DropdownMenuTrigger
                 aria-label={t('post.more_options')}
@@ -426,7 +453,19 @@ export function PostCard({ post, showPinBadge = false, focusCommentId, embedded 
                     className="cursor-pointer"
                   >
                     <Flag className="mr-2 h-4 w-4" />
-                    {t('report.action')}
+                    {t('report.post_action')}
+                  </DropdownMenuItem>
+                )}
+                {canBlock && (
+                  <DropdownMenuItem
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      void handleBlockAuthor()
+                    }}
+                    className="cursor-pointer text-red-500 focus:text-red-500"
+                  >
+                    <UserX className="mr-2 h-4 w-4" />
+                    {t('block.block_user')}
                   </DropdownMenuItem>
                 )}
                 {post.canDelete && (

@@ -536,6 +536,7 @@ export const messages: Record<Locale, Messages> = {
 
     // ── Signalement (formulaire réutilisable) ──
     'report.action': 'Signaler',
+    'report.post_action': 'Signaler le post',
     'report.profile_action': 'Signaler ce profil',
     'report.message_action': 'Signaler le message',
     'report.title': 'Signaler ce contenu',
@@ -562,6 +563,23 @@ export const messages: Record<Locale, Messages> = {
     'report.disclose_notice':
       'Ce message est chiffré : en le signalant, vous transmettez cette copie à la modération (le serveur ne peut pas la lire seul).',
     'report.disclose_empty': '(message vide ou non déchiffrable)',
+
+    // ── Blocage utilisateur ──
+    'block.block_user': "Bloquer l'utilisateur",
+    'block.unblock_user': "Débloquer l'utilisateur",
+    'block.blocked': 'Utilisateur bloqué.',
+    'block.unblocked': 'Utilisateur débloqué.',
+    'block.block_failed': 'Blocage impossible.',
+    'block.unblock_failed': 'Déblocage impossible.',
+    'block.blocked_user': 'Utilisateur bloqué',
+    'block.blocked_profile_message':
+      "Vous ne voyez plus les posts, réponses, J'aime ni l'activité de cette personne.",
+    'block.settings_title': 'Utilisateurs bloqués',
+    'block.settings_desc':
+      'Gérez les comptes dont vous ne voyez plus les posts ni l’activité.',
+    'block.empty': 'Aucun utilisateur bloqué.',
+    'block.unblock_short': 'Débloquer',
+    'block.list_failed': 'Impossible de charger les utilisateurs bloqués.',
 
     // ── Onglets Signalements (modération + admin) ──
     'moderation.tab_reports': 'Signalements',
@@ -1731,6 +1749,7 @@ export const messages: Record<Locale, Messages> = {
 
     // ── Report (reusable form) ──
     'report.action': 'Report',
+    'report.post_action': 'Report post',
     'report.profile_action': 'Report this profile',
     'report.message_action': 'Report message',
     'report.title': 'Report this content',
@@ -1757,6 +1776,23 @@ export const messages: Record<Locale, Messages> = {
     'report.disclose_notice':
       'This message is encrypted: by reporting it, you share this copy with moderation (the server cannot read it on its own).',
     'report.disclose_empty': '(empty or undecryptable message)',
+
+    // ── User blocking ──
+    'block.block_user': 'Block user',
+    'block.unblock_user': 'Unblock user',
+    'block.blocked': 'User blocked.',
+    'block.unblocked': 'User unblocked.',
+    'block.block_failed': 'Could not block.',
+    'block.unblock_failed': 'Could not unblock.',
+    'block.blocked_user': 'Blocked user',
+    'block.blocked_profile_message':
+      "You no longer see this person's posts, replies, likes, or activity.",
+    'block.settings_title': 'Blocked users',
+    'block.settings_desc':
+      'Manage accounts whose posts and activity you no longer see.',
+    'block.empty': 'No blocked users.',
+    'block.unblock_short': 'Unblock',
+    'block.list_failed': 'Could not load blocked users.',
 
     // ── Report tabs (moderation + admin) ──
     'moderation.tab_reports': 'Reports',

@@ -1,10 +1,11 @@
 'use client'
 
-import { EyeOff, Languages, Lock, Scale, Settings } from 'lucide-react'
+import { EyeOff, Languages, Lock, Scale, Settings, UserX } from 'lucide-react'
 
 import { useT } from '@/components/language-provider'
 import { LanguageSelector } from '@/components/language-selector'
 import { LegalLinks } from '@/components/legal/legal-links'
+import { BlockedUsersSettings } from '@/components/settings/blocked-users-settings'
 import { MutedWordsSettings } from '@/components/settings/muted-words-settings'
 import { VisibilitySettings } from '@/components/settings/visibility-settings'
 import { UserAccountSettings } from '@/components/settings/user-account-settings'
@@ -83,6 +84,22 @@ export function SettingsView() {
               </div>
 
               <MutedWordsSettings />
+            </div>
+
+            <div className="grid gap-4 px-4 py-4 md:grid-cols-[minmax(0,1fr)_minmax(260px,340px)] md:items-start">
+              <div className="flex items-start gap-3">
+                <span className="mt-1 text-primary">
+                  <UserX className="h-5 w-5" aria-hidden />
+                </span>
+                <div className="min-w-0">
+                  <h3 className="font-semibold text-foreground">{t('block.settings_title')}</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {t('block.settings_desc')}
+                  </p>
+                </div>
+              </div>
+
+              <BlockedUsersSettings />
             </div>
           </div>
         </section>

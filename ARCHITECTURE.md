@@ -36,7 +36,7 @@ social network built for the FISA INFO A3 "Distributed App Dev" project.
 |---|---|---|---|
 | api-gateway | 8080 | — | Thin reverse proxy (stdlib `httputil.ReverseProxy`), CORS, prefix routing, WS proxy, media streaming |
 | auth-service | 8081 | PostgreSQL | Credentials, JWT (HS256), refresh tokens (opaque, SHA-256 hashed, rotated) |
-| user-service | 8082 | PostgreSQL | Identity: `username` (immutable handle), `is_active`, social graph (follows + follow_requests + counts) |
+| user-service | 8082 | PostgreSQL | Identity: `username` (immutable handle), `is_active`, social graph (follows + follow_requests + blocks + counts) |
 | profil-service | 8083 | MongoDB | Decorative/editable fields: `display_name`, `bio`, avatar/banner, website, location, birth_date, gender, nationality (ISO alpha-2), **`visibility`** |
 | post-service | 8084 | MongoDB | Posts, hashtags/trends, comments (threaded 2 levels), likes, reposts/quotes, pins, polls/votes, bookmarks (collections), post media refs |
 | message-service | 8085 | MongoDB | E2EE messaging (DM/groups/communities), conversations, members, encrypted messages, WS |
@@ -66,7 +66,8 @@ composed by the **caller** (front/BFF).
   Email changes use `pending_email` plus a one-use 24h token sent to the new address; confirmation
   atomically promotes it, revokes prior refresh tokens, and opens a session carrying the new email.
 - **Cross-service reads (privacy):** post-service calls profil-service (`visibility`) and
-  user-service (follow status) to filter post visibility; clients have no-op fallbacks for autonomy.
+  user-service (follow/block status) to filter post visibility and hide activity from accounts blocked
+  by the viewer; clients have no-op fallbacks for autonomy.
 - **Notifications (server→server):** post/message/user-service POST best-effort fire-and-forget
   events to notification-service `/internal/events` (secret `INTERNAL_EVENT_SECRET`, off the gateway).
 - **Auto-moderation (server→server):** when a post crosses the admin-set report threshold, report-service

@@ -66,7 +66,7 @@ These govern *how* Claude works on this repo. They override default behavior.
 - One service = one Go module (`internal/{config,database,models,repository,service,handlers,middleware}`), embedded schema at boot, no mounted init-db scripts.
 - Mongo counters denormalized as `int32` (`$jsonSchema` declares `bsonType:"int"`).
 - Frontend: business clients (`lib/{api,posts,bookmarks,messages,notifications,media}.ts`) layer over `apiFetch` (Bearer + single-flight refresh); no hardcoded URLs (`lib/config.ts`/`lib/routes.ts`).
-- i18n: every UI string via `useT()`, keys `namespace.key`, FR is reference, EN parity required.
+- i18n: every UI string via `useT()`, keys `namespace.key`; FR is reference and any new user-facing key must be added to all 12 available locales (`fr/en/zh/es/pt/ru/ja/ko/ar/hi/de/it`).
 - Identity (avatar/name) is always clickable → the person's profile, with a web hover preview.
 - Pure, testable functions for non-trivial logic — Go tests + vitest.
 - Secrets only via `.env` (root = cross-cutting + compose-interpolable; `<service>/.env` = own config).

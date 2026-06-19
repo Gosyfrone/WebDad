@@ -26,6 +26,7 @@ var (
 	ErrUsernameTaken         = errors.New("nom d'utilisateur déjà utilisé")
 	ErrInvalidUsername       = errors.New("nom d'utilisateur invalide (3-50 caractères : lettres, chiffres, _ et . ; le point ni en début/fin ni doublé)")
 	ErrSelfFollow            = errors.New("impossible de se suivre soi-même")
+	ErrSelfBlock             = errors.New("impossible de se bloquer soi-même")
 	ErrUsernameCooldown      = errors.New("nom d'utilisateur modifié trop récemment")
 	ErrFollowRequestNotFound = errors.New("demande de suivi introuvable")
 	ErrInvalidLocale         = errors.New("langue préférée invalide")
@@ -526,6 +527,59 @@ func (s *UserService) IsFollowing(userId string, followingId string) bool {
 		return false
 	}
 	return exists
+}
+
+// Block bloque targetID pour blockerID. Idempotent, et coupe les relations de
+// suivi dans les deux sens via le repository.
+func (s *UserService) Block(blockerID, targetID string) error {
+	if blockerID == targetID {
+		return ErrSelfBlock
+	}
+	if err := s.requireExists(blockerID); err != nil {
+		return err
+	}
+	if err := s.requireExists(targetID); err != nil {
+		return err
+	}
+	if err := s.repo.Block(blockerID, targetID); err != nil {
+		return fmt.Errorf("blocage utilisateur : %w", err)
+	}
+	return nil
+}
+
+func (s *UserService) Unblock(blockerID, targetID string) error {
+	if blockerID == targetID {
+		return ErrSelfBlock
+	}
+	if err := s.requireExists(blockerID); err != nil {
+		return err
+	}
+	if err := s.requireExists(targetID); err != nil {
+		return err
+	}
+	if err := s.repo.Unblock(blockerID, targetID); err != nil {
+		return fmt.Errorf("déblocage utilisateur : %w", err)
+	}
+	return nil
+}
+
+func (s *UserService) BlockedIDs(blockerID string) ([]string, error) {
+	if err := s.requireExists(blockerID); err != nil {
+		return nil, err
+	}
+	ids, err := s.repo.BlockedIDs(blockerID)
+	if err != nil {
+		return nil, fmt.Errorf("liste blocages : %w", err)
+	}
+	return ids, nil
+}
+
+func (s *UserService) HasBlocked(blockerID, targetID string) bool {
+	if blockerID == targetID {
+		return false
+	}
+	exists, err := s.repo.HasBlocked(blockerID, targetID)
+	return err == nil && exists
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
