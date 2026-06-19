@@ -685,8 +685,10 @@ function MediaGallery({
   const { t } = useLanguage()
   const { toast } = useToast()
   const [menu, setMenu] = useState<{ url: string; x: number; y: number } | null>(null)
-  const imageLongPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const imageLongPressed = useRef(false)
+  // Sur tactile (iOS/Android), on laisse le menu natif du navigateur gérer
+  // l'appui long sur l'image ; le menu custom Breezy n'apparaît qu'au clic droit
+  // souris (desktop). On mémorise le dernier type de pointeur pour distinguer.
+  const lastPointerType = useRef<string>('mouse')
 
   useEffect(() => {
     if (!menu) return
@@ -703,31 +705,12 @@ function MediaGallery({
     }
   }, [menu])
 
-  function clearImageLongPress() {
-    if (!imageLongPressTimer.current) return
-    clearTimeout(imageLongPressTimer.current)
-    imageLongPressTimer.current = null
-  }
-
-  function startImageLongPress(e: React.PointerEvent, url: string) {
-    if (e.pointerType === 'mouse') return
-    clearImageLongPress()
-    imageLongPressed.current = false
-    const { clientX, clientY } = e
-    imageLongPressTimer.current = setTimeout(() => {
-      imageLongPressed.current = true
-      setMenu({ url, x: clientX, y: clientY })
-    }, 520)
-  }
-
-  function handleImageClick(e: React.MouseEvent, index: number) {
-    if (imageLongPressed.current) {
-      e.preventDefault()
-      e.stopPropagation()
-      imageLongPressed.current = false
-      return
-    }
-    onOpen?.(index)
+  function handleImageContextMenu(e: React.MouseEvent, url: string) {
+    // Tactile → menu natif du navigateur (« Enregistrer l'image »…). Le menu
+    // Breezy (copier/enregistrer) reste au clic droit souris uniquement.
+    if (lastPointerType.current !== 'mouse') return
+    e.preventDefault()
+    setMenu({ url, x: e.clientX, y: e.clientY })
   }
 
   async function copyImage(url: string) {
@@ -793,11 +776,8 @@ function MediaGallery({
               <div
                 key={m.url}
                 data-no-nav
-                onPointerDown={(e) => startImageLongPress(e, m.url)}
-                onPointerUp={clearImageLongPress}
-                onPointerCancel={clearImageLongPress}
-                onPointerLeave={clearImageLongPress}
-                onContextMenu={(e) => e.preventDefault()}
+                onPointerDown={(e) => (lastPointerType.current = e.pointerType)}
+                onContextMenu={(e) => handleImageContextMenu(e, m.url)}
                 className={cn('group relative block overflow-hidden', media.length === 3 && i === 0 && 'row-span-2')}
               >
                 {image}
@@ -810,12 +790,9 @@ function MediaGallery({
               key={m.url}
               type="button"
               data-no-nav
-              onClick={(e) => handleImageClick(e, i)}
-              onPointerDown={(e) => startImageLongPress(e, m.url)}
-              onPointerUp={clearImageLongPress}
-              onPointerCancel={clearImageLongPress}
-              onPointerLeave={clearImageLongPress}
-              onContextMenu={(e) => e.preventDefault()}
+              onClick={() => onOpen?.(i)}
+              onPointerDown={(e) => (lastPointerType.current = e.pointerType)}
+              onContextMenu={(e) => handleImageContextMenu(e, m.url)}
               className={cn('group relative block overflow-hidden', media.length === 3 && i === 0 && 'row-span-2')}
               aria-label={t('media.open_image')}
             >
@@ -909,6 +886,8 @@ async function copyImageToClipboard(url: string): Promise<void> {
   ])
 }
 
+// Menu custom Breezy = desktop uniquement (clic droit) ; `<a download>` y est
+// fiable. Sur tactile, c'est le menu natif du navigateur qui gère l'image.
 async function downloadImage(url: string): Promise<void> {
   const blob = await fetchImageBlob(url)
   const objectUrl = URL.createObjectURL(blob)
