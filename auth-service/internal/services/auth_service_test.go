@@ -1,6 +1,7 @@
 package services
 
 import (
+	"encoding/hex"
 	"testing"
 )
 
@@ -51,10 +52,8 @@ func TestHashToken_FormatHex(t *testing.T) {
 	if len(h) != 64 { // SHA-256 → 32 octets → 64 hex chars
 		t.Fatalf("hashToken len = %d, attendu 64 (SHA-256 hex)", len(h))
 	}
-	for _, c := range h {
-		if !(('0' <= c && c <= '9') || ('a' <= c && c <= 'f')) {
-			t.Fatalf("hashToken contient un caractère non-hex : %c", c)
-		}
+	if _, err := hex.DecodeString(h); err != nil {
+		t.Fatalf("hashToken n'est pas un hex valide : %v", err)
 	}
 }
 
