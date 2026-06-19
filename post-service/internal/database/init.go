@@ -142,7 +142,13 @@ var validators = map[string]bson.M{
 			"required": bson.A{"author_id", "content", "created_at"},
 			"properties": bson.M{
 				"author_id": bson.M{"bsonType": "string"},
-				"content":   bson.M{"bsonType": "string", "maxLength": 280},
+				// Plafond = max applicatif TOUS rôles confondus : 4000 pour les
+				// modos/admins (cf. enforceContentLimit). Le validateur ne connaît
+				// pas le rôle → il porte la borne la plus large ; la distinction
+				// 280 (standard) / 4000 (privilégié) reste appliquée dans le handler.
+				// Relâcher un maxLength est rétrocompatible : aucun doc existant ne
+				// peut violer une borne plus grande → pas de backfill (cf. Règle 5b).
+				"content": bson.M{"bsonType": "string", "maxLength": 4000},
 				"hashtags": bson.M{
 					"bsonType": "array",
 					"items":    bson.M{"bsonType": "string"},
