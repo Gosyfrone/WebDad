@@ -2,6 +2,7 @@
 
 import { cn } from '@/lib/utils'
 import { useKeyboardInset } from '@/hooks/use-keyboard-inset'
+import { useMessages } from '@/components/messages-provider'
 
 /**
  * Coquille d'overlay rendue **pile au-dessus de la colonne centrale (le feed)**,
@@ -43,6 +44,13 @@ export function FeedOverlay({
   // sur `pb-14` (hauteur de la tab bar).
   const keyboardInset = useKeyboardInset(wide)
 
+  // Vue large (messagerie) avec une conversation ouverte sur mobile : le
+  // `MobileHeader` se masque (le ChatPane porte son propre en-tête) → on remonte
+  // l'overlay à `top-0` au lieu de `top-14` pour ne pas laisser 56px de vide en
+  // haut. Le bas reste inchangé (tab bar dégagée par `pb-14`).
+  const { activeConversationId } = useMessages()
+  const fillTop = wide && Boolean(activeConversationId)
+
   return (
     <div
       className={cn(
@@ -56,7 +64,11 @@ export function FeedOverlay({
         // restent collés. Le composer est ensuite décalé de la hauteur de la tab
         // bar via le PADDING du panneau (cf. plus bas), pas via `bottom`.
         // ≥ lg : ni en-tête ni tab bar mobiles → plein écran (`inset-0`).
-        wide ? 'inset-x-0 top-14 bottom-0 lg:inset-y-0' : 'inset-0',
+        // `fillTop` (conversation ouverte) : `top-0` pour combler le vide laissé
+        // par le `MobileHeader` masqué.
+        wide
+          ? cn('inset-x-0 bottom-0 lg:inset-y-0', fillTop ? 'top-0' : 'top-14')
+          : 'inset-0',
       )}
     >
       <div className="flex w-full max-w-[1265px]">
