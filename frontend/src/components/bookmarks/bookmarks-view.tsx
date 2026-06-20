@@ -183,55 +183,55 @@ export function BookmarksView() {
     <div className="flex flex-col">
       {/* En-tête + barre de collections */}
       <div className="panel z-10 border-b lg:sticky lg:top-0">
-        <div className="flex items-center justify-between gap-2 px-4 py-3">
+        {/* Ligne de titre : masquée sur mobile (l'en-tête global type-feed porte
+            déjà le titre « Signets ») → visible seulement ≥ lg, comme la modération. */}
+        <div className="hidden items-center justify-between gap-2 px-4 py-3 lg:flex">
           <h1 className="brand-text flex items-center gap-2 text-xl font-bold">
             <Bookmark className="h-5 w-5" />
             {t('bookmarks.title')}
           </h1>
           {activeCollection && !activeCollection.isDefault && (
-            <DropdownMenu modal={false}>
-              <DropdownMenuTrigger
-                aria-label={t('bookmarks.manage')}
-                className="rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary focus:outline-none"
-              >
-                <MoreHorizontal className="h-5 w-5" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="z-40">
-                <DropdownMenuItem onClick={() => openRename(activeCollection)} className="cursor-pointer">
-                  <Pencil className="mr-2 h-4 w-4" />
-                  {t('bookmarks.rename')}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setDeleteTarget(activeCollection)}
-                  className="cursor-pointer text-red-500 focus:text-red-500"
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  {t('bookmarks.delete')}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <ManageMenu
+              collection={activeCollection}
+              onRename={openRename}
+              onDelete={setDeleteTarget}
+            />
           )}
         </div>
 
-        <div className="flex items-center gap-2 overflow-x-auto px-3 pb-3">
-          <Pill active={active === ALL} onClick={() => setActive(ALL)}>
-            {t('bookmarks.all')}
-          </Pill>
-          {collections.map((c) => (
-            <Pill key={c.id} active={active === c.id} onClick={() => setActive(c.id)}>
-              {c.isDefault ? t('bookmarks.default_name') : c.name}
-              <span className="ml-1.5 text-xs opacity-70">{c.itemsCount}</span>
+        <div className="flex items-center gap-2 px-3 pb-3 pt-3 lg:pt-0">
+          <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto">
+            <Pill active={active === ALL} onClick={() => setActive(ALL)}>
+              {t('bookmarks.all')}
             </Pill>
-          ))}
-          <button
-            type="button"
-            onClick={openCreate}
-            aria-label={t('bookmarks.new_collection')}
-            className="flex shrink-0 items-center gap-1 rounded-full border border-dashed border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:border-primary hover:text-primary"
-          >
-            <Plus className="h-4 w-4" />
-            {t('bookmarks.new_collection')}
-          </button>
+            {collections.map((c) => (
+              <Pill key={c.id} active={active === c.id} onClick={() => setActive(c.id)}>
+                {c.isDefault ? t('bookmarks.default_name') : c.name}
+                <span className="ml-1.5 text-xs opacity-70">{c.itemsCount}</span>
+              </Pill>
+            ))}
+            <button
+              type="button"
+              onClick={openCreate}
+              aria-label={t('bookmarks.new_collection')}
+              className="flex shrink-0 items-center gap-1 rounded-full border border-dashed border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+            >
+              <Plus className="h-4 w-4" />
+              {t('bookmarks.new_collection')}
+            </button>
+          </div>
+
+          {/* Menu de gestion (mobile) : la ligne de titre étant masquée, on garde
+              l'action « … » accessible ici, épinglée à droite hors du défilement. */}
+          {activeCollection && !activeCollection.isDefault && (
+            <div className="shrink-0 lg:hidden">
+              <ManageMenu
+                collection={activeCollection}
+                onRename={openRename}
+                onDelete={setDeleteTarget}
+              />
+            </div>
+          )}
         </div>
       </div>
 
@@ -312,6 +312,43 @@ export function BookmarksView() {
         </DialogContent>
       </Dialog>
     </div>
+  )
+}
+
+/** Menu « … » de gestion d'une collection (renommer / supprimer). Rendu à deux
+ *  emplacements selon la largeur : ligne de titre (desktop), barre de pills (mobile). */
+function ManageMenu({
+  collection,
+  onRename,
+  onDelete,
+}: {
+  collection: BookmarkCollection
+  onRename: (coll: BookmarkCollection) => void
+  onDelete: (coll: BookmarkCollection) => void
+}) {
+  const t = useT()
+  return (
+    <DropdownMenu modal={false}>
+      <DropdownMenuTrigger
+        aria-label={t('bookmarks.manage')}
+        className="rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary focus:outline-none"
+      >
+        <MoreHorizontal className="h-5 w-5" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="z-40">
+        <DropdownMenuItem onClick={() => onRename(collection)} className="cursor-pointer">
+          <Pencil className="mr-2 h-4 w-4" />
+          {t('bookmarks.rename')}
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => onDelete(collection)}
+          className="cursor-pointer text-red-500 focus:text-red-500"
+        >
+          <Trash2 className="mr-2 h-4 w-4" />
+          {t('bookmarks.delete')}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
 

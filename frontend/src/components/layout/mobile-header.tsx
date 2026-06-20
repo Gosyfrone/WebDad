@@ -67,6 +67,7 @@ export function MobileHeader() {
     | 'parametres'
     | 'admin'
     | 'moderation'
+    | 'signets'
     | 'other' =
     pathname === ROUTES.feed
       ? 'feed'
@@ -82,7 +83,9 @@ export function MobileHeader() {
                 ? 'moderation'
                 : pathname?.startsWith(ROUTES.admin)
                   ? 'admin'
-                  : 'other'
+                  : pathname?.startsWith(ROUTES.bookmarks)
+                    ? 'signets'
+                    : 'other'
   // Titre centré (sections nommées) ; sinon le logo Breezy est affiché.
   const titleKey =
     section === 'explorer'
@@ -97,7 +100,9 @@ export function MobileHeader() {
               ? 'nav.moderation'
               : section === 'admin'
                 ? 'nav.admin'
-                : null
+                : section === 'signets'
+                  ? 'bookmarks.title'
+                  : null
   // Cloche à droite (vers les notifs) sur les sections de navigation principale
   // et les pages admin / modération (header type-feed : avatar ← titre → cloche).
   const showBell =
@@ -105,7 +110,8 @@ export function MobileHeader() {
     section === 'explorer' ||
     section === 'messages' ||
     section === 'admin' ||
-    section === 'moderation'
+    section === 'moderation' ||
+    section === 'signets'
   // Flèche retour à gauche (au lieu de l'avatar) sur les pages « secondaires »
   // ouvertes au-dessus du menu normal (notifications, paramètres).
   const showBack = section === 'notifications' || section === 'parametres'
@@ -157,9 +163,9 @@ export function MobileHeader() {
 
   // En-tête contextuel pour le feed, les sections de nav principale (explorer /
   // messages / notifications), les paramètres (variante flèche retour) et les
-  // pages admin / modération (header type-feed : avatar ← titre → cloche). Les
-  // autres pages (signets, profil) conservent leur propre en-tête → pas de header
-  // global ni de décalage `pt-14` (cf. `headerOffset={false}`).
+  // pages admin / modération / signets (header type-feed : avatar ← titre →
+  // cloche). Les autres pages (profil) conservent leur propre en-tête → pas de
+  // header global ni de décalage `pt-14` (cf. `headerOffset={false}`).
   if (hidden || section === 'other') return null
   // Conversation ouverte (mobile) : le ChatPane affiche son propre en-tête (nom +
   // retour) → on efface l'en-tête global pour ne pas le recouvrir/dédoubler.

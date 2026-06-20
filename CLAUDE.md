@@ -10,7 +10,7 @@
 > - Knowledge graph in `graphify-out/` — query it before reading source (Operating Rule 11).
 >
 > **Latest session work and suggested commit messages live in `CHANGELOG.md`, not here.**
-> **Session freshness:** current work log updated in `CHANGELOG.md` on 20/06/2026 (feat ui — bouton GIF en commentaire ET réponse via `GifPicker` extrait dans `feed/gif-picker.tsx` et partagé avec le composer de post ; emoji masqué sur mobile dans le composer de commentaire. Précédemment : composer de commentaire responsive + factorisation en `CommentComposer`).
+> **Session freshness:** current work log updated in `CHANGELOG.md` on 20/06/2026 (fix ui — en-tête mobile type-feed sur la page Signets : `MobileHeader` gère désormais la section `signets` avec avatar + titre + cloche ; `bookmarks-view` masque sa ligne de titre sur mobile et factorise le menu « … » en `ManageMenu`. Précédemment : bouton GIF en commentaire/réponse via `GifPicker` partagé).
 
 ---
 
