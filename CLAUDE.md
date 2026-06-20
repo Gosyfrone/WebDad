@@ -10,7 +10,7 @@
 > - Knowledge graph in `graphify-out/` — query it before reading source (Operating Rule 11).
 >
 > **Latest session work and suggested commit messages live in `CHANGELOG.md`, not here.**
-> **Session freshness:** current work log updated in `CHANGELOG.md` on 20/06/2026 (fix ui — scroll d'arrière-plan bloqué quand un menu « 3 points » est ouvert : `modal={false}` sur les 7 `DropdownMenu` d'actions de l'app pour retirer le scroll-lock Radix par défaut).
+> **Session freshness:** current work log updated in `CHANGELOG.md` on 20/06/2026 (fix ui — composer allégé : emoji masqué sur mobile + bouton épinglé supprimé ; refonte des résultats de sondage façon Twitter dans `PostPollCard` : barres non encadrées, gagnant en bleu Breezy, votes+% à droite).
 
 ---
 

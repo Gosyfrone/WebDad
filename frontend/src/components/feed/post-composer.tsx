@@ -8,7 +8,6 @@ import {
   Image as ImageIcon,
   ListChecks,
   Loader2,
-  Pin,
   Plus,
   Search,
   Smile,
@@ -22,7 +21,6 @@ import { exceedsMediaLimit, MAX_MEDIA_MB, resolveMediaUrl, uploadedMediaUrl, upl
 import {
   createPost,
   notifyPostCreated,
-  pinPost,
   type FeedPost,
   type PollAudience,
   type PostMedia,
@@ -89,7 +87,6 @@ export function PostComposer({
   const avatarUrl = profil?.avatarUrl ?? ''
   const initial = initialOf(profil?.displayName, profil?.username)
   const [submitting, setSubmitting] = useState(false)
-  const [pinOnProfile, setPinOnProfile] = useState(false)
   const [nsfw, setNsfw] = useState(false)
   const poll = usePollDraft()
   const [replyAudience, setReplyAudience] = useState<ReplyAudience>('everyone')
@@ -134,13 +131,11 @@ export function PostComposer({
     setSubmitting(true)
     try {
       const created = await createPost(content.trim(), media, quotePost?.id, poll.payload, replyAudience, nsfw)
-      const post = pinOnProfile ? await pinPost(created.id) : created
-      notifyPostCreated(post) // le fil prépend sans refetch
+      notifyPostCreated(created) // le fil prépend sans refetch
       playAppSound('breeze_posted')
       onPosted?.(content)
       setContent('')
       setMedia([])
-      setPinOnProfile(false)
       setNsfw(false)
       setReplyAudience('everyone')
       poll.reset()
@@ -339,18 +334,6 @@ export function PostComposer({
             />
             <button
               type="button"
-              aria-label={t('composer.pin_profile')}
-              aria-pressed={pinOnProfile}
-              onClick={() => setPinOnProfile((v) => !v)}
-              className={cn(
-                'rounded-full p-2 transition-colors hover:bg-primary/10',
-                pinOnProfile && 'bg-primary/10 text-primary',
-              )}
-            >
-              <Pin className={cn('h-5 w-5', pinOnProfile && 'fill-current')} />
-            </button>
-            <button
-              type="button"
               aria-label={t('composer.add_poll')}
               aria-pressed={poll.open}
               onClick={() => poll.setOpen((v) => !v)}
@@ -374,11 +357,12 @@ export function PostComposer({
             >
               {t('nsfw.post_badge')}
             </button>
+            {/* Sur mobile, le clavier natif fournit déjà les emojis → on masque le picker. */}
             <EmojiPicker onSelect={insertEmoji}>
               <button
                 type="button"
                 aria-label={t('composer.add_emoji')}
-                className="rounded-full p-2 transition-colors hover:bg-primary/10"
+                className="hidden rounded-full p-2 transition-colors hover:bg-primary/10 sm:block"
               >
                 <Smile className="h-5 w-5" />
               </button>
