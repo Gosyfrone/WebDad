@@ -41,6 +41,7 @@ import {
   type PostMedia,
   type PostPoll,
 } from '@/lib/posts'
+import { formatPollRemaining, isPollClosed, isPollClosedAt, pollResultsView } from '@/lib/poll-view'
 import { resolveMediaUrl } from '@/lib/media'
 import { quickBookmark, removeBookmarkEverywhere } from '@/lib/bookmarks'
 import { useLongPress } from '@/lib/use-long-press'
@@ -1097,7 +1098,7 @@ function PostPollCard({
   const total = Math.max(0, poll.totalVotes)
   // Bascule vers l'affichage « résultats » (barres type chart) une fois qu'on a
   // voté ou que le sondage est clos ; sinon on garde la vue de vote cliquable.
-  const resultsView = showResults && (Boolean(poll.votedChoiceId) || closed)
+  const resultsView = pollResultsView(poll, closed)
 
   useEffect(() => {
     if (closed) return
@@ -1256,26 +1257,6 @@ function PostPollCard({
       </div>
     </div>
   )
-}
-
-function isPollClosed(poll: PostPoll): boolean {
-  return isPollClosedAt(poll, Date.now())
-}
-
-function isPollClosedAt(poll: PostPoll, now: number): boolean {
-  return Boolean(poll.closedAt) || Date.parse(poll.endsAt) <= now
-}
-
-function formatPollRemaining(endsAt: string, now: number): string {
-  const remainingSeconds = Math.max(0, Math.ceil((Date.parse(endsAt) - now) / 1000))
-  const days = Math.floor(remainingSeconds / 86400)
-  const hours = Math.floor((remainingSeconds % 86400) / 3600)
-  const minutes = Math.floor((remainingSeconds % 3600) / 60)
-  const seconds = remainingSeconds % 60
-  if (days > 0) return `${days} j ${hours} h`
-  if (hours > 0) return `${hours} h ${minutes} min`
-  if (minutes > 0) return `${minutes} min ${seconds} s`
-  return `${seconds} s`
 }
 
 interface ActionButtonProps {

@@ -9,6 +9,7 @@ import { ArrowLeft, Bell, LogIn, LogOut, Settings } from 'lucide-react'
 import { cn, initialOf } from '@/lib/utils'
 import { logout } from '@/lib/auth-client'
 import { ROUTES, navItemsForRole } from '@/lib/routes'
+import { resolveMobileHeaderNav } from '@/lib/mobile-header-nav'
 import { useCurrentUser } from '@/components/current-user-provider'
 import { useAuthGate } from '@/components/auth-prompt-provider'
 import { useNotifications } from '@/components/notifications-provider'
@@ -58,63 +59,9 @@ export function MobileHeader() {
   const { activeConversationId } = useMessages()
   const hidden = pathname?.startsWith(ROUTES.profil) ?? false
 
-  // Section courante → pilote les 3 zones (gauche / centre / droite) du header.
-  const section:
-    | 'feed'
-    | 'explorer'
-    | 'messages'
-    | 'notifications'
-    | 'parametres'
-    | 'admin'
-    | 'moderation'
-    | 'signets'
-    | 'other' =
-    pathname === ROUTES.feed
-      ? 'feed'
-      : pathname?.startsWith(ROUTES.notifications)
-        ? 'notifications'
-        : pathname?.startsWith(ROUTES.explorer)
-          ? 'explorer'
-          : pathname?.startsWith(ROUTES.messages)
-            ? 'messages'
-            : pathname?.startsWith(ROUTES.parametres)
-              ? 'parametres'
-              : pathname?.startsWith(ROUTES.moderation)
-                ? 'moderation'
-                : pathname?.startsWith(ROUTES.admin)
-                  ? 'admin'
-                  : pathname?.startsWith(ROUTES.bookmarks)
-                    ? 'signets'
-                    : 'other'
-  // Titre centré (sections nommées) ; sinon le logo Breezy est affiché.
-  const titleKey =
-    section === 'explorer'
-      ? 'nav.explore'
-      : section === 'messages'
-        ? 'messages.title'
-        : section === 'notifications'
-          ? 'notifications.title'
-          : section === 'parametres'
-            ? 'settings.title'
-            : section === 'moderation'
-              ? 'nav.moderation'
-              : section === 'admin'
-                ? 'nav.admin'
-                : section === 'signets'
-                  ? 'bookmarks.title'
-                  : null
-  // Cloche à droite (vers les notifs) sur les sections de navigation principale
-  // et les pages admin / modération (header type-feed : avatar ← titre → cloche).
-  const showBell =
-    section === 'feed' ||
-    section === 'explorer' ||
-    section === 'messages' ||
-    section === 'admin' ||
-    section === 'moderation' ||
-    section === 'signets'
-  // Flèche retour à gauche (au lieu de l'avatar) sur les pages « secondaires »
-  // ouvertes au-dessus du menu normal (notifications, paramètres).
-  const showBack = section === 'notifications' || section === 'parametres'
+  // Section courante (pilote les 3 zones gauche/centre/droite), titre centré,
+  // cloche notifs et flèche retour : dérivés purs du pathname (cf. lib testée).
+  const { section, titleKey, showBell, showBack } = resolveMobileHeaderNav(pathname)
 
   const [open, setOpen] = useState(false)
   const [themeDialogOpen, setThemeDialogOpen] = useState(false)
