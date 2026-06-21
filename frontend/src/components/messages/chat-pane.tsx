@@ -133,6 +133,12 @@ export function ChatPane({
   const fileInputRef = useRef<HTMLInputElement>(null)
   // Id du message devant lequel afficher « Nouveaux messages » (gelé à l'ouverture).
   const [dividerBeforeId, setDividerBeforeId] = useState<string | null>(null)
+  // Cible de portail des menus « … » des messages. On les rend DANS l'overlay
+  // messagerie (`FeedOverlay`, `z-40`) plutôt que sur `document.body`, pour que
+  // le composer sticky (`z-20`, lui aussi dans l'overlay) puisse passer DEVANT
+  // eux — impossible autrement, un portail racine étant toujours au-dessus de
+  // tout l'overlay ou caché derrière.
+  const [menuPortal, setMenuPortal] = useState<HTMLDivElement | null>(null)
 
   const oldestIdRef = useRef<string | null>(null)
   const scrollRef = useRef<HTMLDivElement | null>(null)
@@ -402,6 +408,8 @@ export function ChatPane({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
+      {/* Cible de portail des menus « … » des messages (cf. `menuPortal`). */}
+      <div ref={setMenuPortal} />
       {/* En-tête */}
       <ChatHeader
         conversation={conversation}
@@ -452,6 +460,7 @@ export function ChatPane({
                   message={m}
                   conversation={conversation}
                   memberUsernames={memberUsernames}
+                  menuContainer={menuPortal}
                   receipt={m.mine ? receiptMarks.get(m.id) : undefined}
                   canDelete={!m.deletedAt && canSend && (m.mine || isModerator)}
                   // Affiche l'avatar/nom de l'expéditeur si l'auteur change (groupes/communautés).
@@ -661,6 +670,7 @@ function MessageBubble({
   showSender,
   onEditStart,
   onDelete,
+  menuContainer,
 }: {
   message: ChatMessage
   conversation: Conversation
@@ -672,6 +682,8 @@ function MessageBubble({
   showSender: boolean
   onEditStart: (message: ChatMessage) => void
   onDelete: (message: ChatMessage) => void
+  /** Conteneur de portail du menu « … » (cf. `menuPortal` dans ChatPane). */
+  menuContainer: HTMLElement | null
 }) {
   const { t, locale } = useLanguage()
   const sender = useResolvedUser(showSender ? message.senderId : null)
@@ -768,6 +780,7 @@ function MessageBubble({
               onEdit={() => onEditStart(message)}
               onDelete={() => onDelete(message)}
               onReport={() => setReportOpen(true)}
+              menuContainer={menuContainer}
               className="mb-1"
             />
           )}
@@ -842,6 +855,7 @@ function MessageBubble({
             onEdit={() => onEditStart(message)}
             onDelete={() => onDelete(message)}
             onReport={() => setReportOpen(true)}
+            menuContainer={menuContainer}
             className="mb-1"
           />
         </div>
@@ -878,6 +892,7 @@ function MessageActionsMenu({
   onEdit,
   onDelete,
   onReport,
+  menuContainer,
   className,
 }: {
   canEdit: boolean
@@ -886,12 +901,14 @@ function MessageActionsMenu({
   onEdit: () => void
   onDelete: () => void
   onReport: () => void
+  /** Conteneur de portail : l'overlay messagerie, pour passer SOUS le composer. */
+  menuContainer: HTMLElement | null
   className?: string
 }) {
   const { t } = useLanguage()
   if (!canEdit && !canDelete && !canReport) return null
   return (
-    <DropdownMenu>
+    <DropdownMenu modal={false}>
       <DropdownMenuTrigger
         aria-label={t('messages.actions')}
         className={cn(
@@ -902,7 +919,16 @@ function MessageActionsMenu({
       >
         <MoreHorizontal className="h-4 w-4" />
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
+      <DropdownMenuContent
+        align="end"
+        // Porté DANS l'overlay messagerie (`z-40`) et placé à `z-10` : au-dessus
+        // des bulles (z-auto) mais SOUS le composer sticky (`z-20`), qui passe
+        // donc devant. `collisionPadding` bas pour s'ouvrir vers le haut près du
+        // composer plutôt que d'être masqué par lui.
+        container={menuContainer}
+        collisionPadding={{ bottom: 88 }}
+        className="z-10"
+      >
         {canEdit && (
           <DropdownMenuItem onClick={onEdit} className="cursor-pointer">
             <Pencil className="mr-2 h-4 w-4" />

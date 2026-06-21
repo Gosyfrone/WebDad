@@ -41,6 +41,7 @@ import {
   type PostMedia,
   type PostPoll,
 } from '@/lib/posts'
+import { formatPollRemaining, isPollClosed, isPollClosedAt, pollResultsView } from '@/lib/poll-view'
 import { resolveMediaUrl } from '@/lib/media'
 import { quickBookmark, removeBookmarkEverywhere } from '@/lib/bookmarks'
 import { useLongPress } from '@/lib/use-long-press'
@@ -454,7 +455,7 @@ export function PostCard({ post, showPinBadge = false, focusCommentId, embedded 
           </div>
 
           {(post.canDelete || canReport || canBlock || post.canMarkNsfw) && (
-            <DropdownMenu>
+            <DropdownMenu modal={false}>
               <DropdownMenuTrigger
                 aria-label={t('post.more_options')}
                 disabled={deleting}
@@ -466,7 +467,7 @@ export function PostCard({ post, showPinBadge = false, focusCommentId, embedded 
                   <MoreHorizontal className="h-4 w-4" />
                 )}
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
+              <DropdownMenuContent align="end" className="z-40">
                 {post.canPin && (
                   <DropdownMenuItem onClick={togglePin} disabled={pinning} className="cursor-pointer">
                     {isPinned ? (
@@ -1095,6 +1096,9 @@ function PostPollCard({
   const closed = isPollClosedAt(poll, now)
   const showResults = poll.canViewResults
   const total = Math.max(0, poll.totalVotes)
+  // Bascule vers l'affichage « résultats » (barres type chart) une fois qu'on a
+  // voté ou que le sondage est clos ; sinon on garde la vue de vote cliquable.
+  const resultsView = pollResultsView(poll, closed)
 
   useEffect(() => {
     if (closed) return
@@ -1129,7 +1133,14 @@ function PostPollCard({
   }
 
   return (
-    <div className={cn('mt-3 rounded-2xl border border-border bg-background/45 p-3', compact && 'rounded-xl p-2')}>
+    <div
+      className={cn(
+        'mt-3',
+        // En mode résultats : pas de cadre (façon Twitter). Sinon, on garde la carte.
+        resultsView ? 'mt-2' : 'rounded-2xl border border-border bg-background/45 p-3',
+        !resultsView && compact && 'rounded-xl p-2',
+      )}
+    >
       {onClose && !closed && !compact && (
         <div className="mb-2 flex justify-end">
           <button
@@ -1142,16 +1153,49 @@ function PostPollCard({
           </button>
         </div>
       )}
-      <div className="space-y-2">
+      <div className={cn('space-y-2', resultsView && 'space-y-1.5')}>
         {poll.choices.map((choice) => {
           const percent = total > 0 ? Math.round((choice.votesCount / total) * 100) : 0
           const selected = poll.votedChoiceId === choice.id
           const winner = poll.winnerChoiceIds.includes(choice.id)
-          // Compte exact par choix visible seulement après avoir voté ou une fois le sondage terminé.
-          const showCounts = showResults && (Boolean(poll.votedChoiceId) || closed)
-          const resultText = showCounts
-            ? `${percent}% · ${t('post.poll_votes', { count: choice.votesCount })}`
-            : `${percent}%`
+
+          // Vue résultats (façon Twitter) : barre proportionnelle non encadrée,
+          // % à droite avec le nombre de votes en plus petit juste à sa gauche.
+          if (resultsView) {
+            return (
+              <div
+                key={choice.id}
+                className="relative flex min-h-9 items-center justify-between gap-3 overflow-hidden rounded-md px-3 py-1.5 text-sm"
+              >
+                <span
+                  aria-hidden
+                  className={cn(
+                    'absolute inset-y-0 left-0 rounded-md transition-all',
+                    winner ? 'bg-primary/35' : 'bg-muted',
+                  )}
+                  style={{ width: `${Math.max(percent, 2)}%` }}
+                />
+                <span className="relative z-10 flex min-w-0 items-center gap-2">
+                  {choice.imageUrl && (
+                    <img
+                      src={resolveMediaUrl(choice.imageUrl)}
+                      alt=""
+                      className="h-7 w-7 shrink-0 rounded object-cover"
+                    />
+                  )}
+                  <span className={cn('min-w-0 truncate', winner ? 'font-bold' : 'font-medium')}>
+                    {choice.label}
+                  </span>
+                </span>
+                <span className="relative z-10 ml-3 flex shrink-0 items-baseline gap-1.5">
+                  <span className="text-xs text-muted-foreground">{choice.votesCount}</span>
+                  <span aria-hidden className="text-xs text-muted-foreground">·</span>
+                  <span className={cn('font-semibold', winner && 'text-primary')}>{percent}%</span>
+                </span>
+              </div>
+            )
+          }
+
           return (
             <button
               key={choice.id}
@@ -1162,16 +1206,12 @@ function PostPollCard({
                 'relative flex min-h-10 w-full items-center justify-between overflow-hidden rounded-lg border border-border px-3 py-2 text-left text-sm transition',
                 onVote && !closed && !poll.votedChoiceId && 'hover:border-primary hover:bg-primary/5',
                 selected && 'border-primary text-primary',
-                winner && closed && 'border-emerald-500 bg-emerald-500/10 ring-1 ring-emerald-500/35',
               )}
             >
               {showResults && (
                 <span
                   aria-hidden
-                  className={cn(
-                    'absolute inset-y-0 left-0 transition-all',
-                    winner && closed ? 'bg-emerald-500/16' : 'bg-primary/12',
-                  )}
+                  className="absolute inset-y-0 left-0 bg-primary/12 transition-all"
                   style={{ width: `${percent}%` }}
                 />
               )}
@@ -1186,13 +1226,12 @@ function PostPollCard({
                 <span className="min-w-0 truncate font-medium">{choice.label}</span>
               </span>
               <span className="relative z-10 ml-3 flex shrink-0 items-center gap-2 font-semibold">
-                {winner && <span className="text-xs text-primary">{t('post.poll_winner')}</span>}
                 {voting === choice.id ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
-                ) : selected ? (
-                  showResults ? `${t('post.poll_voted')} · ${resultText}` : t('post.poll_voted')
                 ) : showResults ? (
-                  resultText
+                  `${percent}%`
+                ) : selected ? (
+                  t('post.poll_voted')
                 ) : (
                   t('post.poll_vote')
                 )}
@@ -1218,26 +1257,6 @@ function PostPollCard({
       </div>
     </div>
   )
-}
-
-function isPollClosed(poll: PostPoll): boolean {
-  return isPollClosedAt(poll, Date.now())
-}
-
-function isPollClosedAt(poll: PostPoll, now: number): boolean {
-  return Boolean(poll.closedAt) || Date.parse(poll.endsAt) <= now
-}
-
-function formatPollRemaining(endsAt: string, now: number): string {
-  const remainingSeconds = Math.max(0, Math.ceil((Date.parse(endsAt) - now) / 1000))
-  const days = Math.floor(remainingSeconds / 86400)
-  const hours = Math.floor((remainingSeconds % 86400) / 3600)
-  const minutes = Math.floor((remainingSeconds % 3600) / 60)
-  const seconds = remainingSeconds % 60
-  if (days > 0) return `${days} j ${hours} h`
-  if (hours > 0) return `${hours} h ${minutes} min`
-  if (minutes > 0) return `${minutes} min ${seconds} s`
-  return `${seconds} s`
 }
 
 interface ActionButtonProps {

@@ -7,6 +7,7 @@ import { cn, initialOf, timeAgo } from '@/lib/utils'
 import { getAccessToken } from '@/lib/auth-client'
 import { useInfiniteScroll } from '@/lib/use-infinite-scroll'
 import { exceedsMediaLimit, MAX_MEDIA_MB, resolveMediaUrl, uploadedMediaUrl, uploadMedia } from '@/lib/media'
+import { captureGif, type GiphyGif } from '@/lib/giphy'
 import {
   createComment,
   deleteComment,
@@ -27,6 +28,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { AnimatedCount } from '@/components/feed/animated-count'
 import { EmojiPicker } from '@/components/feed/emoji-picker'
+import { GifPicker } from '@/components/feed/gif-picker'
 import { MentionAutocomplete } from '@/components/mention/mention-autocomplete'
 import { TranslatedContent } from '@/components/feed/translated-content'
 import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
@@ -271,6 +273,25 @@ export function CommentSection({ postId, focusCommentId, onCountChange, canReply
     setMedia((prev) => prev.filter((_, i) => i !== index))
   }
 
+  async function addGif(gif: GiphyGif) {
+    if (media.length >= MAX_MEDIA) {
+      toast({ title: t('composer.media_max', { count: MAX_MEDIA }), variant: 'destructive' })
+      return
+    }
+    // Capture serveur → MinIO : on stocke `/media/<id>` (servi par la gateway),
+    // jamais l'URL giphy externe (hotlink 403/404, bloqué par la CSP).
+    setUploadingMedia(true)
+    try {
+      const captured = await captureGif(gif.url)
+      setMedia((prev) => [...prev, { url: uploadedMediaUrl(captured), type: 'image' }])
+      toast({ title: t('composer.gif_added') })
+    } catch {
+      toast({ title: t('composer.gif_failed'), variant: 'destructive' })
+    } finally {
+      setUploadingMedia(false)
+    }
+  }
+
   function insertEmoji(emoji: string) {
     const el = inputRef.current
     const start = el?.selectionStart ?? content.length
@@ -310,75 +331,23 @@ export function CommentSection({ postId, focusCommentId, onCountChange, canReply
           {t('comment.restricted_followers')}
         </p>
       ) : (
-      <div className="flex flex-col gap-2">
-        {media.length > 0 && (
-          <CommentMediaPreviews media={media} onRemove={removeMedia} removeLabel={t('composer.media_remove')} />
-        )}
-        <div className="flex items-center gap-2">
-          <div className="relative min-w-0 flex-1">
-            <input
-              ref={inputRef}
-              value={content}
-              onChange={(e) => {
-                setContent(e.target.value)
-                mention.sync()
-              }}
-              onKeyUp={mention.sync}
-              onClick={mention.sync}
-              onKeyDown={(e) => {
-                mention.onKeyDown(e)
-                if (e.defaultPrevented) return
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault()
-                  void handleSubmit()
-                }
-              }}
-              placeholder={t('comment.placeholder')}
-              maxLength={MAX_CHARS + 20}
-              className="w-full rounded-full border border-border bg-background/60 px-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-[#5B6CFF] focus:outline-none"
-            />
-            <MentionAutocomplete controller={mention} placement="top" />
-          </div>
-          <button
-            type="button"
-            aria-label={t('composer.add_image')}
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploadingMedia || media.length >= MAX_MEDIA}
-            className="shrink-0 rounded-full p-2 text-[#5B6CFF] transition-colors hover:bg-primary/10 disabled:opacity-40"
-          >
-            {uploadingMedia ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <ImageIcon className="h-4 w-4" />
-            )}
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*,video/*"
-            multiple
-            onChange={handleFiles}
-            className="sr-only"
-          />
-          <EmojiPicker onSelect={insertEmoji}>
-            <button
-              type="button"
-              aria-label={t('composer.add_emoji')}
-              className="shrink-0 rounded-full p-2 text-[#5B6CFF] transition-colors hover:bg-primary/10"
-            >
-              <Smile className="h-4 w-4" />
-            </button>
-          </EmojiPicker>
-          <Button
-            size="sm"
-            className="shrink-0 rounded-full bg-gradient-to-r from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] font-bold text-white"
-            disabled={!canSubmit}
-            onClick={handleSubmit}
-          >
-            {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : t('comment.reply')}
-          </Button>
-        </div>
-      </div>
+      <CommentComposer
+        inputRef={inputRef}
+        fileInputRef={fileInputRef}
+        mention={mention}
+        content={content}
+        setContent={setContent}
+        media={media}
+        onRemoveMedia={removeMedia}
+        onFiles={handleFiles}
+        onAddGif={addGif}
+        uploadingMedia={uploadingMedia}
+        onInsertEmoji={insertEmoji}
+        canSubmit={canSubmit}
+        submitting={submitting}
+        onSubmit={handleSubmit}
+        placeholder={t('comment.placeholder')}
+      />
       )}
 
       {/* Liste */}
@@ -706,6 +675,24 @@ function CommentThread({
     setMedia((prev) => prev.filter((_, i) => i !== index))
   }
 
+  async function addReplyGif(gif: GiphyGif) {
+    if (media.length >= MAX_MEDIA) {
+      toast({ title: t('composer.media_max', { count: MAX_MEDIA }), variant: 'destructive' })
+      return
+    }
+    // Capture serveur → MinIO (cf. addGif racine) : jamais l'URL giphy externe.
+    setUploadingMedia(true)
+    try {
+      const captured = await captureGif(gif.url)
+      setMedia((prev) => [...prev, { url: uploadedMediaUrl(captured), type: 'image' }])
+      toast({ title: t('composer.gif_added') })
+    } catch {
+      toast({ title: t('composer.gif_failed'), variant: 'destructive' })
+    } finally {
+      setUploadingMedia(false)
+    }
+  }
+
   function insertReplyEmoji(emoji: string) {
     const el = replyInputRef.current
     const start = el?.selectionStart ?? content.length
@@ -785,79 +772,23 @@ function CommentThread({
       {(open || composerOpen) && (
         <div className="ml-5 mt-2 flex flex-col gap-3 border-l border-border pl-3">
           {composerOpen && (
-            <div className="flex flex-col gap-2">
-              {media.length > 0 && (
-                <CommentMediaPreviews
-                  media={media}
-                  onRemove={removeReplyMedia}
-                  removeLabel={t('composer.media_remove')}
-                />
-              )}
-              <div className="flex items-center gap-2">
-                <div className="relative min-w-0 flex-1">
-                  <input
-                    ref={replyInputRef}
-                    value={content}
-                    onChange={(e) => {
-                      setContent(e.target.value)
-                      mention.sync()
-                    }}
-                    onKeyUp={mention.sync}
-                    onClick={mention.sync}
-                    onKeyDown={(e) => {
-                      mention.onKeyDown(e)
-                      if (e.defaultPrevented) return
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault()
-                        void submitReply()
-                      }
-                    }}
-                    placeholder={t('comment.reply_placeholder')}
-                    maxLength={MAX_CHARS + 20}
-                    className="w-full rounded-full border border-border bg-background/60 px-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-[#5B6CFF] focus:outline-none"
-                  />
-                  <MentionAutocomplete controller={mention} placement="top" />
-                </div>
-                <button
-                  type="button"
-                  aria-label={t('composer.add_image')}
-                  onClick={() => replyFileInputRef.current?.click()}
-                  disabled={uploadingMedia || media.length >= MAX_MEDIA}
-                  className="shrink-0 rounded-full p-2 text-[#5B6CFF] transition-colors hover:bg-primary/10 disabled:opacity-40"
-                >
-                  {uploadingMedia ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <ImageIcon className="h-4 w-4" />
-                  )}
-                </button>
-                <input
-                  ref={replyFileInputRef}
-                  type="file"
-                  accept="image/*,video/*"
-                  multiple
-                  onChange={handleReplyFiles}
-                  className="sr-only"
-                />
-                <EmojiPicker onSelect={insertReplyEmoji}>
-                  <button
-                    type="button"
-                    aria-label={t('composer.add_emoji')}
-                    className="shrink-0 rounded-full p-2 text-[#5B6CFF] transition-colors hover:bg-primary/10"
-                  >
-                    <Smile className="h-4 w-4" />
-                  </button>
-                </EmojiPicker>
-                <Button
-                  size="sm"
-                  className="shrink-0 rounded-full bg-gradient-to-r from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] font-bold text-white"
-                  disabled={!canSubmit}
-                  onClick={submitReply}
-                >
-                  {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : t('comment.reply')}
-                </Button>
-              </div>
-            </div>
+            <CommentComposer
+              inputRef={replyInputRef}
+              fileInputRef={replyFileInputRef}
+              mention={mention}
+              content={content}
+              setContent={setContent}
+              media={media}
+              onRemoveMedia={removeReplyMedia}
+              onFiles={handleReplyFiles}
+              onAddGif={addReplyGif}
+              uploadingMedia={uploadingMedia}
+              onInsertEmoji={insertReplyEmoji}
+              canSubmit={canSubmit}
+              submitting={submitting}
+              onSubmit={submitReply}
+              placeholder={t('comment.reply_placeholder')}
+            />
           )}
 
           {open &&
@@ -1031,6 +962,130 @@ function CommentLikeButton({
       </span>
       <AnimatedCount value={likeCount} />
     </button>
+  )
+}
+
+interface CommentComposerProps {
+  inputRef: React.RefObject<HTMLInputElement>
+  fileInputRef: React.RefObject<HTMLInputElement>
+  mention: ReturnType<typeof useMention>
+  content: string
+  setContent: (value: string) => void
+  media: PostMedia[]
+  onRemoveMedia: (index: number) => void
+  onFiles: (e: React.ChangeEvent<HTMLInputElement>) => void
+  onAddGif: (gif: GiphyGif) => void
+  uploadingMedia: boolean
+  onInsertEmoji: (emoji: string) => void
+  canSubmit: boolean
+  submitting: boolean
+  onSubmit: () => void
+  placeholder: string
+}
+
+/**
+ * Composer partagé (commentaire racine + réponse). Layout responsive : sur mobile
+ * l'input prend une ligne pleine et les actions (média / emoji / Répondre) passent
+ * en dessous ; sur desktop (≥ sm) tout reste sur une seule ligne comme avant.
+ */
+function CommentComposer({
+  inputRef,
+  fileInputRef,
+  mention,
+  content,
+  setContent,
+  media,
+  onRemoveMedia,
+  onFiles,
+  onAddGif,
+  uploadingMedia,
+  onInsertEmoji,
+  canSubmit,
+  submitting,
+  onSubmit,
+  placeholder,
+}: CommentComposerProps) {
+  const { t } = useLanguage()
+  return (
+    <div className="flex flex-col gap-2">
+      {media.length > 0 && (
+        <CommentMediaPreviews media={media} onRemove={onRemoveMedia} removeLabel={t('composer.media_remove')} />
+      )}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="relative min-w-0 flex-1">
+          <input
+            ref={inputRef}
+            value={content}
+            onChange={(e) => {
+              setContent(e.target.value)
+              mention.sync()
+            }}
+            onKeyUp={mention.sync}
+            onClick={mention.sync}
+            onKeyDown={(e) => {
+              mention.onKeyDown(e)
+              if (e.defaultPrevented) return
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                void onSubmit()
+              }
+            }}
+            placeholder={placeholder}
+            maxLength={MAX_CHARS + 20}
+            className="w-full rounded-full border border-border bg-background/60 px-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-[#5B6CFF] focus:outline-none"
+          />
+          <MentionAutocomplete controller={mention} placement="top" />
+        </div>
+        {/* Actions : sur mobile médias/emoji à gauche, Répondre à droite (pouce) ;
+            sur desktop le groupe se recolle à droite de l'input. */}
+        <div className="flex items-center justify-between gap-2 sm:justify-end">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              aria-label={t('composer.add_image')}
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadingMedia || media.length >= MAX_MEDIA}
+              className="shrink-0 rounded-full p-2 text-[#5B6CFF] transition-colors hover:bg-primary/10 disabled:opacity-40"
+            >
+              {uploadingMedia ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <ImageIcon className="h-4 w-4" />
+              )}
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*,video/*"
+              multiple
+              onChange={onFiles}
+              className="sr-only"
+            />
+            <span className="shrink-0 text-[#5B6CFF]">
+              <GifPicker disabled={uploadingMedia || media.length >= MAX_MEDIA} onSelect={onAddGif} />
+            </span>
+            {/* Sur mobile, le clavier natif fournit déjà les emojis → on masque le picker. */}
+            <EmojiPicker onSelect={onInsertEmoji}>
+              <button
+                type="button"
+                aria-label={t('composer.add_emoji')}
+                className="hidden shrink-0 rounded-full p-2 text-[#5B6CFF] transition-colors hover:bg-primary/10 sm:block"
+              >
+                <Smile className="h-4 w-4" />
+              </button>
+            </EmojiPicker>
+          </div>
+          <Button
+            size="sm"
+            className="shrink-0 rounded-full bg-gradient-to-r from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] font-bold text-white"
+            disabled={!canSubmit}
+            onClick={onSubmit}
+          >
+            {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : t('comment.reply')}
+          </Button>
+        </div>
+      </div>
+    </div>
   )
 }
 

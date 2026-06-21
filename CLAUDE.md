@@ -10,7 +10,7 @@
 > - Knowledge graph in `graphify-out/` — query it before reading source (Operating Rule 11).
 >
 > **Latest session work and suggested commit messages live in `CHANGELOG.md`, not here.**
-> **Session freshness:** current work log updated in `CHANGELOG.md` on 19/06/2026 (feat gateway/sécurité — validation + propagation du JWT au gateway : middleware global `PropagateJWT` « valider-si-présent », rejet 401 au plus tôt, strip anti-spoof + propagation `X-User-Id`/`X-User-Role`/`X-Email-Verified`, défense en profondeur conservée).
+> **Session freshness:** current work log updated in `CHANGELOG.md` on 21/06/2026 (test frontend — couverture lib de la branche #318, **lib-only** : extraction de logique pure vers `lib/` (`mobile-header-nav`, `poll-view`) + tests `giphy`. Pas d'infra de test composant (jsdom/RTL essayée puis retirée sur choix utilisateur). 372 → 408 tests, 100 % vert, 0 régression `tsc`. Précédemment : en-tête mobile type-feed sur la page Signets).
 
 ---
 
