@@ -1,0 +1,546 @@
+Introduction
+
+Le projet Breezy vise à développer un réseau social léger et réactif, inspiré de Twitter/X, mais optimisé pour des environnements à faibles ressources. L’objectif est de concevoir une application qui permet de publier des messages courts, d’interagir avec les autres utilisateurs, et de maintenir une expérience utilisateur rapide et fluide.
+
+L’équipe utilisera des technologies modernes pour garantir la robustesse et la scalabilité de l’application. Le back-end sera développé en Node.js avec le framework Express, gérant les requêtes via une API RESTful. Pour l'authentification et la gestion des sessions utilisateurs, nous mettrons en œuvre des JWT (JSON Web Tokens), assurant ainsi la sécurité des échanges. Le front-end sera construit en React, avec une approche mobile-first, garantissant une interface réactive et intuitive, adaptée à tous les formats d'écran.
+
+Pour simplifier le déploiement et la gestion des environnements de développement, nous utiliserons Docker pour containeriser les services. Cette approche garantit une mise en production rapide, portable et fiable tout en facilitant la gestion des dépendances.
+Sujet
+Consignes de travail
+Fonctionnalités Primaires (Obligatoires) :
+
+    Fx1. Création de comptes utilisateurs avec validation
+
+        En tant que visiteur, je veux créer un compte utilisateur afin de pouvoir accéder aux fonctionnalités de la plateforme.
+
+    Fx2. Authentification sécurisée
+
+        En tant qu'utilisateur, je veux pouvoir me connecter de manière sécurisée pour protéger mes informations personnelles.
+
+    Fx3. Publication de messages courts
+
+        En tant qu'utilisateur, je veux publier des messages courts (ex. : 280 caractères) pour partager mes idées avec mes abonnés.
+
+    Fx4. Affichage des messages sur le profil
+
+        En tant qu'utilisateur, je veux voir tous mes messages affichés sur mon profil afin de les consulter ou les modifier.
+
+    Fx5. Flux chronologique des messages des utilisateurs suivis
+
+        En tant qu'utilisateur, je veux un fil d'actualités avec les messages des utilisateurs que je suis pour rester à jour avec leur contenu.
+
+    Fx6. Liker un post
+
+        En tant qu'utilisateur, je veux liker un post pour montrer mon appréciation.
+
+    Fx7. Répondre à un post sous forme de commentaire
+
+        En tant qu'utilisateur, je veux répondre à un post pour partager mes réactions ou avis.
+
+    Fx8. Répondre à un commentaire sur un post
+
+        En tant qu'utilisateur, je veux répondre à un commentaire sur un post pour participer à une discussion.
+
+    Fx9. Suivre ou être suivi par d'autres utilisateurs
+
+        En tant qu'utilisateur, je veux pouvoir suivre d'autres utilisateurs pour voir leur contenu dans mon fil d'actualités.
+
+    Fx10. Profil utilisateur avec informations de base
+
+        En tant qu'utilisateur, je veux une page de profil affichant mon nom, ma biographie courte et ma photo de profil pour me présenter aux autres.
+
+    Fx11. Liste des messages publiés par l'utilisateur sur le profil
+
+        En tant qu'utilisateur, je veux voir la liste de mes messages publiés sur ma page de profil.
+
+Fonctionnalités Secondaires (Optionnelles) :
+
+    Fx12. Ajout de tags aux messages
+
+        En tant qu'utilisateur, je veux ajouter des tags à mes messages pour les catégoriser.
+
+    Fx13. Recherche de posts via des tags
+
+        En tant qu'utilisateur, je veux rechercher des messages via des tags pour trouver du contenu pertinent.
+
+    Fx14. Notifications pour les mentions
+
+        En tant qu'utilisateur, je veux recevoir une notification lorsqu'on me mentionne dans un post.
+
+    Fx15. Notifications pour les likes
+
+        En tant qu'utilisateur, je veux être informé lorsqu'un autre utilisateur like mon post.
+
+    Fx16. Notifications pour les nouveaux followers
+
+        En tant qu'utilisateur, je veux recevoir une notification lorsque quelqu'un commence à me suivre.
+
+    Fx17. Système de messages privés entre utilisateurs
+
+        En tant qu'utilisateur, je veux envoyer des messages privés à d'autres utilisateurs pour communiquer en toute confidentialité.
+
+    Fx18. Ajout d’images aux messages
+
+        En tant qu'utilisateur, je veux ajouter des images à mes messages pour les rendre plus attractifs.
+
+    Fx19. Ajout de vidéos aux messages
+
+        En tant qu'utilisateur, je veux ajouter des vidéos à mes messages pour partager du contenu riche.
+
+    Fx20. Signalement de contenu inapproprié
+
+        En tant qu'utilisateur, je veux signaler un contenu inapproprié pour maintenir un environnement sûr.
+
+    Fx21. Suspension ou bannissement des utilisateurs
+
+        En tant que modérateur, je veux suspendre ou bannir les utilisateurs qui enfreignent les règles pour protéger la communauté.
+
+    Fx22. Interface multi-langues
+
+        En tant qu'utilisateur, je veux choisir ma langue préférée pour utiliser l'application confortablement.
+
+    Fx23. Thème personnalisé
+
+        En tant qu'utilisateur, je veux personnaliser le thème de l'application pour améliorer mon expérience visuelle.
+
+Matrice des permissions :
+
+Fonctionnalité (Fx)
+	
+
+Visiteur
+	
+
+Utilisateur
+	
+
+Modérateur
+	
+
+Administrateur
+
+Fx1. Création de comptes utilisateurs
+	
+
+✅
+	
+
+❌
+	
+
+❌
+	
+
+✅
+
+Fx2. Authentification sécurisée
+	
+
+❌
+	
+
+✅
+	
+
+✅
+	
+
+✅
+
+Fx3. Publication de messages courts
+	
+
+❌
+	
+
+✅
+	
+
+✅
+	
+
+✅
+
+Fx4. Affichage des messages sur le profil
+	
+
+❌
+	
+
+✅ (seulement le sien)
+	
+
+✅
+	
+
+✅
+
+Fx5. Flux chronologique des messages
+	
+
+❌
+	
+
+✅
+	
+
+✅
+	
+
+✅
+
+Fx6. Liker un post
+	
+
+❌
+	
+
+✅
+	
+
+✅
+	
+
+✅
+
+Fx7. Répondre à un post sous forme de commentaire
+	
+
+❌
+	
+
+✅
+	
+
+✅
+	
+
+✅
+
+Fx8. Répondre à un commentaire sur un post
+	
+
+❌
+	
+
+✅
+	
+
+✅
+	
+
+✅
+
+Fx9. Suivre ou être suivi par d'autres utilisateurs
+	
+
+❌
+	
+
+✅
+	
+
+✅
+	
+
+✅
+
+Fx10. Profil utilisateur avec informations de base
+	
+
+❌
+	
+
+✅
+	
+
+✅
+	
+
+✅
+
+Fx11. Liste des messages publiés par l'utilisateur sur le profil
+	
+
+❌
+	
+
+✅
+	
+
+✅
+	
+
+✅
+
+Fx12. Ajout de tags aux messages
+	
+
+❌
+	
+
+✅
+	
+
+✅
+	
+
+✅
+
+Fx13. Recherche de posts via des tags
+	
+
+❌
+	
+
+✅
+	
+
+✅
+	
+
+✅
+
+Fx14. Notifications pour les mentions
+	
+
+❌
+	
+
+✅
+	
+
+✅ (modération)
+	
+
+✅ (administration)
+
+Fx15. Notifications pour les likes
+	
+
+❌
+	
+
+✅
+	
+
+❌
+	
+
+❌
+
+Fx16. Notifications pour les nouveaux followers
+	
+
+❌
+	
+
+✅
+	
+
+❌
+	
+
+❌
+
+Fx17. Système de messages privés entre utilisateurs
+	
+
+❌
+	
+
+✅
+	
+
+✅
+	
+
+✅
+
+Fx18. Ajout d’images aux messages
+	
+
+❌
+	
+
+✅
+	
+
+✅
+	
+
+✅
+
+Fx19. Ajout de vidéos aux messages
+	
+
+❌
+	
+
+✅
+	
+
+✅
+	
+
+✅
+
+Fx20. Signalement de contenu inapproprié
+	
+
+❌
+	
+
+✅
+	
+
+✅
+	
+
+✅
+
+Fx21. Suspension ou bannissement des utilisateurs
+	
+
+❌
+	
+
+❌
+	
+
+✅
+	
+
+✅
+
+Fx22. Interface multi-langues
+	
+
+❌
+	
+
+✅
+	
+
+✅
+	
+
+✅
+
+Fx23. Thème personnalisé
+	
+
+✅
+	
+
+✅
+	
+
+✅
+	
+
+✅
+Architecture et Stack Technique :
+
+L'application sera composée de plusieurs microservices interconnectés, chacun ayant une responsabilité distincte. Le schéma ci-dessous représente une base pour vous aider dans le lancement de votre projet. Si vous jugez nécessaire de retirer ou d'ajouter des services, cela est possible, mais attention à votre charge de travail.
+
+Back-end (Node.js & Express) :
+
+    Technologies utilisées :
+
+        Node.js
+
+        Express.js
+
+        JWT (JSON Web Tokens)
+
+        MongoDB
+
+        Mongoose
+
+        Sequelize
+
+        PostgreSQL
+
+    Sécurisation :
+
+        Authentification JWT
+
+        Gestion des erreurs
+
+        CORS (Cross-Origin Resource Sharing)
+
+    Performance :
+
+        Docker
+
+Front-end (React & Next.js) :
+
+    Technologies utilisées :
+
+        React.js
+
+        Next.js
+
+        Tailwind CSS
+
+        Axios
+
+        React Router
+
+    Réactivité et UX/UI :
+
+        Mobile-first
+
+        Responsive
+
+        Gestion des erreurs UI
+
+    Gestion des sessions :
+
+        Stockage des JWT
+
+        Redirection après authentification
+
+Wireframe de l'application :
+Livrables attendus
+
+Projet - Livrable : Rapport
+
+    Identifier et décrire clairement les objectifs et attentes du projet,
+
+    Fournir une représentation visuelle et structurée de l'architecture choisie,
+
+    Expliquer la hiérarchisation des tâches et fonctionnalités,
+
+    Détail des étapes et des ressources mobilisées pour le projet,
+
+    Décrire la méthodologie suivie et les étapes mises en œuvre,
+
+    Illustrer les interfaces utilisateur proposées sous forme de maquettes ou wireframes,
+
+    Détailler les fonctionnalités principales et leur mise en œuvre,
+
+    Proposer des axes d’amélioration et des évolutions potentielles,
+
+    Respecter les normes de présentation et de structuration selon le guide de rédaction (cf. : Guide de rédaction des rapports).
+
+Projet - Déroulement de la soutenance :
+
+    5 min : Présentation à travers un support de présentation qui rappelle les éléments suivants​ :
+
+        Présentation de l'équipe
+
+        Rappel du contexte
+
+    15 min : Présentation de la maquette, prévoir un scénario préconstruit afin de fluidifier la présentation.
+
+    10 min : Questions du jury au groupe projet.
+
+    5 min : Questions individuelles (chaque membre doit maîtriser l'ensemble des éléments du projet).
+
+    5 min : Délibération du jury.
+
+    5 min : Restitution à chaud par le jury.
+
+Tenue correcte exigée pour la soutenance.
