@@ -1,7 +1,14 @@
 package realtime
 
 import (
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"sync"
 	"testing"
+	"time"
+
+	"github.com/gorilla/websocket"
 )
 
 func TestNewHub(t *testing.T) {
@@ -55,6 +62,141 @@ func TestRemove_ConnInconnue(t *testing.T) {
 	h := NewHub()
 	fake := &Conn{hub: h, userID: "unknown", send: make(chan []byte, 1)}
 	h.remove(fake)
+}
+
+func TestRemove_ConnAbsentePourUtilisateurConnu(t *testing.T) {
+	h := NewHub()
+	h.mu.Lock()
+	h.conns["u1"] = make(map[*Conn]struct{})
+	registered := &Conn{hub: h, userID: "u1", send: make(chan []byte, 1)}
+	h.conns["u1"][registered] = struct{}{}
+	h.mu.Unlock()
+
+	unknown := &Conn{hub: h, userID: "u1", send: make(chan []byte, 1)}
+	h.remove(unknown)
+
+	h.mu.RLock()
+	_, exists := h.conns["u1"][registered]
+	h.mu.RUnlock()
+	if !exists {
+		t.Fatal("la connexion enregistrée ne doit pas être retirée")
+	}
+}
+
+func TestPublishToMultipleConnections(t *testing.T) {
+	h := NewHub()
+	first := &Conn{hub: h, userID: "u1", send: make(chan []byte, 1)}
+	second := &Conn{hub: h, userID: "u1", send: make(chan []byte, 1)}
+	h.conns["u1"] = map[*Conn]struct{}{first: {}, second: {}}
+
+	h.Publish([]string{"u1", "absent"}, map[string]string{"type": "refresh"})
+
+	for i, conn := range []*Conn{first, second} {
+		select {
+		case <-conn.send:
+		default:
+			t.Fatalf("connexion %d sans message", i)
+		}
+	}
+}
+
+func TestRegisterPublishesAndRemovesWebSocket(t *testing.T) {
+	h := NewHub()
+	done := make(chan struct{})
+	upgrader := websocket.Upgrader{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ws, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			return
+		}
+		h.Register("user", ws)
+		close(done)
+	}))
+	defer server.Close()
+
+	client, _, err := websocket.DefaultDialer.Dial("ws"+strings.TrimPrefix(server.URL, "http"), nil)
+	if err != nil {
+		t.Fatalf("dial websocket: %v", err)
+	}
+	deadline := time.Now().Add(time.Second)
+	for {
+		h.mu.RLock()
+		registered := len(h.conns["user"]) == 1
+		h.mu.RUnlock()
+		if registered {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("connexion non enregistrée")
+		}
+		time.Sleep(time.Millisecond)
+	}
+	h.Publish([]string{"user"}, map[string]string{"type": "notification"})
+	_, payload, err := client.ReadMessage()
+	if err != nil {
+		t.Fatalf("ReadMessage: %v", err)
+	}
+	if !strings.Contains(string(payload), "notification") {
+		t.Fatalf("payload = %s", payload)
+	}
+	if err := client.WriteMessage(websocket.TextMessage, []byte("ignored")); err != nil {
+		t.Fatalf("WriteMessage: %v", err)
+	}
+	if err := client.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("Register ne s'est pas terminé")
+	}
+	h.mu.RLock()
+	_, exists := h.conns["user"]
+	h.mu.RUnlock()
+	if exists {
+		t.Fatal("connexion non retirée après fermeture")
+	}
+}
+
+func TestPublishClosesSaturatedConnection(t *testing.T) {
+	var serverWS *websocket.Conn
+	ready := make(chan struct{})
+	var once sync.Once
+	upgrader := websocket.Upgrader{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ws, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			return
+		}
+		serverWS = ws
+		once.Do(func() { close(ready) })
+	}))
+	defer server.Close()
+	defer func() { _ = serverWS.Close() }()
+
+	client, _, err := websocket.DefaultDialer.Dial("ws"+strings.TrimPrefix(server.URL, "http"), nil)
+	if err != nil {
+		t.Fatalf("dial websocket: %v", err)
+	}
+	defer client.Close()
+	<-ready
+
+	h := NewHub()
+	c := &Conn{hub: h, userID: "slow", ws: serverWS, send: make(chan []byte, 1)}
+	c.send <- []byte("already full")
+	h.conns["slow"] = map[*Conn]struct{}{c: {}}
+	h.Publish([]string{"slow"}, map[string]string{"type": "overflow"})
+
+	_ = client.SetReadDeadline(time.Now().Add(time.Second))
+	if _, _, err := client.ReadMessage(); err == nil {
+		t.Fatal("la connexion saturée aurait dû être fermée")
+	}
+
+	failedWriter := &Conn{ws: serverWS, send: make(chan []byte, 1)}
+	failedWriter.send <- []byte("write after close")
+	close(failedWriter.send)
+	failedWriter.writePump()
 }
 
 func TestRemove_VideLEntréeUtilisateur(t *testing.T) {
