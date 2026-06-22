@@ -104,6 +104,16 @@ jobs:
           MONGO_TEST_URI: ${{ matrix.service == 'report-service' && 'mongodb://localhost:27017' || '' }}
         run: go test -race -covermode=atomic -coverprofile=coverage.out ./...
 
+      # Filtre le profil de couverture AVANT l'upload : on retire le code non
+      # testable unitairement (main.go = bootstrap du process), généré (swaggo,
+      # docs/docs.go) et l'infrastructure de test (helper Mongo mongotest). Plus
+      # fiable que de compter sur le `ignore` du codecov.yml (résolution de la
+      # config côté Codecov parfois capricieuse). La 1re ligne `mode:` est gardée.
+      - name: Filtrer la couverture (bootstrap + généré + infra de test)
+        run: |
+          grep -vE '(/main\.go:|/docs/docs\.go:|/internal/mongotest/)' coverage.out > coverage.filtered.out
+          mv coverage.filtered.out coverage.out
+
       # Upload de la couverture vers Codecov, un flag par service pour une
       # lecture service-par-service. Non bloquant (fail_ci_if_error: false) :
       # un hoquet Codecov ne doit jamais casser la CI.
