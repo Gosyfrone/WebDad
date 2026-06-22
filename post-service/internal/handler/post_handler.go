@@ -17,21 +17,30 @@ import (
 	"github.com/webdad/post-service/internal/service"
 )
 
-// defaultContentMaxChars : plafond de caractères pour un utilisateur standard.
-// Les modérateurs/admins en sont exemptés (garde-fou absolu posé par le tag
-// binding `max` des requêtes). Comptage en runes pour coller au validateur
-// go-playground (qui mesure la longueur d'une string en runes).
-const defaultContentMaxChars = 280
+// Plafonds de caractères du contenu, par rôle. Comptage en runes pour coller au
+// validateur go-playground (qui mesure la longueur d'une string en runes).
+//   - standard          : 280
+//   - modérateur/admin  : 4000
+//
+// Ces deux bornes DOIVENT rester ≤ au maxLength du validateur Mongo (cf.
+// init.go, posté à 4000) : sinon le doc passe le handler mais est rejeté par
+// Mongo → 500 (vécu pour le cas modo > 280, le schéma étant resté à 280).
+const (
+	defaultContentMaxChars    = 280
+	privilegedContentMaxChars = 4000
+)
 
 // enforceContentLimit vérifie la longueur du contenu selon le rôle de l'appelant.
-// Renvoie false (et répond 400) si un utilisateur standard dépasse la limite ;
-// les modérateurs/admins passent toujours. À appeler après le bind.
+// Renvoie false (et répond 400) si l'appelant dépasse la borne de son rôle. À
+// appeler après le bind. Les modérateurs/admins ont une borne élargie (4000)
+// mais bornée tout de même, pour rester sous le validateur Mongo.
 func enforceContentLimit(c *gin.Context, content, role string) bool {
+	limit := defaultContentMaxChars
 	if role == models.RoleModerator || role == models.RoleAdmin {
-		return true
+		limit = privilegedContentMaxChars
 	}
-	if utf8.RuneCountInString(content) > defaultContentMaxChars {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "contenu trop long : 280 caractères maximum"})
+	if utf8.RuneCountInString(content) > limit {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "contenu trop long : " + strconv.Itoa(limit) + " caractères maximum"})
 		return false
 	}
 	return true
