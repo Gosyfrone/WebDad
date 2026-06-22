@@ -29,6 +29,9 @@ flag_management:
 ignore:
   - "**/*_test.go"
   - "**/mocks/**"
+  - "**/testutil/**"     # aides de test partagées (importées uniquement par des _test.go)
+  - "**/main.go"         # racine de composition (câblage des deps + r.Run) — non testable unitairement
   - "doc/**"
+  - "**/docs/docs.go"    # Swagger généré (swaggo) — code non testable
   - "frontend/src/components/ui/**"
   - "frontend/**/*.test.ts"

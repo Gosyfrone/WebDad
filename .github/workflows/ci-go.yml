@@ -82,7 +82,26 @@ jobs:
       - name: Build
         run: go build ./...
 
+      # MongoDB éphémère pour les tests d'INTÉGRATION du report-service (dépôt +
+      # service + handlers adossés à une vraie base). Scopé à ce seul service via
+      # la matrice : les autres jobs ne paient pas le coût du conteneur. Les tests
+      # lisent MONGO_TEST_URI ; s'il est absent (run local), ils sont ignorés
+      # (t.Skip) — la base n'est donc requise qu'ici.
+      - name: Start MongoDB (report-service integration tests)
+        if: matrix.service == 'report-service'
+        run: |
+          docker run -d --name mongo-test -p 27017:27017 mongo:7
+          for i in $(seq 1 30); do
+            if docker exec mongo-test mongosh --quiet --eval 'db.runCommand({ping:1}).ok' >/dev/null 2>&1; then
+              echo "MongoDB prêt"; exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::MongoDB n'a pas démarré à temps"; exit 1
+
       - name: Test (race detector + coverage)
+        env:
+          MONGO_TEST_URI: ${{ matrix.service == 'report-service' && 'mongodb://localhost:27017' || '' }}
         run: go test -race -covermode=atomic -coverprofile=coverage.out ./...
 
       # Upload de la couverture vers Codecov, un flag par service pour une
