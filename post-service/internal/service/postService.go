@@ -74,7 +74,7 @@ const MaxStatsIDs = 100
 var hashtagPattern = regexp.MustCompile(`(^|[^\p{L}\p{N}_])#([\p{L}\p{N}_]{1,64})`)
 
 type PostService struct {
-	repo *repository.PostRepository
+	repo Repository
 	// notif émet les événements de notification (like, commentaire, mention…).
 	// Par défaut un no-op : le post-service reste autonome si le
 	// notification-service n'est pas configuré. Câblé via SetNotifier au boot.
@@ -162,7 +162,7 @@ func WithPurgeRetention(after, warnBefore time.Duration) Option {
 	}
 }
 
-func NewPostService(r *repository.PostRepository, opts ...Option) *PostService {
+func NewPostService(r Repository, opts ...Option) *PostService {
 	s := &PostService{repo: r, notif: notifier.Noop{}, feed: noopBroadcaster{}}
 	for _, opt := range opts {
 		opt(s)
