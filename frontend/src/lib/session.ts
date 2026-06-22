@@ -23,6 +23,8 @@ export interface RawClaims {
   role?: string
   /** Mot de passe temporaire (compte créé par un admin) → changement imposé. */
   must_change_password?: boolean
+  /** CGU en vigueur acceptées. Absent/false → modale d'acceptation imposée. */
+  terms_accepted?: boolean
 }
 
 /** Session normalisée pour le front (rôle mappé vers `UserRole`). */
@@ -32,6 +34,8 @@ export interface Session {
   role: UserRole
   /** Mot de passe temporaire à changer à la 1re connexion (porté par le JWT). */
   mustChangePassword: boolean
+  /** CGU en vigueur acceptées (porté par le JWT). false → modale bloquante. */
+  termsAccepted: boolean
 }
 
 /**
@@ -72,6 +76,7 @@ export function readSession(): Session | null {
     email: claims.email ?? '',
     role: mapRole(claims.role),
     mustChangePassword: claims.must_change_password === true,
+    termsAccepted: claims.terms_accepted === true,
   }
 }
 

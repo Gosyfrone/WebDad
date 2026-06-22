@@ -1090,6 +1090,57 @@
         }
       }
     },
+    "/auth/terms/accept": {
+      "post": {
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "auth"
+        ],
+        "summary": "Accepter les CGU en vigueur",
+        "responses": {
+          "200": {
+            "description": "CGU acceptées — data: {token, refresh_token, user}",
+            "schema": {
+              "$ref": "#/definitions/models.AuthUser"
+            }
+          },
+          "401": {
+            "description": "Non authentifié",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "404": {
+            "description": "Compte introuvable",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "500": {
+            "description": "Erreur interne",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
     "/auth/users": {
       "get": {
         "security": [

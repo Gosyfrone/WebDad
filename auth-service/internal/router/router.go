@@ -65,6 +65,9 @@ func New(auth *services.AuthService, oauthReg *oauth.Registry) *gin.Engine {
 		authGroup.POST("/password/change", middleware.JWTAuth(auth), h.ChangePassword)
 		authGroup.POST("/email/change/request", middleware.JWTAuth(auth), h.RequestEmailChange)
 		authGroup.POST("/email/change/confirm", h.ConfirmEmailChange)
+		// /auth/terms/accept : enregistre l'acceptation des CGU en vigueur et
+		// ré-émet une paire de tokens (le nouveau JWT porte terms_accepted=true).
+		authGroup.POST("/terms/accept", middleware.JWTAuth(auth), h.AcceptTerms)
 		// MFA TOTP (opt-in). setup/enable/disable/status sont authentifiés
 		// (gestion depuis /parametres) ; verify est PUBLIQUE : le challenge émis
 		// au login (mot de passe déjà validé) y tient lieu d'authentification.

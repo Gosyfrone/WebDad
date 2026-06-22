@@ -6,6 +6,39 @@
 
 ---
 
+## Acceptation des CGU : consentement versionné persisté + modale bloquante (22/06/2026)
+
+> Besoin : forcer les comptes **déjà existants** (local + prod) à accepter les CGU à leur prochaine
+> connexion. Jusqu'ici, le consentement n'existait qu'à l'inscription (case à cocher + flag
+> `localStorage breezy-cgu-read`), non persisté → aucune trace pour les comptes existants.
+
+- **Consentement persisté côté back, pas en localStorage.** `credentials.terms_accepted_version`
+  (INT) porte la version acceptée ; `models.CurrentTermsVersion` est la version EN VIGUEUR.
+  *Pourquoi* : robuste, cross-device, auditable (RGPD via `terms_accepted_at`), vraiment
+  « obligatoire » (Rule 6 : la sécurité ne dépend pas du front), et **rebumper la version
+  re-déclenche le consentement de tout le monde** lors d'une révision des CGU. Le localStorage seul
+  serait par-navigateur et non auditable.
+- **Rétro-compatibilité = le mécanisme même du prompt (Rule 5b).** `ADD COLUMN ... DEFAULT 0` pose 0
+  sur toutes les lignes existantes → tous les comptes déjà en base repassent sous `CurrentTermsVersion`
+  (=1) et **doivent accepter au prochain login**. Surtout pas d'UPDATE inconditionnel (réimposerait
+  l'acceptation à chaque boot). Les comptes ayant déjà consenti à la création (`Register`, OAuth
+  `complete`) sont insérés directement à `CurrentTermsVersion` ; les comptes créés par un admin
+  restent à 0 (ils n'ont jamais consenti → doivent accepter).
+- **Propagation par claim JWT `terms_accepted`, calquée sur `must_change_password`.** Le claim est
+  dérivé (`version >= CurrentTermsVersion`) à chaque émission de token ; le front lit le JWT
+  (`session.ts`) et affiche une **modale bloquante** (`TermsAcceptGate`) tant qu'il est faux — zéro
+  appel réseau supplémentaire, disparaît sans rechargement après acceptation.
+- **`terms_accepted_version` re-chargé dans `issueTokens` (un SELECT PK centralisé)**, pas threadé
+  dans les ~8 SELECT qui émettent un token. *Pourquoi* : sinon le claim retomberait faux après
+  refresh/MFA/changement d'e-mail (même piège vécu avec `email_verified`). Best-effort : en cas
+  d'erreur, on laisse 0 → on re-demande l'acceptation (côté sûr).
+- **Modale AVEC issue « Refuser & se déconnecter » (logout), pas de blocage définitif.** Choix
+  utilisateur : consentement *libre* (refuser déconnecte plutôt que de coincer l'utilisateur).
+- `POST /auth/terms/accept` (JWT) écrit la version + `NOW()` et **ré-émet la paire de tokens** (comme
+  `ChangePassword`) → le nouveau JWT porte `terms_accepted=true`.
+
+---
+
 ## GIF GIPHY : capture serveur en MinIO, pas de hotlink (19/06/2026)
 
 > Le picker GIPHY renvoie des URL CDN giphy. Question : que stocke-t-on dans le post ?

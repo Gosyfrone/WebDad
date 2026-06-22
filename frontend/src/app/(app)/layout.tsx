@@ -11,6 +11,7 @@ import { MessagesProvider } from '@/components/messages-provider'
 import { AuthPromptProvider } from '@/components/auth-prompt-provider'
 import { OnboardingGate } from '@/components/onboarding/onboarding-gate'
 import { PasswordChangeGate } from '@/components/account/password-change-gate'
+import { TermsAcceptGate } from '@/components/account/terms-accept-gate'
 import { UsernamePendingGate } from '@/components/account/username-pending-gate'
 import { ExplorerFilterProvider } from '@/components/explorer/explorer-filter-context'
 import { FeedView } from '@/components/feed/feed-view'
@@ -65,6 +66,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     provisoire (comptes créés par un admin). */}
                 <OnboardingGate />
                 <PasswordChangeGate />
+                <TermsAcceptGate />
                 <UsernamePendingGate />
                 <ActivityLifecycle />
                 <WarningsGate />
