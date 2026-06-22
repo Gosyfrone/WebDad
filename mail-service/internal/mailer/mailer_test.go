@@ -234,14 +234,22 @@ func startFakeSMTPServer(t *testing.T) (string, <-chan struct{}) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		defer ln.Close()
+		defer func() {
+			if err := ln.Close(); err != nil {
+				t.Errorf("ln.Close() error = %v", err)
+			}
+		}()
 
 		conn, err := ln.Accept()
 		if err != nil {
 			t.Errorf("Accept() error = %v", err)
 			return
 		}
-		defer conn.Close()
+		defer func() {
+			if err := conn.Close(); err != nil {
+				t.Errorf("conn.Close() error = %v", err)
+			}
+		}()
 
 		reader := bufio.NewReader(conn)
 		write := func(s string) {
@@ -283,10 +291,7 @@ func startFakeSMTPServer(t *testing.T) (string, <-chan struct{}) {
 			write("250 OK\r\n")
 		}
 
-		for {
-			if strings.TrimSpace(readLine()) == "." {
-				break
-			}
+		for strings.TrimSpace(readLine()) != "." {
 		}
 		write("250 OK queued\r\n")
 
