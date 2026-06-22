@@ -52,9 +52,10 @@ export function UsernamePendingGate() {
   const [submitting, setSubmitting] = React.useState(false)
 
   // Username provisoire (depuis le store) : on n'active la modale qu'une fois le
-  // mot de passe temporaire réglé (sinon la modale mot de passe prime).
+  // mot de passe temporaire réglé ET les CGU acceptées (sinon ces modales priment,
+  // chaîne mot de passe → CGU → username — jamais d'empilement).
   React.useEffect(() => {
-    if (!getAccessToken() || session?.mustChangePassword) {
+    if (!getAccessToken() || session?.mustChangePassword || !session?.termsAccepted) {
       setStatus('done')
       return
     }
@@ -64,7 +65,7 @@ export function UsernamePendingGate() {
     } else {
       setStatus('done')
     }
-  }, [session?.mustChangePassword, usernamePending, profil?.username])
+  }, [session?.mustChangePassword, session?.termsAccepted, usernamePending, profil?.username])
 
   // Disponibilité du username (débounce), même contrat que le register.
   React.useEffect(() => {

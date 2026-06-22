@@ -275,15 +275,17 @@ func (s *AuthService) ChangePassword(userID, currentPassword, newPassword string
 // `terms_accepted=true` → la modale d'acceptation disparaît sans reconnexion.
 // Renvoie ErrUserNotFound si le compte n'existe pas (ou a été désactivé).
 func (s *AuthService) AcceptTerms(userID string) (string, string, *models.User, error) {
+	// terms_accepted_version n'est pas relu : issueTokens le recharge depuis la
+	// base (source de vérité unique du claim) juste avant de signer le token.
 	const q = `
 		UPDATE credentials
 		SET terms_accepted_version = $1, terms_accepted_at = NOW()
 		WHERE id = $2 AND is_active = true
-		RETURNING id, email, role, is_active, email_verified, must_change_password, terms_accepted_version, created_at`
+		RETURNING id, email, role, is_active, email_verified, must_change_password, created_at`
 	u := &models.User{}
 	if err := s.db.QueryRow(q, models.CurrentTermsVersion, userID).Scan(
 		&u.ID, &u.Email, &u.Role, &u.IsActive, &u.EmailVerified,
-		&u.MustChangePassword, &u.TermsAcceptedVersion, &u.CreatedAt,
+		&u.MustChangePassword, &u.CreatedAt,
 	); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return "", "", nil, ErrUserNotFound

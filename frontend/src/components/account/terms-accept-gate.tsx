@@ -33,8 +33,11 @@ export function TermsAcceptGate() {
   const [error, setError] = React.useState<string>()
   const [submitting, setSubmitting] = React.useState(false)
 
-  // Visiteur (pas de session) ou CGU déjà acceptées : aucune contrainte.
-  if (!session || session.termsAccepted) return null
+  // Visiteur (pas de session) ou CGU déjà acceptées : aucune contrainte. On
+  // s'efface aussi tant qu'un changement de mot de passe est imposé pour ne
+  // jamais empiler les deux modales (PasswordChangeGate prime ; UsernamePendingGate
+  // attend ensuite l'acceptation des CGU → chaîne mot de passe → CGU → username).
+  if (!session || session.mustChangePassword || session.termsAccepted) return null
 
   const handleAccept = async () => {
     setError(undefined)
