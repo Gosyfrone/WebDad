@@ -209,6 +209,19 @@ func TestRandHex(t *testing.T) {
 	}
 }
 
+func TestRandHex_FallbackOnRandomFailure(t *testing.T) {
+	originalReadRandom := readRandom
+	readRandom = func([]byte) (int, error) {
+		return 0, errors.New("random unavailable")
+	}
+	t.Cleanup(func() { readRandom = originalReadRandom })
+
+	got := randHex(8)
+	if got == "" {
+		t.Fatal("randHex fallback should return a non-empty value")
+	}
+}
+
 func TestFromHeaderAjouteNom(t *testing.T) {
 	// Adresse sans "<" → enveloppée dans "Breezy <addr>"
 	raw := buildMIME("noreply@breezy.dev", "noreply@breezy.dev", Message{

@@ -103,6 +103,7 @@ func (m *smtpMailer) Send(msg Message) error {
 }
 
 var htmlTagRE = regexp.MustCompile(`<[^>]*>`)
+var readRandom = rand.Read
 
 // buildMIME assemble un message RFC 5322 complet :
 //   - en-têtes Date + Message-ID (leur absence est un signal anti-spam) ;
@@ -163,7 +164,7 @@ func buildMIME(fromHeader, envelopeFrom string, msg Message) []byte {
 // randHex retourne n octets aléatoires en hexadécimal (boundary, Message-ID).
 func randHex(n int) string {
 	buf := make([]byte, n)
-	if _, err := rand.Read(buf); err != nil {
+	if _, err := readRandom(buf); err != nil {
 		return fmt.Sprintf("%x", time.Now().UnixNano())
 	}
 	return hex.EncodeToString(buf)

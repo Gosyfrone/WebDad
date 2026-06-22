@@ -1,6 +1,11 @@
 package config
 
-import "testing"
+import (
+	"os"
+	"os/exec"
+	"strings"
+	"testing"
+)
 
 func TestSMTPConfigured(t *testing.T) {
 	tests := []struct {
@@ -91,6 +96,33 @@ func TestLoadUsesExplicitEnvironmentValues(t *testing.T) {
 	}
 	if cfg.SMTP.Configured() {
 		t.Fatal("SMTP should not be configured without host/user/password")
+	}
+}
+
+func TestLoadExitsWhenInternalSecretIsMissing(t *testing.T) {
+	if os.Getenv("MAIL_CONFIG_FATAL_HELPER") == "1" {
+		_ = os.Unsetenv("MAIL_INTERNAL_SECRET")
+		Load()
+		return
+	}
+
+	cmd := exec.Command(os.Args[0], "-test.run=TestLoadExitsWhenInternalSecretIsMissing")
+	cmd.Env = append(os.Environ(), "MAIL_CONFIG_FATAL_HELPER=1", "MAIL_INTERNAL_SECRET=")
+
+	output, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatal("Load() without MAIL_INTERNAL_SECRET should exit")
+	}
+
+	exitErr, ok := err.(*exec.ExitError)
+	if !ok {
+		t.Fatalf("cmd.Run() error = %T %v, want *exec.ExitError", err, err)
+	}
+	if exitErr.Success() {
+		t.Fatal("helper process unexpectedly succeeded")
+	}
+	if !strings.Contains(string(output), "MAIL_INTERNAL_SECRET manquant") {
+		t.Fatalf("output = %q, want missing secret message", string(output))
 	}
 }
 
