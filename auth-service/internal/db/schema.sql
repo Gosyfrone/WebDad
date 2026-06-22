@@ -56,6 +56,21 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_credentials_pending_email
 ALTER TABLE credentials ADD COLUMN IF NOT EXISTS mfa_enabled BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE credentials ADD COLUMN IF NOT EXISTS mfa_secret TEXT;
 
+-- Acceptation des CGU (consentement versionné). terms_accepted_version porte la
+-- version des CGU acceptée par le compte ; CurrentTermsVersion (côté Go) est la
+-- version EN VIGUEUR. Si version_acceptée < version_en_vigueur → le front impose
+-- une modale d'acceptation bloquante post-login (claim JWT `terms_accepted`).
+-- Rétro-compatible (règle 5b) : ADD COLUMN ... DEFAULT 0 pose 0 sur TOUTES les
+-- lignes existantes au déploiement → tous les comptes déjà en prod (qui n'ont
+-- jamais consenti explicitement) repassent sous la version courante et doivent
+-- accepter à leur prochaine connexion. Surtout PAS d'UPDATE inconditionnel ici :
+-- il ré-imposerait l'acceptation à chaque redémarrage. Rebumper CurrentTermsVersion
+-- lors d'une MAJ des CGU re-déclenche le consentement de tout le monde.
+ALTER TABLE credentials ADD COLUMN IF NOT EXISTS terms_accepted_version INT NOT NULL DEFAULT 0;
+-- terms_accepted_at : horodatage du dernier consentement (audit RGPD). NULL tant
+-- qu'aucune acceptation explicite n'a eu lieu.
+ALTER TABLE credentials ADD COLUMN IF NOT EXISTS terms_accepted_at TIMESTAMPTZ;
+
 -- Refresh tokens (préparé pour la feature bonus).
 CREATE TABLE IF NOT EXISTS refresh_tokens (
     id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

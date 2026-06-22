@@ -994,6 +994,17 @@ export const messages: Record<Locale, Messages> = {
     'account.password_change.err.same':
       'Le nouveau mot de passe doit être différent du temporaire.',
     'account.password_change.err.generic': 'Changement impossible. Réessaie.',
+    'account.terms_gate.title': 'Mise à jour de nos conditions',
+    'account.terms_gate.subtitle':
+      'Pour continuer à utiliser Breezy, vous devez accepter nos conditions.',
+    'account.terms_gate.body':
+      'En cliquant sur « J’accepte », vous reconnaissez avoir lu et accepté nos Conditions Générales d’Utilisation et notre Politique de confidentialité.',
+    'account.terms_gate.read_cgu': 'Lire les CGU',
+    'account.terms_gate.read_privacy': 'Politique de confidentialité',
+    'account.terms_gate.accept': 'J’accepte',
+    'account.terms_gate.accepting': 'Enregistrement…',
+    'account.terms_gate.decline': 'Refuser et se déconnecter',
+    'account.terms_gate.err': 'Impossible d’enregistrer votre acceptation. Réessayez.',
 
     // — Nom d'utilisateur provisoire (attribué d'office par un admin) —
     'account.username_pending.title': "Choisis un nom d'utilisateur",
@@ -2220,6 +2231,17 @@ export const messages: Record<Locale, Messages> = {
       'The new password must be different from the temporary one.',
     'account.password_change.err.generic':
       'Could not change the password. Try again.',
+    'account.terms_gate.title': 'Our terms have been updated',
+    'account.terms_gate.subtitle':
+      'To keep using Breezy, you must accept our terms.',
+    'account.terms_gate.body':
+      'By clicking “I accept”, you acknowledge that you have read and agreed to our Terms of Service and Privacy Policy.',
+    'account.terms_gate.read_cgu': 'Read the Terms',
+    'account.terms_gate.read_privacy': 'Privacy Policy',
+    'account.terms_gate.accept': 'I accept',
+    'account.terms_gate.accepting': 'Saving…',
+    'account.terms_gate.decline': 'Decline and sign out',
+    'account.terms_gate.err': 'Could not save your acceptance. Try again.',
 
     // — Provisional username (assigned by an admin) —
     'account.username_pending.title': 'Choose a username',

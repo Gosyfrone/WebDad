@@ -113,6 +113,13 @@ describe('readSession', () => {
     mockWindow(makeJWT({ user_id: 'u3', must_change_password: true }))
     expect(readSession()?.mustChangePassword).toBe(true)
   })
+
+  it('reflète terms_accepted (true) et le défaut false', () => {
+    mockWindow(makeJWT({ user_id: 'u4', terms_accepted: true }))
+    expect(readSession()?.termsAccepted).toBe(true)
+    mockWindow(makeJWT({ user_id: 'u5' }))
+    expect(readSession()?.termsAccepted).toBe(false)
+  })
 })
 
 // ─── currentUserId / isAdmin ──────────────────────────────────────────────────

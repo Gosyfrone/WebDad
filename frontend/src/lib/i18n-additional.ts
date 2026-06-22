@@ -1,6 +1,15 @@
 // Generated once from the English reference messages. Keep key parity with i18n.ts.
 export const additionalMessages = {
   "zh": {
+    "account.terms_gate.title": "我们的条款已更新",
+    "account.terms_gate.subtitle": "若要继续使用 Breezy，您必须接受我们的条款。",
+    "account.terms_gate.body": "点击“我接受”，即表示您已阅读并同意我们的《用户协议》和《隐私政策》。",
+    "account.terms_gate.read_cgu": "阅读用户协议",
+    "account.terms_gate.read_privacy": "隐私政策",
+    "account.terms_gate.accept": "我接受",
+    "account.terms_gate.accepting": "正在保存…",
+    "account.terms_gate.decline": "拒绝并退出登录",
+    "account.terms_gate.err": "无法保存您的接受记录。请重试。",
 
     "nsfw.title": "敏感内容",
     "nsfw.desc": "管理被标记为敏感（NSFW）内容的显示方式。",
@@ -953,6 +962,15 @@ export const additionalMessages = {
     "post.poll_close_failed": "无法关闭投票",
   },
   "es": {
+    "account.terms_gate.title": "Hemos actualizado nuestras condiciones",
+    "account.terms_gate.subtitle": "Para seguir usando Breezy, debes aceptar nuestras condiciones.",
+    "account.terms_gate.body": "Al hacer clic en «Acepto», confirmas que has leído y aceptado nuestras Condiciones de uso y nuestra Política de privacidad.",
+    "account.terms_gate.read_cgu": "Leer las condiciones",
+    "account.terms_gate.read_privacy": "Política de privacidad",
+    "account.terms_gate.accept": "Acepto",
+    "account.terms_gate.accepting": "Guardando…",
+    "account.terms_gate.decline": "Rechazar y cerrar sesión",
+    "account.terms_gate.err": "No se pudo guardar tu aceptación. Inténtalo de nuevo.",
 
     "nsfw.title": "Contenido sensible",
     "nsfw.desc": "Gestiona cómo se muestra el contenido marcado como sensible (NSFW).",
@@ -1905,6 +1923,15 @@ export const additionalMessages = {
     "post.poll_close_failed": "No se pudo cerrar la encuesta",
   },
   "pt": {
+    "account.terms_gate.title": "Atualizámos os nossos termos",
+    "account.terms_gate.subtitle": "Para continuar a usar o Breezy, tens de aceitar os nossos termos.",
+    "account.terms_gate.body": "Ao clicar em «Aceito», confirmas que leste e aceitaste os nossos Termos de Utilização e a nossa Política de Privacidade.",
+    "account.terms_gate.read_cgu": "Ler os termos",
+    "account.terms_gate.read_privacy": "Política de Privacidade",
+    "account.terms_gate.accept": "Aceito",
+    "account.terms_gate.accepting": "A guardar…",
+    "account.terms_gate.decline": "Recusar e terminar sessão",
+    "account.terms_gate.err": "Não foi possível guardar a tua aceitação. Tenta novamente.",
 
     "nsfw.title": "Conteúdo sensível",
     "nsfw.desc": "Gerencie como o conteúdo marcado como sensível (NSFW) é exibido.",
@@ -2857,6 +2884,15 @@ export const additionalMessages = {
     "post.poll_close_failed": "Não foi possível fechar a enquete",
   },
   "ru": {
+    "account.terms_gate.title": "Мы обновили условия",
+    "account.terms_gate.subtitle": "Чтобы продолжить пользоваться Breezy, необходимо принять наши условия.",
+    "account.terms_gate.body": "Нажимая «Принимаю», вы подтверждаете, что прочитали и приняли наши Условия использования и Политику конфиденциальности.",
+    "account.terms_gate.read_cgu": "Читать условия",
+    "account.terms_gate.read_privacy": "Политика конфиденциальности",
+    "account.terms_gate.accept": "Принимаю",
+    "account.terms_gate.accepting": "Сохранение…",
+    "account.terms_gate.decline": "Отказаться и выйти",
+    "account.terms_gate.err": "Не удалось сохранить ваше согласие. Попробуйте ещё раз.",
 
     "nsfw.title": "Деликатный контент",
     "nsfw.desc": "Управляйте показом контента, помеченного как деликатный (NSFW).",
@@ -3809,6 +3845,15 @@ export const additionalMessages = {
     "post.poll_close_failed": "Не удалось закрыть опрос",
   },
   "ja": {
+    "account.terms_gate.title": "利用規約を更新しました",
+    "account.terms_gate.subtitle": "Breezy を引き続き利用するには、規約に同意する必要があります。",
+    "account.terms_gate.body": "「同意する」をクリックすると、利用規約およびプライバシーポリシーを読み、同意したものとみなされます。",
+    "account.terms_gate.read_cgu": "利用規約を読む",
+    "account.terms_gate.read_privacy": "プライバシーポリシー",
+    "account.terms_gate.accept": "同意する",
+    "account.terms_gate.accepting": "保存中…",
+    "account.terms_gate.decline": "拒否してログアウト",
+    "account.terms_gate.err": "同意を保存できませんでした。もう一度お試しください。",
 
     "nsfw.title": "センシティブな内容",
     "nsfw.desc": "センシティブ（NSFW）として設定された内容の表示方法を管理します。",
@@ -4761,6 +4806,15 @@ export const additionalMessages = {
     "post.poll_close_failed": "投票を終了できませんでした",
   },
   "ko": {
+    "account.terms_gate.title": "약관이 업데이트되었습니다",
+    "account.terms_gate.subtitle": "Breezy를 계속 사용하려면 약관에 동의해야 합니다.",
+    "account.terms_gate.body": "'동의합니다'를 클릭하면 이용약관 및 개인정보 처리방침을 읽고 동의한 것으로 간주됩니다.",
+    "account.terms_gate.read_cgu": "약관 읽기",
+    "account.terms_gate.read_privacy": "개인정보 처리방침",
+    "account.terms_gate.accept": "동의합니다",
+    "account.terms_gate.accepting": "저장 중…",
+    "account.terms_gate.decline": "거부하고 로그아웃",
+    "account.terms_gate.err": "동의를 저장할 수 없습니다. 다시 시도해 주세요.",
 
     "nsfw.title": "민감한 콘텐츠",
     "nsfw.desc": "민감함(NSFW)으로 표시된 콘텐츠의 표시 방법을 관리합니다.",
@@ -5713,6 +5767,15 @@ export const additionalMessages = {
     "post.poll_close_failed": "설문조사를 닫을 수 없습니다.",
   },
   "ar": {
+    "account.terms_gate.title": "لقد حدّثنا شروطنا",
+    "account.terms_gate.subtitle": "لمواصلة استخدام Breezy، يجب أن توافق على شروطنا.",
+    "account.terms_gate.body": "بالنقر على «أوافق»، فإنك تقرّ بأنك قرأت ووافقت على شروط الاستخدام وسياسة الخصوصية.",
+    "account.terms_gate.read_cgu": "قراءة الشروط",
+    "account.terms_gate.read_privacy": "سياسة الخصوصية",
+    "account.terms_gate.accept": "أوافق",
+    "account.terms_gate.accepting": "جارٍ الحفظ…",
+    "account.terms_gate.decline": "الرفض وتسجيل الخروج",
+    "account.terms_gate.err": "تعذّر حفظ موافقتك. حاول مرة أخرى.",
 
     "nsfw.title": "محتوى حساس",
     "nsfw.desc": "تحكم في طريقة عرض المحتوى المُعلَّم كحساس (NSFW).",
@@ -6665,6 +6728,15 @@ export const additionalMessages = {
     "post.poll_close_failed": "تعذر إغلاق الاستطلاع",
   },
   "hi": {
+    "account.terms_gate.title": "हमने अपनी शर्तें अपडेट की हैं",
+    "account.terms_gate.subtitle": "Breezy का उपयोग जारी रखने के लिए, आपको हमारी शर्तें स्वीकार करनी होंगी।",
+    "account.terms_gate.body": "«मैं स्वीकार करता हूँ» पर क्लिक करके, आप पुष्टि करते हैं कि आपने हमारी उपयोग की शर्तें और गोपनीयता नीति पढ़ ली है और उन्हें स्वीकार किया है।",
+    "account.terms_gate.read_cgu": "शर्तें पढ़ें",
+    "account.terms_gate.read_privacy": "गोपनीयता नीति",
+    "account.terms_gate.accept": "मैं स्वीकार करता हूँ",
+    "account.terms_gate.accepting": "सहेजा जा रहा है…",
+    "account.terms_gate.decline": "अस्वीकार करें और साइन आउट करें",
+    "account.terms_gate.err": "आपकी स्वीकृति सहेजी नहीं जा सकी। पुनः प्रयास करें।",
 
     "nsfw.title": "संवेदनशील सामग्री",
     "nsfw.desc": "संवेदनशील (NSFW) के रूप में चिह्नित सामग्री के प्रदर्शन को प्रबंधित करें।",
@@ -7617,6 +7689,15 @@ export const additionalMessages = {
     "post.poll_close_failed": "मतदान बंद नहीं किया जा सका",
   },
   "de": {
+    "account.terms_gate.title": "Wir haben unsere Bedingungen aktualisiert",
+    "account.terms_gate.subtitle": "Um Breezy weiter zu nutzen, musst du unsere Bedingungen akzeptieren.",
+    "account.terms_gate.body": "Mit Klick auf „Ich stimme zu“ bestätigst du, dass du unsere Nutzungsbedingungen und Datenschutzrichtlinie gelesen und akzeptiert hast.",
+    "account.terms_gate.read_cgu": "Bedingungen lesen",
+    "account.terms_gate.read_privacy": "Datenschutzrichtlinie",
+    "account.terms_gate.accept": "Ich stimme zu",
+    "account.terms_gate.accepting": "Wird gespeichert…",
+    "account.terms_gate.decline": "Ablehnen und abmelden",
+    "account.terms_gate.err": "Deine Zustimmung konnte nicht gespeichert werden. Versuche es erneut.",
 
     "nsfw.title": "Sensible Inhalte",
     "nsfw.desc": "Lege fest, wie als sensibel (NSFW) markierte Inhalte angezeigt werden.",
@@ -8569,6 +8650,15 @@ export const additionalMessages = {
     "post.poll_close_failed": "Die Umfrage konnte nicht geschlossen werden",
   },
   "it": {
+    "account.terms_gate.title": "Abbiamo aggiornato le nostre condizioni",
+    "account.terms_gate.subtitle": "Per continuare a usare Breezy, devi accettare le nostre condizioni.",
+    "account.terms_gate.body": "Facendo clic su «Accetto», confermi di aver letto e accettato le nostre Condizioni d’uso e l’Informativa sulla privacy.",
+    "account.terms_gate.read_cgu": "Leggi le condizioni",
+    "account.terms_gate.read_privacy": "Informativa sulla privacy",
+    "account.terms_gate.accept": "Accetto",
+    "account.terms_gate.accepting": "Salvataggio…",
+    "account.terms_gate.decline": "Rifiuta ed esci",
+    "account.terms_gate.err": "Impossibile salvare la tua accettazione. Riprova.",
 
     "nsfw.title": "Contenuto sensibile",
     "nsfw.desc": "Gestisci come viene mostrato il contenuto contrassegnato come sensibile (NSFW).",

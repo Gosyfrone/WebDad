@@ -89,6 +89,12 @@ type Claims struct {
 	// (RIV-002). Le token émis à l'inscription porte donc false ; il devient true
 	// après vérification (lien e-mail), au login, et est re-propagé au refresh.
 	EmailVerified bool `json:"email_verified"`
+	// TermsAccepted : true si le compte a accepté la version EN VIGUEUR des CGU
+	// (terms_accepted_version >= models.CurrentTermsVersion). Quand false, le
+	// front impose une modale d'acceptation bloquante. Re-dérivé à chaque
+	// émission de token (login/refresh) depuis la base, donc à jour après
+	// acceptation comme après un rebump de la version des CGU.
+	TermsAccepted bool `json:"terms_accepted"`
 	jwt.RegisteredClaims
 }
 
@@ -152,13 +158,15 @@ func (s *AuthService) Register(email, password string) (string, string, *models.
 		return "", "", nil, fmt.Errorf("hash mot de passe : %w", err)
 	}
 
+	// terms_accepted_version posé à la version courante : l'inscription exige
+	// déjà l'acceptation des CGU (case à cocher front) → pas de re-prompt.
 	const q = `
-		INSERT INTO credentials (email, password, role)
-		VALUES ($1, $2, $3)
+		INSERT INTO credentials (email, password, role, terms_accepted_version, terms_accepted_at)
+		VALUES ($1, $2, $3, $4, NOW())
 		RETURNING id, email, role, is_active, created_at`
 
 	u := &models.User{}
-	err = s.db.QueryRow(q, email, string(hash), models.RoleUser).
+	err = s.db.QueryRow(q, email, string(hash), models.RoleUser, models.CurrentTermsVersion).
 		Scan(&u.ID, &u.Email, &u.Role, &u.IsActive, &u.CreatedAt)
 	if err != nil {
 		if isUniqueViolation(err) {
@@ -258,6 +266,30 @@ func (s *AuthService) ChangePassword(userID, currentPassword, newPassword string
 	}
 
 	u.MustChangePassword = false // le nouveau token ne doit plus porter le drapeau
+	return s.issueTokens(u)
+}
+
+// AcceptTerms enregistre l'acceptation par le compte de la version EN VIGUEUR des
+// CGU (terms_accepted_version = models.CurrentTermsVersion, terms_accepted_at =
+// NOW()) puis ré-émet une paire de tokens : le nouveau JWT porte
+// `terms_accepted=true` → la modale d'acceptation disparaît sans reconnexion.
+// Renvoie ErrUserNotFound si le compte n'existe pas (ou a été désactivé).
+func (s *AuthService) AcceptTerms(userID string) (string, string, *models.User, error) {
+	const q = `
+		UPDATE credentials
+		SET terms_accepted_version = $1, terms_accepted_at = NOW()
+		WHERE id = $2 AND is_active = true
+		RETURNING id, email, role, is_active, email_verified, must_change_password, terms_accepted_version, created_at`
+	u := &models.User{}
+	if err := s.db.QueryRow(q, models.CurrentTermsVersion, userID).Scan(
+		&u.ID, &u.Email, &u.Role, &u.IsActive, &u.EmailVerified,
+		&u.MustChangePassword, &u.TermsAcceptedVersion, &u.CreatedAt,
+	); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", "", nil, ErrUserNotFound
+		}
+		return "", "", nil, fmt.Errorf("acceptation CGU : %w", err)
+	}
 	return s.issueTokens(u)
 }
 
@@ -700,11 +732,13 @@ func (s *AuthService) CompleteOAuthSignup(provider, rawToken string) (string, st
 	}
 
 	u := &models.User{}
+	// terms_accepted_version posé à la version courante : la finalisation OAuth
+	// exige déjà l'acceptation des CGU (OAuthComplete) → pas de re-prompt.
 	const ins = `
-		INSERT INTO credentials (email, password, role, provider, provider_subject, email_verified)
-		VALUES ($1, NULL, $2, $3, $4, true)
+		INSERT INTO credentials (email, password, role, provider, provider_subject, email_verified, terms_accepted_version, terms_accepted_at)
+		VALUES ($1, NULL, $2, $3, $4, true, $5, NOW())
 		RETURNING id, email, role, is_active, email_verified, must_change_password, created_at, provider`
-	if err := tx.QueryRow(ins, email, models.RoleUser, provider, subject).
+	if err := tx.QueryRow(ins, email, models.RoleUser, provider, subject, models.CurrentTermsVersion).
 		Scan(&u.ID, &u.Email, &u.Role, &u.IsActive, &u.EmailVerified, &u.MustChangePassword, &u.CreatedAt, &u.Provider); err != nil {
 		if isUniqueViolation(err) {
 			return "", "", nil, ErrOAuthAccountExists
@@ -1040,6 +1074,15 @@ func (s *AuthService) createOAuthSignupToken(provider, subject, email string) (s
 // issueTokens signe un access token (court) et crée un refresh token (long,
 // persisté haché). Retourné par Register/Login/Refresh.
 func (s *AuthService) issueTokens(u *models.User) (string, string, *models.User, error) {
+	// Re-dérive l'acceptation CGU depuis la base pour CHAQUE émission de token,
+	// quelle que soit la requête appelante (login/refresh/MFA/changement
+	// d'e-mail…). Évite de threader terms_accepted_version dans tous les SELECT
+	// (même piège que email_verified au refresh) : le claim `terms_accepted`
+	// reste fiable partout. Best-effort : en cas d'erreur, on laisse la valeur à
+	// 0 → le front re-demande l'acceptation (côté sûr).
+	_ = s.db.QueryRow(`SELECT terms_accepted_version FROM credentials WHERE id = $1`, u.ID).
+		Scan(&u.TermsAcceptedVersion)
+
 	access, err := s.GenerateToken(u)
 	if err != nil {
 		return "", "", nil, err
@@ -1322,6 +1365,7 @@ func (s *AuthService) GenerateToken(u *models.User) (string, error) {
 		Role:               u.Role,
 		MustChangePassword: u.MustChangePassword,
 		EmailVerified:      u.EmailVerified,
+		TermsAccepted:      u.TermsAcceptedVersion >= models.CurrentTermsVersion,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   u.ID,
 			IssuedAt:  jwt.NewNumericDate(now),
