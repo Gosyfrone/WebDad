@@ -179,6 +179,31 @@ func TestSvc_Fault_CorruptTargetMember(t *testing.T) {
 	}
 }
 
+// SetMemberRole : le membre CIBLE (communauté) est corrompu → GetMember(target)
+// échoue au décodage (distinct de ErrNoDocuments), après les contrôles owner.
+func TestSvc_Fault_CorruptRoleTarget(t *testing.T) {
+	e := newFaultEnv(t)
+	com, _ := e.svc.CreateCommunity(e.ctx, uA, "C", "ck")
+	if _, _, err := e.svc.JoinCommunity(e.ctx, com.ID, uB); err != nil {
+		t.Fatalf("Join : %v", err)
+	}
+	e.corruptMember(t, com.ID, uB)
+	if _, err := e.svc.SetMemberRole(e.ctx, com.ID, uA, uB, models.MemberTalker); err == nil {
+		t.Errorf("SetMemberRole (cible corrompue) doit échouer")
+	}
+}
+
+// ListMembers : un membre (autre que le demandeur) est corrompu → requireMember
+// réussit mais le décodage de la liste complète échoue.
+func TestSvc_Fault_CorruptListMembers(t *testing.T) {
+	e := newFaultEnv(t)
+	g, _ := e.svc.CreateGroup(e.ctx, uA, "t", "n", env(uA, uB))
+	e.corruptMember(t, g.ID, uB)
+	if _, err := e.svc.ListMembers(e.ctx, g.ID, uA); err == nil {
+		t.Errorf("ListMembers (membre corrompu) doit échouer")
+	}
+}
+
 // JoinCommunity : le membre déjà présent (corrompu) fait échouer GetMember avec
 // une erreur distincte de ErrNoDocuments.
 func TestSvc_Fault_CorruptJoinMember(t *testing.T) {

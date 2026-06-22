@@ -27,6 +27,7 @@ type liveEnv struct {
 	router *gin.Engine
 	svc    *service.MessageService
 	repo   *repository.MessageRepository
+	hub    *realtime.Hub
 	ctx    context.Context
 }
 
@@ -40,11 +41,12 @@ func newLiveEnv(t *testing.T) *liveEnv {
 	}
 	repo := repository.NewMessageRepository(db)
 	svc := service.NewMessageService(repo)
+	hub := realtime.NewHub()
 
 	r := gin.New()
 	r.Use(gin.Recovery())
-	RegisterRoutes(r, "message-test", svc, realtime.NewHub(), msgTestSecret, []string{"http://localhost:3000"})
-	return &liveEnv{router: r, svc: svc, repo: repo, ctx: ctx}
+	RegisterRoutes(r, "message-test", svc, hub, msgTestSecret, []string{"http://localhost:3000"})
+	return &liveEnv{router: r, svc: svc, repo: repo, hub: hub, ctx: ctx}
 }
 
 // token forge un JWT pour un user donné (vérifié, rôle user par défaut).

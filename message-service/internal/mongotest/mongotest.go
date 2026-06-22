@@ -21,9 +21,21 @@ import (
 	"testing"
 	"time"
 
+	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
+
+// Mot de passe de l'utilisateur Mongo EN LECTURE SEULE créé par ReadOnlyDB (le
+// NOM est unique par appel — cf. roUserName — pour éviter toute collision entre
+// binaires de test exécutés en parallèle par `go test ./...`).
+const roPass = "msgtest_ro_pass"
+
+// roUserName fabrique un nom d'utilisateur unique (pid + compteur atomique) →
+// pas de drop/create concurrent sur un nom partagé.
+func roUserName() string {
+	return fmt.Sprintf("msgtest_ro_%d_%d", os.Getpid(), atomic.AddInt64(&counter, 1))
+}
 
 var (
 	counter      int64
@@ -45,9 +57,15 @@ func uri(t *testing.T) string {
 func connect(uri string) (*mongo.Client, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+	// Petit pool + sélection serveur tolérante : `go test ./...` lance les
+	// binaires de package en parallèle (× -race) → on limite le nombre total de
+	// connexions ouvertes sur la même Mongo pour éviter les coupures côté serveur.
 	opts := options.Client().ApplyURI(uri).
-		SetServerSelectionTimeout(5 * time.Second).
-		SetMaxPoolSize(20)
+		SetServerSelectionTimeout(15 * time.Second).
+		SetConnectTimeout(15 * time.Second).
+		SetMaxPoolSize(5).
+		SetRetryReads(true).
+		SetRetryWrites(true)
 	client, err := mongo.Connect(opts)
 	if err != nil {
 		return nil, err
@@ -78,6 +96,53 @@ func DB(t *testing.T) *mongo.Database {
 		_ = db.Drop(ctx)
 	})
 	return db
+}
+
+// ReadOnlyDB renvoie DEUX vues d'une même base jetable :
+//   - root : client partagé, en LECTURE/ÉCRITURE → sert à PEUPLER les données ;
+//   - ro   : client dédié authentifié comme un utilisateur en LECTURE SEULE →
+//     les lectures réussissent mais toute ÉCRITURE échoue (« Unauthorized »).
+//
+// Cela permet d'exercer, avec une vraie Mongo et sans toucher au code de prod,
+// les branches d'erreur situées sur un appel repo EN ÉCRITURE qui suit des
+// lectures réussies (contrôles d'appartenance OK, puis l'écriture échoue).
+func ReadOnlyDB(t *testing.T) (root *mongo.Database, ro *mongo.Database) {
+	t.Helper()
+	root = DB(t) // base writable sur le client partagé (drop au cleanup)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	admin := sharedClient.Database("admin")
+	user := roUserName() // unique → pas de collision entre binaires de test parallèles
+	if err := admin.RunCommand(ctx, bson.D{
+		{Key: "createUser", Value: user},
+		{Key: "pwd", Value: roPass},
+		{Key: "roles", Value: bson.A{bson.D{{Key: "role", Value: "readAnyDatabase"}, {Key: "db", Value: "admin"}}}},
+	}).Err(); err != nil {
+		// Droits insuffisants pour gérer les utilisateurs → on ignore proprement
+		// (le test dépendant de ReadOnlyDB est skip, pas en échec).
+		t.Skipf("création de l'utilisateur Mongo lecture seule impossible : %v", err)
+	}
+
+	roClient, cerr := mongo.Connect(options.Client().
+		ApplyURI(uri(t)).
+		SetAuth(options.Credential{Username: user, Password: roPass, AuthSource: "admin"}).
+		SetServerSelectionTimeout(15 * time.Second).
+		SetMaxPoolSize(3))
+	if cerr != nil {
+		t.Fatalf("connexion Mongo lecture seule : %v", cerr)
+	}
+	if perr := roClient.Ping(ctx, nil); perr != nil {
+		t.Fatalf("ping Mongo lecture seule : %v", perr)
+	}
+	t.Cleanup(func() {
+		c, cc := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cc()
+		_ = roClient.Disconnect(c)
+		_ = admin.RunCommand(c, bson.D{{Key: "dropUser", Value: user}}).Err()
+	})
+	return root, roClient.Database(root.Name())
 }
 
 // DisposableDB renvoie une base jetable sur un client DÉDIÉ (propre au test),
