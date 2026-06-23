@@ -83,6 +83,27 @@ func TestHTTPPostClient_AutoUnhide_AvecServeur(t *testing.T) {
 	}
 }
 
+// Le serveur répond en erreur (≥300) → la branche de log est exercée, mais
+// l'appelant n'est jamais impacté (fire-and-forget). On attend que la requête
+// ait bien été reçue.
+func TestHTTPPostClient_Erreur5xx_NImpactePasLAppelant(t *testing.T) {
+	done := make(chan struct{}, 1)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		done <- struct{}{}
+	}))
+	defer srv.Close()
+
+	c := NewPostClient(srv.URL, "s")
+	c.AutoHide("post-err") // ne doit pas paniquer ni bloquer
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout : la requête n'a pas atteint le serveur")
+	}
+}
+
 func TestHTTPPostClient_AutoHide_IDVide_PasDeRequête(t *testing.T) {
 	called := make(chan struct{}, 1)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

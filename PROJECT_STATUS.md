@@ -79,6 +79,16 @@
   `USERNAME_CHANGE_COOLDOWN` (e.g. `168h`), no migration.
 - **user-service repo integration tests** — current Go tests cover middleware/validation, not SQL
   (validated by manual e2e). Add `dockertest`/`testcontainers` for CI repo coverage.
+  *Pattern de référence désormais en place : **report-service** (couverture 33 % → ~92 %) teste dépôt +
+  service + handlers contre un **vrai MongoDB** via `internal/testutil` (`MONGO_TEST_URI`, `t.Skip` si
+  absent) + service Mongo conditionnel en CI (`ci-go.yml`). Reproduire pour Postgres (user/auth) avec un
+  service `postgres` scopé par la matrice.*
+- **report-service coverage** — 🟢 **~98 %** (codecov-équivalent 585/597 = 97.99 %, flag `report-service`).
+  Objectif 95 % atteint **sans changement de prod** : les branches d'erreur du driver Mongo sont exercées
+  en passant un **`context` déjà annulé** (→ `context.Canceled`, pas besoin d'injecter une panne via une
+  interface de dépôt). 5 fichiers `*_errorpaths_test.go` (repository 97.2 %, service 98.2 %, handler 99.3 %,
+  database 92.7 %, client 100 %). Résiduel ~12 stmts incouvrables (config `log.Fatal`/branche `/.dockerenv`,
+  `jwt` `!token.Valid` défensif, `init` erreurs `collMod`/`CreateCollection`).
 - **Private follow/privacy review points:** (1) user-service `/internal/...is-following...` doesn't check
   `X-Internal-Secret` (graph leak if port reachable); (2) profile `followOverride=false` after a pending
   request can hide later real-time accept until remount; (3) `NotificationsView` accept/reject relies on WS

@@ -10,7 +10,7 @@
 > - Knowledge graph in `graphify-out/` — query it before reading source (Operating Rule 11).
 >
 > **Latest session work and suggested commit messages live in `CHANGELOG.md`, not here.**
-> **Session freshness:** current work log updated in `CHANGELOG.md` on 22/06/2026 (test frontend — **couverture `src/lib` 82,2 % → 96,1 %, objectif codecov 95 % atteint**. Même doctrine que le 1er increase : **lib-only / Node-only, pas de jsdom/RTL, aucune exclusion codecov ajoutée** ; on teste la couche technique (clients réseau + utils navigateur en mockant `apiFetch`/`fetch`/globals) et on laisse les hooks React `use-*.ts` non testés. +313 tests (625 → 938, 64 fichiers, 100 % vert), `tsc` propre sur les fichiers ajoutés).
+> **Session freshness:** current work log updated in `CHANGELOG.md` on 23/06/2026 (test(report-service) — +2 branches défensives **déterministes** : `Transfer` collision index unique partiel (377-379) + `EnsureSchema` conflit d'index (30-32). database 92.7→95.1 %, service 98.2→98.8 %, total statements 98.3 %, proxy-ligne codecov ~97.2 %. **Le 90,41 % de codecov datait d'AVANT le commit `errorpaths`** (branche non poussée) ; codecov compte lignes+partials, plus sévère que les statements → **action : pousser la branche** pour recalcul. `go test -race ./...` vert, `go vet`/`gofmt` propres).
 
 ---
 
