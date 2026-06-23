@@ -23,6 +23,10 @@ var collectionOrder = []string{"profiles"}
 // son schéma et le maintient au démarrage — il fonctionne sans script d'init
 // externe, en local comme en stack Docker (même pattern qu'auth/user/post).
 func EnsureSchema(ctx context.Context, db *mongo.Database) error {
+	return ensureSchema(ctx, mongoSchemaDatabase{db: db})
+}
+
+func ensureSchema(ctx context.Context, db schemaDatabase) error {
 	if err := ensureCollections(ctx, db); err != nil {
 		return err
 	}
@@ -41,13 +45,71 @@ func EnsureSchema(ctx context.Context, db *mongo.Database) error {
 	return ensureSeed(ctx, db)
 }
 
+type schemaDatabase interface {
+	ListCollectionNames(ctx context.Context, filter any, opts ...options.Lister[options.ListCollectionsOptions]) ([]string, error)
+	CreateCollection(ctx context.Context, name string, opts ...options.Lister[options.CreateCollectionOptions]) error
+	RunCommand(ctx context.Context, runCommand any, opts ...options.Lister[options.RunCmdOptions]) rawResult
+	Collection(name string, opts ...options.Lister[options.CollectionOptions]) schemaCollection
+}
+
+type schemaCollection interface {
+	UpdateMany(ctx context.Context, filter any, update any, opts ...options.Lister[options.UpdateManyOptions]) (*mongo.UpdateResult, error)
+	UpdateOne(ctx context.Context, filter any, update any, opts ...options.Lister[options.UpdateOneOptions]) (*mongo.UpdateResult, error)
+	Indexes() schemaIndexView
+}
+
+type schemaIndexView interface {
+	DropOne(ctx context.Context, name string, opts ...options.Lister[options.DropIndexesOptions]) error
+	CreateMany(ctx context.Context, models []mongo.IndexModel, opts ...options.Lister[options.CreateIndexesOptions]) ([]string, error)
+}
+
+type rawResult interface {
+	Raw() (bson.Raw, error)
+}
+
+type mongoSchemaDatabase struct {
+	db *mongo.Database
+}
+
+func (m mongoSchemaDatabase) ListCollectionNames(ctx context.Context, filter any, opts ...options.Lister[options.ListCollectionsOptions]) ([]string, error) {
+	return m.db.ListCollectionNames(ctx, filter, opts...)
+}
+
+func (m mongoSchemaDatabase) CreateCollection(ctx context.Context, name string, opts ...options.Lister[options.CreateCollectionOptions]) error {
+	return m.db.CreateCollection(ctx, name, opts...)
+}
+
+func (m mongoSchemaDatabase) RunCommand(ctx context.Context, runCommand any, opts ...options.Lister[options.RunCmdOptions]) rawResult {
+	return m.db.RunCommand(ctx, runCommand, opts...)
+}
+
+func (m mongoSchemaDatabase) Collection(name string, opts ...options.Lister[options.CollectionOptions]) schemaCollection {
+	return mongoSchemaCollection{collection: m.db.Collection(name, opts...)}
+}
+
+type mongoSchemaCollection struct {
+	collection *mongo.Collection
+}
+
+func (m mongoSchemaCollection) UpdateMany(ctx context.Context, filter any, update any, opts ...options.Lister[options.UpdateManyOptions]) (*mongo.UpdateResult, error) {
+	return m.collection.UpdateMany(ctx, filter, update, opts...)
+}
+
+func (m mongoSchemaCollection) UpdateOne(ctx context.Context, filter any, update any, opts ...options.Lister[options.UpdateOneOptions]) (*mongo.UpdateResult, error) {
+	return m.collection.UpdateOne(ctx, filter, update, opts...)
+}
+
+func (m mongoSchemaCollection) Indexes() schemaIndexView {
+	return m.collection.Indexes()
+}
+
 // backfillBirthDate pose une date de naissance par défaut (01/01/1999, traité
 // comme MAJEUR) sur les profils antérieurs au champ (date absente). Sans elle,
 // ces comptes seraient « mineurs par défaut » et verraient le contenu NSFW
 // masqué alors qu'ils en disposaient en prod : on préserve l'expérience
 // existante. Les nouveaux comptes (register Breezy + onboarding OAuth) saisissent
 // TOUJOURS leur vraie date. Idempotent : filtre sur birth_date absente.
-func backfillBirthDate(ctx context.Context, db *mongo.Database) error {
+func backfillBirthDate(ctx context.Context, db schemaDatabase) error {
 	defaultBirthDate := time.Date(1999, time.January, 1, 0, 0, 0, 0, time.UTC)
 	filter := bson.M{"birth_date": bson.M{"$exists": false}}
 	res, err := db.Collection("profiles").UpdateMany(ctx, filter,
@@ -73,7 +135,7 @@ func backfillBirthDate(ctx context.Context, db *mongo.Database) error {
 // index unique) doit fournir ce type de migration idempotente au boot, sinon les
 // vieux documents bloquent leurs propres écritures. Idempotent : no-op une fois
 // les documents corrigés (filtre sur champ absent OU chaîne vide).
-func backfillVisibility(ctx context.Context, db *mongo.Database) error {
+func backfillVisibility(ctx context.Context, db schemaDatabase) error {
 	coll := db.Collection("profiles")
 	for _, field := range []string{"visibility", "likes_visibility", "activity_visibility"} {
 		filter := bson.M{"$or": bson.A{
@@ -100,7 +162,7 @@ func backfillVisibility(ctx context.Context, db *mongo.Database) error {
 // validateur (ex. un schéma qui exigeait encore `username`, supprimé depuis du
 // profil) → les écritures conformes au schéma courant échoueraient. `collMod`
 // avec le validateur courant est idempotent (no-op s'il est déjà à jour).
-func ensureCollections(ctx context.Context, db *mongo.Database) error {
+func ensureCollections(ctx context.Context, db schemaDatabase) error {
 	existing, err := db.ListCollectionNames(ctx, bson.M{})
 	if err != nil {
 		return fmt.Errorf("liste des collections : %w", err)
@@ -128,7 +190,7 @@ func ensureCollections(ctx context.Context, db *mongo.Database) error {
 // updateValidator aligne le validateur d'une collection existante avec le
 // schéma courant. Sans ça, les volumes Mongo de dev gardent les anciens
 // validateurs et peuvent refuser des documents pourtant valides côté code.
-func updateValidator(ctx context.Context, db *mongo.Database, name string) error {
+func updateValidator(ctx context.Context, db schemaDatabase, name string) error {
 	if _, err := db.RunCommand(ctx, bson.D{
 		{Key: "collMod", Value: name},
 		{Key: "validator", Value: validators[name]},
@@ -142,7 +204,7 @@ func updateValidator(ctx context.Context, db *mongo.Database, name string) error
 // correspondent plus au modèle actuel. username vit maintenant dans
 // user-service ; garder cet index unique dans profiles bloque tous les profils
 // sans username après le premier document.
-func dropLegacyIndexes(ctx context.Context, db *mongo.Database) error {
+func dropLegacyIndexes(ctx context.Context, db schemaDatabase) error {
 	if err := db.Collection("profiles").Indexes().DropOne(ctx, "username_1"); err != nil {
 		if isIndexNotFound(err) {
 			return nil
@@ -159,7 +221,7 @@ func isIndexNotFound(err error) bool {
 
 // ensureIndexes crée les index (CreateMany est idempotent pour un index de
 // spécification identique).
-func ensureIndexes(ctx context.Context, db *mongo.Database) error {
+func ensureIndexes(ctx context.Context, db schemaDatabase) error {
 	for _, coll := range collectionOrder {
 		models := indexes[coll]
 		if len(models) == 0 {
@@ -175,7 +237,7 @@ func ensureIndexes(ctx context.Context, db *mongo.Database) error {
 // ensureSeed insère le profil de l'administrateur (idempotent : upsert sur
 // user_id). Le username vit dans user-service ; ici on ne porte que le
 // décoratif (display_name + champs éditables).
-func ensureSeed(ctx context.Context, db *mongo.Database) error {
+func ensureSeed(ctx context.Context, db schemaDatabase) error {
 	now := time.Now().UTC()
 	filter := bson.M{"user_id": adminUserID}
 	update := bson.M{

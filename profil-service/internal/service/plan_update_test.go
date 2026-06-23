@@ -196,3 +196,42 @@ func TestPlanUpdate_Nationality(t *testing.T) {
 		t.Fatalf("nationality = %v, attendu FR", set["nationality"])
 	}
 }
+
+func TestPlanUpdate_AllSimpleFields(t *testing.T) {
+	now := time.Now().UTC()
+	nsfw := false
+	req := models.UpdateProfilRequest{
+		Bio:             ptr("bio"),
+		AvatarURL:       ptr("https://cdn/avatar.png"),
+		BannerURL:       ptr("https://cdn/banner.png"),
+		Website:         ptr("https://breezy.dev"),
+		Location:        ptr("Paris"),
+		Gender:          ptr("male"),
+		Nationality:     ptr(" fr "),
+		LikesVisibility: ptr(models.VisibilityPrivate),
+		NsfwEnabled:     &nsfw,
+	}
+	current := &models.Profil{LikesVisibility: models.VisibilityPublic}
+
+	set, err := planUpdate(current, req, now, 0)
+	if err != nil {
+		t.Fatalf("err inattendue: %v", err)
+	}
+
+	expected := map[string]any{
+		"bio":              "bio",
+		"avatar_url":       "https://cdn/avatar.png",
+		"banner_url":       "https://cdn/banner.png",
+		"website":          "https://breezy.dev",
+		"location":         "Paris",
+		"gender":           "male",
+		"nationality":      "FR",
+		"likes_visibility": models.VisibilityPrivate,
+		"nsfw_enabled":     false,
+	}
+	for key, want := range expected {
+		if got := set[key]; got != want {
+			t.Fatalf("%s = %#v, attendu %#v dans %#v", key, got, want, set)
+		}
+	}
+}

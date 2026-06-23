@@ -16,7 +16,6 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo"
 
 	"github.com/webdad/profil-service/internal/models"
-	"github.com/webdad/profil-service/internal/repository"
 )
 
 // Erreurs métier (mappées vers des codes HTTP par les handlers).
@@ -38,7 +37,7 @@ var (
 
 // ProfilService regroupe les dépendances et la config métier.
 type ProfilService struct {
-	repo                *repository.ProfilRepository
+	repo                Repository
 	displayNameCooldown time.Duration
 	follows             FollowChecker
 }
@@ -53,6 +52,17 @@ type FollowChecker interface {
 	AcceptAllFollowRequests(ctx context.Context, ownerID string) error
 }
 
+// Repository décrit les opérations de persistance utilisées par la couche
+// métier. Le repository Mongo concret l'implémente, et les tests peuvent fournir
+// un faux sans dépendre d'une base.
+type Repository interface {
+	GetByUserID(ctx context.Context, userID string) (*models.Profil, error)
+	Insert(ctx context.Context, p *models.Profil) error
+	SearchByDisplayName(ctx context.Context, pattern string, limit int64) ([]models.Profil, error)
+	Update(ctx context.Context, userID string, set bson.M) (*models.Profil, error)
+	Delete(ctx context.Context, userID string) error
+}
+
 // Option configure les dépendances optionnelles du service.
 type Option func(*ProfilService)
 
@@ -65,7 +75,7 @@ func WithFollowChecker(checker FollowChecker) Option {
 
 // New construit le service. displayNameCooldown=0 désactive l'enforcement du
 // cooldown (le timestamp de changement reste enregistré dans tous les cas).
-func New(repo *repository.ProfilRepository, displayNameCooldown time.Duration, opts ...Option) *ProfilService {
+func New(repo Repository, displayNameCooldown time.Duration, opts ...Option) *ProfilService {
 	s := &ProfilService{repo: repo, displayNameCooldown: displayNameCooldown}
 	for _, opt := range opts {
 		opt(s)

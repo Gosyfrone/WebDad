@@ -55,6 +55,13 @@ func TestAcceptAllFollowRequests_Erreur(t *testing.T) {
 	}
 }
 
+func TestAcceptAllFollowRequests_URLInvalide(t *testing.T) {
+	c := NewUserClient("%")
+	if err := c.AcceptAllFollowRequests(context.Background(), "owner-123"); err == nil {
+		t.Fatal("URL invalide devrait retourner une erreur")
+	}
+}
+
 // ─── IsFollowing ─────────────────────────────────────────────────────────────
 
 func TestIsFollowing_True(t *testing.T) {
@@ -99,5 +106,24 @@ func TestIsFollowing_ErreurServeur(t *testing.T) {
 	_, err := c.IsFollowing(context.Background(), "a", "b")
 	if err == nil {
 		t.Fatal("status 502 devrait retourner une erreur")
+	}
+}
+
+func TestIsFollowing_URLInvalide(t *testing.T) {
+	c := NewUserClient("%")
+	if _, err := c.IsFollowing(context.Background(), "a", "b"); err == nil {
+		t.Fatal("URL invalide devrait retourner une erreur")
+	}
+}
+
+func TestIsFollowing_JSONInvalide(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{invalid}`))
+	}))
+	defer srv.Close()
+
+	c := NewUserClient(srv.URL)
+	if _, err := c.IsFollowing(context.Background(), "a", "b"); err == nil {
+		t.Fatal("JSON invalide devrait retourner une erreur")
 	}
 }
