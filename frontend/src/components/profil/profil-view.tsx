@@ -5,7 +5,7 @@ import { ArrowLeft, FileText, Loader2, Lock, MessageCircle, ShieldAlert } from '
 import { useRouter } from 'next/navigation'
 
 import { cn } from '@/lib/utils'
-import { ROUTES, postHref } from '@/lib/routes'
+import { ROUTES, messagesConversationHref, postHref } from '@/lib/routes'
 import { useFollow } from '@/lib/use-follow'
 import {
   getMyProfil,
@@ -79,6 +79,14 @@ export function ProfilView({ username }: ProfilViewProps) {
   // notifs…) via l'historique. Fallback feed si accès direct par URL (pas
   // d'historique in-app à dépiler).
   const handleBack = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      const conversationId = params.get('from') === 'messages' ? params.get('conv') : null
+      if (conversationId) {
+        router.push(messagesConversationHref(conversationId))
+        return
+      }
+    }
     if (typeof window !== 'undefined' && window.history.length > 1) {
       router.back()
     } else {

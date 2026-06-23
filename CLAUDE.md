@@ -10,7 +10,7 @@
 > - Knowledge graph in `graphify-out/` — query it before reading source (Operating Rule 11).
 >
 > **Latest session work and suggested commit messages live in `CHANGELOG.md`, not here.**
-> **Session freshness:** current work log updated in `CHANGELOG.md` on 23/06/2026 (feat(certifications) — `profil-service` owns `certification=none|political|public_figure` with Mongo enum + boot backfill, new mod/admin route `PATCH /profils/:userId/certification` annotated Swagger, front moderation submenu + profile/hover badge: verified rosette façon X, yellow for political, blue for public figures, Breezy logo for staff when role is known. Swagger regenerated via Docker after Windows `make swagger` bash failure. Checks: `go test ./...` profil-service OK, targeted vitest 62/62 OK; full `tsc` still blocked only by pre-existing test fixture errors).
+> **Session freshness:** current work log updated in `CHANGELOG.md` on 23/06/2026 (feat(messages/profile-nav) — front-only DM header identity links: avatar/display name/@username open `/profil/<username>?from=messages&conv=<conversationId>`, profile back arrow returns via `/messages?conv=<conversationId>`, and mobile DM header stacks `@username` above activity status so “dernière connexion…” no longer hides the handle. No backend route/Swagger. Checks: route helper vitest 21/21 OK, targeted coverage `routes.ts` 100 %, targeted lint OK + `chat-pane.tsx` lint OK; full `tsc` still blocked only by pre-existing test fixture errors).
 
 ---
 

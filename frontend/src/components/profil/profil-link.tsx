@@ -11,6 +11,8 @@ interface ProfilLinkProps {
   /** Auteur ciblé : on a besoin de son id (pour détecter « moi ») + username. */
   author: { id: string; username: string }
   className?: string
+  /** Destination personnalisée, utile pour conserver un contexte de retour. */
+  href?: string
   /** Désactive la carte de survol pour les liens invisibles/étirés. */
   preview?: boolean
   children: React.ReactNode
@@ -27,6 +29,7 @@ type AnchorProps = Omit<React.AnchorHTMLAttributes<HTMLAnchorElement>, 'href'>
 export function ProfilLink({
   author,
   className,
+  href,
   preview = true,
   children,
   ...linkProps
@@ -35,18 +38,19 @@ export function ProfilLink({
   if (!author.username) {
     return <span className={className}>{children}</span>
   }
-  const href = currentUserId() === author.id ? ROUTES.profil : profilHref(author.username)
+  const targetHref =
+    href ?? (currentUserId() === author.id ? ROUTES.profil : profilHref(author.username))
   // Visiteur : pas d'aperçu au survol (la carte charge le graphe social
   // authentifié). Le lien reste, mais le middleware le renverra vers /login.
   if (!preview || isVisitor) {
     return (
-      <Link href={href} className={className} {...linkProps}>
+      <Link href={targetHref} className={className} {...linkProps}>
         {children}
       </Link>
     )
   }
   return (
-    <ProfileHoverCard author={author} href={href} className={className} {...linkProps}>
+    <ProfileHoverCard author={author} href={targetHref} className={className} {...linkProps}>
       {children}
     </ProfileHoverCard>
   )
