@@ -34,6 +34,7 @@ pnpm-debug.log*
 
 # Couverture de tests
 coverage/
+coverage.out
 *.lcov
 .nyc_output/
 

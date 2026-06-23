@@ -82,11 +82,13 @@ jobs:
       - name: Build
         run: go build ./...
 
-      # MongoDB éphémère pour les tests d'INTÉGRATION du report-service (dépôt +
-      # service + handlers adossés à une vraie base). Scopé à ce seul service via
-      # la matrice : les autres jobs ne paient pas le coût du conteneur. Les tests
-      # lisent MONGO_TEST_URI ; s'il est absent (run local), ils sont ignorés
+      # MongoDB éphémère pour les tests d'INTÉGRATION (dépôt + service + handlers
+      # adossés à une vraie base). Scopé via la matrice aux seuls services qui en
+      # ont besoin : les autres jobs ne paient pas le coût du conteneur. Les tests
+      # lisent MONGO_TEST_URI ; s'il est absent (run local), ils s'auto-ignorent
       # (t.Skip) — la base n'est donc requise qu'ici.
+      #
+      # report-service : Mongo SANS auth, suffisant pour ses tests d'intégration.
       - name: Start MongoDB (report-service integration tests)
         if: matrix.service == 'report-service'
         run: |
@@ -99,10 +101,46 @@ jobs:
           done
           echo "::error::MongoDB n'a pas démarré à temps"; exit 1
 
+      # message-service : Mongo AVEC auth (--auth via MONGO_INITDB_ROOT_*) — ses
+      # tests de lecture seule (mongotest.ReadOnlyDB) créent un utilisateur
+      # `readAnyDatabase` et vérifient que ses écritures sont REFUSÉES ; sans
+      # auth, Mongo n'applique pas les rôles et ces tests échoueraient. Le ping de
+      # readiness s'authentifie donc avec les identifiants root (éphémères, propres
+      # au conteneur de CI — pas un secret de prod).
+      - name: Start MongoDB (message-service integration tests, auth enabled)
+        if: matrix.service == 'message-service'
+        run: |
+          docker run -d --name mongo-test -p 27017:27017 \
+            -e MONGO_INITDB_ROOT_USERNAME=root \
+            -e MONGO_INITDB_ROOT_PASSWORD=ci-test-root \
+            mongo:7
+          for i in $(seq 1 30); do
+            if docker exec mongo-test mongosh --quiet -u root -p ci-test-root \
+                --authenticationDatabase admin \
+                --eval 'db.runCommand({ping:1}).ok' >/dev/null 2>&1; then
+              echo "MongoDB prêt"; exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::MongoDB n'a pas démarré à temps"; exit 1
+
       - name: Test (race detector + coverage)
         env:
-          MONGO_TEST_URI: ${{ matrix.service == 'report-service' && 'mongodb://localhost:27017' || '' }}
+          MONGO_TEST_URI: >-
+            ${{ matrix.service == 'report-service' && 'mongodb://localhost:27017'
+             || matrix.service == 'message-service' && 'mongodb://root:ci-test-root@localhost:27017/?authSource=admin'
+             || '' }}
         run: go test -race -covermode=atomic -coverprofile=coverage.out ./...
+
+      # Filtre le profil de couverture AVANT l'upload : on retire le code non
+      # testable unitairement (main.go = bootstrap du process), généré (swaggo,
+      # docs/docs.go) et l'infrastructure de test (helper Mongo mongotest). Plus
+      # fiable que de compter sur le `ignore` du codecov.yml (résolution de la
+      # config côté Codecov parfois capricieuse). La 1re ligne `mode:` est gardée.
+      - name: Filtrer la couverture (bootstrap + généré + infra de test)
+        run: |
+          grep -vE '(/main\.go:|/docs/docs\.go:|/internal/mongotest/)' coverage.out > coverage.filtered.out
+          mv coverage.filtered.out coverage.out
 
       # Upload de la couverture vers Codecov, un flag par service pour une
       # lecture service-par-service. Non bloquant (fail_ci_if_error: false) :

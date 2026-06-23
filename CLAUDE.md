@@ -10,7 +10,7 @@
 > - Knowledge graph in `graphify-out/` — query it before reading source (Operating Rule 11).
 >
 > **Latest session work and suggested commit messages live in `CHANGELOG.md`, not here.**
-> **Session freshness:** current work log updated in `CHANGELOG.md` on 23/06/2026 (feat(messages/profile-nav) — front-only DM header identity links: avatar/display name/@username open `/profil/<username>?from=messages&conv=<conversationId>`, profile back arrow returns via `/messages?conv=<conversationId>`, and mobile DM header stacks `@username` above activity status so “dernière connexion…” no longer hides the handle. No backend route/Swagger. Checks: route helper vitest 21/21 OK, targeted coverage `routes.ts` 100 %, targeted lint OK + `chat-pane.tsx` lint OK; full `tsc` still blocked only by pre-existing test fixture errors).
+> **Session freshness:** current work log updated in `CHANGELOG.md` on 23/06/2026 (ci(message-service) — Codecov montrait 41,34 % car les tests d'intégration Mongo étaient tous `t.Skip` en CI (Mongo + `MONGO_TEST_URI` réservés à report-service). Fix `ci-go.yml` : étape Mongo **dédiée message-service avec `--auth`** (les tests `ReadOnlyDB` exigent l'auth pour que les rôles soient appliqués), `MONGO_TEST_URI` avec creds root éphémères ; report-service inchangé. Validé local `go test -race ./...` vert, couverture filtrée 97,3 %. À POUSSER pour recalcul Codecov. Aucun changement de prod/test, CI only).
 
 ---
 

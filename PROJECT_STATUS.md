@@ -84,6 +84,9 @@
   service + handlers contre un **vrai MongoDB** via `internal/testutil` (`MONGO_TEST_URI`, `t.Skip` si
   absent) + service Mongo conditionnel en CI (`ci-go.yml`). Reproduire pour Postgres (user/auth) avec un
   service `postgres` scopé par la matrice.*
+  *Template disponible :* **message-service** couvre désormais repository+service+handlers à **95 %** via
+  des tests d'intégration sur Mongo RÉELLE, gated par `MONGO_TEST_URI` (helper `internal/mongotest`, skip
+  sans DB) + un service `mongo` ajouté à `ci-go.yml`. Même approche transposable à user-service (Postgres).
 - **report-service coverage** — 🟢 **~98 %** (codecov-équivalent 585/597 = 97.99 %, flag `report-service`).
   Objectif 95 % atteint **sans changement de prod** : les branches d'erreur du driver Mongo sont exercées
   en passant un **`context` déjà annulé** (→ `context.Canceled`, pas besoin d'injecter une panne via une
