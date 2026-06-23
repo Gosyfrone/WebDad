@@ -67,7 +67,7 @@ func TestEnsureSchemaCreatesAndUpdatesSchema(t *testing.T) {
 	if err != nil {
 		t.Fatalf("liste index: %v", err)
 	}
-	defer cursor.Close(ctx)
+	defer func() { _ = cursor.Close(ctx) }()
 	var specs []bson.M
 	if err := cursor.All(ctx, &specs); err != nil {
 		t.Fatalf("décodage index: %v", err)

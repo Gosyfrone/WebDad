@@ -179,7 +179,7 @@ func TestPublishClosesSaturatedConnection(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dial websocket: %v", err)
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 	<-ready
 
 	h := NewHub()
