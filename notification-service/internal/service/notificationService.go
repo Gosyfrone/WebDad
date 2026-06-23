@@ -13,7 +13,6 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo"
 
 	"github.com/webdad/notification-service/internal/models"
-	"github.com/webdad/notification-service/internal/repository"
 	"github.com/webdad/notification-service/internal/userdir"
 )
 
@@ -37,14 +36,28 @@ type Publisher interface {
 	Publish(userIDs []string, event any)
 }
 
+// Repository décrit les opérations de persistance nécessaires à la logique
+// métier. L'implémentation de production reste NotificationRepository ; cette
+// frontière permet de tester chaque branche sans démarrer MongoDB.
+type Repository interface {
+	Upsert(context.Context, *models.Notification) (*models.Notification, error)
+	UpsertUniqueActor(context.Context, *models.Notification) (*models.Notification, error)
+	Decrement(context.Context, string, string) (*models.Notification, bool, error)
+	DeleteByPost(context.Context, string) ([]string, error)
+	List(context.Context, string, int64, *bson.ObjectID) ([]models.Notification, error)
+	CountUnread(context.Context, string) (int64, error)
+	MarkAllRead(context.Context, string) error
+	MarkRead(context.Context, string, bson.ObjectID) error
+}
+
 // NotificationService orchestre dépôt + résolveur de handles + diffusion.
 type NotificationService struct {
-	repo      *repository.NotificationRepository
+	repo      Repository
 	publisher Publisher
 	resolver  userdir.Resolver
 }
 
-func NewNotificationService(r *repository.NotificationRepository, p Publisher, res userdir.Resolver) *NotificationService {
+func NewNotificationService(r Repository, p Publisher, res userdir.Resolver) *NotificationService {
 	return &NotificationService{repo: r, publisher: p, resolver: res}
 }
 

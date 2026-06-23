@@ -16,11 +16,42 @@ import (
 
 // NotificationRepository encapsule la collection `notifications`.
 type NotificationRepository struct {
-	notifications *mongo.Collection
+	notifications        notificationCollection
+	distinctRecipientIDs func(context.Context, bson.M) ([]string, error)
+}
+
+// notificationCollection reprend uniquement les opérations Mongo utilisées par
+// ce repository. *mongo.Collection l'implémente directement ; les tests peuvent
+// fournir un double sans démarrer un serveur Mongo.
+type notificationCollection interface {
+	FindOneAndUpdate(context.Context, any, any, ...options.Lister[options.FindOneAndUpdateOptions]) *mongo.SingleResult
+	DeleteOne(context.Context, any, ...options.Lister[options.DeleteOneOptions]) (*mongo.DeleteResult, error)
+	DeleteMany(context.Context, any, ...options.Lister[options.DeleteManyOptions]) (*mongo.DeleteResult, error)
+	Find(context.Context, any, ...options.Lister[options.FindOptions]) (*mongo.Cursor, error)
+	CountDocuments(context.Context, any, ...options.Lister[options.CountOptions]) (int64, error)
+	UpdateMany(context.Context, any, any, ...options.Lister[options.UpdateManyOptions]) (*mongo.UpdateResult, error)
+	UpdateOne(context.Context, any, any, ...options.Lister[options.UpdateOneOptions]) (*mongo.UpdateResult, error)
 }
 
 func NewNotificationRepository(db *mongo.Database) *NotificationRepository {
-	return &NotificationRepository{notifications: db.Collection("notifications")}
+	collection := db.Collection("notifications")
+	return &NotificationRepository{
+		notifications: collection,
+		distinctRecipientIDs: func(ctx context.Context, filter bson.M) ([]string, error) {
+			out := []string{}
+			err := collection.Distinct(ctx, "recipient_id", filter).Decode(&out)
+			return out, err
+		},
+	}
+}
+
+func newNotificationRepository(collection notificationCollection) *NotificationRepository {
+	return &NotificationRepository{
+		notifications: collection,
+		distinctRecipientIDs: func(context.Context, bson.M) ([]string, error) {
+			return nil, nil
+		},
+	}
 }
 
 // Upsert agrège un événement dans le groupe (recipient_id, group_key) : crée la
@@ -144,11 +175,7 @@ func (r *NotificationRepository) DeleteByPost(ctx context.Context, postID string
 }
 
 func (r *NotificationRepository) distinctRecipients(ctx context.Context, filter bson.M) ([]string, error) {
-	out := []string{}
-	if err := r.notifications.Distinct(ctx, "recipient_id", filter).Decode(&out); err != nil {
-		return nil, err
-	}
-	return out, nil
+	return r.distinctRecipientIDs(ctx, filter)
 }
 
 // List renvoie les notifications d'un utilisateur, de la plus récente à la plus
