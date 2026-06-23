@@ -45,7 +45,7 @@ const FR: Record<LegalSlug, LegalDoc> = {
         title: 'Éditeur du Service',
         blocks: [
           {
-            p: 'Le site et l’application Breezy (ci-après « le Service ») sont édités par l’équipe projet Breezy (Zaid, Perujan, Candis, Théo) dans le cadre d’un projet étudiant. Contact : contact@breezy.example.',
+            p: 'Le site et l’application Breezy (ci-après « le Service ») sont édités par l’équipe projet Breezy (Philippe, Alexandre, Maxime, Romain) dans le cadre d’un projet étudiant. Contact : contact@breezy.example.',
           },
         ],
       },
@@ -329,7 +329,7 @@ const EN: Record<LegalSlug, LegalDoc> = {
         title: 'Publisher',
         blocks: [
           {
-            p: 'The Breezy website and application (the “Service”) are published by the Breezy project team (Zaid, Perujan, Candis, Théo) as a student project. Contact: contact@breezy.example.',
+            p: 'The Breezy website and application (the “Service”) are published by the Breezy project team (Philippe, Alexandre, Maxime, Romain) as a student project. Contact: contact@breezy.example.',
           },
         ],
       },
@@ -611,7 +611,7 @@ const DE: Record<LegalSlug, LegalDoc> = {
         title: 'Herausgeber des Dienstes',
         blocks: [
           {
-            p: 'Die Website und die Anwendung Breezy (nachfolgend „der Dienst“) werden vom Breezy-Projektteam (Zaid, Perujan, Candis, Théo) im Rahmen eines studentischen Projekts herausgegeben. Kontakt: contact@breezy.example.',
+            p: 'Die Website und die Anwendung Breezy (nachfolgend „der Dienst“) werden vom Breezy-Projektteam (Philippe, Alexandre, Maxime, Romain) im Rahmen eines studentischen Projekts herausgegeben. Kontakt: contact@breezy.example.',
           },
         ],
       },
@@ -895,7 +895,7 @@ const ES: Record<LegalSlug, LegalDoc> = {
         title: 'Editor del Servicio',
         blocks: [
           {
-            p: 'El sitio web y la aplicación Breezy (en adelante, «el Servicio») son editados por el equipo del proyecto Breezy (Zaid, Perujan, Candis, Théo) en el marco de un proyecto estudiantil. Contacto: contact@breezy.example.',
+            p: 'El sitio web y la aplicación Breezy (en adelante, «el Servicio») son editados por el equipo del proyecto Breezy (Philippe, Alexandre, Maxime, Romain) en el marco de un proyecto estudiantil. Contacto: contact@breezy.example.',
           },
         ],
       },
@@ -1179,7 +1179,7 @@ const PT: Record<LegalSlug, LegalDoc> = {
         title: 'Editor do Serviço',
         blocks: [
           {
-            p: 'O site e a aplicação Breezy (doravante «o Serviço») são editados pela equipa do projeto Breezy (Zaid, Perujan, Candis, Théo) no âmbito de um projeto estudantil. Contacto: contact@breezy.example.',
+            p: 'O site e a aplicação Breezy (doravante «o Serviço») são editados pela equipa do projeto Breezy (Philippe, Alexandre, Maxime, Romain) no âmbito de um projeto estudantil. Contacto: contact@breezy.example.',
           },
         ],
       },
@@ -1463,7 +1463,7 @@ const IT: Record<LegalSlug, LegalDoc> = {
         title: 'Editore del Servizio',
         blocks: [
           {
-            p: 'Il sito e l’applicazione Breezy (di seguito «il Servizio») sono editi dal team del progetto Breezy (Zaid, Perujan, Candis, Théo) nell’ambito di un progetto studentesco. Contatto: contact@breezy.example.',
+            p: 'Il sito e l’applicazione Breezy (di seguito «il Servizio») sono editi dal team del progetto Breezy (Philippe, Alexandre, Maxime, Romain) nell’ambito di un progetto studentesco. Contatto: contact@breezy.example.',
           },
         ],
       },
@@ -1747,7 +1747,7 @@ const RU: Record<LegalSlug, LegalDoc> = {
         title: 'Издатель Сервиса',
         blocks: [
           {
-            p: 'Сайт и приложение Breezy (далее — «Сервис») издаются командой проекта Breezy (Zaid, Perujan, Candis, Théo) в рамках студенческого проекта. Контакт: contact@breezy.example.',
+            p: 'Сайт и приложение Breezy (далее — «Сервис») издаются командой проекта Breezy (Philippe, Alexandre, Maxime, Romain) в рамках студенческого проекта. Контакт: contact@breezy.example.',
           },
         ],
       },
@@ -2031,7 +2031,7 @@ const ZH: Record<LegalSlug, LegalDoc> = {
         title: '服务的发布者',
         blocks: [
           {
-            p: 'Breezy 网站及应用程序（以下简称“本服务”）由 Breezy 项目团队（Zaid、Perujan、Candis、Théo）作为学生项目发布。联系方式：contact@breezy.example。',
+            p: 'Breezy 网站及应用程序（以下简称“本服务”）由 Breezy 项目团队（Philippe、Alexandre、Maxime、Romain）作为学生项目发布。联系方式：contact@breezy.example。',
           },
         ],
       },
@@ -2313,7 +2313,7 @@ const JA: Record<LegalSlug, LegalDoc> = {
         title: 'サービスの発行者',
         blocks: [
           {
-            p: 'Breezy のウェブサイトおよびアプリケーション（以下「本サービス」）は、学生プロジェクトとして Breezy プロジェクトチーム（Zaid、Perujan、Candis、Théo）が発行しています。連絡先：contact@breezy.example。',
+            p: 'Breezy のウェブサイトおよびアプリケーション（以下「本サービス」）は、学生プロジェクトとして Breezy プロジェクトチーム（Philippe、Alexandre、Maxime、Romain）が発行しています。連絡先：contact@breezy.example。',
           },
         ],
       },
@@ -2595,7 +2595,7 @@ const KO: Record<LegalSlug, LegalDoc> = {
         title: '서비스 발행자',
         blocks: [
           {
-            p: 'Breezy 웹사이트 및 애플리케이션(이하 “본 서비스”)은 학생 프로젝트의 일환으로 Breezy 프로젝트 팀(Zaid, Perujan, Candis, Théo)이 발행합니다. 연락처: contact@breezy.example.',
+            p: 'Breezy 웹사이트 및 애플리케이션(이하 “본 서비스”)은 학생 프로젝트의 일환으로 Breezy 프로젝트 팀(Philippe, Alexandre, Maxime, Romain)이 발행합니다. 연락처: contact@breezy.example.',
           },
         ],
       },
@@ -2877,7 +2877,7 @@ const AR: Record<LegalSlug, LegalDoc> = {
         title: 'ناشر الخدمة',
         blocks: [
           {
-            p: 'يتولى فريق مشروع Breezy (Zaid وPerujan وCandis وThéo) نشر موقع وتطبيق Breezy (المشار إليهما فيما يلي بـ«الخدمة») في إطار مشروع طلابي. للتواصل: contact@breezy.example.',
+            p: 'يتولى فريق مشروع Breezy (Philippe وAlexandre وMaxime وRomain) نشر موقع وتطبيق Breezy (المشار إليهما فيما يلي بـ«الخدمة») في إطار مشروع طلابي. للتواصل: contact@breezy.example.',
           },
         ],
       },
@@ -3159,7 +3159,7 @@ const HI: Record<LegalSlug, LegalDoc> = {
         title: 'सेवा का प्रकाशक',
         blocks: [
           {
-            p: 'Breezy वेबसाइट और एप्लिकेशन (आगे "सेवा") को Breezy परियोजना टीम (Zaid, Perujan, Candis, Théo) द्वारा एक छात्र परियोजना के रूप में प्रकाशित किया जाता है। संपर्क: contact@breezy.example।',
+            p: 'Breezy वेबसाइट और एप्लिकेशन (आगे "सेवा") को Breezy परियोजना टीम (Philippe, Alexandre, Maxime, Romain) द्वारा एक छात्र परियोजना के रूप में प्रकाशित किया जाता है। संपर्क: contact@breezy.example।',
           },
         ],
       },
