@@ -47,3 +47,10 @@ func TestEraseSkipsUnconfigured(t *testing.T) {
 		t.Fatalf("aucun échec attendu (rien de configuré), eu %v", failed)
 	}
 }
+
+func TestDeleteOKRejectsMalformedURL(t *testing.T) {
+	e := New(Targets{})
+	if e.deleteOK(context.Background(), "token", "://bad-url") {
+		t.Fatal("malformed URL should fail")
+	}
+}
