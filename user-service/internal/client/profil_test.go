@@ -143,6 +143,15 @@ func TestVisibility_ContextAnnulé_RetourneErr(t *testing.T) {
 	}
 }
 
+// URL contenant un caractère de contrôle : http.NewRequestWithContext échoue
+// avant tout appel réseau (branche de construction de requête).
+func TestVisibility_URLInvalide_RetourneErr(t *testing.T) {
+	c := NewProfilClient("http://exemple\x7f.invalide")
+	if _, err := c.Visibility(context.Background(), "x"); err == nil {
+		t.Fatal("une URL invalide doit retourner une erreur de construction de requête")
+	}
+}
+
 // ─── VisibilityPrivate constant ───────────────────────────────────────────────
 
 func TestVisibilityPrivateConstante(t *testing.T) {
