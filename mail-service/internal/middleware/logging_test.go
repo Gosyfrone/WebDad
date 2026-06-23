@@ -70,6 +70,26 @@ func TestRequestLogger_NePasPlanter(t *testing.T) {
 	}
 }
 
+func TestRequestLogger_AvecUserID(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(RequestID())
+	r.Use(func(c *gin.Context) {
+		c.Set("user_id", "user-123")
+		c.Next()
+	})
+	r.Use(RequestLogger())
+	r.GET("/", func(c *gin.Context) { c.Status(http.StatusOK) })
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, attendu 200", w.Code)
+	}
+}
+
 // ─── Recovery ────────────────────────────────────────────────────────────────
 
 func TestRecovery_PanicCapturé_500(t *testing.T) {
