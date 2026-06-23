@@ -26,11 +26,17 @@ flag_management:
     carryforward: true         # garde le dernier % d'un flag si son job n'a pas tourné (paths filters)
 
 # Fichiers exclus du calcul : tests, généré, et l'UI shadcn (non testée par design).
+# Les couches repository Mongo sont exclues : ce sont des I/O sur la base (pipelines
+# d'agrégation, curseurs) couvertes par les tests d'intégration (`*integration*_test.go`,
+# qui tournent quand un Mongo est présent), mais non unit-testables sans base — le job
+# de couverture CI n'en fournit pas. Les exclure évite de mesurer une couche infra par
+# un job qui ne peut pas l'exécuter (même logique que l'UI shadcn côté front).
 ignore:
   - "**/*_test.go"
   - "**/mocks/**"
   - "**/testutil/**"     # aides de test partagées (importées uniquement par des _test.go)
   - "**/main.go"         # racine de composition (câblage des deps + r.Run) — non testable unitairement
+  - "**/internal/repository/**"
   - "doc/**"
   - "**/docs/docs.go"    # Swagger généré (swaggo) — code non testable
   - "frontend/src/components/ui/**"
