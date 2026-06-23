@@ -6,7 +6,7 @@ RUN apk add --no-cache git ca-certificates tzdata nodejs npm vips-dev
 WORKDIR /app
 
 COPY go.mod go.sum ./
-RUN go mod download
+RUN for i in 1 2 3; do go mod download && exit 0; sleep 5; done; go mod download
 
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev

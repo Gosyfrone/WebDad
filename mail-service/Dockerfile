@@ -7,7 +7,7 @@ WORKDIR /app
 
 # Copier les fichiers de dépendances en premier (cache Docker optimal)
 COPY go.mod go.sum ./
-RUN go mod download
+RUN for i in 1 2 3; do go mod download && exit 0; sleep 5; done; go mod download
 
 # Copier le code source
 COPY . .
