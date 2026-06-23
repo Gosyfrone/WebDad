@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -14,6 +15,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/minio/minio-go/v7"
 
 	"github.com/webdad/media-service/internal/config"
 	"github.com/webdad/media-service/internal/imageproc"
@@ -39,7 +41,7 @@ const maxTransformBytes = 20 * 1024 * 1024
 
 // MediaHandler sert les endpoints média au-dessus du stockage objet.
 type MediaHandler struct {
-	store         *storage.Store
+	store         mediaStore
 	maxImageBytes int64
 	maxVideoBytes int64
 	maxBlobBytes  int64
@@ -47,9 +49,18 @@ type MediaHandler struct {
 	httpClient    *http.Client
 }
 
+type mediaStore interface {
+	Put(context.Context, string, io.Reader, int64, string, string) error
+	PutVariant(context.Context, string, string, io.Reader, int64, string, string) error
+	Open(context.Context, string) (storage.Object, minio.ObjectInfo, error)
+	Stat(context.Context, string) (minio.ObjectInfo, error)
+	RemoveMediaSet(context.Context, string) error
+	RemoveByOwner(context.Context, string) (int, error)
+}
+
 // NewMediaHandler construit le handler avec ses caps de taille (appliqués aux
 // utilisateurs non-admin ; les admins bypassent, cf. Upload/UploadEncrypted).
-func NewMediaHandler(store *storage.Store, cfg *config.Config) *MediaHandler {
+func NewMediaHandler(store mediaStore, cfg *config.Config) *MediaHandler {
 	return &MediaHandler{
 		store:         store,
 		maxImageBytes: cfg.MaxImageBytes,
@@ -113,6 +124,8 @@ var giphyHosts = map[string]bool{
 	"media4.giphy.com": true,
 	"i.giphy.com":      true,
 }
+
+var randomRead = rand.Read
 
 type giphyAPIResponse struct {
 	Data []struct {
@@ -918,7 +931,7 @@ func (h *MediaHandler) PurgeByOwner(c *gin.Context) {
 // randomID génère un identifiant opaque non devinable (128 bits → 32 hex).
 func randomID() (string, error) {
 	b := make([]byte, 16)
-	if _, err := rand.Read(b); err != nil {
+	if _, err := randomRead(b); err != nil {
 		return "", err
 	}
 	return hex.EncodeToString(b), nil

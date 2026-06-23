@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log/slog"
 	"os"
 
@@ -17,19 +18,26 @@ const serviceName = "media-service"
 
 func main() {
 	logging.Setup(serviceName)
-
 	cfg := config.Load()
+	if err := run(cfg, storage.New, func(r *gin.Engine, address string) error { return r.Run(address) }); err != nil {
+		slog.Error("arrêt du service", "error", err)
+		os.Exit(1)
+	}
+}
+
+type storeFactory func(string, string, string, bool, string) (*storage.Store, error)
+
+func run(cfg *config.Config, newStore storeFactory, serve func(*gin.Engine, string) error) error {
 	gin.SetMode(ginMode(cfg.GinMode))
 
 	// Le service garantit l'existence de son bucket au démarrage (idempotent) →
 	// autonome, sans provisioning externe. MinIO est sa « base ».
-	store, err := storage.New(
+	store, err := newStore(
 		cfg.MinioEndpoint, cfg.MinioAccessKey, cfg.MinioSecretKey,
 		cfg.MinioUseSSL, cfg.MinioBucket,
 	)
 	if err != nil {
-		slog.Error("connexion MinIO", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("connexion MinIO: %w", err)
 	}
 
 	r := gin.New()
@@ -40,10 +48,10 @@ func main() {
 	handler.RegisterRoutes(r, serviceName, store, cfg)
 
 	slog.Info("en écoute", "port", cfg.Port)
-	if err := r.Run(":" + cfg.Port); err != nil {
-		slog.Error("échec du démarrage", "error", err)
-		os.Exit(1)
+	if err := serve(r, ":"+cfg.Port); err != nil {
+		return fmt.Errorf("échec du démarrage: %w", err)
 	}
+	return nil
 }
 
 // ginMode borne la valeur de GIN_MODE aux modes connus (défaut : debug).

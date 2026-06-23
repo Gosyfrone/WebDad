@@ -115,3 +115,14 @@ func TestClaimsFrom(t *testing.T) {
 		t.Fatalf("ClaimsFrom : status = %d", w.Code)
 	}
 }
+
+func TestParseTokenRejectsNonHMAC(t *testing.T) {
+	tok := jwt.NewWithClaims(jwt.SigningMethodNone, &Claims{})
+	raw, err := tok.SignedString(jwt.UnsafeAllowNoneSignatureType)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := parseToken(raw, []byte(testSecret)); err == nil {
+		t.Fatal("algorithme non-HMAC accepté")
+	}
+}
