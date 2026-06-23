@@ -176,11 +176,11 @@ func (f *s3Fixture) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write([]byte("not xml"))
 			return
 		}
-		fmt.Fprint(w, `<?xml version="1.0"?><ListBucketResult><Name>bucket</Name><IsTruncated>false</IsTruncated>`)
+		_, _ = fmt.Fprint(w, `<?xml version="1.0"?><ListBucketResult><Name>bucket</Name><IsTruncated>false</IsTruncated>`)
 		for k := range f.objects {
-			fmt.Fprintf(w, "<Contents><Key>%s</Key><Size>%d</Size></Contents>", k, len(f.objects[k]))
+			_, _ = fmt.Fprintf(w, "<Contents><Key>%s</Key><Size>%d</Size></Contents>", k, len(f.objects[k]))
 		}
-		fmt.Fprint(w, "</ListBucketResult>")
+		_, _ = fmt.Fprint(w, "</ListBucketResult>")
 		return
 	}
 	switch r.Method {
