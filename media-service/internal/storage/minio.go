@@ -22,17 +22,25 @@ const ownerMetaKey = "owner-id"
 // ErrNotFound : objet absent (→ 404 côté handler).
 var ErrNotFound = errors.New("média introuvable")
 
+var newMinioClient = minio.New
+
 // Store : client MinIO + bucket cible.
 type Store struct {
 	client *minio.Client
 	bucket string
 }
 
+// Object est le contrat minimal requis par http.ServeContent.
+type Object interface {
+	io.ReadSeeker
+	io.Closer
+}
+
 // New connecte MinIO et garantit l'existence du bucket (idempotent) → le
 // service est autonome, sans provisioning externe (même esprit que les
 // EnsureSchema des services à base de données).
 func New(endpoint, accessKey, secretKey string, useSSL bool, bucket string) (*Store, error) {
-	client, err := minio.New(endpoint, &minio.Options{
+	client, err := newMinioClient(endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(accessKey, secretKey, ""),
 		Secure: useSSL,
 	})
@@ -73,7 +81,7 @@ func (s *Store) PutVariant(ctx context.Context, originalID, variant string, r io
 // Open ouvre l'objet en lecture et renvoie son ObjectInfo. L'appel à Stat()
 // matérialise un éventuel 404 (objet absent) → ErrNotFound. L'objet retourné
 // est un io.ReadSeekCloser (compatible http.ServeContent pour les Range).
-func (s *Store) Open(ctx context.Context, id string) (*minio.Object, minio.ObjectInfo, error) {
+func (s *Store) Open(ctx context.Context, id string) (Object, minio.ObjectInfo, error) {
 	obj, err := s.client.GetObject(ctx, s.bucket, id, minio.GetObjectOptions{})
 	if err != nil {
 		return nil, minio.ObjectInfo{}, err
