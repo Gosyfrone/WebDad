@@ -97,7 +97,7 @@ func TestRegister_ReadPump_WritePump(t *testing.T) {
 	// PostCreated déclenche writePump : le client doit recevoir le message.
 	h.PostCreated("post-id-ws", "author-id-ws")
 
-	conn.SetReadDeadline(time.Now().Add(time.Second))
+	_ = conn.SetReadDeadline(time.Now().Add(time.Second))
 	_, msg, err := conn.ReadMessage()
 	if err != nil {
 		t.Fatalf("ReadMessage : %v", err)
@@ -108,7 +108,7 @@ func TestRegister_ReadPump_WritePump(t *testing.T) {
 
 	// Fermeture côté client → readPump détecte l'erreur → remove → close(send)
 	// → writePump quitte son for-range.
-	conn.Close()
+	_ = conn.Close()
 	time.Sleep(50 * time.Millisecond)
 
 	h.mu.RLock()
@@ -141,7 +141,7 @@ func TestBroadcast_ClientLent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("WebSocket dial : %v", err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	time.Sleep(20 * time.Millisecond)
 

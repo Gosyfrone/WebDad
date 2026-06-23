@@ -40,7 +40,7 @@ func TestWSConnect_ValidToken_FullUpgrade(t *testing.T) {
 	if err != nil {
 		t.Fatalf("WS dial : %v", err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	// Laisser le hub enregistrer la connexion.
 	time.Sleep(30 * time.Millisecond)

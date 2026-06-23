@@ -152,15 +152,6 @@ func TestOptionalJWTAuth_TokenInvalide_Continue(t *testing.T) {
 
 // --- VerifiedOnly ---
 
-func setClaimsInCtx(c *gin.Context, verified bool, role string) {
-	c.Set("claims", &Claims{
-		UserID:        "user-id",
-		Email:         "test@breezy.dev",
-		Role:          role,
-		EmailVerified: verified,
-	})
-}
-
 func newVerifiedRouter() *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
