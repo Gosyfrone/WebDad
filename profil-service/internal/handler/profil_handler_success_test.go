@@ -13,6 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/v2/bson"
 
+	"github.com/webdad/profil-service/internal/middleware"
 	"github.com/webdad/profil-service/internal/models"
 	"github.com/webdad/profil-service/internal/service"
 )
@@ -173,6 +174,19 @@ func TestHandlerSuccess_PublicReads(t *testing.T) {
 	}
 }
 
+func TestSearch_RepositoryError(t *testing.T) {
+	repo := newMemoryProfilRepo()
+	repo.err = errors.New("search down")
+	r := newSuccessRouter(t, repo)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/profils/search?q=Alice&limit=10", nil)
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("Search erreur repo = %d body=%s", w.Code, w.Body.String())
+	}
+}
+
 func TestHandlerSuccess_PrivateOwnerRoutes(t *testing.T) {
 	birthDate := time.Now().UTC().AddDate(-20, 0, 0)
 	repo := newMemoryProfilRepo(&models.Profil{
@@ -214,6 +228,43 @@ func TestHandlerSuccess_PrivateOwnerRoutes(t *testing.T) {
 	}
 }
 
+func TestHandlerProtectedMethodsWithoutClaims(t *testing.T) {
+	repo := newMemoryProfilRepo()
+	h := NewProfilHandler(service.New(repo, 0))
+
+	cases := []struct {
+		name string
+		call func(*gin.Context)
+		body string
+	}{
+		{name: "GetMe", call: h.GetMe},
+		{name: "UpdateMe", call: h.UpdateMe, body: `{}`},
+		{name: "TouchActivity", call: h.TouchActivity},
+		{name: "TouchActivityOffline", call: h.TouchActivityOffline},
+		{name: "Create", call: h.Create, body: `{"display_name":"Alice"}`},
+		{name: "AdminCreate", call: h.AdminCreate, body: `{"id":"u2","display_name":"Bob"}`},
+		{name: "Delete", call: h.Delete},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			gin.SetMode(gin.TestMode)
+			w := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(w)
+			body := strings.NewReader(tc.body)
+			c.Request = httptest.NewRequest(http.MethodPost, "/", body)
+			if tc.body != "" {
+				c.Request.Header.Set("Content-Type", "application/json")
+			}
+
+			tc.call(c)
+			if w.Code != http.StatusUnauthorized {
+				t.Fatalf("status = %d body=%s", w.Code, w.Body.String())
+			}
+		})
+	}
+}
+
 func TestHandlerSuccess_CreateAdminCreateAndDelete(t *testing.T) {
 	repo := newMemoryProfilRepo()
 	r := newSuccessRouter(t, repo)
@@ -244,6 +295,35 @@ func TestHandlerSuccess_CreateAdminCreateAndDelete(t *testing.T) {
 	r.ServeHTTP(w, req)
 	if w.Code != http.StatusNoContent {
 		t.Fatalf("Delete = %d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestCreate_JSONInvalide_400(t *testing.T) {
+	repo := newMemoryProfilRepo()
+	r := newSuccessRouter(t, repo)
+	token := makeProfilToken(t, models.RoleUser)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/profils", strings.NewReader(`{invalid}`))
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("Create JSON invalide = %d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestDelete_NotFound_404(t *testing.T) {
+	repo := newMemoryProfilRepo()
+	r := newSuccessRouter(t, repo)
+	token := makeProfilToken(t, models.RoleAdmin)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodDelete, "/profils/missing", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("Delete absent = %d body=%s", w.Code, w.Body.String())
 	}
 }
 
@@ -392,5 +472,34 @@ func TestSanitizePublicProfil(t *testing.T) {
 	}
 	if p.LastLoginAt != nil || p.IsOnline {
 		t.Fatalf("activite privee non masquee: %#v", p)
+	}
+}
+
+func TestSanitizePublicProfil_OwnerCanSeePrivateActivity(t *testing.T) {
+	repo := newMemoryProfilRepo()
+	h := NewProfilHandler(service.New(repo, 0))
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	c.Set("claims", &middleware.Claims{UserID: "u1", Role: models.RoleUser})
+
+	now := time.Now().UTC()
+	nsfw := true
+	p := &models.Profil{
+		UserID:             "u1",
+		Visibility:         models.VisibilityPrivate,
+		ActivityVisibility: models.VisibilityPublic,
+		LastLoginAt:        &now,
+		IsOnline:           true,
+		NsfwEnabled:        &nsfw,
+	}
+
+	h.sanitizePublicProfil(c, p)
+	if p.NsfwEnabled != nil {
+		t.Fatal("nsfw_enabled doit etre masque")
+	}
+	if p.LastLoginAt == nil || !p.IsOnline {
+		t.Fatalf("le proprietaire doit voir son activite: %#v", p)
 	}
 }
