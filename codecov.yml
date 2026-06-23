@@ -26,19 +26,29 @@ flag_management:
     carryforward: true         # garde le dernier % d'un flag si son job n'a pas tourné (paths filters)
 
 # Fichiers exclus du calcul : tests, généré, et l'UI shadcn (non testée par design).
+# Les couches repository Mongo (I/O sur la base : pipelines d'agrégation, curseurs)
+# ne sont mesurées QUE pour les services dont le job CI fournit un Mongo éphémère et
+# exporte MONGO_TEST_URI (cf. ci-go.yml) : leurs `*integration*_test.go` tournent
+# alors et couvrent la couche. Pour les services sans Mongo en CI, le repository
+# resterait non exécuté (~0 %) et pénaliserait à tort le flag — on l'exclut donc
+# explicitement, service par service, plutôt que par un glob global. À retirer pour
+# un service le jour où son job CI gagne un Mongo (cf. post-service).
 ignore:
   - "**/*_test.go"
   - "**/mocks/**"
   - "**/testutil/**"     # aides de test partagées (importées uniquement par des _test.go)
   - "**/main.go"         # racine de composition (câblage des deps + r.Run) — non testable unitairement
+  - "message-service/internal/repository/**"
+  - "notification-service/internal/repository/**"
+  - "profil-service/internal/repository/**"
+  - "report-service/internal/repository/**"
+  - "user-service/internal/repository/**"
   - "doc/**"
   - "**/docs/docs.go"    # Swagger généré (swaggo) — code non testable
   - "frontend/src/components/ui/**"
   - "frontend/**/*.test.ts"
   # Infra de test des tests d'intégration Mongo (helper, importé uniquement par des _test.go).
   - "message-service/internal/mongotest/**"
-  # Couches 100% Mongo de message-service : non couvertes sans conteneur Mongo en CI
-  # (tests d'intégration MONGO_TEST_URI-gated → t.Skip). Exclues pour garder un % propre,
-  # le métier testable restant mesuré ailleurs.
-  - "message-service/internal/repository/**"
+  # Couche 100% Mongo de message-service : database exclue pour garder un % propre
+  # (le repository est déjà couvert plus haut par le bloc par-service).
   - "message-service/internal/database/**"

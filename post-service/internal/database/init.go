@@ -18,6 +18,10 @@ var collectionOrder = []string{"posts", "comments", "likes", "comment_likes", "r
 // schéma et le maintient au démarrage — il fonctionne sans script d'init
 // externe, en local comme en stack Docker.
 func EnsureSchema(ctx context.Context, db *mongo.Database) error {
+	return ensureSchema(ctx, mongoSchemaDatabase{db: db})
+}
+
+func ensureSchema(ctx context.Context, db schemaDatabase) error {
 	if err := ensureCollections(ctx, db); err != nil {
 		return err
 	}
@@ -30,6 +34,62 @@ func EnsureSchema(ctx context.Context, db *mongo.Database) error {
 	return ensureIndexes(ctx, db)
 }
 
+// schemaDatabase abstrait le sous-ensemble de *mongo.Database utilisé par la
+// mise en place du schéma. Il permet de tester ensureSchema et ses étapes sans
+// Mongo (cf. fakeSchemaDB dans init_test.go) ; mongoSchemaDatabase en est
+// l'implémentation réelle, qui délègue au driver.
+type schemaDatabase interface {
+	ListCollectionNames(ctx context.Context, filter any, opts ...options.Lister[options.ListCollectionsOptions]) ([]string, error)
+	CreateCollection(ctx context.Context, name string, opts ...options.Lister[options.CreateCollectionOptions]) error
+	RunCommand(ctx context.Context, runCommand any, opts ...options.Lister[options.RunCmdOptions]) rawResult
+	Collection(name string, opts ...options.Lister[options.CollectionOptions]) schemaCollection
+}
+
+type schemaCollection interface {
+	UpdateMany(ctx context.Context, filter any, update any, opts ...options.Lister[options.UpdateManyOptions]) (*mongo.UpdateResult, error)
+	Indexes() schemaIndexView
+}
+
+type schemaIndexView interface {
+	CreateMany(ctx context.Context, models []mongo.IndexModel, opts ...options.Lister[options.CreateIndexesOptions]) ([]string, error)
+}
+
+type rawResult interface {
+	Raw() (bson.Raw, error)
+}
+
+type mongoSchemaDatabase struct {
+	db *mongo.Database
+}
+
+func (m mongoSchemaDatabase) ListCollectionNames(ctx context.Context, filter any, opts ...options.Lister[options.ListCollectionsOptions]) ([]string, error) {
+	return m.db.ListCollectionNames(ctx, filter, opts...)
+}
+
+func (m mongoSchemaDatabase) CreateCollection(ctx context.Context, name string, opts ...options.Lister[options.CreateCollectionOptions]) error {
+	return m.db.CreateCollection(ctx, name, opts...)
+}
+
+func (m mongoSchemaDatabase) RunCommand(ctx context.Context, runCommand any, opts ...options.Lister[options.RunCmdOptions]) rawResult {
+	return m.db.RunCommand(ctx, runCommand, opts...)
+}
+
+func (m mongoSchemaDatabase) Collection(name string, opts ...options.Lister[options.CollectionOptions]) schemaCollection {
+	return mongoSchemaCollection{collection: m.db.Collection(name, opts...)}
+}
+
+type mongoSchemaCollection struct {
+	collection *mongo.Collection
+}
+
+func (m mongoSchemaCollection) UpdateMany(ctx context.Context, filter any, update any, opts ...options.Lister[options.UpdateManyOptions]) (*mongo.UpdateResult, error) {
+	return m.collection.UpdateMany(ctx, filter, update, opts...)
+}
+
+func (m mongoSchemaCollection) Indexes() schemaIndexView {
+	return m.collection.Indexes()
+}
+
 // backfillReplyAudience pose `reply_audience: "everyone"` sur les posts écrits
 // avant l'introduction du champ (audience des réponses absente). Bien qu'un champ
 // absent reste valide vis-à-vis de l'enum optionnelle du $jsonSchema (donc pas de
@@ -38,7 +98,7 @@ func EnsureSchema(ctx context.Context, db *mongo.Database) error {
 // champ contraint fournit une migration idempotente au boot, vu les cas vécus
 // `visibility`/`likes_visibility`). Idempotent : no-op une fois les docs corrigés
 // (filtre sur champ absent OU chaîne vide).
-func backfillReplyAudience(ctx context.Context, db *mongo.Database) error {
+func backfillReplyAudience(ctx context.Context, db schemaDatabase) error {
 	coll := db.Collection("posts")
 	filter := bson.M{"$or": bson.A{
 		bson.M{"reply_audience": bson.M{"$exists": false}},
@@ -57,7 +117,7 @@ func backfillReplyAudience(ctx context.Context, db *mongo.Database) error {
 // backfillCommentLikesCount pose `likes_count: 0` sur les commentaires hérités
 // d'avant l'introduction des likes de commentaire. Idempotent : une fois les
 // documents corrigés, le filtre (champ absent OU vide) ne rematche plus rien.
-func backfillCommentLikesCount(ctx context.Context, db *mongo.Database) error {
+func backfillCommentLikesCount(ctx context.Context, db schemaDatabase) error {
 	coll := db.Collection("comments")
 	filter := bson.M{"$or": bson.A{
 		bson.M{"likes_count": bson.M{"$exists": false}},
@@ -81,7 +141,7 @@ func backfillCommentLikesCount(ctx context.Context, db *mongo.Database) error {
 // créé par une version antérieure conserverait indéfiniment son ancien
 // validateur (ex. un schéma `posts` sans `pinned_at`) → les écritures conformes
 // au schéma courant échoueraient.
-func ensureCollections(ctx context.Context, db *mongo.Database) error {
+func ensureCollections(ctx context.Context, db schemaDatabase) error {
 	existing, err := db.ListCollectionNames(ctx, bson.M{})
 	if err != nil {
 		return fmt.Errorf("liste des collections : %w", err)
@@ -108,7 +168,7 @@ func ensureCollections(ctx context.Context, db *mongo.Database) error {
 
 // updateValidator aligne le validateur d'une collection existante avec le
 // schéma courant. `collMod` est idempotent si le validateur est déjà à jour.
-func updateValidator(ctx context.Context, db *mongo.Database, name string) error {
+func updateValidator(ctx context.Context, db schemaDatabase, name string) error {
 	if _, err := db.RunCommand(ctx, bson.D{
 		{Key: "collMod", Value: name},
 		{Key: "validator", Value: validators[name]},
@@ -120,7 +180,7 @@ func updateValidator(ctx context.Context, db *mongo.Database, name string) error
 
 // ensureIndexes crée les index (CreateMany est idempotent pour un index
 // de spécification identique).
-func ensureIndexes(ctx context.Context, db *mongo.Database) error {
+func ensureIndexes(ctx context.Context, db schemaDatabase) error {
 	for _, coll := range collectionOrder {
 		models := indexes[coll]
 		if len(models) == 0 {
