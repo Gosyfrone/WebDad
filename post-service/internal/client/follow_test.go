@@ -76,3 +76,63 @@ func TestIsFollowing_ServeDown(t *testing.T) {
 		t.Fatal("serveur fermé doit retourner une erreur")
 	}
 }
+
+// --- HasBlocked ---
+
+func TestHasBlocked_True(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(blockResponse{HasBlocked: true})
+	}))
+	defer srv.Close()
+
+	c := NewFollowClient(srv.URL, "secret")
+	ok, err := c.HasBlocked(context.Background(), "blocker-id", "blocked-id")
+	if err != nil {
+		t.Fatalf("HasBlocked erreur : %v", err)
+	}
+	if !ok {
+		t.Fatal("HasBlocked = false, attendu true")
+	}
+}
+
+func TestHasBlocked_False(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(blockResponse{HasBlocked: false})
+	}))
+	defer srv.Close()
+
+	c := NewFollowClient(srv.URL, "secret")
+	ok, err := c.HasBlocked(context.Background(), "a", "b")
+	if err != nil {
+		t.Fatalf("HasBlocked erreur : %v", err)
+	}
+	if ok {
+		t.Fatal("HasBlocked = true, attendu false")
+	}
+}
+
+func TestHasBlocked_ErreurServeur(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	c := NewFollowClient(srv.URL, "secret")
+	_, err := c.HasBlocked(context.Background(), "a", "b")
+	if err == nil {
+		t.Fatal("500 doit retourner une erreur")
+	}
+}
+
+func TestHasBlocked_ServeDown(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	srv.Close()
+
+	c := NewFollowClient(srv.URL, "secret")
+	_, err := c.HasBlocked(context.Background(), "a", "b")
+	if err == nil {
+		t.Fatal("serveur fermé doit retourner une erreur")
+	}
+}
