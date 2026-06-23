@@ -16,12 +16,53 @@ import (
 
 // ProfilRepository : accès à la collection `profiles`.
 type ProfilRepository struct {
-	collection *mongo.Collection
+	collection collectionAPI
 }
 
 // NewProfilRepository construit le repository sur la collection `profiles`.
 func NewProfilRepository(db *mongo.Database) *ProfilRepository {
-	return &ProfilRepository{collection: db.Collection("profiles")}
+	return &ProfilRepository{collection: mongoCollection{collection: db.Collection("profiles")}}
+}
+
+type collectionAPI interface {
+	FindOne(ctx context.Context, filter any, opts ...options.Lister[options.FindOneOptions]) singleResult
+	InsertOne(ctx context.Context, document any, opts ...options.Lister[options.InsertOneOptions]) (*mongo.InsertOneResult, error)
+	Find(ctx context.Context, filter any, opts ...options.Lister[options.FindOptions]) (cursorAPI, error)
+	FindOneAndUpdate(ctx context.Context, filter any, update any, opts ...options.Lister[options.FindOneAndUpdateOptions]) singleResult
+	DeleteOne(ctx context.Context, filter any, opts ...options.Lister[options.DeleteOneOptions]) (*mongo.DeleteResult, error)
+}
+
+type singleResult interface {
+	Decode(v any) error
+}
+
+type cursorAPI interface {
+	All(ctx context.Context, results any) error
+	Close(ctx context.Context) error
+}
+
+type mongoCollection struct {
+	collection *mongo.Collection
+}
+
+func (m mongoCollection) FindOne(ctx context.Context, filter any, opts ...options.Lister[options.FindOneOptions]) singleResult {
+	return m.collection.FindOne(ctx, filter, opts...)
+}
+
+func (m mongoCollection) InsertOne(ctx context.Context, document any, opts ...options.Lister[options.InsertOneOptions]) (*mongo.InsertOneResult, error) {
+	return m.collection.InsertOne(ctx, document, opts...)
+}
+
+func (m mongoCollection) Find(ctx context.Context, filter any, opts ...options.Lister[options.FindOptions]) (cursorAPI, error) {
+	return m.collection.Find(ctx, filter, opts...)
+}
+
+func (m mongoCollection) FindOneAndUpdate(ctx context.Context, filter any, update any, opts ...options.Lister[options.FindOneAndUpdateOptions]) singleResult {
+	return m.collection.FindOneAndUpdate(ctx, filter, update, opts...)
+}
+
+func (m mongoCollection) DeleteOne(ctx context.Context, filter any, opts ...options.Lister[options.DeleteOneOptions]) (*mongo.DeleteResult, error) {
+	return m.collection.DeleteOne(ctx, filter, opts...)
 }
 
 // GetByUserID retourne le profil d'un utilisateur. mongo.ErrNoDocuments si

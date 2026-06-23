@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 
 	"github.com/webdad/profil-service/internal/client"
 	"github.com/webdad/profil-service/internal/config"
@@ -22,14 +23,75 @@ const serviceName = "profil-service"
 
 func main() {
 	logging.Setup(serviceName)
+	if err := runWithDeps(defaultAppDeps()); err != nil {
+		slog.Error("arrêt du service", "error", err)
+		os.Exit(1)
+	}
+}
 
-	cfg := config.Load()
+type appMongoClient interface {
+	Disconnect(ctx context.Context) error
+}
+
+type appDeps struct {
+	loadConfig       func() *config.Config
+	connectMongo     func(uri string) (appMongoClient, error)
+	database         func(client appMongoClient, name string) any
+	ensureSchema     func(ctx context.Context, db any) error
+	newProfilService func(db any, cfg *config.Config) *service.ProfilService
+	registerRoutes   func(r *gin.Engine, serviceName string, profils *service.ProfilService, jwtSecret string)
+	runServer        func(r *gin.Engine, addr string) error
+}
+
+func defaultAppDeps() appDeps {
+	return appDeps{
+		loadConfig: config.Load,
+		connectMongo: func(uri string) (appMongoClient, error) {
+			client, err := database.ConnectMongo(uri)
+			if err != nil {
+				return nil, err
+			}
+			return &mongoClientAdapter{Client: client}, nil
+		},
+		database: func(client appMongoClient, name string) any {
+			return client.(*mongoClientAdapter).Database(name)
+		},
+		ensureSchema: func(ctx context.Context, db any) error {
+			return database.EnsureSchema(ctx, db.(*mongoDatabaseAdapter).Database)
+		},
+		newProfilService: func(db any, cfg *config.Config) *service.ProfilService {
+			return service.New(
+				repository.NewProfilRepository(db.(*mongoDatabaseAdapter).Database),
+				cfg.DisplayNameCooldown,
+				service.WithFollowChecker(client.NewUserClient(cfg.UserURL)),
+			)
+		},
+		registerRoutes: handler.RegisterRoutes,
+		runServer: func(r *gin.Engine, addr string) error {
+			return r.Run(addr)
+		},
+	}
+}
+
+type mongoClientAdapter struct {
+	*mongo.Client
+}
+
+func (m *mongoClientAdapter) Database(name string) *mongoDatabaseAdapter {
+	return &mongoDatabaseAdapter{Database: m.Client.Database(name)}
+}
+
+type mongoDatabaseAdapter struct {
+	*mongo.Database
+}
+
+func runWithDeps(deps appDeps) error {
+	cfg := deps.loadConfig()
 	gin.SetMode(ginMode(cfg.GinMode))
 
-	mongoClient, err := database.ConnectMongo(cfg.MongoURI)
+	mongoClient, err := deps.connectMongo(cfg.MongoURI)
 	if err != nil {
-		slog.Error("connexion Mongo", "error", err)
-		os.Exit(1)
+		return err
 	}
 	defer func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -37,37 +99,29 @@ func main() {
 		_ = mongoClient.Disconnect(ctx)
 	}()
 
-	db := mongoClient.Database(cfg.MongoDB)
+	db := deps.database(mongoClient, cfg.MongoDB)
 
 	// Le service applique son propre schéma (collection + validateur + index +
 	// seed admin) au démarrage, de façon idempotente → autonome, sans script
 	// d'init externe.
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-	if err := database.EnsureSchema(ctx, db); err != nil {
-		slog.Error("schéma", "error", err)
-		os.Exit(1)
+	if err := deps.ensureSchema(ctx, db); err != nil {
+		return err
 	}
 
 	// On logue l'URL user-service résolue : un `http://localhost:...` ici en
 	// conteneur = USER_SERVICE_URL absent de l'environnement (conteneur à recréer)
 	// → les appels inter-services (is-following, accept-all) échoueraient.
 	slog.Info("user-service", "url", cfg.UserURL)
-	profils := service.New(
-		repository.NewProfilRepository(db),
-		cfg.DisplayNameCooldown,
-		service.WithFollowChecker(client.NewUserClient(cfg.UserURL)),
-	)
+	profils := deps.newProfilService(db, cfg)
 
 	r := gin.New()
 	r.Use(middleware.RequestID(), middleware.Recovery(), middleware.RequestLogger())
-	handler.RegisterRoutes(r, serviceName, profils, cfg.JWTSecret)
+	deps.registerRoutes(r, serviceName, profils, cfg.JWTSecret)
 
 	slog.Info("en écoute", "port", cfg.Port)
-	if err := r.Run(":" + cfg.Port); err != nil {
-		slog.Error("échec du démarrage", "error", err)
-		os.Exit(1)
-	}
+	return deps.runServer(r, ":"+cfg.Port)
 }
 
 // ginMode borne la valeur de GIN_MODE aux modes connus (défaut : debug).
