@@ -78,7 +78,7 @@ func TestOIDCGuardsAndRegistryDiscovery(t *testing.T) {
 	mux.HandleFunc("/keys", func(w http.ResponseWriter, _ *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]any{"keys": []map[string]any{{
 			"kty": "RSA", "kid": "test-key", "use": "sig", "alg": "RS256",
-			"n": base64.RawURLEncoding.EncodeToString(privateKey.PublicKey.N.Bytes()),
+			"n": base64.RawURLEncoding.EncodeToString(privateKey.N.Bytes()),
 			"e": base64.RawURLEncoding.EncodeToString([]byte{1, 0, 1}),
 		}}})
 	})
