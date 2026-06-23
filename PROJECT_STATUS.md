@@ -78,15 +78,15 @@
   derive real `role`/`username` (via `/users/me` or JWT decode).
 - **Identity cooldowns** — architecture posed; activate by setting `DISPLAY_NAME_CHANGE_COOLDOWN` /
   `USERNAME_CHANGE_COOLDOWN` (e.g. `168h`), no migration.
-- **user-service repo integration tests** — current Go tests cover middleware/validation, not SQL
-  (validated by manual e2e). Add `dockertest`/`testcontainers` for CI repo coverage.
-  *Pattern de référence désormais en place : **report-service** (couverture 33 % → ~92 %) teste dépôt +
-  service + handlers contre un **vrai MongoDB** via `internal/testutil` (`MONGO_TEST_URI`, `t.Skip` si
-  absent) + service Mongo conditionnel en CI (`ci-go.yml`). Reproduire pour Postgres (user/auth) avec un
-  service `postgres` scopé par la matrice.*
-  *Template disponible :* **message-service** couvre désormais repository+service+handlers à **95 %** via
-  des tests d'intégration sur Mongo RÉELLE, gated par `MONGO_TEST_URI` (helper `internal/mongotest`, skip
-  sans DB) + un service `mongo` ajouté à `ci-go.yml`. Même approche transposable à user-service (Postgres).
+- **user-service coverage** — 🟢 **~95 %** (filtré 95,1 %, brut 89,2 %, flag `user-service`). Objectif 95 %
+  atteint **sans changement de prod** : tests d'intégration sur **vrai PostgreSQL** via `internal/testutil`
+  (`USER_TEST_DSN`, base jetable `CREATE DATABASE` par test, `t.Skip` si absent) couvrant repository/service/
+  handlers (routeur complet) ; branches d'erreur DB exercées via un **pool `*sql.DB` fermé** ; branches
+  « claims absents » par appels directs ; unitaires `config`/`db`/`middleware`/`main`. CI `ci-go.yml` :
+  service `postgres:16` scopé par la matrice + filtrage du profil avant Codecov (`docs/`/`main.go`/
+  `testutil/`). Par paquet : handlers/router/logging 100 %, middleware 97,3 %, client 95,1 %, service 92,9 %,
+  config 92,6 %, repository 91,1 %, db 80 %. Résiduel : `return …err` post-vérification (panne mi-transaction),
+  `config.Load` `log.Fatal`, `db.Connect` retry 20 s. **Pattern Postgres réutilisable pour auth-service.**
 - **report-service coverage** — 🟢 **~98 %** (codecov-équivalent 585/597 = 97.99 %, flag `report-service`).
   Objectif 95 % atteint **sans changement de prod** : les branches d'erreur du driver Mongo sont exercées
   en passant un **`context` déjà annulé** (→ `context.Canceled`, pas besoin d'injecter une panne via une
