@@ -10,7 +10,7 @@
 > - Knowledge graph in `graphify-out/` — query it before reading source (Operating Rule 11).
 >
 > **Latest session work and suggested commit messages live in `CHANGELOG.md`, not here.**
-> **Session freshness:** current work log updated in `CHANGELOG.md` on 23/06/2026 (feat(certifications) — `profil-service` owns `certification=none|political|public_figure` with Mongo enum + boot backfill, new mod/admin route `PATCH /profils/:userId/certification` annotated Swagger, front moderation submenu + profile/hover badge: yellow political check, blue public-figure check, Breezy logo for staff when role is known. Swagger regenerated via Docker after Windows `make swagger` bash failure. Checks: `go test ./...` profil-service OK, targeted vitest 62/62 OK; full `tsc` still blocked only by pre-existing test fixture errors).
+> **Session freshness:** current work log updated in `CHANGELOG.md` on 23/06/2026 (feat(certifications) — `profil-service` owns `certification=none|political|public_figure` with Mongo enum + boot backfill, new mod/admin route `PATCH /profils/:userId/certification` annotated Swagger, front moderation submenu + profile/hover badge: verified rosette façon X, yellow for political, blue for public figures, Breezy logo for staff when role is known. Swagger regenerated via Docker after Windows `make swagger` bash failure. Checks: `go test ./...` profil-service OK, targeted vitest 62/62 OK; full `tsc` still blocked only by pre-existing test fixture errors).
 
 ---
 
