@@ -10,7 +10,7 @@
 > - Knowledge graph in `graphify-out/` — query it before reading source (Operating Rule 11).
 >
 > **Latest session work and suggested commit messages live in `CHANGELOG.md`, not here.**
-> **Session freshness:** current work log updated in `CHANGELOG.md` on 23/06/2026 (test(report-service) — couverture **~92 % → ~98 %** (objectif 95 % dépassé), **sans changement de prod** : branches d'erreur du driver Mongo exercées via un **`context` déjà annulé** (`context.Canceled`). 5 fichiers `*_errorpaths_test.go` (repository 97.2 %, service 98.2 %, handler 99.3 %, database 92.7 %, client 100 %) ; codecov-équivalent 585/597 = 97.99 %. `go test -race ./...` vert, `go vet`/`gofmt` propres).
+> **Session freshness:** current work log updated in `CHANGELOG.md` on 23/06/2026 (test(report-service) — +2 branches défensives **déterministes** : `Transfer` collision index unique partiel (377-379) + `EnsureSchema` conflit d'index (30-32). database 92.7→95.1 %, service 98.2→98.8 %, total statements 98.3 %, proxy-ligne codecov ~97.2 %. **Le 90,41 % de codecov datait d'AVANT le commit `errorpaths`** (branche non poussée) ; codecov compte lignes+partials, plus sévère que les statements → **action : pousser la branche** pour recalcul. `go test -race ./...` vert, `go vet`/`gofmt` propres).
 
 ---
 

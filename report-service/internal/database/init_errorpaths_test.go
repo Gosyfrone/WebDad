@@ -3,6 +3,9 @@ package database
 import (
 	"context"
 	"testing"
+
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 // canceled renvoie un contexte déjà annulé : les commandes Mongo (listCollections,
@@ -33,6 +36,26 @@ func TestEnsureSchema_CtxAnnule(t *testing.T) {
 	// Bout en bout : EnsureSchema doit propager l'erreur de la 1re sous-étape.
 	if err := EnsureSchema(cctx, db); err == nil {
 		t.Error("EnsureSchema(ctx annulé) → nil, attendu erreur")
+	}
+}
+
+// TestEnsureSchema_IndexConflit couvre le forwarding `if err := ensureIndexes(...)`
+// d'EnsureSchema — non atteint par ctx annulé (ensureCollections échoue d'abord).
+// Levier déterministe : on pré-crée sur "tickets" un index de MÊME clé (donc même
+// nom auto `entity_type_1_entity_id_1`) mais aux options différentes (ni unique, ni
+// partiel). EnsureSchema crée alors les collections avec succès, puis ensureIndexes
+// tente l'index unique partiel homonyme → conflit d'options Mongo → l'erreur
+// remonte par la 2e sous-étape.
+func TestEnsureSchema_IndexConflit(t *testing.T) {
+	db, ctx := freshDB(t) // skip si MONGO_TEST_URI absent
+	conflit := mongo.IndexModel{
+		Keys: bson.D{{Key: "entity_type", Value: 1}, {Key: "entity_id", Value: 1}},
+	}
+	if _, err := db.Collection("tickets").Indexes().CreateOne(ctx, conflit); err != nil {
+		t.Fatalf("pré-création de l'index en conflit : %v", err)
+	}
+	if err := EnsureSchema(ctx, db); err == nil {
+		t.Error("EnsureSchema avec index homonyme en conflit → nil, attendu erreur ensureIndexes")
 	}
 }
 

@@ -105,3 +105,32 @@ func TestSvc_MaybeAutoHide_SettingsErreur(t *testing.T) {
 		t.Errorf("maybeAutoHide ne doit pas masquer quand Settings échoue : %v", spy.hidden)
 	}
 }
+
+// TestSvc_Transfer_AddActionErreur couvre la branche `if err != nil` de Transfer
+// après l'appel AddAction (≠ NotFound, ≠ NotBug) — non atteignable par ctx annulé
+// (le GetTicket initial échouerait d'abord). Levier déterministe : transférer un
+// bug vers la modération alors qu'un ticket de modération occupe DÉJÀ la même clé
+// (entity_type, entity_id) — index partiel unique `category=moderation` (init.go).
+// Le repassage en catégorie modération viole alors la contrainte d'unicité côté
+// Mongo, et AddAction remonte une erreur de clé dupliquée.
+func TestSvc_Transfer_AddActionErreur(t *testing.T) {
+	svc, _, ctx := svcForTest(t)
+	// Un ticket de modération occupe la clé unique (post, dup-entity).
+	if _, err := svc.CreateReport(ctx, "u1", modInput("dup-entity")); err != nil {
+		t.Fatalf("seed modération : %v", err)
+	}
+	// Un bug porte la MÊME entité (conservée car entity_type valide).
+	bug, err := svc.CreateReport(ctx, "u2", CreateReportInput{
+		Category: models.CategoryBug, Reason: models.ReasonBug, Text: "doublon",
+		EntityType: models.EntityPost, EntityID: "dup-entity",
+	})
+	if err != nil {
+		t.Fatalf("seed bug : %v", err)
+	}
+	// Transfer bug → modération : AddAction repasse category=moderation → collision
+	// sur l'index partiel unique → erreur dépôt (ni NotFound, ni NotBug, ni InvalidID).
+	_, err = svc.Transfer(ctx, bug.ID.Hex(), "admin")
+	if err == nil || errors.Is(err, ErrNotFound) || errors.Is(err, ErrNotBug) || errors.Is(err, ErrInvalidID) {
+		t.Errorf("Transfer (collision clé unique) → %v, attendu erreur dépôt", err)
+	}
+}
