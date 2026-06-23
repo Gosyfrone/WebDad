@@ -40,7 +40,7 @@ func TestConnectAndEnsureSchema(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Connect success: %v", err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	if err := EnsureSchema(conn); err != nil {
 		t.Fatalf("EnsureSchema success: %v", err)
 	}
