@@ -26,6 +26,7 @@ import {
 } from 'lucide-react'
 
 import { cn, initialOf } from '@/lib/utils'
+import { profilFromConversationHref } from '@/lib/routes'
 import { ReportDialog } from '@/components/moderation/report-dialog'
 import {
   DropdownMenu,
@@ -68,6 +69,7 @@ import {
 } from '@/components/messages/conversation-meta'
 import { ActivityStatus } from '@/components/profil/activity-status'
 import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
+import { ProfilLink } from '@/components/profil/profil-link'
 
 const PAGE = 30
 
@@ -614,6 +616,11 @@ function ChatHeader({
         ? `@${peer.username}`
         : ''
       : t(`messages.type_${conversation.type}`)
+  const profileHref =
+    conversation.type === 'dm' && peer?.username
+      ? profilFromConversationHref(peer.username, conversation.id)
+      : null
+  const profileAuthor = peer ? { id: peer.id, username: peer.username } : null
 
   return (
     <header className="panel flex items-center gap-3 border-b px-3 py-2.5 sm:px-4">
@@ -628,19 +635,54 @@ function ChatHeader({
         <ArrowLeft className="h-5 w-5" />
       </Button>
 
-      <ConversationAvatar
-        conversation={conversation}
-        peer={peer}
-        className="h-10 w-10"
-      />
+      {profileHref && profileAuthor ? (
+        <ProfilLink
+          author={profileAuthor}
+          href={profileHref}
+          aria-label={t('list.view_profile_aria', { name: title })}
+          className="shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B6CFF] focus-visible:ring-offset-2"
+        >
+          <ConversationAvatar
+            conversation={conversation}
+            peer={peer}
+            className="h-10 w-10"
+          />
+        </ProfilLink>
+      ) : (
+        <ConversationAvatar
+          conversation={conversation}
+          peer={peer}
+          className="h-10 w-10"
+        />
+      )}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate text-sm font-bold text-foreground">
-          {title}
-        </span>
+        {profileHref && profileAuthor ? (
+          <ProfilLink
+            author={profileAuthor}
+            href={profileHref}
+            className="truncate text-sm font-bold text-foreground hover:underline focus-visible:outline-none focus-visible:underline"
+          >
+            {title}
+          </ProfilLink>
+        ) : (
+          <span className="truncate text-sm font-bold text-foreground">
+            {title}
+          </span>
+        )}
         {subtitle && (
-          <span className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
-            <span className="truncate">{subtitle}</span>
+          <span className="flex min-w-0 flex-col items-start gap-0.5 text-xs text-muted-foreground sm:flex-row sm:items-center sm:gap-2">
+            {profileHref && profileAuthor ? (
+              <ProfilLink
+                author={profileAuthor}
+                href={profileHref}
+                className="max-w-full truncate hover:underline focus-visible:outline-none focus-visible:underline"
+              >
+                {subtitle}
+              </ProfilLink>
+            ) : (
+              <span className="max-w-full truncate">{subtitle}</span>
+            )}
             {peerId && <ActivityStatus userId={peerId} className="shrink-0" />}
           </span>
         )}

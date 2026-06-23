@@ -40,6 +40,16 @@ export function profilHref(username: string): string {
   return `${ROUTES.profil}/${encodeURIComponent(username)}`
 }
 
+/** Lien vers une conversation existante (`/messages?conv=<id>`). */
+export function messagesConversationHref(conversationId: string): string {
+  return `${ROUTES.messages}?conv=${encodeURIComponent(conversationId)}`
+}
+
+/** Profil atteint depuis un DM, avec retour explicite vers la conversation. */
+export function profilFromConversationHref(username: string, conversationId: string): string {
+  return `${profilHref(username)}?from=messages&conv=${encodeURIComponent(conversationId)}`
+}
+
 /** Lien vers le détail d'un post (`/posts/<id>`). */
 export function postHref(id: string): string {
   return `/posts/${encodeURIComponent(id)}`

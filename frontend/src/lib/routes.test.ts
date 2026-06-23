@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest'
 
-import { ROUTES, profilHref, postHref, hashtagHref, searchHref, navItemsForRole } from '@/lib/routes'
+import {
+  ROUTES,
+  hashtagHref,
+  messagesConversationHref,
+  navItemsForRole,
+  postHref,
+  profilFromConversationHref,
+  profilHref,
+  searchHref,
+} from '@/lib/routes'
 
 describe('ROUTES', () => {
   it('contient les clés essentielles', () => {
@@ -17,6 +26,30 @@ describe('profilHref', () => {
 
   it('encode les caractères spéciaux', () => {
     expect(profilHref('alice bob')).toBe('/profil/alice%20bob')
+  })
+})
+
+describe('messagesConversationHref', () => {
+  it('construit /messages?conv=<id>', () => {
+    expect(messagesConversationHref('c123')).toBe('/messages?conv=c123')
+  })
+
+  it('encode les caractères spéciaux', () => {
+    expect(messagesConversationHref('conv/slash')).toBe('/messages?conv=conv%2Fslash')
+  })
+})
+
+describe('profilFromConversationHref', () => {
+  it('construit un profil avec contexte de retour vers la conversation', () => {
+    expect(profilFromConversationHref('alice', 'c123')).toBe(
+      '/profil/alice?from=messages&conv=c123',
+    )
+  })
+
+  it('encode username et conversation id', () => {
+    expect(profilFromConversationHref('alice bob', 'conv/slash')).toBe(
+      '/profil/alice%20bob?from=messages&conv=conv%2Fslash',
+    )
   })
 })
 
