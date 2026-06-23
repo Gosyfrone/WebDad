@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 const apiFetch = vi.fn()
 vi.mock('@/lib/auth-client', () => ({ apiFetch: (...a: unknown[]) => apiFetch(...a) }))
 vi.mock('@/lib/session', () => ({ mapRole: (r: string) => (r === 'admin' ? 'administrator' : r) }))
-const resolveUser = vi.fn(async (id: string) => ({ username: 'u_' + id, displayName: 'D ' + id, avatarUrl: '' }))
+const resolveUser = vi.fn(async (id: string) => ({ username: 'u_' + id, displayName: 'D ' + id, avatarUrl: '', certification: 'none' }))
 vi.mock('@/lib/user-cache', () => ({ resolveUser: (id: string) => resolveUser(id) }))
 
 import * as admin from '@/lib/admin'
@@ -70,6 +70,14 @@ describe('updateUserRole', () => {
   it('rôle non-admin inchangé, échec → erreur', async () => {
     routes([[path('/auth/users/a/role'), json({ error: 'no' }, { ok: false, status: 403 })]])
     await expect(admin.updateUserRole('a', 'moderator')).rejects.toMatchObject({ status: 403 })
+  })
+})
+
+describe('updateUserCertification', () => {
+  it('envoie la certification au profil-service', async () => {
+    routes([[path('/profils/a/certification'), json({}, { ok: true })]])
+    await admin.updateUserCertification('a', 'public_figure')
+    expect(JSON.parse(apiFetch.mock.calls[0][1].body)).toEqual({ certification: 'public_figure' })
   })
 })
 

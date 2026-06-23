@@ -2111,6 +2111,58 @@ paths:
             type: object
             additionalProperties:
               type: string
+  /profils/{userId}/certification:
+    patch:
+      security:
+      - BearerAuth: []
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      tags:
+      - profils
+      summary: Attribuer une certification de profil
+      parameters:
+      - type: string
+        description: User ID
+        name: userId
+        in: path
+        required: true
+      - description: 'Certification: none|political|public_figure'
+        name: body
+        in: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.UpdateCertificationRequest'
+      responses:
+        '200':
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Profil'
+        '400':
+          description: Bad Request
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '403':
+          description: Réservé modérateur/admin
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '404':
+          description: Not Found
+          schema:
+            type: object
+            additionalProperties:
+              type: string
   /profils/{userId}/likes-visibility:
     get:
       produces:
@@ -5310,6 +5362,8 @@ definitions:
         type: string
       birth_date:
         type: string
+      certification:
+        type: string
       created_at:
         type: string
       display_name:
@@ -5381,6 +5435,17 @@ definitions:
         type: string
       website:
         type: string
+  models.UpdateCertificationRequest:
+    type: object
+    required:
+    - certification
+    properties:
+      certification:
+        type: string
+        enum:
+        - none
+        - political
+        - public_figure
   models.UpdateProfilRequest:
     type: object
     properties:

@@ -24,7 +24,7 @@ describe('resolveUser (mémoïsé)', () => {
       [path('/users/uA'), json({ data: { id: 'uA', username: 'al' } })],
       [path('/profils/uA'), json({ data: { user_id: 'uA', display_name: 'Alice', avatar_url: 'a.png' } })],
     ])
-    expect(await resolveUser('uA')).toEqual({ id: 'uA', username: 'al', displayName: 'Alice', avatarUrl: 'R:a.png' })
+    expect(await resolveUser('uA')).toEqual({ id: 'uA', username: 'al', displayName: 'Alice', avatarUrl: 'R:a.png', certification: 'none' })
   })
 
   it('repli sur le username puis libellé si profil/user absents', async () => {

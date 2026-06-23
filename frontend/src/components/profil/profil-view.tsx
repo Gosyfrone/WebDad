@@ -34,6 +34,7 @@ import { useT } from '@/components/language-provider'
 import { PostCard } from '@/components/feed/post-card'
 import { CommentRow } from '@/components/feed/comment-section'
 import { ProfilHeader } from '@/components/profil/profil-header'
+import { CertificationBadge } from '@/components/profil/certification-badge'
 
 type ProfilTab = 'posts' | 'replies' | 'likes'
 
@@ -432,7 +433,10 @@ export function ProfilView({ username }: ProfilViewProps) {
           <ArrowLeft className="h-5 w-5" />
         </button>
         <div className="flex flex-col">
-          <span className="font-bold leading-tight text-foreground">{profil.displayName}</span>
+          <span className="flex min-w-0 items-center gap-1.5 font-bold leading-tight text-foreground">
+            <span className="truncate">{profil.displayName}</span>
+            <CertificationBadge certification={profil.certification} role={profil.role} />
+          </span>
           <span className="text-xs text-muted-foreground">
             {t(posts.length > 1 ? 'profil.posts_count_other' : 'profil.posts_count_one', {
               count: posts.length,

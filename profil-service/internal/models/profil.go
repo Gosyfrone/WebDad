@@ -15,6 +15,12 @@ const (
 	VisibilityPrivate = "private"
 )
 
+const (
+	CertificationNone         = "none"
+	CertificationPolitical    = "political"
+	CertificationPublicFigure = "public_figure"
+)
+
 // Profil représente un document de la collection `profiles` : uniquement les
 // données « décoratives » d'un utilisateur. L'identité (username), les rôles
 // et le graphe social vivent dans user-service / le JWT — pas ici (une seule
@@ -35,6 +41,7 @@ type Profil struct {
 	UpdatedAt       time.Time  `json:"updated_at"            bson:"updated_at"`
 	Visibility      string     `json:"visibility"       bson:"visibility,omitempty"`
 	LikesVisibility string     `json:"likes_visibility"  bson:"likes_visibility,omitempty"`
+	Certification   string     `json:"certification"     bson:"certification,omitempty"`
 	// ActivityVisibility contrôle l'affichage public de last_login_at. Un profil
 	// privé ne l'expose qu'au propriétaire et aux abonnés acceptés.
 	ActivityVisibility string     `json:"activity_visibility" bson:"activity_visibility,omitempty"`
@@ -141,4 +148,10 @@ type UpdateProfilRequest struct {
 	ActivityVisibility *string    `json:"activity_visibility" binding:"omitempty,oneof=public private"`
 	// NsfwEnabled : préférence « afficher le contenu NSFW » (toggle des paramètres).
 	NsfwEnabled *bool `json:"nsfw_enabled" binding:"omitempty"`
+}
+
+// UpdateCertificationRequest : payload réservé aux modérateurs/admins pour
+// attribuer ou retirer la certification décorative d'un profil.
+type UpdateCertificationRequest struct {
+	Certification string `json:"certification" binding:"required,oneof=none political public_figure"`
 }

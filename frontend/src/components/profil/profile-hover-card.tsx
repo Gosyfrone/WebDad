@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/popover'
 import { ActivityStatus } from '@/components/profil/activity-status'
 import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
+import { CertificationBadge } from '@/components/profil/certification-badge'
 
 type AnchorProps = Omit<React.AnchorHTMLAttributes<HTMLAnchorElement>, 'href'>
 
@@ -404,12 +405,15 @@ function ProfilePreview({
       </div>
 
       <div className="mt-3 min-w-0">
-        <Link
-          href={href}
-          className="block truncate text-lg font-extrabold text-foreground hover:underline"
-        >
-          {profil.displayName}
-        </Link>
+        <div className="flex min-w-0 items-center gap-1.5">
+          <Link
+            href={href}
+            className="truncate text-lg font-extrabold text-foreground hover:underline"
+          >
+            {profil.displayName}
+          </Link>
+          <CertificationBadge certification={profil.certification} role={profil.role} />
+        </div>
         <div className="flex min-w-0 items-center gap-2">
           <Link
             href={href}
@@ -483,6 +487,7 @@ function toRelationUser(profil: ProfilDetails): RelationUser {
     displayName: profil.displayName,
     bio: profil.bio,
     avatarUrl: profil.avatarUrl,
+    certification: profil.certification,
   }
 }
 

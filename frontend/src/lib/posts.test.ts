@@ -69,6 +69,7 @@ function makeProfil(overrides: Partial<ProfilDetails> = {}): ProfilDetails {
     visibility: 'public',
     likesVisibility: 'public',
     activityVisibility: 'public',
+    certification: 'none',
     lastLoginAt: '',
     isOnline: true,
     followersCount: 0,

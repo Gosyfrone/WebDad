@@ -80,7 +80,7 @@ describe('listRelations + enrichFromUser', () => {
       [path('/profils/a'), json({ data: { user_id: 'a', display_name: 'Alpha', bio: 'b', avatar_url: 'http://x' } })],
     ])
     const rel = await api.listRelations('u1', 'followers')
-    expect(rel[0]).toEqual({ id: 'a', username: 'aa', displayName: 'Alpha', bio: 'b', avatarUrl: 'http://x' })
+    expect(rel[0]).toEqual({ id: 'a', username: 'aa', displayName: 'Alpha', bio: 'b', avatarUrl: 'http://x', certification: 'none' })
   })
   it('profil absent → repli sur le username', async () => {
     routes([

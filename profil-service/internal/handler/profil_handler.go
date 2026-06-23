@@ -318,6 +318,48 @@ func (h *ProfilHandler) Delete(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
+// UpdateCertification : PATCH /profils/:userId/certification — attribue ou
+// retire une certification de profil. Réservé aux modérateurs/admins.
+// @Summary     Attribuer une certification de profil
+// @Tags        profils
+// @Accept      json
+// @Produce     json
+// @Security    BearerAuth
+// @Param       userId path string true "User ID"
+// @Param       body body models.UpdateCertificationRequest true "Certification: none|political|public_figure"
+// @Success     200 {object} models.Profil
+// @Failure     400 {object} map[string]string
+// @Failure     401 {object} map[string]string
+// @Failure     403 {object} map[string]string "Réservé modérateur/admin"
+// @Failure     404 {object} map[string]string
+// @Router      /profils/{userId}/certification [patch]
+func (h *ProfilHandler) UpdateCertification(c *gin.Context) {
+	claims, ok := middleware.ClaimsFrom(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "claims absents"})
+		return
+	}
+	if claims.Role != models.RoleAdmin && claims.Role != models.RoleModerator {
+		c.JSON(http.StatusForbidden, gin.H{"error": "réservé aux modérateurs et administrateurs"})
+		return
+	}
+	var req models.UpdateCertificationRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "payload invalide : " + err.Error()})
+		return
+	}
+	profil, err := h.profils.SetCertification(c.Request.Context(), c.Param("userId"), req.Certification)
+	if err != nil {
+		respondProfilError(c, err)
+		return
+	}
+	logging.FromGin(c).Info("certification profil mise à jour",
+		"target_id", c.Param("userId"),
+		"certification", req.Certification,
+	)
+	c.JSON(http.StatusOK, gin.H{"data": profil})
+}
+
 // GetVisibility : GET /profils/:userId/visibility — visibilité d'un profil.
 // @Summary     Visibilité d'un profil (public/private)
 // @Tags        profils
@@ -373,6 +415,8 @@ func respondProfilError(c *gin.Context, err error) {
 	case errors.Is(err, service.ErrInvalidDisplayName):
 		logging.FromGin(c).Warn("changement de display_name refusé", "reason", "invalid_characters")
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "code": "invalid_display_name"})
+	case errors.Is(err, service.ErrInvalidCertification):
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "code": "invalid_certification"})
 	default:
 		logging.FromGin(c).Error("erreur profil inattendue", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "erreur interne"})

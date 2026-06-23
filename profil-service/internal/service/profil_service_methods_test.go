@@ -65,6 +65,9 @@ func (f *fakeProfilRepo) Update(_ context.Context, userID string, set bson.M) (*
 	if v, ok := set["visibility"].(string); ok {
 		next.Visibility = v
 	}
+	if v, ok := set["certification"].(string); ok {
+		next.Certification = v
+	}
 	if v, ok := set["is_online"].(bool); ok {
 		next.IsOnline = v
 	}
@@ -119,6 +122,9 @@ func TestCreate_ValidProfilSetsDefaults(t *testing.T) {
 	}
 	if got.Visibility != models.VisibilityPublic || got.LikesVisibility != models.VisibilityPublic || got.ActivityVisibility != models.VisibilityPublic {
 		t.Fatalf("visibilites par defaut incorrectes: %#v", got)
+	}
+	if got.Certification != models.CertificationNone {
+		t.Fatalf("certification par defaut = %q", got.Certification)
 	}
 	if got.NsfwEnabled == nil || !*got.NsfwEnabled {
 		t.Fatal("nsfw_enabled doit etre pose a true par defaut")
@@ -220,6 +226,38 @@ func TestUpdate_PrivateToPublicAcceptsPendingRequestsBestEffort(t *testing.T) {
 	}
 	if !follows.acceptCalled {
 		t.Fatal("passer de prive a public doit declencher AcceptAllFollowRequests")
+	}
+}
+
+func TestSetCertification(t *testing.T) {
+	repo := &fakeProfilRepo{profil: &models.Profil{UserID: "u1", Certification: models.CertificationNone}}
+	svc := New(repo, 0)
+
+	got, err := svc.SetCertification(context.Background(), "u1", models.CertificationPolitical)
+	if err != nil {
+		t.Fatalf("SetCertification erreur inattendue: %v", err)
+	}
+	if got.Certification != models.CertificationPolitical {
+		t.Fatalf("certification = %q", got.Certification)
+	}
+	if repo.updatedUser != "u1" || repo.updateSet["certification"] != models.CertificationPolitical {
+		t.Fatalf("updateSet inattendu: user=%q set=%#v", repo.updatedUser, repo.updateSet)
+	}
+	if _, ok := repo.updateSet["updated_at"].(time.Time); !ok {
+		t.Fatalf("updated_at doit etre pose: %#v", repo.updateSet)
+	}
+}
+
+func TestSetCertification_InvalidValue(t *testing.T) {
+	repo := &fakeProfilRepo{profil: &models.Profil{UserID: "u1"}}
+	svc := New(repo, 0)
+
+	_, err := svc.SetCertification(context.Background(), "u1", "gold")
+	if !errors.Is(err, ErrInvalidCertification) {
+		t.Fatalf("attendu ErrInvalidCertification, obtenu %v", err)
+	}
+	if repo.updateCalled {
+		t.Fatal("valeur invalide ne doit pas appeler le repository")
 	}
 }
 

@@ -33,6 +33,8 @@ var (
 	// ErrInvalidDisplayName : le nom contient un caractère autre qu'une lettre,
 	// un chiffre, un espace, un tiret, un underscore ou un point → 400.
 	ErrInvalidDisplayName = errors.New("le nom ne peut contenir que des lettres, chiffres, espaces, tirets, underscores et points")
+	// ErrInvalidCertification : certification inconnue → 400.
+	ErrInvalidCertification = errors.New("certification invalide")
 )
 
 // ProfilService regroupe les dépendances et la config métier.
@@ -147,6 +149,7 @@ func (s *ProfilService) Create(ctx context.Context, userID string, req models.Cr
 		Visibility:         models.VisibilityPublic,
 		LikesVisibility:    models.VisibilityPublic,
 		ActivityVisibility: models.VisibilityPublic,
+		Certification:      models.CertificationNone,
 		NsfwEnabled:        &nsfwOn,
 	}
 	if req.Gender != nil {
@@ -193,6 +196,20 @@ func (s *ProfilService) Update(ctx context.Context, userID string, req models.Up
 				"user_id", userID, "error", aerr)
 		}
 	}
+	return mapGet(p, err)
+}
+
+// SetCertification attribue ou retire la certification décorative d'un profil.
+// L'autorisation mod/admin est vérifiée par le handler ; le service ne reçoit
+// qu'une valeur déjà normalisée par le contrat API.
+func (s *ProfilService) SetCertification(ctx context.Context, userID, certification string) (*models.Profil, error) {
+	if !validCertification(certification) {
+		return nil, ErrInvalidCertification
+	}
+	p, err := s.repo.Update(ctx, userID, bson.M{
+		"certification": certification,
+		"updated_at":    time.Now().UTC(),
+	})
 	return mapGet(p, err)
 }
 
@@ -322,6 +339,12 @@ func validDisplayName(value string) bool {
 		return false
 	}
 	return true
+}
+
+func validCertification(value string) bool {
+	return value == models.CertificationNone ||
+		value == models.CertificationPolitical ||
+		value == models.CertificationPublicFigure
 }
 
 // mapGet mappe mongo.ErrNoDocuments vers ErrProfilNotFound.

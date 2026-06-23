@@ -7,6 +7,7 @@ import {
   hardDeleteUser,
   listAdminUsers,
   setUserBanned,
+  updateUserCertification,
   updateUserRole,
   type AdminUser,
 } from '@/lib/admin'
@@ -14,6 +15,7 @@ import { useCurrentUser } from '@/components/current-user-provider'
 import { cn, initialOf, timeAgo } from '@/lib/utils'
 import { ProfilLink } from '@/components/profil/profil-link'
 import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
+import { CertificationBadge } from '@/components/profil/certification-badge'
 import { useLanguage } from '@/components/language-provider'
 import { useToast } from '@/hooks/use-toast'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -38,9 +40,10 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import type { UserRole } from '@/types'
+import type { UserCertification, UserRole } from '@/types'
 
 const ROLES: UserRole[] = ['user', 'moderator', 'administrator']
+const CERTIFICATIONS: UserCertification[] = ['political', 'public_figure', 'none']
 
 interface AccountsPanelProps {
   /**
@@ -105,6 +108,20 @@ export function AccountsPanel({ canGovern }: AccountsPanelProps) {
       await updateUserRole(user.id, role)
       setUsers((prev) => prev.map((u) => (u.id === user.id ? { ...u, role } : u)))
       toast({ title: t('admin.role_changed', { role: t(`role.${role}`) }) })
+    } catch {
+      toast({ title: t('admin.action_failed'), variant: 'destructive' })
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  async function onChangeCertification(user: AdminUser, certification: UserCertification) {
+    if (certification === user.certification) return
+    setBusyId(user.id)
+    try {
+      await updateUserCertification(user.id, certification)
+      setUsers((prev) => prev.map((u) => (u.id === user.id ? { ...u, certification } : u)))
+      toast({ title: t('certification.updated') })
     } catch {
       toast({ title: t('admin.action_failed'), variant: 'destructive' })
     } finally {
@@ -220,9 +237,10 @@ export function AccountsPanel({ canGovern }: AccountsPanelProps) {
             const banAllowed = !isSelf && (canGovern || user.role === 'user')
             // Gouvernance (rôle + effacement) = admin, sauf sur soi-même.
             const canChangeRole = canGovern && !isSelf
+            const canCertify = !isSelf
             const canErase = canGovern && !isSelf
             // Au moins une action disponible → on affiche la bulle « … ».
-            const hasActions = canChangeRole || banAllowed || canErase
+            const hasActions = canChangeRole || canCertify || banAllowed || canErase
             const initial = initialOf(user.displayName, user.username || user.email)
             return (
               <li
@@ -240,6 +258,7 @@ export function AccountsPanel({ canGovern }: AccountsPanelProps) {
                 <div className="flex min-w-0 flex-1 flex-col">
                   <span className="flex items-center gap-2 truncate text-sm font-bold">
                     {user.displayName || user.username || t('common.user')}
+                    <CertificationBadge certification={user.certification} role={user.role} />
                     {isSelf && (
                       <Badge variant="outline" className="text-[10px]">
                         {t('admin.you')}
@@ -306,6 +325,23 @@ export function AccountsPanel({ canGovern }: AccountsPanelProps) {
                                 onSelect={() => void onChangeRole(user, role)}
                               >
                                 {t(`role.${role}`)}
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuSubContent>
+                        </DropdownMenuSub>
+                      )}
+
+                      {canCertify && (
+                        <DropdownMenuSub>
+                          <DropdownMenuSubTrigger>{t('certification.assign')}</DropdownMenuSubTrigger>
+                          <DropdownMenuSubContent className="panel border">
+                            {CERTIFICATIONS.map((certification) => (
+                              <DropdownMenuItem
+                                key={certification}
+                                disabled={certification === user.certification}
+                                onSelect={() => void onChangeCertification(user, certification)}
+                              >
+                                {t(`certification.option.${certification}`)}
                               </DropdownMenuItem>
                             ))}
                           </DropdownMenuSubContent>
