@@ -2,11 +2,13 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"os"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 
 	"github.com/webdad/notification-service/internal/config"
 	"github.com/webdad/notification-service/internal/database"
@@ -21,16 +23,34 @@ import (
 
 const serviceName = "notification-service"
 
+type runtimeDependencies struct {
+	connectMongo func(string) (*mongo.Client, error)
+	ensureSchema func(context.Context, *mongo.Database) error
+	serve        func(*gin.Engine, ...string) error
+}
+
+func defaultRuntimeDependencies() runtimeDependencies {
+	return runtimeDependencies{
+		connectMongo: database.ConnectMongo,
+		ensureSchema: database.EnsureSchema,
+		serve:        (*gin.Engine).Run,
+	}
+}
+
 func main() {
 	logging.Setup(serviceName)
+	if err := run(config.Load(), defaultRuntimeDependencies()); err != nil {
+		slog.Error("arrêt du service", "error", err)
+		os.Exit(1)
+	}
+}
 
-	cfg := config.Load()
+func run(cfg *config.Config, deps runtimeDependencies) error {
 	gin.SetMode(ginMode(cfg.GinMode))
 
-	client, err := database.ConnectMongo(cfg.MongoURI)
+	client, err := deps.connectMongo(cfg.MongoURI)
 	if err != nil {
-		slog.Error("connexion Mongo", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("connexion Mongo : %w", err)
 	}
 	defer func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -44,9 +64,8 @@ func main() {
 	// au démarrage, de façon idempotente → autonome, sans script d'init externe.
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-	if err := database.EnsureSchema(ctx, db); err != nil {
-		slog.Error("schéma", "error", err)
-		os.Exit(1)
+	if err := deps.ensureSchema(ctx, db); err != nil {
+		return fmt.Errorf("schéma : %w", err)
 	}
 
 	repo := repository.NewNotificationRepository(db)
@@ -59,10 +78,10 @@ func main() {
 	handler.RegisterRoutes(r, serviceName, svc, hub, cfg.JWTSecret, cfg.InternalSecret, cfg.AllowedOrigins)
 
 	slog.Info("en écoute", "port", cfg.Port)
-	if err := r.Run(":" + cfg.Port); err != nil {
-		slog.Error("échec du démarrage", "error", err)
-		os.Exit(1)
+	if err := deps.serve(r, ":"+cfg.Port); err != nil {
+		return fmt.Errorf("démarrage HTTP : %w", err)
 	}
+	return nil
 }
 
 // ginMode borne la valeur de GIN_MODE aux modes connus (défaut : debug).

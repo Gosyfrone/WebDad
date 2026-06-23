@@ -12,6 +12,25 @@ import (
 // collectionOrder fige l'ordre de création (déterministe pour les logs/tests).
 var collectionOrder = []string{"notifications"}
 
+// Points d'accès Mongo remplaçables dans les tests. Les valeurs de production
+// délèguent directement au driver ; isoler ces quatre effets permet de tester
+// toute l'orchestration du schéma sans serveur externe.
+var (
+	listCollectionNames = func(ctx context.Context, db *mongo.Database) ([]string, error) {
+		return db.ListCollectionNames(ctx, bson.M{})
+	}
+	runCommand = func(ctx context.Context, db *mongo.Database, command bson.D) error {
+		return db.RunCommand(ctx, command).Err()
+	}
+	createCollection = func(ctx context.Context, db *mongo.Database, name string, opts *options.CreateCollectionOptionsBuilder) error {
+		return db.CreateCollection(ctx, name, opts)
+	}
+	createIndexes = func(ctx context.Context, db *mongo.Database, collection string, models []mongo.IndexModel) error {
+		_, err := db.Collection(collection).Indexes().CreateMany(ctx, models)
+		return err
+	}
+)
+
 // EnsureSchema crée la collection `notifications` (avec validateur $jsonSchema)
 // et ses index, de façon idempotente. Le service possède ainsi son schéma et le
 // maintient au démarrage — autonome, sans script d'init externe (même pattern
@@ -32,7 +51,7 @@ func EnsureSchema(ctx context.Context, db *mongo.Database) error {
 // validateur est resynchronisé via collMod sur une collection existante → un
 // volume créé par une version antérieure est corrigé (même pattern qu'ailleurs).
 func ensureCollections(ctx context.Context, db *mongo.Database) error {
-	existing, err := db.ListCollectionNames(ctx, bson.M{})
+	existing, err := listCollectionNames(ctx, db)
 	if err != nil {
 		return fmt.Errorf("liste des collections : %w", err)
 	}
@@ -48,13 +67,13 @@ func ensureCollections(ctx context.Context, db *mongo.Database) error {
 				{Key: "validator", Value: validators[name]},
 				{Key: "validationLevel", Value: "moderate"},
 			}
-			if err := db.RunCommand(ctx, cmd).Err(); err != nil {
+			if err := runCommand(ctx, db, cmd); err != nil {
 				return fmt.Errorf("collMod %q : %w", name, err)
 			}
 			continue
 		}
 		opts := options.CreateCollection().SetValidator(validators[name])
-		if err := db.CreateCollection(ctx, name, opts); err != nil {
+		if err := createCollection(ctx, db, name, opts); err != nil {
 			return fmt.Errorf("création collection %q : %w", name, err)
 		}
 	}
@@ -68,7 +87,7 @@ func ensureIndexes(ctx context.Context, db *mongo.Database) error {
 		if len(models) == 0 {
 			continue
 		}
-		if _, err := db.Collection(coll).Indexes().CreateMany(ctx, models); err != nil {
+		if err := createIndexes(ctx, db, coll, models); err != nil {
 			return fmt.Errorf("index sur %q : %w", coll, err)
 		}
 	}
