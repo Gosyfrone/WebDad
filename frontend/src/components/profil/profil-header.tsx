@@ -31,6 +31,7 @@ import {
 import { EditProfilDialog } from '@/components/profil/edit-profil-dialog'
 import { RelationsDialog } from '@/components/profil/relations-dialog'
 import { ActivityStatus } from '@/components/profil/activity-status'
+import { CertificationBadge } from '@/components/profil/certification-badge'
 import { ShareDialog } from '@/components/share/share-dialog'
 import { ReportDialog } from '@/components/moderation/report-dialog'
 
@@ -196,6 +197,7 @@ export function ProfilHeader({
             <h1 className="text-xl font-extrabold text-foreground">
               {profil.displayName}
             </h1>
+            <CertificationBadge certification={profil.certification} role={profil.role} />
             <Badge variant="secondary">{t(`role.${profil.role}`)}</Badge>
             {profil.gender && (
               <span
@@ -379,6 +381,7 @@ function toRelationUser(profil: ProfilDetails): RelationUser {
     displayName: profil.displayName,
     bio: profil.bio,
     avatarUrl: profil.avatarUrl,
+    certification: profil.certification,
   }
 }
 

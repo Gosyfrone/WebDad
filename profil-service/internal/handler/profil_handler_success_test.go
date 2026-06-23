@@ -102,6 +102,9 @@ func applyHandlerSet(p *models.Profil, set bson.M) {
 	if v, ok := set["activity_visibility"].(string); ok {
 		p.ActivityVisibility = v
 	}
+	if v, ok := set["certification"].(string); ok {
+		p.Certification = v
+	}
 	if v, ok := set["is_online"].(bool); ok {
 		p.IsOnline = v
 	}
@@ -244,6 +247,7 @@ func TestHandlerProtectedMethodsWithoutClaims(t *testing.T) {
 		{name: "Create", call: h.Create, body: `{"display_name":"Alice"}`},
 		{name: "AdminCreate", call: h.AdminCreate, body: `{"id":"u2","display_name":"Bob"}`},
 		{name: "Delete", call: h.Delete},
+		{name: "UpdateCertification", call: h.UpdateCertification, body: `{"certification":"political"}`},
 	}
 
 	for _, tc := range cases {
@@ -295,6 +299,48 @@ func TestHandlerSuccess_CreateAdminCreateAndDelete(t *testing.T) {
 	r.ServeHTTP(w, req)
 	if w.Code != http.StatusNoContent {
 		t.Fatalf("Delete = %d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestHandlerSuccess_UpdateCertification(t *testing.T) {
+	repo := newMemoryProfilRepo(&models.Profil{
+		UserID:        "target",
+		DisplayName:   "Alice",
+		Certification: models.CertificationNone,
+	})
+	r := newSuccessRouter(t, repo)
+	modToken := makeProfilToken(t, models.RoleModerator)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPatch, "/profils/target/certification", strings.NewReader(`{"certification":"political"}`))
+	req.Header.Set("Authorization", "Bearer "+modToken)
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("UpdateCertification = %d body=%s", w.Code, w.Body.String())
+	}
+	if repo.profils["target"].Certification != models.CertificationPolitical {
+		t.Fatalf("certification non persistee: %#v", repo.profils["target"])
+	}
+	body := decodeBody(t, w)
+	data := body["data"].(map[string]any)
+	if data["certification"] != models.CertificationPolitical {
+		t.Fatalf("certification reponse = %#v", data["certification"])
+	}
+}
+
+func TestUpdateCertification_InvalidJSON_400(t *testing.T) {
+	repo := newMemoryProfilRepo(&models.Profil{UserID: "target"})
+	r := newSuccessRouter(t, repo)
+	token := makeProfilToken(t, models.RoleModerator)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPatch, "/profils/target/certification", strings.NewReader(`{"certification":"gold"}`))
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("UpdateCertification payload invalide = %d body=%s", w.Code, w.Body.String())
 	}
 }
 
@@ -401,6 +447,7 @@ func TestHandlerForbiddenAdminRoutes(t *testing.T) {
 	}{
 		{http.MethodPost, "/profils/admin", `{"id":"u2","display_name":"Bob"}`},
 		{http.MethodDelete, "/profils/u2", ""},
+		{http.MethodPatch, "/profils/u2/certification", `{"certification":"political"}`},
 	}
 
 	for _, tc := range cases {
@@ -430,6 +477,7 @@ func TestRespondProfilErrorBranches(t *testing.T) {
 		{name: "birth date", err: service.ErrBirthDateLocked, want: http.StatusConflict},
 		{name: "cooldown", err: service.ErrDisplayNameCooldown, want: http.StatusTooManyRequests},
 		{name: "invalid display", err: service.ErrInvalidDisplayName, want: http.StatusBadRequest},
+		{name: "invalid certification", err: service.ErrInvalidCertification, want: http.StatusBadRequest},
 		{name: "internal", err: errors.New("boom"), want: http.StatusInternalServerError},
 	}
 

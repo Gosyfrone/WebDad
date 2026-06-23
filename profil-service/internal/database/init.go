@@ -39,6 +39,9 @@ func ensureSchema(ctx context.Context, db schemaDatabase) error {
 	if err := backfillVisibility(ctx, db); err != nil {
 		return err
 	}
+	if err := backfillCertification(ctx, db); err != nil {
+		return err
+	}
 	if err := backfillBirthDate(ctx, db); err != nil {
 		return err
 	}
@@ -153,6 +156,25 @@ func backfillVisibility(ctx context.Context, db schemaDatabase) error {
 	return nil
 }
 
+// backfillCertification pose la valeur neutre sur les profils antérieurs à la
+// certification. Le champ est enum-validé par Mongo ; les vieux documents sans
+// valeur doivent donc être normalisés avant toute future mise à jour.
+func backfillCertification(ctx context.Context, db schemaDatabase) error {
+	coll := db.Collection("profiles")
+	filter := bson.M{"$or": bson.A{
+		bson.M{"certification": bson.M{"$exists": false}},
+		bson.M{"certification": ""},
+	}}
+	res, err := coll.UpdateMany(ctx, filter, bson.M{"$set": bson.M{"certification": "none"}})
+	if err != nil {
+		return fmt.Errorf("backfill certification : %w", err)
+	}
+	if res.ModifiedCount > 0 {
+		slog.Info("migration: certification profils legacy posée au défaut", "count", res.ModifiedCount)
+	}
+	return nil
+}
+
 // ensureCollections crée les collections manquantes avec leur validateur, et
 // resynchronise le validateur des collections déjà présentes (`collMod`).
 //
@@ -252,6 +274,7 @@ func ensureSeed(ctx context.Context, db schemaDatabase) error {
 			"visibility":          "public",
 			"likes_visibility":    "public",
 			"activity_visibility": "public",
+			"certification":       "none",
 			"is_online":           false,
 			"created_at":          now,
 			"updated_at":          now,
@@ -284,6 +307,7 @@ var validators = map[string]bson.M{
 				"visibility":          bson.M{"bsonType": "string", "enum": bson.A{"public", "private"}},
 				"likes_visibility":    bson.M{"bsonType": "string", "enum": bson.A{"public", "private"}},
 				"activity_visibility": bson.M{"bsonType": "string", "enum": bson.A{"public", "private"}},
+				"certification":       bson.M{"bsonType": "string", "enum": bson.A{"none", "political", "public_figure"}},
 				// Champs optionnels (validés uniquement s'ils sont présents).
 				"is_online":               bson.M{"bsonType": "bool"},
 				"nsfw_enabled":            bson.M{"bsonType": "bool"},

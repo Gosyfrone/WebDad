@@ -3,7 +3,7 @@
 import { apiFetch } from '@/lib/auth-client'
 import { resolveMediaUrl, toStoredMedia } from '@/lib/media'
 import { decodeClaims, mapRole } from '@/lib/session'
-import type { ProfilDetails, ProfilEditableFields } from '@/types'
+import type { ProfilDetails, ProfilEditableFields, UserCertification } from '@/types'
 
 type ApiEnvelope<T> = { data?: T; error?: string; message?: string }
 
@@ -34,6 +34,7 @@ type ApiProfil = {
   visibility?: 'public' | 'private'
   likes_visibility?: 'public' | 'private'
   activity_visibility?: 'public' | 'private'
+  certification?: UserCertification
   last_login_at?: string
   is_online?: boolean
   nsfw_enabled?: boolean
@@ -207,6 +208,7 @@ function mergeProfil(
     likesVisibility:
       profil?.likes_visibility === 'private' ? 'private' : 'public',
     activityVisibility,
+    certification: profil?.certification ?? 'none',
     lastLoginAt: profil?.last_login_at ?? '',
     isOnline: Boolean(profil?.is_online),
     // Défaut `true` : pref NSFW ON / adulte par défaut (cf. backend). Sur un profil

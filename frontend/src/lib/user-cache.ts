@@ -13,6 +13,7 @@
 
 import { apiFetch } from '@/lib/auth-client'
 import { resolveMediaUrl } from '@/lib/media'
+import type { UserCertification } from '@/types'
 
 /** Identité résolue, prête à l'affichage (repli sur le username puis un libellé). */
 export interface ResolvedUser {
@@ -20,6 +21,7 @@ export interface ResolvedUser {
   username: string
   displayName: string
   avatarUrl: string
+  certification: UserCertification
 }
 
 interface ApiUser {
@@ -31,6 +33,7 @@ interface ApiProfil {
   user_id: string
   display_name: string
   avatar_url: string
+  certification?: UserCertification
 }
 
 const cache = new Map<string, Promise<ResolvedUser>>()
@@ -61,6 +64,7 @@ export function resolveUser(userId: string): Promise<ResolvedUser> {
       username: user?.username ?? '',
       displayName: profil?.display_name?.trim() || user?.username || 'Utilisateur',
       avatarUrl: resolveMediaUrl(profil?.avatar_url),
+      certification: profil?.certification ?? 'none',
     }
   })()
 

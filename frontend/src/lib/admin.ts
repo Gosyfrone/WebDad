@@ -17,7 +17,7 @@
 import { apiFetch } from '@/lib/auth-client'
 import { mapRole } from '@/lib/session'
 import { resolveUser } from '@/lib/user-cache'
-import type { UserRole } from '@/types'
+import type { UserCertification, UserRole } from '@/types'
 
 /** Erreur d'appel API admin portant le code HTTP. */
 export class AdminApiError extends Error {
@@ -42,6 +42,7 @@ export interface AdminUser {
   username: string
   displayName: string
   avatarUrl: string
+  certification: UserCertification
 }
 
 interface ApiAuthUser {
@@ -176,6 +177,7 @@ export async function listAdminUsers(
         username: resolved.username,
         displayName: resolved.displayName,
         avatarUrl: resolved.avatarUrl,
+        certification: resolved.certification,
       }
     }),
   )
@@ -188,6 +190,20 @@ export async function updateUserRole(id: string, role: UserRole): Promise<void> 
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ role: toBackendRole(role) }),
+    }),
+  )
+}
+
+/** Attribue ou retire une certification décorative (modérateur/admin). */
+export async function updateUserCertification(
+  id: string,
+  certification: UserCertification,
+): Promise<void> {
+  await expectOk(
+    await apiFetch(`/profils/${id}/certification`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ certification }),
     }),
   )
 }

@@ -29,6 +29,7 @@ func RegisterRoutes(r *gin.Engine, serviceName string, profils *service.ProfilSe
 		p.PATCH("/me", auth, h.UpdateMe)
 		p.PATCH("/me/activity", auth, h.TouchActivity)
 		p.PATCH("/me/activity/offline", auth, h.TouchActivityOffline)
+		p.PATCH("/:userId/certification", auth, h.UpdateCertification)
 
 		// Lecture publique.
 		p.GET("/search", h.Search) // ?q= : recherche par display_name

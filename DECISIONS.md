@@ -6,6 +6,29 @@
 
 ---
 
+## Certifications de profil : donnée décorative côté profil-service, staff dérivé du rôle (23/06/2026)
+
+> Besoin : permettre aux modérateurs/administrateurs d'attribuer une certification visible à côté du
+> `display_name` : jaune pour les personnalités politiques, bleue pour les personnalités publiques,
+> logo Breezy pour les modérateurs/administrateurs.
+
+- **La certification publique vit dans `profil-service`.** C'est une donnée décorative affichée avec
+  le `display_name`, comme l'avatar ou la bio ; elle ne doit pas vivre dans auth/user-service. Le champ
+  Mongo est `certification=none|political|public_figure`, avec défaut explicite à la création et
+  backfill boot idempotent à `none` pour les profils existants (Rule 5b + validateur strict).
+- **Le badge staff est dérivé du rôle, pas stocké comme certification.** Le rôle reste dans le JWT /
+  auth-service ; dupliquer `staff` dans profil-service créerait une incohérence possible lors d'une
+  promotion/rétrogradation. Le front affiche donc le logo Breezy dès qu'il connaît un rôle
+  `moderator` ou `administrator`, sinon il affiche la certification stockée.
+- **Écriture réservée aux modérateurs/admins.** Route `PATCH /profils/:userId/certification`
+  protégée par JWT et contrôlée dans le handler (mod ou admin). Le front l'expose dans
+  Modération › Comptes sous le menu `...`, afin que l'opération reste dans le flux de gouvernance
+  existant.
+- **Tooltip accessible web/mobile.** Le badge est un bouton/popover : `title`/hover/focus sur desktop,
+  clic/tap sur mobile, même libellé i18n dans les 12 langues.
+
+---
+
 ## Acceptation des CGU : consentement versionné persisté + modale bloquante (22/06/2026)
 
 > Besoin : forcer les comptes **déjà existants** (local + prod) à accepter les CGU à leur prochaine

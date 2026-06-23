@@ -1,4 +1,5 @@
 export type UserRole = 'user' | 'moderator' | 'administrator'
+export type UserCertification = 'none' | 'political' | 'public_figure'
 
 export interface User {
   id: string
@@ -57,6 +58,7 @@ export interface ProfilDetails {
   visibility: 'public' | 'private'
   likesVisibility: 'public' | 'private'
   activityVisibility: 'public' | 'private'
+  certification: UserCertification
   lastLoginAt: string
   isOnline: boolean
   /** Préférence « afficher le contenu NSFW » (toggle des paramètres, défaut on). */
@@ -96,4 +98,5 @@ export interface RelationUser {
   displayName: string
   bio: string
   avatarUrl: string
+  certification?: UserCertification
 }

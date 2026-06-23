@@ -15,7 +15,7 @@
 
 import { apiFetch } from '@/lib/auth-client'
 import { resolveMediaUrl } from '@/lib/media'
-import type { RelationUser } from '@/types'
+import type { RelationUser, UserCertification } from '@/types'
 
 /** Erreur d'appel API portant le code HTTP (pour distinguer 401/404/…). */
 export class ApiError extends Error {
@@ -46,6 +46,7 @@ interface ApiProfil {
   bio: string
   avatar_url: string
   banner_url: string
+  certification?: UserCertification
 }
 
 /** Déplie l'enveloppe `{ data }` ; lève une `ApiError` sur statut non-2xx. */
@@ -167,6 +168,7 @@ async function enrichFromUser(u: ApiUser): Promise<RelationUser> {
     displayName: p?.display_name?.trim() || u.username,
     bio: p?.bio ?? '',
     avatarUrl: resolveMediaUrl(p?.avatar_url),
+    certification: p?.certification ?? 'none',
   }
 }
 
@@ -180,6 +182,7 @@ async function enrichFromProfil(p: ApiProfil): Promise<RelationUser | null> {
     displayName: p.display_name?.trim() || u.username,
     bio: p.bio ?? '',
     avatarUrl: resolveMediaUrl(p.avatar_url),
+    certification: p.certification ?? 'none',
   }
 }
 
