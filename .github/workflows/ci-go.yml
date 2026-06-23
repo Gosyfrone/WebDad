@@ -88,9 +88,10 @@ jobs:
       # lisent MONGO_TEST_URI ; s'il est absent (run local), ils s'auto-ignorent
       # (t.Skip) — la base n'est donc requise qu'ici.
       #
-      # report-service : Mongo SANS auth, suffisant pour ses tests d'intégration.
-      - name: Start MongoDB (report-service integration tests)
-        if: matrix.service == 'report-service'
+      # report-service et post-service : Mongo SANS auth, suffisant pour leurs
+      # tests d'intégration.
+      - name: Start MongoDB (report-service & post-service integration tests)
+        if: matrix.service == 'report-service' || matrix.service == 'post-service'
         run: |
           docker run -d --name mongo-test -p 27017:27017 mongo:7
           for i in $(seq 1 30); do
@@ -146,7 +147,7 @@ jobs:
       - name: Test (race detector + coverage)
         env:
           MONGO_TEST_URI: >-
-            ${{ matrix.service == 'report-service' && 'mongodb://localhost:27017'
+            ${{ (matrix.service == 'report-service' || matrix.service == 'post-service') && 'mongodb://localhost:27017'
              || matrix.service == 'message-service' && 'mongodb://root:ci-test-root@localhost:27017/?authSource=admin'
              || '' }}
           USER_TEST_DSN: ${{ matrix.service == 'user-service' && 'host=localhost port=5432 user=postgres password=ci-test dbname=usertest sslmode=disable' || '' }}

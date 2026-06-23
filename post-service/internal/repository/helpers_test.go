@@ -51,6 +51,17 @@ func TestSortProfilePosts(t *testing.T) {
 	if posts[1].Content != "récent" || posts[2].Content != "ancien" {
 		t.Fatalf("ordre anté-chronologique attendu ensuite, got %q puis %q", posts[1].Content, posts[2].Content)
 	}
+
+	// Épinglé EN TÊTE de l'entrée : force le comparateur dans l'autre sens
+	// (i non épinglé vs j épinglé → false), couvrant la branche symétrique.
+	posts2 := []models.Post{
+		{Content: "épinglé", CreatedAt: older, PinnedAt: &pinnedAt},
+		{Content: "récent", CreatedAt: now},
+	}
+	sortProfilePosts(posts2)
+	if posts2[0].Content != "épinglé" {
+		t.Fatalf("l'épinglé doit rester en tête, got %q", posts2[0].Content)
+	}
 }
 
 func TestNotHidden(t *testing.T) {
