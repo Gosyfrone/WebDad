@@ -35,7 +35,11 @@ func init() {
 // fakeSvcDrv : driver pilotable par test. Les tests remplissent gFakeDrv.queries
 // avant chaque appel ; la file est consommée dans l'ordre (FIFO).
 type fakeSvcDrv struct {
-	queries []*fakeQ
+	queries         []*fakeQ
+	beginErr        error
+	commitErr       error
+	rowsAffected    int64
+	rowsAffectedErr error
 }
 
 type fakeQ struct {
@@ -44,7 +48,13 @@ type fakeQ struct {
 	err  error
 }
 
-func (d *fakeSvcDrv) reset() { d.queries = nil }
+func (d *fakeSvcDrv) reset() {
+	d.queries = nil
+	d.beginErr = nil
+	d.commitErr = nil
+	d.rowsAffected = 1
+	d.rowsAffectedErr = nil
+}
 
 // driver.Driver
 func (d *fakeSvcDrv) Open(_ string) (driver.Conn, error) {
@@ -56,12 +66,17 @@ type fakeSvcConn struct{ drv *fakeSvcDrv }
 func (c *fakeSvcConn) Prepare(_ string) (driver.Stmt, error) {
 	return &fakeSvcStmt{drv: c.drv}, nil
 }
-func (c *fakeSvcConn) Close() error              { return nil }
-func (c *fakeSvcConn) Begin() (driver.Tx, error) { return &fakeSvcTx{}, nil }
+func (c *fakeSvcConn) Close() error { return nil }
+func (c *fakeSvcConn) Begin() (driver.Tx, error) {
+	if c.drv.beginErr != nil {
+		return nil, c.drv.beginErr
+	}
+	return &fakeSvcTx{drv: c.drv}, nil
+}
 
-type fakeSvcTx struct{}
+type fakeSvcTx struct{ drv *fakeSvcDrv }
 
-func (t *fakeSvcTx) Commit() error   { return nil }
+func (t *fakeSvcTx) Commit() error   { return t.drv.commitErr }
 func (t *fakeSvcTx) Rollback() error { return nil }
 
 type fakeSvcStmt struct{ drv *fakeSvcDrv }
@@ -77,7 +92,7 @@ func (s *fakeSvcStmt) Exec(_ []driver.Value) (driver.Result, error) {
 			return nil, q.err
 		}
 	}
-	return &fakeSvcResult{n: 1}, nil
+	return &fakeSvcResult{n: s.drv.rowsAffected, err: s.drv.rowsAffectedErr}, nil
 }
 
 func (s *fakeSvcStmt) Query(_ []driver.Value) (driver.Rows, error) {
@@ -109,10 +124,13 @@ func (r *fakeSvcRows) Next(dest []driver.Value) error {
 	return nil
 }
 
-type fakeSvcResult struct{ n int64 }
+type fakeSvcResult struct {
+	n   int64
+	err error
+}
 
 func (r *fakeSvcResult) LastInsertId() (int64, error) { return 0, nil }
-func (r *fakeSvcResult) RowsAffected() (int64, error) { return r.n, nil }
+func (r *fakeSvcResult) RowsAffected() (int64, error) { return r.n, r.err }
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 

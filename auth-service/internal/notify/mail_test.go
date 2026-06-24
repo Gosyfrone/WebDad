@@ -82,3 +82,10 @@ func TestSend_URLInjoignable_RetourneErreur(t *testing.T) {
 		t.Fatal("URL injoignable devrait retourner une erreur")
 	}
 }
+
+func TestSend_URLInvalide_RetourneErreur(t *testing.T) {
+	c := NewMailClient("://bad-url", "s")
+	if err := c.Send("a@b.com", "sub", "", "text"); err == nil {
+		t.Fatal("URL invalide devrait retourner une erreur")
+	}
+}
