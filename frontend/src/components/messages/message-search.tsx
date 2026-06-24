@@ -114,7 +114,7 @@ function SearchResult({ message, query }: { message: ChatMessage; query: string 
         <div className="flex items-baseline justify-between gap-2">
           <span className="flex min-w-0 items-center gap-1 text-sm font-semibold text-foreground">
             <span className="truncate">{sender?.displayName ?? '…'}</span>
-            <CertificationBadge certification={sender?.certification} className="h-4 w-4" />
+            <CertificationBadge userId={sender?.id} certification={sender?.certification} className="h-4 w-4" />
           </span>
           <span className="shrink-0 text-[11px] text-muted-foreground">
             {formatDateTime(message.createdAt, locale)}

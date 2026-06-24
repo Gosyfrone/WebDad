@@ -215,7 +215,7 @@ export function SidebarLeft() {
               <div className="flex min-w-0 flex-1 flex-col text-left">
                 <span className="flex min-w-0 items-center gap-1 text-sm font-bold">
                   <span className="truncate">{shownName}</span>
-                  <CertificationBadge certification={profil?.certification} role={profil?.role} className="h-4 w-4" />
+                  <CertificationBadge userId={profil?.userId} certification={profil?.certification} role={profil?.role} className="h-4 w-4" />
                 </span>
                 <span className="truncate text-sm text-muted-foreground">{handle}</span>
               </div>

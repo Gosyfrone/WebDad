@@ -56,6 +56,7 @@ func newTestRouter(t *testing.T) *gin.Engine {
 	r.PUT("/auth/users/:id/role", jwtMW, middleware.AdminOnly(), h.SetRole)
 	r.PATCH("/auth/users/:id/status", jwtMW, middleware.ModeratorOnly(), h.SetStatus)
 	r.DELETE("/auth/users/:id", jwtMW, middleware.AdminOnly(), h.DeleteUser)
+	r.GET("/auth/users/roles", jwtMW, h.PublicRoles)
 	r.GET("/auth/users", jwtMW, middleware.ModeratorOnly(), h.ListUsers)
 	return r
 }

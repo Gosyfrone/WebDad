@@ -322,7 +322,7 @@ function MemberRow({
       <div className="flex min-w-0 flex-1 flex-col">
         <span className="flex min-w-0 items-center gap-1 text-sm font-semibold text-foreground">
           <span className="truncate">{user?.displayName ?? '…'}</span>
-          <CertificationBadge certification={user?.certification} className="h-4 w-4" />
+          <CertificationBadge userId={user?.id} certification={user?.certification} className="h-4 w-4" />
           {isSelf && <span className="ml-1 text-xs text-muted-foreground">({t('messages.you')})</span>}
         </span>
         <Badge variant="secondary" className="mt-0.5 w-fit text-[10px]">

@@ -179,7 +179,7 @@ export function NotificationsView() {
                           <ProfilLink author={n.actor} className="relative z-10 font-semibold hover:underline">
                             {n.actor.displayName}
                           </ProfilLink>
-                          <CertificationBadge certification={n.actor.certification} className="h-4 w-4" />
+                          <CertificationBadge userId={n.actor.id} certification={n.actor.certification} className="h-4 w-4" />
                         </span>
                       </>
                     ) : (
@@ -188,7 +188,7 @@ export function NotificationsView() {
                           <ProfilLink author={n.actor} className="relative z-10 font-semibold hover:underline">
                             {n.actor.displayName}
                           </ProfilLink>
-                          <CertificationBadge certification={n.actor.certification} className="h-4 w-4" />
+                          <CertificationBadge userId={n.actor.id} certification={n.actor.certification} className="h-4 w-4" />
                         </span>{' '}
                         {/* describe() commence toujours par « {name} » → on retire le nom
                             (déjà rendu en lien gras) + l'espace qui suit. */}

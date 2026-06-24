@@ -299,6 +299,25 @@ func TestListUsers_RoleAdmin_200(t *testing.T) {
 	}
 }
 
+func TestPublicRoles_GuardsAndDB(t *testing.T) {
+	r := newTestRouter(t)
+	req := httptest.NewRequest(http.MethodGet, "/auth/users/roles?ids=u1,u2", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("public roles sans token = %d, attendu 401", w.Code)
+	}
+
+	tok := makeAuthToken(t, models.RoleUser)
+	req = httptest.NewRequest(http.MethodGet, "/auth/users/roles?ids=u1,u2", nil)
+	req.Header.Set("Authorization", "Bearer "+tok)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("public roles DB nil = %d, attendu 500", w.Code)
+	}
+}
+
 func TestSetRole_SurSoiMême_400(t *testing.T) {
 	r := newTestRouter(t)
 	tok := makeAuthToken(t, models.RoleAdmin)

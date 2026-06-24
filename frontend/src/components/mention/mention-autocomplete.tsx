@@ -65,7 +65,7 @@ export function MentionAutocomplete({
           <div className="flex min-w-0 flex-col leading-tight">
             <span className="flex min-w-0 items-center gap-1 text-sm font-semibold text-foreground">
               <span className="truncate">{c.displayName}</span>
-              <CertificationBadge certification={c.certification} className="h-4 w-4" />
+              <CertificationBadge userId={c.id} certification={c.certification} className="h-4 w-4" />
             </span>
             <span className="truncate text-xs text-muted-foreground">@{c.username}</span>
           </div>

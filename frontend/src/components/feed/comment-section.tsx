@@ -883,7 +883,7 @@ export function CommentRow({
           >
             {comment.author.displayName}
           </ProfilLink>
-          <CertificationBadge certification={comment.author.certification} className="h-4 w-4" />
+          <CertificationBadge userId={comment.author.id} certification={comment.author.certification} className="h-4 w-4" />
           {comment.author.username && (
             <ProfilLink
               onClick={stop}

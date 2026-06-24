@@ -123,14 +123,18 @@ func TestPushEvents(t *testing.T) {
 	svc.pushDeleted("recipient", "notification-id")
 	svc.pushRefresh("recipient")
 	svc.pushFollowRequestDecision("recipient", "actor", "accepted")
+	svc.pushIdentityUpdate(models.Event{TargetUserID: "target", Certification: "political", Role: "moderator"})
 
-	if len(pub.events) != 4 {
-		t.Fatalf("nombre d'événements publiés = %d, attendu 4", len(pub.events))
+	if len(pub.events) != 5 {
+		t.Fatalf("nombre d'événements publiés = %d, attendu 5", len(pub.events))
 	}
-	for i, recipients := range pub.userIDs {
+	for i, recipients := range pub.userIDs[:4] {
 		if len(recipients) != 1 || recipients[0] != "recipient" {
 			t.Errorf("publication %d vers %#v, attendu recipient", i, recipients)
 		}
+	}
+	if pub.userIDs[4] != nil {
+		t.Fatalf("identity update doit être broadcast, obtenu %#v", pub.userIDs[4])
 	}
 
 	notification := pub.events[0].(map[string]any)
@@ -149,6 +153,10 @@ func TestPushEvents(t *testing.T) {
 	if decision["type"] != "follow_request_decision" {
 		t.Errorf("décision publiée = %#v", decision)
 	}
+	identity := pub.events[4].(map[string]any)
+	if identity["type"] != "identity_updated" {
+		t.Errorf("identité publiée = %#v", identity)
+	}
 }
 
 func TestHandleEventEarlyReturns(t *testing.T) {
@@ -157,6 +165,7 @@ func TestHandleEventEarlyReturns(t *testing.T) {
 		ev   models.Event
 	}{
 		{"type inconnu", models.Event{Type: "unknown"}},
+		{"identity sans cible", models.Event{Type: models.EventIdentityUpdated}},
 		{"message sans destinataire", models.Event{Type: models.TypeMessage, ActorID: "actor", ConversationID: "conv"}},
 		{"message à soi-même", models.Event{Type: models.TypeMessage, ActorID: "actor", RecipientID: "actor", ConversationID: "conv"}},
 		{"message sans conversation", models.Event{Type: models.TypeMessage, ActorID: "actor", RecipientID: "recipient"}},
@@ -181,6 +190,27 @@ func TestHandleEventEarlyReturns(t *testing.T) {
 				t.Fatalf("publications inattendues = %#v", pub.events)
 			}
 		})
+	}
+}
+
+func TestHandleEventIdentityUpdateBroadcasts(t *testing.T) {
+	pub := &historyPublisher{}
+	svc := NewNotificationService(nil, pub, nil)
+	if err := svc.HandleEvent(context.Background(), models.Event{
+		Type:          models.EventIdentityUpdated,
+		ActorID:       "actor",
+		TargetUserID:  "target",
+		Certification: "public_figure",
+		Role:          "admin",
+	}); err != nil {
+		t.Fatalf("HandleEvent(identity) = %v", err)
+	}
+	if len(pub.events) != 1 || pub.userIDs[0] != nil {
+		t.Fatalf("broadcast identity = recipients %#v events %#v", pub.userIDs, pub.events)
+	}
+	data := pub.events[0].(map[string]any)["data"].(map[string]string)
+	if data["user_id"] != "target" || data["certification"] != "public_figure" || data["role"] != "admin" {
+		t.Fatalf("payload identité = %#v", data)
 	}
 }
 

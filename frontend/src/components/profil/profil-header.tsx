@@ -197,7 +197,7 @@ export function ProfilHeader({
             <h1 className="text-xl font-extrabold text-foreground">
               {profil.displayName}
             </h1>
-            <CertificationBadge certification={profil.certification} role={profil.role} />
+            <CertificationBadge userId={profil.userId} certification={profil.certification} role={profil.role} />
             <Badge variant="secondary">{t(`role.${profil.role}`)}</Badge>
             {profil.gender && (
               <span

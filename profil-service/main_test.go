@@ -10,6 +10,7 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	"github.com/webdad/profil-service/internal/config"
+	"github.com/webdad/profil-service/internal/handler"
 	"github.com/webdad/profil-service/internal/service"
 )
 
@@ -93,7 +94,7 @@ func testAppDeps(client *fakeAppMongoClient) appDeps {
 		newProfilService: func(any, *config.Config) *service.ProfilService {
 			return nil
 		},
-		registerRoutes: func(*gin.Engine, string, *service.ProfilService, string) {},
+		registerRoutes: func(*gin.Engine, string, *service.ProfilService, string, ...handler.IdentityEmitter) {},
 		runServer: func(*gin.Engine, string) error {
 			return nil
 		},

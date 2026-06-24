@@ -96,7 +96,7 @@ export function BlockedUsersSettings() {
                   <span className="min-w-0 flex-1">
                     <span className="flex min-w-0 items-center gap-1 text-sm font-semibold text-foreground">
                       <span className="truncate">{user.displayName}</span>
-                      <CertificationBadge certification={user.certification} className="h-4 w-4" />
+                      <CertificationBadge userId={user.id} certification={user.certification} className="h-4 w-4" />
                     </span>
                     <span className="block truncate text-xs text-muted-foreground">@{user.username}</span>
                   </span>

@@ -190,7 +190,7 @@ export function MobileHeader() {
               <div className="flex min-w-0 flex-col">
                 <div className="flex min-w-0 items-center gap-1">
                   <SheetTitle className="truncate">{shownName}</SheetTitle>
-                  <CertificationBadge certification={profil?.certification} role={profil?.role} className="h-4 w-4" />
+                  <CertificationBadge userId={profil?.userId} certification={profil?.certification} role={profil?.role} className="h-4 w-4" />
                 </div>
                 <SheetDescription className="truncate">
                   {handle} · {displayedRole ? t(`role.${displayedRole}`) : t('common.not_connected')}

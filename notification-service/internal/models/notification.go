@@ -46,6 +46,7 @@ const (
 const (
 	EventPostDeleted           = "post_deleted"
 	EventFollowRequestRejected = "follow_request_rejected"
+	EventIdentityUpdated       = "identity_updated"
 )
 
 // Notification — document de la collection `notifications`. Une notification est
@@ -99,10 +100,13 @@ type Notification struct {
 type Event struct {
 	Type           string   `json:"type" binding:"required"`
 	ActorID        string   `json:"actor_id" binding:"required"`
+	TargetUserID   string   `json:"target_user_id"`
 	RecipientID    string   `json:"recipient_id"`
 	PostID         string   `json:"post_id"`
 	CommentID      string   `json:"comment_id"`
 	ConversationID string   `json:"conversation_id"`
+	Certification  string   `json:"certification"`
+	Role           string   `json:"role"`
 	MentionHandles []string `json:"mention_handles"`
 	Retract        bool     `json:"retract"`
 }

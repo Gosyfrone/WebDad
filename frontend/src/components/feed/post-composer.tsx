@@ -770,7 +770,7 @@ function QuotePreview({ post }: { post: FeedPost }) {
       <div className="mb-1 flex min-w-0 items-center gap-1.5 text-xs">
         <span className="flex min-w-0 items-center gap-1 font-bold text-foreground">
           <span className="truncate">{post.author.displayName}</span>
-          <CertificationBadge certification={post.author.certification} className="h-4 w-4" />
+          <CertificationBadge userId={post.author.id} certification={post.author.certification} className="h-4 w-4" />
         </span>
         {post.author.username && (
           <span className="shrink-0 text-muted-foreground">@{post.author.username}</span>

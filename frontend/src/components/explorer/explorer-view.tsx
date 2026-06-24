@@ -440,7 +440,7 @@ function LiveSearchMenu({
                   <span className="min-w-0">
                     <span className="flex min-w-0 items-center gap-1 font-bold text-foreground">
                       <span className="truncate">{user.displayName}</span>
-                      <CertificationBadge certification={user.certification} className="h-4 w-4" />
+                      <CertificationBadge userId={user.id} certification={user.certification} className="h-4 w-4" />
                     </span>
                     <span className="block truncate text-sm text-muted-foreground">@{user.username}</span>
                   </span>
@@ -708,7 +708,7 @@ function SuggestionCard({
             >
               {user.displayName}
             </ProfilLink>
-            <CertificationBadge certification={user.certification} className="h-4 w-4" />
+            <CertificationBadge userId={user.id} certification={user.certification} className="h-4 w-4" />
           </span>
           <ProfilLink
             author={{ id: user.id, username: user.username }}
@@ -799,7 +799,7 @@ function ExplorerUserRow({
           >
             {user.displayName}
           </ProfilLink>
-          <CertificationBadge certification={user.certification} className="h-4 w-4" />
+          <CertificationBadge userId={user.id} certification={user.certification} className="h-4 w-4" />
         </span>
         <ProfilLink
           author={{ id: user.id, username: user.username }}

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -43,6 +44,27 @@ func (h *Handler) ListUsers(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"data": users})
+}
+
+// PublicRoles : GET /auth/users/roles?ids=... — rôles d'affichage publics.
+// @Summary     Rôles publics d'affichage
+// @Tags        auth
+// @Produce     json
+// @Security    BearerAuth
+// @Param       ids query string true "IDs utilisateurs séparés par des virgules"
+// @Success     200 {object} map[string]interface{} "data: []PublicRole"
+// @Failure     401 {object} map[string]string "Non authentifié"
+// @Failure     500 {object} map[string]string "Erreur interne"
+// @Router      /auth/users/roles [get]
+func (h *Handler) PublicRoles(c *gin.Context) {
+	ids := strings.Split(c.Query("ids"), ",")
+	roles, err := h.auth.PublicRoles(ids)
+	if err != nil {
+		logging.FromGin(c).Error("rôles publics : erreur DB", "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "rôles publics impossibles"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": roles})
 }
 
 // AdminCreateUser : POST /auth/users — crée un compte de force (admin).

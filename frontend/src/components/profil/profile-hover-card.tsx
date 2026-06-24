@@ -412,7 +412,7 @@ function ProfilePreview({
           >
             {profil.displayName}
           </Link>
-          <CertificationBadge certification={profil.certification} role={profil.role} />
+          <CertificationBadge userId={profil.userId} certification={profil.certification} role={profil.role} />
         </div>
         <div className="flex min-w-0 items-center gap-2">
           <Link

@@ -20,6 +20,7 @@
 import { apiFetch, getAccessToken } from '@/lib/auth-client'
 import { API_URL } from '@/lib/config'
 import { resolveMediaUrl } from '@/lib/media'
+import { dispatchIdentityUpdate, mapPublicRole } from '@/lib/user-roles'
 import type { UserCertification } from '@/types'
 
 export type NotificationType =
@@ -280,7 +281,7 @@ export function connectNotifications(handlers: NotificationHandlers): RealtimeHa
     socket.onmessage = (event) => {
       let payload: {
         type?: string
-        data?: ApiNotification | { id: string } | { actor_id?: string; status?: string }
+        data?: ApiNotification | { id: string } | { actor_id?: string; status?: string } | { user_id?: string; certification?: UserCertification; role?: string }
       }
       try {
         payload = JSON.parse(event.data as string)
@@ -300,6 +301,15 @@ export function connectNotifications(handlers: NotificationHandlers): RealtimeHa
           (data.status === 'accepted' || data.status === 'rejected')
         ) {
           handlers.onFollowRequestDecision?.({ actorId: data.actor_id, status: data.status })
+        }
+      } else if (payload.type === 'identity_updated' && payload.data) {
+        const data = payload.data as { user_id?: string; certification?: UserCertification; role?: string }
+        if (data.user_id) {
+          dispatchIdentityUpdate({
+            userId: data.user_id,
+            certification: data.certification,
+            role: data.role ? mapPublicRole(data.role) : undefined,
+          })
         }
       }
     }

@@ -15,12 +15,14 @@ import (
 
 // Config regroupe la configuration runtime du service.
 type Config struct {
-	Port      string
-	GinMode   string
-	MongoURI  string
-	MongoDB   string
-	JWTSecret string // secret partagé (validation des tokens émis par auth)
-	UserURL   string // URL user-service utilisée pour lire le graphe social interne
+	Port                string
+	GinMode             string
+	MongoURI            string
+	MongoDB             string
+	JWTSecret           string // secret partagé (validation des tokens émis par auth)
+	UserURL             string // URL user-service utilisée pour lire le graphe social interne
+	NotificationURL     string // URL notification-service pour les événements WS internes
+	InternalEventSecret string // secret partagé POST /internal/events
 
 	// DisplayNameCooldown : délai minimal imposé entre deux changements de
 	// display_name. 0 = désactivé (défaut) — le timestamp est tout de même
@@ -47,6 +49,8 @@ func Load() *Config {
 		MongoDB:             getEnv("MONGO_INITDB_DATABASE", "webdad_profil"),
 		JWTSecret:           os.Getenv("JWT_SECRET"),
 		UserURL:             getEnv("USER_SERVICE_URL", defaultUserServiceURL()),
+		NotificationURL:     getEnv("NOTIFICATION_SERVICE_URL", defaultNotificationServiceURL()),
+		InternalEventSecret: os.Getenv("INTERNAL_EVENT_SECRET"),
 		DisplayNameCooldown: parseDuration("DISPLAY_NAME_CHANGE_COOLDOWN", 0),
 	}
 
@@ -55,6 +59,13 @@ func Load() *Config {
 	}
 
 	return cfg
+}
+
+func defaultNotificationServiceURL() string {
+	if os.Getenv("DOCKERIZED") == "true" {
+		return "http://notification-service:8086"
+	}
+	return "http://localhost:8086"
 }
 
 func defaultUserServiceURL() string {

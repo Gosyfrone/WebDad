@@ -24,6 +24,18 @@ type memoryProfilRepo struct {
 	err     error
 }
 
+type memoryIdentityEmitter struct {
+	userID        string
+	certification string
+	role          string
+}
+
+func (m *memoryIdentityEmitter) EmitIdentityUpdated(userID, certification, role string) {
+	m.userID = userID
+	m.certification = certification
+	m.role = role
+}
+
 func newMemoryProfilRepo(profils ...*models.Profil) *memoryProfilRepo {
 	repo := &memoryProfilRepo{profils: map[string]*models.Profil{}}
 	for _, p := range profils {
@@ -308,7 +320,11 @@ func TestHandlerSuccess_UpdateCertification(t *testing.T) {
 		DisplayName:   "Alice",
 		Certification: models.CertificationNone,
 	})
-	r := newSuccessRouter(t, repo)
+	emitter := &memoryIdentityEmitter{}
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(gin.Recovery())
+	RegisterRoutes(r, "profil-service", service.New(repo, 0), "test-secret", emitter)
 	modToken := makeProfilToken(t, models.RoleModerator)
 
 	w := httptest.NewRecorder()
@@ -326,6 +342,9 @@ func TestHandlerSuccess_UpdateCertification(t *testing.T) {
 	data := body["data"].(map[string]any)
 	if data["certification"] != models.CertificationPolitical {
 		t.Fatalf("certification reponse = %#v", data["certification"])
+	}
+	if emitter.userID != "target" || emitter.certification != models.CertificationPolitical || emitter.role != "" {
+		t.Fatalf("événement identité = %#v", emitter)
 	}
 }
 

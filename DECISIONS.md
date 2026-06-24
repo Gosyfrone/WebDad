@@ -20,6 +20,14 @@
   auth-service ; dupliquer `staff` dans profil-service créerait une incohérence possible lors d'une
   promotion/rétrogradation. Le front affiche donc le logo Breezy dès qu'il connaît un rôle
   `moderator` ou `administrator`, sinon il affiche la certification stockée.
+- **Lecture minimale du rôle public via auth-service.** Comme les posts/messages/recherches ne portent
+  pas toujours le rôle, `GET /auth/users/roles?ids=...` renvoie uniquement `{user_id, role}` pour les
+  rôles d'affichage staff. On évite de dupliquer le rôle dans user/profil-service et on n'expose pas
+  d'e-mail, d'état de session ou de donnée sensible.
+- **Mise à jour instantanée via le bus WS notification existant.** Après un changement de certification,
+  profil-service émet `identity_updated` vers notification-service (secret interne, best-effort), qui
+  broadcast aux clients connectés. Le badge local écoute cet événement et met à jour `certification` /
+  `role` sans rechargement, en gardant le backend autoritaire pour les droits.
 - **Écriture réservée aux modérateurs/admins.** Route `PATCH /profils/:userId/certification`
   protégée par JWT et contrôlée dans le handler (mod ou admin). Le front l'expose dans
   Modération › Comptes sous le menu `...`, afin que l'opération reste dans le flux de gouvernance

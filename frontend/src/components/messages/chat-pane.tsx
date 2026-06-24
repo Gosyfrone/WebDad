@@ -667,7 +667,7 @@ function ChatHeader({
             >
               {title}
             </ProfilLink>
-            <CertificationBadge certification={peer?.certification} className="h-4 w-4" />
+            <CertificationBadge userId={peer?.id} certification={peer?.certification} className="h-4 w-4" />
           </span>
         ) : (
           <span className="truncate text-sm font-bold text-foreground">
@@ -791,7 +791,7 @@ function MessageBubble({
           </Avatar>
           <span className="flex min-w-0 items-center gap-1 text-xs font-semibold text-muted-foreground">
             <span className="truncate">{sender?.displayName ?? '…'}</span>
-            <CertificationBadge certification={sender?.certification} className="h-4 w-4" />
+            <CertificationBadge userId={sender?.id} certification={sender?.certification} className="h-4 w-4" />
           </span>
         </div>
       )}

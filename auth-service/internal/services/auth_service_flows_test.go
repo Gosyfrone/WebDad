@@ -252,6 +252,21 @@ func TestTokenRefreshVerificationAndAdministrationFlows(t *testing.T) {
 			t.Fatalf("RoleOf: %q %v", role, err)
 		}
 
+		gFakeDrv.queries = []*fakeQ{{
+			cols: []string{"id", "role"},
+			rows: [][]driver.Value{
+				{"u1", models.RoleModerator},
+				{"u2", models.RoleAdmin},
+			},
+		}}
+		roles, err := s.PublicRoles([]string{"u1", "u2", "u1", ""})
+		if err != nil || len(roles) != 2 || roles[0].Role != models.RoleModerator || roles[1].Role != models.RoleAdmin {
+			t.Fatalf("PublicRoles: %#v %v", roles, err)
+		}
+		if roles, err := s.PublicRoles(nil); err != nil || len(roles) != 0 {
+			t.Fatalf("PublicRoles vide: %#v %v", roles, err)
+		}
+
 		gFakeDrv.queries = []*fakeQ{{}, {}}
 		if err := s.SetActive("u1", false); err != nil {
 			t.Fatal(err)

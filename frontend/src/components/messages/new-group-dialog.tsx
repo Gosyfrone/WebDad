@@ -110,7 +110,7 @@ export function NewGroupDialog({ open, onOpenChange, myId, onCreated }: NewGroup
                   </Avatar>
                   <span className="flex min-w-0 items-center gap-1 font-semibold">
                     <span className="truncate">{m.displayName}</span>
-                    <CertificationBadge certification={m.certification} className="h-4 w-4" />
+                    <CertificationBadge userId={m.id} certification={m.certification} className="h-4 w-4" />
                   </span>
                   <button
                     type="button"

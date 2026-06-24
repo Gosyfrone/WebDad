@@ -192,7 +192,7 @@ export function SearchSuggestionsDropdown({
               <span className="min-w-0">
                 <span className="flex min-w-0 items-center gap-1 text-[15px] font-bold leading-5">
                   <span className="truncate">{user.displayName}</span>
-                  <CertificationBadge certification={user.certification} className="h-4 w-4" />
+                  <CertificationBadge userId={user.id} certification={user.certification} className="h-4 w-4" />
                 </span>
                 <span className="block truncate text-[15px] leading-5 text-white/45">
                   @{user.username}

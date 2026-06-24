@@ -70,6 +70,10 @@ composed by the **caller** (front/BFF).
   by the viewer; clients have no-op fallbacks for autonomy.
 - **Notifications (server→server):** post/message/user-service POST best-effort fire-and-forget
   events to notification-service `/internal/events` (secret `INTERNAL_EVENT_SECRET`, off the gateway).
+- **Identity badge refresh:** profil-service emits best-effort `identity_updated` events after a
+  certification change; notification-service broadcasts them through the existing notifications WS.
+  Frontend badges also query auth-service `GET /auth/users/roles?ids=...` for the minimal public
+  display role so staff badges stay derived from auth rather than duplicated in profil-service.
 - **Auto-moderation (server→server):** when a post crosses the admin-set report threshold, report-service
   POSTs best-effort to post-service `/internal/posts/:id/auto-hide` (and `…/auto-unhide` on approval),
   off the gateway, authenticated by `X-Internal-Secret` (same shared secret). Post-service owns the

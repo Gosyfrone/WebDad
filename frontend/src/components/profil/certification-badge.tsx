@@ -1,25 +1,60 @@
 'use client'
 
 import Image from 'next/image'
+import { useEffect, useState } from 'react'
 
 import { useLanguage } from '@/components/language-provider'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { getUserRole, subscribeIdentityUpdate } from '@/lib/user-roles'
 import { cn } from '@/lib/utils'
 import type { UserCertification, UserRole } from '@/types'
 
 interface CertificationBadgeProps {
+  userId?: string
   certification?: UserCertification
   role?: UserRole
   className?: string
 }
 
 export function CertificationBadge({
+  userId = '',
   certification = 'none',
   role = 'user',
   className,
 }: CertificationBadgeProps) {
   const { t } = useLanguage()
-  const kind = badgeKind(certification, role)
+  const [currentCertification, setCurrentCertification] = useState<UserCertification>(certification)
+  const [currentRole, setCurrentRole] = useState<UserRole>(role)
+
+  useEffect(() => {
+    setCurrentCertification(certification)
+  }, [certification])
+
+  useEffect(() => {
+    setCurrentRole(role)
+  }, [role])
+
+  useEffect(() => {
+    if (!userId) return
+    let cancelled = false
+    void getUserRole(userId)
+      .then((resolvedRole) => {
+        if (!cancelled) setCurrentRole(resolvedRole)
+      })
+      .catch(() => {})
+
+    const unsubscribe = subscribeIdentityUpdate((update) => {
+      if (update.userId !== userId) return
+      if (update.certification) setCurrentCertification(update.certification)
+      if (update.role) setCurrentRole(update.role)
+    })
+    return () => {
+      cancelled = true
+      unsubscribe()
+    }
+  }, [userId])
+
+  const kind = badgeKind(currentCertification, currentRole)
   if (kind === 'none') return null
 
   const label = t(`certification.${kind}`)

@@ -107,7 +107,7 @@ export function UserListItem({
           >
             {user.displayName}
           </ProfilLink>
-          <CertificationBadge certification={user.certification} className="relative z-10 h-4 w-4" />
+          <CertificationBadge userId={user.id} certification={user.certification} className="relative z-10 h-4 w-4" />
         </span>
         <ProfilLink
           author={{ id: user.id, username: user.username }}

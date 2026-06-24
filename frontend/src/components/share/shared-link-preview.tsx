@@ -73,7 +73,7 @@ function PostPreview({ id }: { id: string }) {
           </Avatar>
           <span className="flex min-w-0 items-center gap-1 text-xs font-bold">
             <span className="truncate">{post.author.displayName}</span>
-            <CertificationBadge certification={post.author.certification} className="h-4 w-4" />
+            <CertificationBadge userId={post.author.id} certification={post.author.certification} className="h-4 w-4" />
           </span>
           {post.author.username && (
             <span className="truncate text-xs text-muted-foreground">@{post.author.username}</span>
@@ -115,7 +115,7 @@ function ProfilePreview({ handle }: { handle: string }) {
       <div className="flex min-w-0 flex-col">
         <span className="flex min-w-0 items-center gap-1 text-sm font-bold">
           <span className="truncate">{user.displayName}</span>
-          <CertificationBadge certification={user.certification} className="h-4 w-4" />
+          <CertificationBadge userId={user.id} certification={user.certification} className="h-4 w-4" />
         </span>
         <span className="truncate text-xs text-muted-foreground">@{user.username}</span>
       </div>

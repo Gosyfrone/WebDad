@@ -440,7 +440,7 @@ export function PostCard({ post, showPinBadge = false, focusCommentId, embedded 
             >
               {post.author.displayName}
             </ProfilLink>
-            <CertificationBadge certification={post.author.certification} className="h-4 w-4" />
+            <CertificationBadge userId={post.author.id} certification={post.author.certification} className="h-4 w-4" />
             {post.author.username && (
               <ProfilLink
                 author={post.author}
@@ -1059,7 +1059,7 @@ function QuotedPost({ post }: { post: FeedPost }) {
         <ProfilLink author={post.author} className="truncate font-bold text-foreground hover:underline">
           {post.author.displayName}
         </ProfilLink>
-        <CertificationBadge certification={post.author.certification} className="h-4 w-4" />
+        <CertificationBadge userId={post.author.id} certification={post.author.certification} className="h-4 w-4" />
         {post.author.username && (
           <ProfilLink author={post.author} className="shrink-0 text-muted-foreground hover:underline">
             @{post.author.username}
