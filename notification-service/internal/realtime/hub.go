@@ -87,6 +87,18 @@ func (h *Hub) Publish(userIDs []string, event any) {
 
 	h.mu.RLock()
 	defer h.mu.RUnlock()
+	if len(userIDs) == 0 {
+		for _, set := range h.conns {
+			for c := range set {
+				select {
+				case c.send <- data:
+				default:
+					_ = c.ws.Close()
+				}
+			}
+		}
+		return
+	}
 	for _, uid := range userIDs {
 		for c := range h.conns[uid] {
 			select {

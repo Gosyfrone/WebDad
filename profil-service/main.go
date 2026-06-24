@@ -39,7 +39,7 @@ type appDeps struct {
 	database         func(client appMongoClient, name string) any
 	ensureSchema     func(ctx context.Context, db any) error
 	newProfilService func(db any, cfg *config.Config) *service.ProfilService
-	registerRoutes   func(r *gin.Engine, serviceName string, profils *service.ProfilService, jwtSecret string)
+	registerRoutes   func(r *gin.Engine, serviceName string, profils *service.ProfilService, jwtSecret string, emitters ...handler.IdentityEmitter)
 	runServer        func(r *gin.Engine, addr string) error
 }
 
@@ -114,11 +114,13 @@ func runWithDeps(deps appDeps) error {
 	// conteneur = USER_SERVICE_URL absent de l'environnement (conteneur à recréer)
 	// → les appels inter-services (is-following, accept-all) échoueraient.
 	slog.Info("user-service", "url", cfg.UserURL)
+	slog.Info("notification-service", "url", cfg.NotificationURL)
 	profils := deps.newProfilService(db, cfg)
+	notifications := client.NewNotificationClient(cfg.NotificationURL, cfg.InternalEventSecret)
 
 	r := gin.New()
 	r.Use(middleware.RequestID(), middleware.Recovery(), middleware.RequestLogger())
-	deps.registerRoutes(r, serviceName, profils, cfg.JWTSecret)
+	deps.registerRoutes(r, serviceName, profils, cfg.JWTSecret, notifications)
 
 	slog.Info("en écoute", "port", cfg.Port)
 	return deps.runServer(r, ":"+cfg.Port)

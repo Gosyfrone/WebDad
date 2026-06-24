@@ -78,6 +78,7 @@ import { postHref } from '@/lib/routes'
 import { blockUser } from '@/lib/api'
 import { BLOCK_CHANGE_EVENT, emitBlockChange, type BlockChangeDetail } from '@/lib/use-block'
 import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
+import { CertificationBadge } from '@/components/profil/certification-badge'
 import { ProfilLink } from '@/components/profil/profil-link'
 import { ReportDialog } from '@/components/moderation/report-dialog'
 
@@ -439,6 +440,7 @@ export function PostCard({ post, showPinBadge = false, focusCommentId, embedded 
             >
               {post.author.displayName}
             </ProfilLink>
+            <CertificationBadge userId={post.author.id} certification={post.author.certification} className="h-4 w-4" />
             {post.author.username && (
               <ProfilLink
                 author={post.author}
@@ -1057,6 +1059,7 @@ function QuotedPost({ post }: { post: FeedPost }) {
         <ProfilLink author={post.author} className="truncate font-bold text-foreground hover:underline">
           {post.author.displayName}
         </ProfilLink>
+        <CertificationBadge userId={post.author.id} certification={post.author.certification} className="h-4 w-4" />
         {post.author.username && (
           <ProfilLink author={post.author} className="shrink-0 text-muted-foreground hover:underline">
             @{post.author.username}

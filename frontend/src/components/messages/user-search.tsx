@@ -8,6 +8,7 @@ import type { RelationUser } from '@/types'
 import { initialOf } from '@/lib/utils'
 import { useLanguage } from '@/components/language-provider'
 import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
+import { CertificationBadge } from '@/components/profil/certification-badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 
 interface UserSearchProps {
@@ -130,8 +131,9 @@ export function UserSearch({
                       <ActivityPresenceDot userId={user.id} />
                     </Avatar>
                     <div className="flex min-w-0 flex-col">
-                      <span className="truncate text-sm font-bold text-foreground">
-                        {user.displayName}
+                      <span className="flex min-w-0 items-center gap-1 text-sm font-bold text-foreground">
+                        <span className="truncate">{user.displayName}</span>
+                        <CertificationBadge userId={user.id} certification={user.certification} className="h-4 w-4" />
                       </span>
                       <span className="truncate text-xs text-muted-foreground">@{user.username}</span>
                     </div>

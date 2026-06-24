@@ -10,10 +10,10 @@ import (
 // RegisterRoutes enregistre les routes du service profil. jwtSecret protège
 // les routes mutables / personnelles (validation locale du token émis par
 // auth-service, même secret partagé).
-func RegisterRoutes(r *gin.Engine, serviceName string, profils *service.ProfilService, jwtSecret string) {
+func RegisterRoutes(r *gin.Engine, serviceName string, profils *service.ProfilService, jwtSecret string, emitters ...IdentityEmitter) {
 	auth := middleware.JWTAuth(jwtSecret)
 	optionalAuth := middleware.OptionalJWTAuth(jwtSecret)
-	h := NewProfilHandler(profils)
+	h := NewProfilHandler(profils, emitters...)
 
 	r.GET("/health", Health(serviceName))
 	r.POST("/profils", auth, h.Create)

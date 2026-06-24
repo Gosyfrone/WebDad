@@ -32,6 +32,7 @@ import { GifPicker } from '@/components/feed/gif-picker'
 import { MentionAutocomplete } from '@/components/mention/mention-autocomplete'
 import { TranslatedContent } from '@/components/feed/translated-content'
 import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
+import { CertificationBadge } from '@/components/profil/certification-badge'
 import { ProfilLink } from '@/components/profil/profil-link'
 
 const MAX_CHARS = 280
@@ -882,6 +883,7 @@ export function CommentRow({
           >
             {comment.author.displayName}
           </ProfilLink>
+          <CertificationBadge userId={comment.author.id} certification={comment.author.certification} className="h-4 w-4" />
           {comment.author.username && (
             <ProfilLink
               onClick={stop}

@@ -20,6 +20,8 @@
 import { apiFetch, getAccessToken } from '@/lib/auth-client'
 import { API_URL } from '@/lib/config'
 import { resolveMediaUrl } from '@/lib/media'
+import { dispatchIdentityUpdate, mapPublicRole } from '@/lib/user-roles'
+import type { UserCertification } from '@/types'
 
 export type NotificationType =
   | 'like'
@@ -85,6 +87,7 @@ interface ApiUser {
 interface ApiProfil {
   display_name?: string
   avatar_url?: string
+  certification?: UserCertification
 }
 
 // --- Types front -------------------------------------------------------------
@@ -95,6 +98,7 @@ export interface NotificationActor {
   username: string
   displayName: string
   avatarUrl: string
+  certification: UserCertification
 }
 
 /** Notification prête pour l'affichage. */
@@ -152,6 +156,7 @@ function resolveActor(userId: string): Promise<NotificationActor> {
       username: user?.username ?? '',
       displayName: profil?.display_name?.trim() || user?.username || 'Utilisateur',
       avatarUrl: resolveMediaUrl(profil?.avatar_url),
+      certification: profil?.certification ?? 'none',
     }
   })()
 
@@ -276,7 +281,7 @@ export function connectNotifications(handlers: NotificationHandlers): RealtimeHa
     socket.onmessage = (event) => {
       let payload: {
         type?: string
-        data?: ApiNotification | { id: string } | { actor_id?: string; status?: string }
+        data?: ApiNotification | { id: string } | { actor_id?: string; status?: string } | { user_id?: string; certification?: UserCertification; role?: string }
       }
       try {
         payload = JSON.parse(event.data as string)
@@ -296,6 +301,15 @@ export function connectNotifications(handlers: NotificationHandlers): RealtimeHa
           (data.status === 'accepted' || data.status === 'rejected')
         ) {
           handlers.onFollowRequestDecision?.({ actorId: data.actor_id, status: data.status })
+        }
+      } else if (payload.type === 'identity_updated' && payload.data) {
+        const data = payload.data as { user_id?: string; certification?: UserCertification; role?: string }
+        if (data.user_id) {
+          dispatchIdentityUpdate({
+            userId: data.user_id,
+            certification: data.certification,
+            role: data.role ? mapPublicRole(data.role) : undefined,
+          })
         }
       }
     }

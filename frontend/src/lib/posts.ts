@@ -8,7 +8,7 @@
 import { apiFetch, getAccessToken } from '@/lib/auth-client'
 import { API_URL } from '@/lib/config'
 import { resolveMediaUrl } from '@/lib/media'
-import type { ProfilDetails } from '@/types'
+import type { ProfilDetails, UserCertification } from '@/types'
 import { currentUserId, decodeClaims } from '@/lib/session'
 
 /** Erreur d'appel API portant le code HTTP. */
@@ -91,6 +91,7 @@ interface ApiProfil {
   avatar_url?: string
   visibility?: 'public' | 'private'
   activity_visibility?: 'public' | 'private'
+  certification?: UserCertification
   last_login_at?: string
   is_online?: boolean
 }
@@ -104,6 +105,7 @@ export interface PostAuthor {
   displayName: string
   avatarUrl: string
   visibility: 'public' | 'private'
+  certification: UserCertification
   lastLoginAt: string
   isOnline: boolean
 }
@@ -276,6 +278,7 @@ function authorFromProfil(profil: ProfilDetails): PostAuthor {
     displayName: profil.displayName || profil.username || 'Utilisateur',
     avatarUrl: profil.avatarUrl,
     visibility: profil.visibility,
+    certification: profil.certification,
     lastLoginAt: profil.lastLoginAt,
     isOnline: profil.isOnline,
   }
@@ -346,6 +349,7 @@ function resolveAuthor(userId: string): Promise<PostAuthor> {
         profil?.display_name?.trim() || user?.username || 'Utilisateur',
       avatarUrl: resolveMediaUrl(profil?.avatar_url),
       visibility: profil?.visibility === 'private' ? 'private' : 'public',
+      certification: profil?.certification ?? 'none',
       lastLoginAt: profil?.last_login_at ?? '',
       isOnline: Boolean(profil?.is_online),
     }
@@ -774,6 +778,7 @@ export async function listCommentsByAuthor(
     displayName: '...',
     avatarUrl: '',
     visibility: 'public',
+    certification: 'none',
     lastLoginAt: '',
     isOnline: false,
   }

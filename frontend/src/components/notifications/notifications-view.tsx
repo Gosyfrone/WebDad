@@ -11,6 +11,7 @@ import { useLanguage } from '@/components/language-provider'
 import { useNotifications } from '@/components/notifications-provider'
 import { ProfilLink } from '@/components/profil/profil-link'
 import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
+import { CertificationBadge } from '@/components/profil/certification-badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 
@@ -174,15 +175,21 @@ export function NotificationsView() {
                         <span className="text-foreground/90">
                           {t('notifications.follow_request_accept_confirm_prefix')}{' '}
                         </span>
-                        <ProfilLink author={n.actor} className="relative z-10 font-semibold hover:underline">
-                          {n.actor.displayName}
-                        </ProfilLink>
+                        <span className="inline-flex min-w-0 items-center gap-1 align-baseline">
+                          <ProfilLink author={n.actor} className="relative z-10 font-semibold hover:underline">
+                            {n.actor.displayName}
+                          </ProfilLink>
+                          <CertificationBadge userId={n.actor.id} certification={n.actor.certification} className="h-4 w-4" />
+                        </span>
                       </>
                     ) : (
                       <>
-                        <ProfilLink author={n.actor} className="relative z-10 font-semibold hover:underline">
-                          {n.actor.displayName}
-                        </ProfilLink>{' '}
+                        <span className="inline-flex min-w-0 items-center gap-1 align-baseline">
+                          <ProfilLink author={n.actor} className="relative z-10 font-semibold hover:underline">
+                            {n.actor.displayName}
+                          </ProfilLink>
+                          <CertificationBadge userId={n.actor.id} certification={n.actor.certification} className="h-4 w-4" />
+                        </span>{' '}
                         {/* describe() commence toujours par « {name} » → on retire le nom
                             (déjà rendu en lien gras) + l'espace qui suit. */}
                         <span className="text-foreground/90">

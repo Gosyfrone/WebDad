@@ -1200,6 +1200,54 @@ func (s *AuthService) RoleOf(id string) (string, error) {
 	return role, nil
 }
 
+// PublicRoles renvoie les rôles d'affichage pour une liste d'utilisateurs. Cette
+// donnée est publique dans l'UI (badge staff), mais l'authz reste strictement
+// fondée sur les JWT/guards serveur.
+func (s *AuthService) PublicRoles(ids []string) ([]models.PublicRole, error) {
+	seen := make(map[string]struct{}, len(ids))
+	clean := make([]string, 0, len(ids))
+	for _, id := range ids {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		clean = append(clean, id)
+	}
+	if len(clean) == 0 {
+		return []models.PublicRole{}, nil
+	}
+
+	placeholders := make([]string, len(clean))
+	args := make([]any, len(clean))
+	for i, id := range clean {
+		placeholders[i] = fmt.Sprintf("$%d", i+1)
+		args[i] = id
+	}
+	q := `SELECT id, role FROM credentials WHERE id IN (` + strings.Join(placeholders, ",") + `)`
+	rows, err := s.db.Query(q, args...)
+	if err != nil {
+		return nil, fmt.Errorf("liste rôles publics : %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	out := make([]models.PublicRole, 0, len(clean))
+	for rows.Next() {
+		var row models.PublicRole
+		if err := rows.Scan(&row.ID, &row.Role); err != nil {
+			return nil, fmt.Errorf("lecture rôle public : %w", err)
+		}
+		out = append(out, row)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("parcours rôles publics : %w", err)
+	}
+	return out, nil
+}
+
 // SetActive active/désactive un compte. Désactiver = bannir : bloque le login
 // ET le /refresh (cf. Login/Refresh), et on révoque immédiatement les refresh
 // tokens du compte pour tuer sa session courante au plus vite (sa session ne

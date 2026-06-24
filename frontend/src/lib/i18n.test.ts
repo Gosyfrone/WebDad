@@ -67,7 +67,7 @@ describe('translate', () => {
   it('replie sur fr si la clé manque dans la locale', () => {
     const firstKey = Object.keys(messages.fr)[0]
     // On teste avec une locale qui peut ne pas avoir la clé
-    const result = translate('en' as ReturnType<typeof DEFAULT_LOCALE>, firstKey)
+    const result = translate('en' as typeof DEFAULT_LOCALE, firstKey)
     expect(typeof result).toBe('string')
     expect(result.length).toBeGreaterThan(0)
   })

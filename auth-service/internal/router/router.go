@@ -93,6 +93,7 @@ func New(auth *services.AuthService, oauthReg *oauth.Registry) *gin.Engine {
 		//   - changement de rôle = GOUVERNANCE → admin uniquement.
 		admin := authGroup.Group("/users", middleware.JWTAuth(auth))
 		{
+			admin.GET("/roles", h.PublicRoles)
 			admin.GET("", middleware.ModeratorOnly(), h.ListUsers)
 			// Création forcée d'un compte (mot de passe temporaire) = GOUVERNANCE → admin.
 			admin.POST("", middleware.AdminOnly(), h.AdminCreateUser)

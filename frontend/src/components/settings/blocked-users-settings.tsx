@@ -7,6 +7,7 @@ import { Loader2, UserCheck, UserX } from 'lucide-react'
 import { useT } from '@/components/language-provider'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
+import { CertificationBadge } from '@/components/profil/certification-badge'
 import { useToast } from '@/hooks/use-toast'
 import { getBlockedUserIds, getUserById, unblockUser } from '@/lib/api'
 import { profilHref } from '@/lib/routes'
@@ -93,7 +94,10 @@ export function BlockedUsersSettings() {
                     </AvatarFallback>
                   </Avatar>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-semibold text-foreground">{user.displayName}</span>
+                    <span className="flex min-w-0 items-center gap-1 text-sm font-semibold text-foreground">
+                      <span className="truncate">{user.displayName}</span>
+                      <CertificationBadge userId={user.id} certification={user.certification} className="h-4 w-4" />
+                    </span>
                     <span className="block truncate text-xs text-muted-foreground">@{user.username}</span>
                   </span>
                 </Link>

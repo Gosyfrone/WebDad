@@ -9,7 +9,14 @@ import {
 import type { RelationUser } from '@/types'
 
 function makeUser(id: string): RelationUser {
-  return { id, username: `user${id}`, displayName: `User ${id}`, avatarUrl: null, isVerified: false }
+  return {
+    id,
+    username: `user${id}`,
+    displayName: `User ${id}`,
+    bio: '',
+    avatarUrl: '',
+    certification: 'none',
+  }
 }
 
 function mockLocalStorage(): Record<string, string> {

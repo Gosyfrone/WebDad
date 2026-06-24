@@ -12,6 +12,7 @@ import { CommentSection } from '@/components/feed/comment-section'
 import { PostActions } from '@/components/feed/post-actions'
 import { TranslatedContent } from '@/components/feed/translated-content'
 import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
+import { CertificationBadge } from '@/components/profil/certification-badge'
 import { ProfilLink } from '@/components/profil/profil-link'
 
 interface PostPhotoModalProps {
@@ -131,6 +132,7 @@ export function PostPhotoModal({ post, index, onClose }: PostPhotoModalProps) {
               <ProfilLink author={post.author} className="truncate font-bold text-foreground hover:underline">
                 {post.author.displayName}
               </ProfilLink>
+              <CertificationBadge userId={post.author.id} certification={post.author.certification} className="h-4 w-4" />
               {post.author.username && (
                 <ProfilLink author={post.author} className="shrink-0 text-muted-foreground hover:underline">
                   @{post.author.username}

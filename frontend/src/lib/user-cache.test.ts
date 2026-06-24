@@ -22,9 +22,9 @@ describe('resolveUser (mémoïsé)', () => {
   it('croise user + profil et résout l’avatar', async () => {
     routes([
       [path('/users/uA'), json({ data: { id: 'uA', username: 'al' } })],
-      [path('/profils/uA'), json({ data: { user_id: 'uA', display_name: 'Alice', avatar_url: 'a.png' } })],
+      [path('/profils/uA'), json({ data: { user_id: 'uA', display_name: 'Alice', avatar_url: 'a.png', certification: 'public_figure' } })],
     ])
-    expect(await resolveUser('uA')).toEqual({ id: 'uA', username: 'al', displayName: 'Alice', avatarUrl: 'R:a.png', certification: 'none' })
+    expect(await resolveUser('uA')).toEqual({ id: 'uA', username: 'al', displayName: 'Alice', avatarUrl: 'R:a.png', certification: 'public_figure' })
   })
 
   it('repli sur le username puis libellé si profil/user absents', async () => {

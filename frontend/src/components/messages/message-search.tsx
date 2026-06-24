@@ -14,6 +14,7 @@ import { initialOf } from '@/lib/utils'
 import { useLanguage } from '@/components/language-provider'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
+import { CertificationBadge } from '@/components/profil/certification-badge'
 
 /**
  * Recherche de messages DANS une conversation (DM / groupe / communauté).
@@ -111,8 +112,9 @@ function SearchResult({ message, query }: { message: ChatMessage; query: string 
       </Avatar>
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex items-baseline justify-between gap-2">
-          <span className="truncate text-sm font-semibold text-foreground">
-            {sender?.displayName ?? '…'}
+          <span className="flex min-w-0 items-center gap-1 text-sm font-semibold text-foreground">
+            <span className="truncate">{sender?.displayName ?? '…'}</span>
+            <CertificationBadge userId={sender?.id} certification={sender?.certification} className="h-4 w-4" />
           </span>
           <span className="shrink-0 text-[11px] text-muted-foreground">
             {formatDateTime(message.createdAt, locale)}

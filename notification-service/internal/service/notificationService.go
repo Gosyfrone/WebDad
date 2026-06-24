@@ -67,6 +67,16 @@ func NewNotificationService(r Repository, p Publisher, res userdir.Resolver) *No
 // partielle plutôt que d'échouer tout l'événement.
 func (s *NotificationService) HandleEvent(ctx context.Context, ev models.Event) error {
 	switch ev.Type {
+	case models.EventIdentityUpdated:
+		if ev.TargetUserID == "" {
+			ev.TargetUserID = ev.ActorID
+		}
+		if ev.TargetUserID == "" {
+			return nil
+		}
+		s.pushIdentityUpdate(ev)
+		return nil
+
 	case models.EventPostDeleted:
 		if ev.PostID == "" {
 			return nil
@@ -290,6 +300,20 @@ func (s *NotificationService) pushFollowRequestDecision(recipientID, actorID, st
 			"actor_id": actorID,
 			"status":   status,
 		},
+	})
+}
+
+func (s *NotificationService) pushIdentityUpdate(ev models.Event) {
+	data := map[string]string{"user_id": ev.TargetUserID}
+	if ev.Certification != "" {
+		data["certification"] = ev.Certification
+	}
+	if ev.Role != "" {
+		data["role"] = ev.Role
+	}
+	s.publisher.Publish(nil, map[string]any{
+		"type": "identity_updated",
+		"data": data,
 	})
 }
 

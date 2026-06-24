@@ -258,7 +258,7 @@ export function AccountsPanel({ canGovern }: AccountsPanelProps) {
                 <div className="flex min-w-0 flex-1 flex-col">
                   <span className="flex items-center gap-2 truncate text-sm font-bold">
                     {user.displayName || user.username || t('common.user')}
-                    <CertificationBadge certification={user.certification} role={user.role} />
+                    <CertificationBadge userId={user.id} certification={user.certification} role={user.role} />
                     {isSelf && (
                       <Badge variant="outline" className="text-[10px]">
                         {t('admin.you')}

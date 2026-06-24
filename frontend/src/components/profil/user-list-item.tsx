@@ -6,6 +6,7 @@ import { useT } from '@/components/language-provider'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
+import { CertificationBadge } from '@/components/profil/certification-badge'
 import { ProfilLink } from '@/components/profil/profil-link'
 
 interface UserListItemProps {
@@ -95,16 +96,19 @@ export function UserListItem({
       </ProfilLink>
 
       <div className={cn('flex min-w-0 flex-1 flex-col', compact && 'pr-1')}>
-        <ProfilLink
-          author={{ id: user.id, username: user.username }}
-          className={cn(
-            'relative z-10 font-bold text-foreground hover:underline',
-            compact ? 'line-clamp-2 break-words text-[13px] leading-4' : 'truncate text-sm',
-          )}
-          onClick={() => onProfileOpen?.(user)}
-        >
-          {user.displayName}
-        </ProfilLink>
+        <span className="flex min-w-0 items-center gap-1">
+          <ProfilLink
+            author={{ id: user.id, username: user.username }}
+            className={cn(
+              'relative z-10 font-bold text-foreground hover:underline',
+              compact ? 'line-clamp-2 break-words text-[13px] leading-4' : 'truncate text-sm',
+            )}
+            onClick={() => onProfileOpen?.(user)}
+          >
+            {user.displayName}
+          </ProfilLink>
+          <CertificationBadge userId={user.id} certification={user.certification} className="relative z-10 h-4 w-4" />
+        </span>
         <ProfilLink
           author={{ id: user.id, username: user.username }}
           className={cn(

@@ -32,6 +32,7 @@ import { CustomThemeDialog } from '@/components/custom-theme-dialog'
 import type { UserRole } from '@/types'
 import { CreatePostDialog } from '@/components/feed/create-post-dialog'
 import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
+import { CertificationBadge } from '@/components/profil/certification-badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import {
@@ -212,7 +213,10 @@ export function SidebarLeft() {
                 <ActivityPresenceDot userId={profil?.userId ?? ''} />
               </Avatar>
               <div className="flex min-w-0 flex-1 flex-col text-left">
-                <span className="truncate text-sm font-bold">{shownName}</span>
+                <span className="flex min-w-0 items-center gap-1 text-sm font-bold">
+                  <span className="truncate">{shownName}</span>
+                  <CertificationBadge userId={profil?.userId} certification={profil?.certification} role={profil?.role} className="h-4 w-4" />
+                </span>
                 <span className="truncate text-sm text-muted-foreground">{handle}</span>
               </div>
               <MoreHorizontal className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden />

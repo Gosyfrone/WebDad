@@ -443,7 +443,7 @@ export function ProfilView({ username }: ProfilViewProps) {
         <div className="flex flex-col">
           <span className="flex min-w-0 items-center gap-1.5 font-bold leading-tight text-foreground">
             <span className="truncate">{profil.displayName}</span>
-            <CertificationBadge certification={profil.certification} role={profil.role} />
+            <CertificationBadge userId={profil.userId} certification={profil.certification} role={profil.role} />
           </span>
           <span className="text-xs text-muted-foreground">
             {t(posts.length > 1 ? 'profil.posts_count_other' : 'profil.posts_count_one', {

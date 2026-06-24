@@ -49,6 +49,13 @@ type AuthUser struct {
 	Role  string `json:"role"`
 }
 
+// PublicRole expose uniquement le rôle d'affichage public d'un compte. Il ne
+// doit jamais servir à autoriser une action côté client.
+type PublicRole struct {
+	ID   string `json:"id"`
+	Role string `json:"role"`
+}
+
 // NewAuthUser projette un User (modèle DB) vers sa vue publique.
 func NewAuthUser(u *User) AuthUser {
 	return AuthUser{ID: u.ID, Email: u.Email, Role: u.Role}

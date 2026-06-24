@@ -22,12 +22,22 @@ const (
 
 // ProfilHandler regroupe les handlers HTTP du profil.
 type ProfilHandler struct {
-	profils *service.ProfilService
+	profils         *service.ProfilService
+	identityEmitter IdentityEmitter
+}
+
+// IdentityEmitter diffuse les changements d'identité décorative aux clients.
+type IdentityEmitter interface {
+	EmitIdentityUpdated(userID, certification, role string)
 }
 
 // NewProfilHandler construit le handler.
-func NewProfilHandler(profils *service.ProfilService) *ProfilHandler {
-	return &ProfilHandler{profils: profils}
+func NewProfilHandler(profils *service.ProfilService, emitters ...IdentityEmitter) *ProfilHandler {
+	var emitter IdentityEmitter
+	if len(emitters) > 0 {
+		emitter = emitters[0]
+	}
+	return &ProfilHandler{profils: profils, identityEmitter: emitter}
 }
 
 // Search : GET /profils/search?q=&limit= — recherche par display_name (public).
@@ -357,6 +367,9 @@ func (h *ProfilHandler) UpdateCertification(c *gin.Context) {
 		"target_id", c.Param("userId"),
 		"certification", req.Certification,
 	)
+	if h.identityEmitter != nil {
+		h.identityEmitter.EmitIdentityUpdated(c.Param("userId"), profil.Certification, "")
+	}
 	c.JSON(http.StatusOK, gin.H{"data": profil})
 }
 

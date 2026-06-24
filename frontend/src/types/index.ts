@@ -98,5 +98,5 @@ export interface RelationUser {
   displayName: string
   bio: string
   avatarUrl: string
-  certification?: UserCertification
+  certification: UserCertification
 }

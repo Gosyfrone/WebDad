@@ -68,7 +68,7 @@ export function ShareDialog({ open, onOpenChange, url, kind, title }: ShareDialo
   useEffect(() => {
     if (!open) return
     setCopied(false)
-    setRecentUsers(getRecentShareTargets().map((u) => ({ ...u, bio: '' })))
+    setRecentUsers(getRecentShareTargets().map((u) => ({ ...u, bio: '', certification: 'none' })))
   }, [open])
 
   const absolute = absoluteUrl(url)
