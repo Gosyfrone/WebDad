@@ -2,160 +2,89 @@ package client
 
 import (
 	"context"
-	"encoding/json"
+	"errors"
+	"io"
 	"net/http"
-	"net/http/httptest"
+	"strings"
 	"testing"
-	"time"
 )
 
-// ─── NewProfilClient ──────────────────────────────────────────────────────────
+type roundTripFunc func(*http.Request) (*http.Response, error)
 
-func TestNewProfilClient_Construit(t *testing.T) {
+func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+func response(status int, body string) *http.Response {
+	return &http.Response{
+		StatusCode: status,
+		Body:       io.NopCloser(strings.NewReader(body)),
+		Header:     make(http.Header),
+	}
+}
+
+func TestNewProfilClient(t *testing.T) {
 	c := NewProfilClient("http://profil-service:8083")
-	if c.baseURL != "http://profil-service:8083" {
-		t.Fatalf("baseURL = %q", c.baseURL)
-	}
-	if c.httpClient == nil {
-		t.Fatal("httpClient nil")
+	if c.baseURL != "http://profil-service:8083" || c.httpClient == nil {
+		t.Fatalf("client mal construit: %+v", c)
 	}
 }
 
-// ─── ProfilClient.Visibility ──────────────────────────────────────────────────
-
-func TestVisibility_Succès(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			t.Errorf("méthode attendue GET, obtenu %s", r.Method)
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(visibilityResponse{Visibility: "public"})
-	}))
-	defer srv.Close()
-
-	c := NewProfilClient(srv.URL)
-	vis, err := c.Visibility(context.Background(), "user-123")
-	if err != nil {
-		t.Fatalf("Visibility inattendue erreur : %v", err)
+func TestVisibility(t *testing.T) {
+	tests := []struct {
+		name         string
+		status       int
+		body         string
+		want         string
+		wantErr      bool
+		transportErr error
+	}{
+		{name: "public", status: http.StatusOK, body: `{"visibility":"public"}`, want: "public"},
+		{name: "private", status: http.StatusOK, body: `{"visibility":"private"}`, want: VisibilityPrivate},
+		{name: "not found", status: http.StatusNotFound, want: ""},
+		{name: "bad request", status: http.StatusBadRequest, wantErr: true},
+		{name: "server error", status: http.StatusInternalServerError, wantErr: true},
+		{name: "invalid json", status: http.StatusOK, body: `{`, wantErr: true},
+		{name: "transport error", wantErr: true, transportErr: errors.New("profil indisponible")},
 	}
-	if vis != "public" {
-		t.Fatalf("Visibility = %q, attendu %q", vis, "public")
-	}
-}
-
-func TestVisibility_Privé(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(visibilityResponse{Visibility: VisibilityPrivate})
-	}))
-	defer srv.Close()
-
-	c := NewProfilClient(srv.URL)
-	vis, err := c.Visibility(context.Background(), "user-456")
-	if err != nil {
-		t.Fatalf("erreur inattendue : %v", err)
-	}
-	if vis != VisibilityPrivate {
-		t.Fatalf("Visibility = %q, attendu %q", vis, VisibilityPrivate)
-	}
-}
-
-func TestVisibility_404_RetourneVide(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusNotFound)
-	}))
-	defer srv.Close()
-
-	c := NewProfilClient(srv.URL)
-	vis, err := c.Visibility(context.Background(), "inconnu")
-	if err != nil {
-		t.Fatalf("404 ne doit pas retourner d'erreur : %v", err)
-	}
-	if vis != "" {
-		t.Fatalf("Visibility pour 404 = %q, attendu vide", vis)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var gotRequest *http.Request
+			c := NewProfilClient("http://profil.test")
+			c.httpClient.Transport = roundTripFunc(func(r *http.Request) (*http.Response, error) {
+				gotRequest = r
+				if tc.transportErr != nil {
+					return nil, tc.transportErr
+				}
+				return response(tc.status, tc.body), nil
+			})
+			got, err := c.Visibility(context.Background(), "user/with space")
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("Visibility error = %v, wantErr %v", err, tc.wantErr)
+			}
+			if got != tc.want {
+				t.Fatalf("Visibility = %q, attendu %q", got, tc.want)
+			}
+			if gotRequest == nil || gotRequest.Method != http.MethodGet || gotRequest.URL.EscapedPath() != "/profils/user%2Fwith%20space/visibility" {
+				t.Fatalf("requête inattendue: %v", gotRequest)
+			}
+		})
 	}
 }
 
-func TestVisibility_ErreurServeur_RetourneErr(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusInternalServerError)
-	}))
-	defer srv.Close()
-
-	c := NewProfilClient(srv.URL)
-	_, err := c.Visibility(context.Background(), "user-789")
-	if err == nil {
-		t.Fatal("erreur 500 doit retourner une erreur")
-	}
-}
-
-func TestVisibility_ErreurBadRequest_RetourneErr(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusBadRequest)
-	}))
-	defer srv.Close()
-
-	c := NewProfilClient(srv.URL)
-	_, err := c.Visibility(context.Background(), "user-bad")
-	if err == nil {
-		t.Fatal("erreur 400 doit retourner une erreur")
-	}
-}
-
-func TestVisibility_JSONInvalide_RetourneErr(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`not json`))
-	}))
-	defer srv.Close()
-
-	c := NewProfilClient(srv.URL)
-	_, err := c.Visibility(context.Background(), "user-json")
-	if err == nil {
-		t.Fatal("JSON invalide doit retourner une erreur")
-	}
-}
-
-func TestVisibility_ServeurInjoignable_RetourneErr(t *testing.T) {
-	c := NewProfilClient("http://127.0.0.1:19999") // rien n'écoute là
-	c.httpClient = &http.Client{Timeout: 50 * time.Millisecond}
-	_, err := c.Visibility(context.Background(), "x")
-	if err == nil {
-		t.Fatal("serveur injoignable doit retourner une erreur")
-	}
-}
-
-func TestVisibility_ContextAnnulé_RetourneErr(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer srv.Close()
-
-	c := NewProfilClient(srv.URL)
+func TestVisibility_ContextCancelled(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	cancel() // annulé immédiatement
-	_, err := c.Visibility(ctx, "user-ctx")
-	if err == nil {
-		t.Fatal("contexte annulé doit retourner une erreur")
+	cancel()
+	c := NewProfilClient("http://profil.test")
+	c.httpClient.Transport = roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		return nil, r.Context().Err()
+	})
+	if _, err := c.Visibility(ctx, "user"); err == nil {
+		t.Fatal("un contexte annulé doit retourner une erreur")
 	}
 }
 
-// URL contenant un caractère de contrôle : http.NewRequestWithContext échoue
-// avant tout appel réseau (branche de construction de requête).
-func TestVisibility_URLInvalide_RetourneErr(t *testing.T) {
+func TestVisibility_InvalidURL(t *testing.T) {
 	c := NewProfilClient("http://exemple\x7f.invalide")
 	if _, err := c.Visibility(context.Background(), "x"); err == nil {
-		t.Fatal("une URL invalide doit retourner une erreur de construction de requête")
-	}
-}
-
-// ─── VisibilityPrivate constant ───────────────────────────────────────────────
-
-func TestVisibilityPrivateConstante(t *testing.T) {
-	if VisibilityPrivate != "private" {
-		t.Fatalf("VisibilityPrivate = %q, attendu %q", VisibilityPrivate, "private")
+		t.Fatal("une URL invalide doit être refusée")
 	}
 }

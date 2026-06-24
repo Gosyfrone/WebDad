@@ -16,6 +16,8 @@ type fakeSchemaDB struct {
 	createErr          error
 	runErr             error
 	updateManyErr      error
+	updateManyErrAt    int
+	updateManyCalls    int
 	updateOneErr       error
 	dropErr            error
 	createIndexesErr   error
@@ -57,7 +59,8 @@ type fakeSchemaCollection struct {
 }
 
 func (f *fakeSchemaCollection) UpdateMany(context.Context, any, any, ...options.Lister[options.UpdateManyOptions]) (*mongo.UpdateResult, error) {
-	if f.db.updateManyErr != nil {
+	f.db.updateManyCalls++
+	if f.db.updateManyErr != nil && (f.db.updateManyErrAt == 0 || f.db.updateManyErrAt == f.db.updateManyCalls) {
 		return nil, f.db.updateManyErr
 	}
 	return &mongo.UpdateResult{ModifiedCount: f.db.modified}, nil
@@ -163,6 +166,28 @@ func TestEnsureSchemaSuccessCreatesMissingCollection(t *testing.T) {
 	}
 	if len(db.requested) == 0 {
 		t.Fatal("aucune collection demandee")
+	}
+}
+
+func TestEnsureSchema_StopsAtEachFailedStage(t *testing.T) {
+	tests := []struct {
+		name string
+		db   *fakeSchemaDB
+	}{
+		{"collections", &fakeSchemaDB{listErr: errors.New("list")}},
+		{"legacy indexes", &fakeSchemaDB{dropErr: errors.New("drop")}},
+		{"indexes", &fakeSchemaDB{createIndexesErr: errors.New("indexes")}},
+		{"visibility", &fakeSchemaDB{updateManyErr: errors.New("visibility"), updateManyErrAt: 1}},
+		{"certification", &fakeSchemaDB{updateManyErr: errors.New("certification"), updateManyErrAt: 4}},
+		{"birth date", &fakeSchemaDB{updateManyErr: errors.New("birth"), updateManyErrAt: 5}},
+		{"seed", &fakeSchemaDB{updateOneErr: errors.New("seed")}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := ensureSchema(context.Background(), tc.db); err == nil {
+				t.Fatal("une erreur était attendue")
+			}
+		})
 	}
 }
 

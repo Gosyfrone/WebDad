@@ -185,6 +185,24 @@ func TestProfilRepository_SearchByDisplayName_FindError(t *testing.T) {
 	}
 }
 
+func TestProfilRepository_SearchByDisplayName_DecodeError(t *testing.T) {
+	sentinel := errors.New("decode")
+	coll := &fakeCollection{}
+	repo := &ProfilRepository{collection: collectionWithCursor{fakeCollection: coll, cursor: &fakeCursor{allErr: sentinel}}}
+	if _, err := repo.SearchByDisplayName(context.Background(), "ali", 5); !errors.Is(err, sentinel) {
+		t.Fatalf("attendu sentinel, obtenu %v", err)
+	}
+}
+
+type collectionWithCursor struct {
+	*fakeCollection
+	cursor cursorAPI
+}
+
+func (f collectionWithCursor) Find(context.Context, any, ...options.Lister[options.FindOptions]) (cursorAPI, error) {
+	return f.cursor, nil
+}
+
 func TestProfilRepository_Update(t *testing.T) {
 	coll := &fakeCollection{one: &models.Profil{UserID: "u1", DisplayName: "Alice"}}
 	repo := &ProfilRepository{collection: coll}
@@ -200,6 +218,14 @@ func TestProfilRepository_Update(t *testing.T) {
 	update := coll.update.(bson.M)
 	if _, ok := update["$set"]; !ok {
 		t.Fatalf("update sans $set: %#v", update)
+	}
+}
+
+func TestProfilRepository_UpdateError(t *testing.T) {
+	sentinel := errors.New("update")
+	repo := &ProfilRepository{collection: &fakeCollection{err: sentinel}}
+	if _, err := repo.Update(context.Background(), "u1", bson.M{"display_name": "Bob"}); !errors.Is(err, sentinel) {
+		t.Fatalf("attendu sentinel, obtenu %v", err)
 	}
 }
 

@@ -36,6 +36,9 @@ func TestIsAdultAt(t *testing.T) {
 
 // TestNsfwEnabledOf : absent (nil) ⇒ true (défaut ON, prod inchangée).
 func TestNsfwEnabledOf(t *testing.T) {
+	if !NsfwEnabledOf(nil) {
+		t.Error("un profil nil devrait conserver le défaut ON")
+	}
 	if !NsfwEnabledOf(&Profil{}) {
 		t.Error("préférence absente devrait valoir true (défaut ON)")
 	}
@@ -48,6 +51,7 @@ func TestNsfwEnabledOf(t *testing.T) {
 // TestHydrateViewerPolicy : nsfw_visible = is_adult && nsfw_enabled. Un mineur
 // reste filtré même si la préférence stockée vaut true.
 func TestHydrateViewerPolicy(t *testing.T) {
+	HydrateViewerPolicy(nil, time.Now()) // no-op défensif
 	now := time.Date(2026, time.June, 19, 0, 0, 0, 0, time.UTC)
 	minorBirth := time.Date(2015, time.June, 19, 0, 0, 0, 0, time.UTC)
 	on := true

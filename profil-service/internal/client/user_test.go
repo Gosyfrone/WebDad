@@ -2,128 +2,108 @@ package client
 
 import (
 	"context"
-	"encoding/json"
+	"errors"
+	"io"
 	"net/http"
-	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
-// ─── NewUserClient ────────────────────────────────────────────────────────────
+type roundTripFunc func(*http.Request) (*http.Response, error)
 
-func TestNewUserClient_SupprimeSlashFinal(t *testing.T) {
-	c := NewUserClient("http://user-service:8082/")
-	if c.baseURL != "http://user-service:8082" {
-		t.Fatalf("baseURL = %q, attendu sans slash final", c.baseURL)
+func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+func clientResponse(status int, body string) *http.Response {
+	return &http.Response{StatusCode: status, Body: io.NopCloser(strings.NewReader(body)), Header: make(http.Header)}
+}
+
+func TestNewUserClient(t *testing.T) {
+	c := NewUserClient("http://user-service:8082///")
+	if c.baseURL != "http://user-service:8082" || c.http == nil {
+		t.Fatalf("client mal construit: %+v", c)
 	}
 }
 
-func TestNewUserClient_SansSlashFinal(t *testing.T) {
-	c := NewUserClient("http://user-service:8082")
-	if c.baseURL != "http://user-service:8082" {
-		t.Fatalf("baseURL = %q", c.baseURL)
+func TestAcceptAllFollowRequests(t *testing.T) {
+	tests := []struct {
+		name    string
+		status  int
+		doErr   error
+		wantErr bool
+	}{
+		{name: "success", status: http.StatusNoContent},
+		{name: "server error", status: http.StatusInternalServerError, wantErr: true},
+		{name: "transport error", doErr: errors.New("user-service indisponible"), wantErr: true},
 	}
-	if c.http == nil {
-		t.Fatal("http client nil")
-	}
-}
-
-// ─── AcceptAllFollowRequests ──────────────────────────────────────────────────
-
-func TestAcceptAllFollowRequests_Succès(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer srv.Close()
-
-	c := NewUserClient(srv.URL)
-	err := c.AcceptAllFollowRequests(context.Background(), "owner-123")
-	if err != nil {
-		t.Fatalf("AcceptAllFollowRequests: %v", err)
-	}
-}
-
-func TestAcceptAllFollowRequests_Erreur(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusInternalServerError)
-	}))
-	defer srv.Close()
-
-	c := NewUserClient(srv.URL)
-	err := c.AcceptAllFollowRequests(context.Background(), "owner-123")
-	if err == nil {
-		t.Fatal("status 500 devrait retourner une erreur")
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var request *http.Request
+			c := NewUserClient("http://user.test")
+			c.http.Transport = roundTripFunc(func(r *http.Request) (*http.Response, error) {
+				request = r
+				if tc.doErr != nil {
+					return nil, tc.doErr
+				}
+				return clientResponse(tc.status, ""), nil
+			})
+			err := c.AcceptAllFollowRequests(context.Background(), "owner-123")
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("error = %v, wantErr %v", err, tc.wantErr)
+			}
+			if request == nil || request.Method != http.MethodPost || request.URL.Path != "/internal/users/owner-123/accept-all-follow-requests" {
+				t.Fatalf("requête inattendue: %v", request)
+			}
+		})
 	}
 }
 
-func TestAcceptAllFollowRequests_URLInvalide(t *testing.T) {
+func TestAcceptAllFollowRequests_InvalidURL(t *testing.T) {
 	c := NewUserClient("%")
-	if err := c.AcceptAllFollowRequests(context.Background(), "owner-123"); err == nil {
-		t.Fatal("URL invalide devrait retourner une erreur")
+	if err := c.AcceptAllFollowRequests(context.Background(), "owner"); err == nil {
+		t.Fatal("URL invalide acceptée")
 	}
 }
 
-// ─── IsFollowing ─────────────────────────────────────────────────────────────
-
-func TestIsFollowing_True(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_ = json.NewEncoder(w).Encode(map[string]bool{"isFollowing": true})
-	}))
-	defer srv.Close()
-
-	c := NewUserClient(srv.URL)
-	ok, err := c.IsFollowing(context.Background(), "a", "b")
-	if err != nil {
-		t.Fatalf("IsFollowing: %v", err)
+func TestIsFollowing(t *testing.T) {
+	tests := []struct {
+		name    string
+		status  int
+		body    string
+		doErr   error
+		want    bool
+		wantErr bool
+	}{
+		{name: "true", status: http.StatusOK, body: `{"isFollowing":true}`, want: true},
+		{name: "false", status: http.StatusOK, body: `{"isFollowing":false}`},
+		{name: "bad status", status: http.StatusBadGateway, wantErr: true},
+		{name: "invalid json", status: http.StatusOK, body: `{`, wantErr: true},
+		{name: "transport error", doErr: errors.New("user-service indisponible"), wantErr: true},
 	}
-	if !ok {
-		t.Fatal("attendu true")
-	}
-}
-
-func TestIsFollowing_False(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_ = json.NewEncoder(w).Encode(map[string]bool{"isFollowing": false})
-	}))
-	defer srv.Close()
-
-	c := NewUserClient(srv.URL)
-	ok, err := c.IsFollowing(context.Background(), "a", "b")
-	if err != nil {
-		t.Fatalf("IsFollowing: %v", err)
-	}
-	if ok {
-		t.Fatal("attendu false")
-	}
-}
-
-func TestIsFollowing_ErreurServeur(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusBadGateway)
-	}))
-	defer srv.Close()
-
-	c := NewUserClient(srv.URL)
-	_, err := c.IsFollowing(context.Background(), "a", "b")
-	if err == nil {
-		t.Fatal("status 502 devrait retourner une erreur")
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var request *http.Request
+			c := NewUserClient("http://user.test")
+			c.http.Transport = roundTripFunc(func(r *http.Request) (*http.Response, error) {
+				request = r
+				if tc.doErr != nil {
+					return nil, tc.doErr
+				}
+				return clientResponse(tc.status, tc.body), nil
+			})
+			got, err := c.IsFollowing(context.Background(), "follower", "following")
+			if (err != nil) != tc.wantErr || got != tc.want {
+				t.Fatalf("IsFollowing = %v, %v; attendu %v, wantErr=%v", got, err, tc.want, tc.wantErr)
+			}
+			if request == nil || request.Method != http.MethodGet || request.URL.Path != "/internal/follows/follower/is-following/following" {
+				t.Fatalf("requête inattendue: %v", request)
+			}
+		})
 	}
 }
 
-func TestIsFollowing_URLInvalide(t *testing.T) {
+func TestIsFollowing_InvalidURL(t *testing.T) {
 	c := NewUserClient("%")
 	if _, err := c.IsFollowing(context.Background(), "a", "b"); err == nil {
-		t.Fatal("URL invalide devrait retourner une erreur")
-	}
-}
-
-func TestIsFollowing_JSONInvalide(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte(`{invalid}`))
-	}))
-	defer srv.Close()
-
-	c := NewUserClient(srv.URL)
-	if _, err := c.IsFollowing(context.Background(), "a", "b"); err == nil {
-		t.Fatal("JSON invalide devrait retourner une erreur")
+		t.Fatal("URL invalide acceptée")
 	}
 }
