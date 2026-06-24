@@ -10,6 +10,7 @@ import type { SharedRef } from '@/lib/share'
 import type { RelationUser } from '@/types'
 import { cn, initialOf } from '@/lib/utils'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { CertificationBadge } from '@/components/profil/certification-badge'
 
 // Caches module-level : un même post/profil partagé apparaît souvent plusieurs
 // fois dans un fil de discussion → on évite de le refetcher à chaque rendu.
@@ -70,7 +71,10 @@ function PostPreview({ id }: { id: string }) {
               {initialOf(post.author.displayName, post.author.username)}
             </AvatarFallback>
           </Avatar>
-          <span className="truncate text-xs font-bold">{post.author.displayName}</span>
+          <span className="flex min-w-0 items-center gap-1 text-xs font-bold">
+            <span className="truncate">{post.author.displayName}</span>
+            <CertificationBadge certification={post.author.certification} className="h-4 w-4" />
+          </span>
           {post.author.username && (
             <span className="truncate text-xs text-muted-foreground">@{post.author.username}</span>
           )}
@@ -109,7 +113,10 @@ function ProfilePreview({ handle }: { handle: string }) {
         </AvatarFallback>
       </Avatar>
       <div className="flex min-w-0 flex-col">
-        <span className="truncate text-sm font-bold">{user.displayName}</span>
+        <span className="flex min-w-0 items-center gap-1 text-sm font-bold">
+          <span className="truncate">{user.displayName}</span>
+          <CertificationBadge certification={user.certification} className="h-4 w-4" />
+        </span>
         <span className="truncate text-xs text-muted-foreground">@{user.username}</span>
       </div>
     </Link>

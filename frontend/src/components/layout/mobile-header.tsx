@@ -18,6 +18,7 @@ import { useT } from '@/components/language-provider'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { CustomThemeDialog } from '@/components/custom-theme-dialog'
 import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
+import { CertificationBadge } from '@/components/profil/certification-badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
   Sheet,
@@ -187,7 +188,10 @@ export function MobileHeader() {
                 <ActivityPresenceDot userId={profil?.userId ?? ''} />
               </Avatar>
               <div className="flex min-w-0 flex-col">
-                <SheetTitle className="truncate">{shownName}</SheetTitle>
+                <div className="flex min-w-0 items-center gap-1">
+                  <SheetTitle className="truncate">{shownName}</SheetTitle>
+                  <CertificationBadge certification={profil?.certification} role={profil?.role} className="h-4 w-4" />
+                </div>
                 <SheetDescription className="truncate">
                   {handle} · {displayedRole ? t(`role.${displayedRole}`) : t('common.not_connected')}
                 </SheetDescription>

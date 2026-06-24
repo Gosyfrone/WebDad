@@ -12,6 +12,7 @@ const actor: NotificationActor = {
   username: 'zaid',
   displayName: 'Zaid',
   avatarUrl: '',
+  certification: 'none',
 }
 
 function raw(overrides: Record<string, unknown> = {}) {

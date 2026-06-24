@@ -3,6 +3,7 @@
 import { cn, initialOf } from '@/lib/utils'
 import type { MentionController } from '@/lib/use-mention'
 import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
+import { CertificationBadge } from '@/components/profil/certification-badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 
 interface MentionAutocompleteProps {
@@ -62,7 +63,10 @@ export function MentionAutocomplete({
             <ActivityPresenceDot userId={c.id} className="h-2.5 w-2.5" />
           </Avatar>
           <div className="flex min-w-0 flex-col leading-tight">
-            <span className="truncate text-sm font-semibold text-foreground">{c.displayName}</span>
+            <span className="flex min-w-0 items-center gap-1 text-sm font-semibold text-foreground">
+              <span className="truncate">{c.displayName}</span>
+              <CertificationBadge certification={c.certification} className="h-4 w-4" />
+            </span>
             <span className="truncate text-xs text-muted-foreground">@{c.username}</span>
           </div>
         </button>

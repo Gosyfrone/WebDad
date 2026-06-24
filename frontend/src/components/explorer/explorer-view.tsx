@@ -32,6 +32,7 @@ import { PostCard } from '@/components/feed/post-card'
 import { ProfilLink } from '@/components/profil/profil-link'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
+import { CertificationBadge } from '@/components/profil/certification-badge'
 import { Button } from '@/components/ui/button'
 
 /**
@@ -437,7 +438,10 @@ function LiveSearchMenu({
                     <ActivityPresenceDot userId={user.id} />
                   </Avatar>
                   <span className="min-w-0">
-                    <span className="block truncate font-bold text-foreground">{user.displayName}</span>
+                    <span className="flex min-w-0 items-center gap-1 font-bold text-foreground">
+                      <span className="truncate">{user.displayName}</span>
+                      <CertificationBadge certification={user.certification} className="h-4 w-4" />
+                    </span>
                     <span className="block truncate text-sm text-muted-foreground">@{user.username}</span>
                   </span>
                 </ProfilLink>
@@ -697,12 +701,15 @@ function SuggestionCard({
           </Avatar>
         </ProfilLink>
         <div className="min-w-0 flex-1">
-          <ProfilLink
-            author={{ id: user.id, username: user.username }}
-            className="block truncate font-bold text-foreground hover:underline"
-          >
-            {user.displayName}
-          </ProfilLink>
+          <span className="flex min-w-0 items-center gap-1">
+            <ProfilLink
+              author={{ id: user.id, username: user.username }}
+              className="truncate font-bold text-foreground hover:underline"
+            >
+              {user.displayName}
+            </ProfilLink>
+            <CertificationBadge certification={user.certification} className="h-4 w-4" />
+          </span>
           <ProfilLink
             author={{ id: user.id, username: user.username }}
             className="block truncate text-sm text-muted-foreground hover:underline"
@@ -785,12 +792,15 @@ function ExplorerUserRow({
         </Avatar>
       </ProfilLink>
       <div className="min-w-0 flex-1">
-        <ProfilLink
-          author={{ id: user.id, username: user.username }}
-          className="block truncate font-bold text-foreground hover:underline"
-        >
-          {user.displayName}
-        </ProfilLink>
+        <span className="flex min-w-0 items-center gap-1">
+          <ProfilLink
+            author={{ id: user.id, username: user.username }}
+            className="truncate font-bold text-foreground hover:underline"
+          >
+            {user.displayName}
+          </ProfilLink>
+          <CertificationBadge certification={user.certification} className="h-4 w-4" />
+        </span>
         <ProfilLink
           author={{ id: user.id, username: user.username }}
           className="block truncate text-sm text-muted-foreground hover:underline"

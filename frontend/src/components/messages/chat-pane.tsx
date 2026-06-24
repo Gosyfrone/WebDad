@@ -69,6 +69,7 @@ import {
 } from '@/components/messages/conversation-meta'
 import { ActivityStatus } from '@/components/profil/activity-status'
 import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
+import { CertificationBadge } from '@/components/profil/certification-badge'
 import { ProfilLink } from '@/components/profil/profil-link'
 
 const PAGE = 30
@@ -658,13 +659,16 @@ function ChatHeader({
 
       <div className="flex min-w-0 flex-1 flex-col">
         {profileHref && profileAuthor ? (
-          <ProfilLink
-            author={profileAuthor}
-            href={profileHref}
-            className="truncate text-sm font-bold text-foreground hover:underline focus-visible:outline-none focus-visible:underline"
-          >
-            {title}
-          </ProfilLink>
+          <span className="flex min-w-0 items-center gap-1">
+            <ProfilLink
+              author={profileAuthor}
+              href={profileHref}
+              className="truncate text-sm font-bold text-foreground hover:underline focus-visible:outline-none focus-visible:underline"
+            >
+              {title}
+            </ProfilLink>
+            <CertificationBadge certification={peer?.certification} className="h-4 w-4" />
+          </span>
         ) : (
           <span className="truncate text-sm font-bold text-foreground">
             {title}
@@ -785,8 +789,9 @@ function MessageBubble({
             </AvatarFallback>
             <ActivityPresenceDot userId={sender?.id} className="h-2 w-2 border" />
           </Avatar>
-          <span className="text-xs font-semibold text-muted-foreground">
-            {sender?.displayName ?? '…'}
+          <span className="flex min-w-0 items-center gap-1 text-xs font-semibold text-muted-foreground">
+            <span className="truncate">{sender?.displayName ?? '…'}</span>
+            <CertificationBadge certification={sender?.certification} className="h-4 w-4" />
           </span>
         </div>
       )}

@@ -13,6 +13,7 @@ function makeAuthor(overrides: Partial<PostAuthor> = {}): PostAuthor {
     displayName: 'Alice',
     avatarUrl: '',
     visibility: 'public',
+    certification: 'none',
     lastLoginAt: '',
     isOnline: false,
     ...overrides,
@@ -44,6 +45,8 @@ function makePost(id: string, author: PostAuthor, overrides: Partial<FeedPost> =
     bookmarked: false,
     canDelete: false,
     canPin: false,
+    nsfw: false,
+    canMarkNsfw: false,
     ...overrides,
   }
 }
@@ -72,6 +75,9 @@ function makeProfil(overrides: Partial<ProfilDetails> = {}): ProfilDetails {
     certification: 'none',
     lastLoginAt: '',
     isOnline: true,
+    nsfwEnabled: true,
+    isAdult: true,
+    nsfwVisible: true,
     followersCount: 0,
     followingCount: 0,
     postsCount: 0,
@@ -151,5 +157,14 @@ describe('applyProfilUpdateToPosts', () => {
 
     const result = applyProfilUpdateToPosts([post], profil)
     expect(result[0].author.isOnline).toBe(true)
+  })
+
+  it('met à jour la certification dans l\'auteur', () => {
+    const author = makeAuthor({ id: 'u1', certification: 'none' })
+    const post = makePost('p1', author)
+    const profil = makeProfil({ userId: 'u1', certification: 'public_figure' })
+
+    const result = applyProfilUpdateToPosts([post], profil)
+    expect(result[0].author.certification).toBe('public_figure')
   })
 })

@@ -16,6 +16,7 @@ function makePost(overrides: Partial<FeedPost> = {}): FeedPost {
       displayName: 'U',
       avatarUrl: '',
       visibility: 'public',
+      certification: 'none',
       lastLoginAt: '',
       isOnline: false,
     },

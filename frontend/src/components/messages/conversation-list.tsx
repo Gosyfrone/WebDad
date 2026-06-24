@@ -27,6 +27,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { ConversationAvatar, conversationTitle } from '@/components/messages/conversation-meta'
+import { CertificationBadge } from '@/components/profil/certification-badge'
 
 /** Aperçu du dernier message d'une conversation (sous-titre de la liste). */
 export interface ConversationPreview {
@@ -265,6 +266,9 @@ function ConversationRow({
           >
             {pinned && <Pin className="h-3 w-3 shrink-0 rotate-45 text-[#8D3DFF]" aria-hidden />}
             <span className="truncate">{title}</span>
+            {conversation.type === 'dm' && (
+              <CertificationBadge certification={peer?.certification} className="h-4 w-4" />
+            )}
             {muted && (
               <BellOff
                 className="h-3 w-3 shrink-0 text-muted-foreground"

@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast'
 import { useLanguage } from '@/components/language-provider'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
+import { CertificationBadge } from '@/components/profil/certification-badge'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -107,7 +108,10 @@ export function NewGroupDialog({ open, onOpenChange, myId, onCreated }: NewGroup
                     </AvatarFallback>
                     <ActivityPresenceDot userId={m.id} className="h-2 w-2 border" />
                   </Avatar>
-                  <span className="font-semibold">{m.displayName}</span>
+                  <span className="flex min-w-0 items-center gap-1 font-semibold">
+                    <span className="truncate">{m.displayName}</span>
+                    <CertificationBadge certification={m.certification} className="h-4 w-4" />
+                  </span>
                   <button
                     type="button"
                     onClick={() => removeMember(m.id)}

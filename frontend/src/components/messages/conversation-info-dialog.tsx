@@ -31,6 +31,7 @@ import { useToast } from '@/hooks/use-toast'
 import { useLanguage } from '@/components/language-provider'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
+import { CertificationBadge } from '@/components/profil/certification-badge'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -319,8 +320,9 @@ function MemberRow({
         <ActivityPresenceDot userId={user?.id} />
       </Avatar>
       <div className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate text-sm font-semibold text-foreground">
-          {user?.displayName ?? '…'}
+        <span className="flex min-w-0 items-center gap-1 text-sm font-semibold text-foreground">
+          <span className="truncate">{user?.displayName ?? '…'}</span>
+          <CertificationBadge certification={user?.certification} className="h-4 w-4" />
           {isSelf && <span className="ml-1 text-xs text-muted-foreground">({t('messages.you')})</span>}
         </span>
         <Badge variant="secondary" className="mt-0.5 w-fit text-[10px]">

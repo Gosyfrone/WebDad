@@ -46,6 +46,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { EmojiPicker } from '@/components/feed/emoji-picker'
 import { MentionAutocomplete } from '@/components/mention/mention-autocomplete'
+import { CertificationBadge } from '@/components/profil/certification-badge'
 import { HashtagAutocomplete } from '@/components/hashtag/hashtag-autocomplete'
 import { ComposerHighlight } from '@/components/hashtag/composer-highlight'
 import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
@@ -767,7 +768,10 @@ function QuotePreview({ post }: { post: FeedPost }) {
   return (
     <div className="rounded-xl border border-border bg-background/45 px-3 py-2 text-sm">
       <div className="mb-1 flex min-w-0 items-center gap-1.5 text-xs">
-        <span className="truncate font-bold text-foreground">{post.author.displayName}</span>
+        <span className="flex min-w-0 items-center gap-1 font-bold text-foreground">
+          <span className="truncate">{post.author.displayName}</span>
+          <CertificationBadge certification={post.author.certification} className="h-4 w-4" />
+        </span>
         {post.author.username && (
           <span className="shrink-0 text-muted-foreground">@{post.author.username}</span>
         )}

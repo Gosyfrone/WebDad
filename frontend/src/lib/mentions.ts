@@ -11,12 +11,15 @@
  * côté détection (calcul des ids mentionnés, « vous a mentionné »).
  */
 
+import type { UserCertification } from '@/types'
+
 /** Candidat proposé dans la pop-up d'autocomplétion. */
 export interface MentionCandidate {
   id: string
   username: string
   displayName: string
   avatarUrl: string
+  certification: UserCertification
 }
 
 /** Segment de texte tokenisé : texte brut ou mention cliquable. */

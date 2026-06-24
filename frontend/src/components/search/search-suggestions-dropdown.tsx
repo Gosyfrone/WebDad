@@ -11,6 +11,7 @@ import type { RelationUser } from '@/types'
 import { initialOf } from '@/lib/utils'
 import { useT } from '@/components/language-provider'
 import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
+import { CertificationBadge } from '@/components/profil/certification-badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 
 interface SearchSuggestionsDropdownProps {
@@ -189,8 +190,9 @@ export function SearchSuggestionsDropdown({
                 <ActivityPresenceDot userId={user.id} />
               </Avatar>
               <span className="min-w-0">
-                <span className="block truncate text-[15px] font-bold leading-5">
-                  {user.displayName}
+                <span className="flex min-w-0 items-center gap-1 text-[15px] font-bold leading-5">
+                  <span className="truncate">{user.displayName}</span>
+                  <CertificationBadge certification={user.certification} className="h-4 w-4" />
                 </span>
                 <span className="block truncate text-[15px] leading-5 text-white/45">
                   @{user.username}

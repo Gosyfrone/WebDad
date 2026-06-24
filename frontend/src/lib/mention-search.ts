@@ -7,7 +7,13 @@ import type { RelationUser } from '@/types'
 const MAX_RESULTS = 6
 
 function toCandidate(u: RelationUser): MentionCandidate {
-  return { id: u.id, username: u.username, displayName: u.displayName, avatarUrl: u.avatarUrl }
+  return {
+    id: u.id,
+    username: u.username,
+    displayName: u.displayName,
+    avatarUrl: u.avatarUrl,
+    certification: u.certification,
+  }
 }
 
 /**

@@ -4,7 +4,7 @@ import { mentionSearchGlobal, makeMemberFirstSearch } from '@/lib/mention-search
 import type { MentionCandidate } from '@/lib/mentions'
 
 function makeCandidate(id: string, username: string): MentionCandidate {
-  return { id, username, displayName: username, avatarUrl: null }
+  return { id, username, displayName: username, avatarUrl: '', certification: 'none' }
 }
 
 // ─── mentionSearchGlobal ─────────────────────────────────────────────────────
@@ -46,7 +46,7 @@ describe('makeMemberFirstSearch', () => {
 
   it('filtre par displayName aussi', async () => {
     const withDisplay: MentionCandidate[] = [
-      { id: '4', username: 'jdupont', displayName: 'Jean Dupont', avatarUrl: null },
+      { id: '4', username: 'jdupont', displayName: 'Jean Dupont', avatarUrl: '', certification: 'none' },
     ]
     const search = makeMemberFirstSearch(withDisplay)
     const results = await search('Jean')
