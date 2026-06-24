@@ -235,3 +235,27 @@ func TestPlanUpdate_AllSimpleFields(t *testing.T) {
 		}
 	}
 }
+
+func TestPlanUpdate_TutorialDone(t *testing.T) {
+	now := time.Now().UTC()
+	current := &models.Profil{}
+
+	// Marque vu : tutorial_done=true poussé dans le $set.
+	done := true
+	set, err := planUpdate(current, models.UpdateProfilRequest{TutorialDone: &done}, now, 0)
+	if err != nil {
+		t.Fatalf("err inattendue: %v", err)
+	}
+	if set["tutorial_done"] != true {
+		t.Fatalf("tutorial_done = %#v, attendu true", set["tutorial_done"])
+	}
+
+	// Champ absent (nil) : non touché.
+	set, err = planUpdate(current, models.UpdateProfilRequest{}, now, 0)
+	if err != nil {
+		t.Fatalf("err inattendue: %v", err)
+	}
+	if _, present := set["tutorial_done"]; present {
+		t.Fatalf("tutorial_done ne doit pas être dans le $set quand nil: %#v", set)
+	}
+}

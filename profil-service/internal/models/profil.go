@@ -60,6 +60,13 @@ type Profil struct {
 	// existante. La valeur stockée d'un MINEUR est sans effet : la politique
 	// effective (NsfwVisible) la combine avec la majorité calculée serveur.
 	NsfwEnabled *bool `json:"nsfw_enabled,omitempty" bson:"nsfw_enabled,omitempty"`
+	// TutorialDone : l'utilisateur a-t-il vu (terminé ou ignoré) le didacticiel
+	// guidé de prise en main. Pointeur + omitempty : un document antérieur au champ
+	// (nil) vaut `false` (cf. TutorialDoneOf) — défaut OFF pour que le tour soit
+	// proposé une fois à TOUS les comptes (existants compris) à leur prochaine
+	// visite, sans backfill (champ optionnel non-required/non-enum → la prod n'est
+	// pas rejetée par le validateur strict). Front pose `true` à la fin/à l'ignore.
+	TutorialDone *bool `json:"tutorial_done,omitempty" bson:"tutorial_done,omitempty"`
 	// IsAdult / NsfwVisible : politique « viewer » TRANSIENTE (bson:"-", jamais
 	// stockée), calculée serveur depuis birth_date et exposée seulement sur la vue
 	// privée /profils/me. IsAdult = ≥18 ans (dynamique : se débloque tout seul le
@@ -80,6 +87,15 @@ func NsfwEnabledOf(p *Profil) bool {
 		return true
 	}
 	return *p.NsfwEnabled
+}
+
+// TutorialDoneOf normalise le drapeau didacticiel : absent (vieux document) ⇒
+// false (défaut OFF, pour que le tour soit proposé une fois à tous les comptes).
+func TutorialDoneOf(p *Profil) bool {
+	if p == nil || p.TutorialDone == nil {
+		return false
+	}
+	return *p.TutorialDone
 }
 
 // IsAdultAt indique si une date de naissance correspond à ≥18 ans à l'instant
@@ -148,6 +164,8 @@ type UpdateProfilRequest struct {
 	ActivityVisibility *string    `json:"activity_visibility" binding:"omitempty,oneof=public private"`
 	// NsfwEnabled : préférence « afficher le contenu NSFW » (toggle des paramètres).
 	NsfwEnabled *bool `json:"nsfw_enabled" binding:"omitempty"`
+	// TutorialDone : marque le didacticiel comme vu (terminé/ignoré).
+	TutorialDone *bool `json:"tutorial_done" binding:"omitempty"`
 }
 
 // UpdateCertificationRequest : payload réservé aux modérateurs/admins pour

@@ -15,6 +15,7 @@ import { useAuthGate } from '@/components/auth-prompt-provider'
 import { useNotifications } from '@/components/notifications-provider'
 import { useMessages } from '@/components/messages-provider'
 import { useT } from '@/components/language-provider'
+import { HelpButton } from '@/components/help/help-button'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { CustomThemeDialog } from '@/components/custom-theme-dialog'
 import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
@@ -275,26 +276,31 @@ export function MobileHeader() {
         </Link>
       )}
 
-      {/* Droite : cloche vers les notifications (avec pastille), sinon contrepoids. */}
+      {/* Droite : cloche vers les notifications (avec pastille) + lampe d'aide à
+          sa droite, sinon contrepoids. */}
       {showBell ? (
-        <Link
-          href={ROUTES.notifications}
-          scroll={false}
-          aria-label={t('nav.notifications')}
-          className="ml-auto flex h-9 w-9 items-center justify-center rounded-full text-foreground transition-colors hover:bg-accent"
-        >
-          <span className="relative">
-            <Bell className="h-6 w-6" aria-hidden />
-            {unreadCount > 0 && (
-              <span
-                aria-label={t('notifications.unread_aria', { count: unreadCount })}
-                className="absolute -right-2 -top-1.5 flex h-[16px] min-w-[16px] items-center justify-center rounded-full bg-gradient-to-r from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] px-1 text-[10px] font-bold leading-none text-white shadow"
-              >
-                {unreadCount > 99 ? '99+' : unreadCount}
-              </span>
-            )}
-          </span>
-        </Link>
+        <div className="ml-auto flex items-center gap-0.5">
+          <Link
+            href={ROUTES.notifications}
+            scroll={false}
+            data-tour="nav-notifications"
+            aria-label={t('nav.notifications')}
+            className="flex h-9 w-9 items-center justify-center rounded-full text-foreground transition-colors hover:bg-accent"
+          >
+            <span className="relative">
+              <Bell className="h-6 w-6" aria-hidden />
+              {unreadCount > 0 && (
+                <span
+                  aria-label={t('notifications.unread_aria', { count: unreadCount })}
+                  className="absolute -right-2 -top-1.5 flex h-[16px] min-w-[16px] items-center justify-center rounded-full bg-gradient-to-r from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] px-1 text-[10px] font-bold leading-none text-white shadow"
+                >
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
+            </span>
+          </Link>
+          <HelpButton variant="mobile" />
+        </div>
       ) : (
         <span className="ml-auto h-9 w-9" aria-hidden />
       )}

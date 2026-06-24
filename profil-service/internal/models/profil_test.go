@@ -45,6 +45,20 @@ func TestNsfwEnabledOf(t *testing.T) {
 	}
 }
 
+// TestTutorialDoneOf : absent (nil) ⇒ false (défaut OFF, tour proposé une fois).
+func TestTutorialDoneOf(t *testing.T) {
+	if TutorialDoneOf(nil) {
+		t.Error("profil nil devrait valoir false")
+	}
+	if TutorialDoneOf(&Profil{}) {
+		t.Error("drapeau absent devrait valoir false (défaut OFF)")
+	}
+	done := true
+	if !TutorialDoneOf(&Profil{TutorialDone: &done}) {
+		t.Error("drapeau true devrait valoir true")
+	}
+}
+
 // TestHydrateViewerPolicy : nsfw_visible = is_adult && nsfw_enabled. Un mineur
 // reste filtré même si la préférence stockée vaut true.
 func TestHydrateViewerPolicy(t *testing.T) {

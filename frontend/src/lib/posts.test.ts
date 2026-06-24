@@ -78,6 +78,7 @@ function makeProfil(overrides: Partial<ProfilDetails> = {}): ProfilDetails {
     nsfwEnabled: true,
     isAdult: true,
     nsfwVisible: true,
+    tutorialDone: true,
     followersCount: 0,
     followingCount: 0,
     postsCount: 0,

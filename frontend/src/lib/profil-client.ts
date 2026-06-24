@@ -38,6 +38,8 @@ type ApiProfil = {
   last_login_at?: string
   is_online?: boolean
   nsfw_enabled?: boolean
+  /** Didacticiel déjà vu (terminé/ignoré). Absent ⇒ false (vieux document). */
+  tutorial_done?: boolean
   /** Calculés serveur, présents uniquement sur la vue privée /profils/me. */
   is_adult?: boolean
   nsfw_visible?: boolean
@@ -151,6 +153,26 @@ export async function saveMyNsfw(
   return updated
 }
 
+/**
+ * Marque le didacticiel comme vu (terminé ou ignoré) côté serveur. Persiste via
+ * `PATCH /profils/me` (champ `tutorial_done`) pour que le tour ne soit plus
+ * proposé automatiquement, sur tous les appareils. Best-effort : l'appelant
+ * (TutorialProvider) ne bloque pas l'UX dessus.
+ */
+export async function saveMyTutorialDone(
+  tutorialDone: boolean,
+): Promise<ProfilDetails> {
+  await fetchApiData<ApiProfil>('/profils/me', {
+    method: 'PATCH',
+    headers: jsonHeaders(),
+    body: JSON.stringify({ tutorial_done: tutorialDone }),
+  })
+
+  const updated = await getMyProfil()
+  notifyProfilUpdated(updated)
+  return updated
+}
+
 export function subscribeProfilUpdated(
   onUpdate: (profil: ProfilDetails) => void,
 ): () => void {
@@ -217,6 +239,9 @@ function mergeProfil(
     nsfwEnabled: profil?.nsfw_enabled ?? true,
     isAdult: profil?.is_adult ?? true,
     nsfwVisible: profil?.nsfw_visible ?? true,
+    // Défaut `false` : un profil sans le champ (vieux document / vue publique) est
+    // considéré « didacticiel non vu » → le tour pourra être proposé une fois.
+    tutorialDone: profil?.tutorial_done ?? false,
     followersCount: user.follower_count ?? 0,
     followingCount: user.following_count ?? 0,
     postsCount: 0,

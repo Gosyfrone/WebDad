@@ -19,12 +19,14 @@ interface TabItem {
   labelKey: string
   /** Icône lucide ; `null` = logo Breezy (Accueil). */
   icon: React.ElementType | null
+  /** Valeur `data-tour` (cible du didacticiel), si l'onglet est étape du tour. */
+  tour?: string
 }
 
 const TABS: TabItem[] = [
-  { href: ROUTES.feed, labelKey: 'nav.home', icon: null },
-  { href: ROUTES.explorer, labelKey: 'nav.search', icon: Search },
-  { href: ROUTES.messages, labelKey: 'nav.messages', icon: Mail },
+  { href: ROUTES.feed, labelKey: 'nav.home', icon: null, tour: 'nav-feed' },
+  { href: ROUTES.explorer, labelKey: 'nav.search', icon: Search, tour: 'nav-explorer' },
+  { href: ROUTES.messages, labelKey: 'nav.messages', icon: Mail, tour: 'nav-messages' },
 ]
 
 /** Onglets du visiteur : seul le fil public est accessible, + une entrée connexion. */
@@ -71,6 +73,7 @@ export function MobileTabBar() {
             key={tab.href}
             href={tab.href === ROUTES.explorer ? searchHref : tab.href}
             scroll={false}
+            data-tour={tab.tour}
             aria-label={t(tab.labelKey)}
             aria-current={active ? 'page' : undefined}
             className="flex flex-1 items-center justify-center transition-colors hover:bg-accent"

@@ -50,15 +50,17 @@ interface NavItem {
   href: string
   icon: React.ElementType
   roles?: UserRole[]
+  /** Valeur `data-tour` (cible du didacticiel), si l'item est étape du tour. */
+  tour?: string
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { labelKey: 'nav.feed', href: ROUTES.feed, icon: Home },
-  { labelKey: 'nav.explore', href: '/explorer', icon: Search },
-  { labelKey: 'nav.notifications', href: '/notifications', icon: Bell },
-  { labelKey: 'nav.messages', href: '/messages', icon: Mail },
-  { labelKey: 'nav.bookmarks', href: ROUTES.bookmarks, icon: Bookmark },
-  { labelKey: 'nav.profil', href: ROUTES.profil, icon: User },
+  { labelKey: 'nav.feed', href: ROUTES.feed, icon: Home, tour: 'nav-feed' },
+  { labelKey: 'nav.explore', href: '/explorer', icon: Search, tour: 'nav-explorer' },
+  { labelKey: 'nav.notifications', href: '/notifications', icon: Bell, tour: 'nav-notifications' },
+  { labelKey: 'nav.messages', href: '/messages', icon: Mail, tour: 'nav-messages' },
+  { labelKey: 'nav.bookmarks', href: ROUTES.bookmarks, icon: Bookmark, tour: 'nav-bookmarks' },
+  { labelKey: 'nav.profil', href: ROUTES.profil, icon: User, tour: 'nav-profil' },
   {
     labelKey: 'nav.moderation',
     href: ROUTES.moderation,
@@ -147,6 +149,7 @@ export function SidebarLeft() {
               key={item.href}
               href={item.href === ROUTES.explorer ? searchHref : item.href}
               scroll={false}
+              data-tour={item.tour}
               className={cn(
                 'flex w-fit items-center gap-4 rounded-full px-4 py-3 text-xl font-normal text-foreground/80 transition hover:bg-accent hover:text-[#5B6CFF] hover:shadow-sm dark:hover:text-[#9aa6ff]',
                 active &&
@@ -177,6 +180,7 @@ export function SidebarLeft() {
           <CreatePostDialog>
             <Button
               size="lg"
+              data-tour="compose"
               className="mt-4 w-[90%] rounded-full bg-gradient-to-r from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] text-base font-bold text-white shadow-[0_18px_44px_rgba(91,108,255,0.3)] transition hover:scale-[1.015]"
             >
               {t('nav.post')}

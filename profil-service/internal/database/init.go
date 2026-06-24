@@ -311,6 +311,7 @@ var validators = map[string]bson.M{
 				// Champs optionnels (validés uniquement s'ils sont présents).
 				"is_online":               bson.M{"bsonType": "bool"},
 				"nsfw_enabled":            bson.M{"bsonType": "bool"},
+				"tutorial_done":           bson.M{"bsonType": "bool"},
 				"birth_date":              bson.M{"bsonType": "date"},
 				"gender":                  bson.M{"bsonType": "string", "enum": bson.A{"male", "female"}},
 				"nationality":             bson.M{"bsonType": "string", "pattern": "^[A-Z]{2}$"},

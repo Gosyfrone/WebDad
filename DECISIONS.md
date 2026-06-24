@@ -6,6 +6,31 @@
 
 ---
 
+## Didacticiel guidé + aide : moteur front maison, état « vu » côté profil-service (24/06/2026)
+
+> Besoin : à la première connexion, une visite guidée (infobulle se promenant sur les pages,
+> avançable au clic sur la cible ou via Suivant/Précédent, ignorable) ; un bouton « lampe » donnant
+> accès à une page d'aide et à la relecture du didacticiel.
+
+- **Moteur de tour custom maison (zéro dépendance).** Cohérent avec l'i18n maison et le thème
+  clair/sombre (tokens). On garde le contrôle total du positionnement (`computeTooltipPosition` pur et
+  testé), du spotlight (`box-shadow` projeté autour de la cible) et de la navigation cross-page. Pas de
+  `react-joyride`/`driver.js` à styliser et maintenir.
+- **Cibles via `data-tour`, instance visible choisie à l'exécution.** La même valeur `data-tour` est
+  posée sur la variante desktop (sidebar) ET mobile (tab bar / cloche du header) ; le tooltip retient
+  l'élément réellement visible (`offsetParent`). Une étape sans cible visible se rend centrée (fallback
+  mobile pour les sections logées dans un menu). Cliquer la cible avance le tour (listener en phase
+  capture qui neutralise l'action native), conformément à « avancer en cliquant ce qui est indiqué ».
+- **État « didacticiel vu » persisté côté serveur, pas en localStorage.** Choix utilisateur : le flag
+  doit survivre au changement d'appareil. `tutorial_done *bool` vit dans `profil-service` (comme
+  `nsfw_enabled`), exposé/mis à jour via `GET`/`PATCH /profils/me` — **aucune route nouvelle**.
+- **Auto-start proposé une fois à TOUS les comptes, donc pas de backfill.** Flag absent ⇒ `false` ⇒ le
+  tour est proposé une fois (comptes existants compris) pour faire découvrir la fonctionnalité, sans
+  migration risquée sur la prod. C'est sûr précisément parce que le champ est **optionnel, non-`required`
+  et sans enum** : le validateur Mongo strict ne revalide pas les documents existants en échec (≠ les cas
+  `visibility`/`likes_visibility` qui, eux, exigeaient un backfill — Rule 5b). Défaut explicite `false`
+  posé à la création (compte neuf = réellement en première connexion).
+
 ## Certifications de profil : donnée décorative côté profil-service, staff dérivé du rôle (23/06/2026)
 
 > Besoin : permettre aux modérateurs/administrateurs d'attribuer une certification visible à côté du

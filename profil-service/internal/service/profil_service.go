@@ -139,7 +139,8 @@ func (s *ProfilService) Create(ctx context.Context, userID string, req models.Cr
 		return nil, ErrInvalidDisplayName
 	}
 	now := time.Now().UTC()
-	nsfwOn := true // défaut ON explicite (cf. Rule 5b : champ à défaut → valeur posée à la création)
+	nsfwOn := true        // défaut ON explicite (cf. Rule 5b : champ à défaut → valeur posée à la création)
+	tutorialDone := false // défaut OFF : un compte neuf est en « première connexion » → tour proposé
 	p := &models.Profil{
 		UserID:             userID,
 		DisplayName:        displayName,
@@ -151,6 +152,7 @@ func (s *ProfilService) Create(ctx context.Context, userID string, req models.Cr
 		ActivityVisibility: models.VisibilityPublic,
 		Certification:      models.CertificationNone,
 		NsfwEnabled:        &nsfwOn,
+		TutorialDone:       &tutorialDone,
 	}
 	if req.Gender != nil {
 		p.Gender = *req.Gender
@@ -323,6 +325,9 @@ func planUpdate(current *models.Profil, req models.UpdateProfilRequest, now time
 	}
 	if req.NsfwEnabled != nil {
 		set["nsfw_enabled"] = *req.NsfwEnabled
+	}
+	if req.TutorialDone != nil {
+		set["tutorial_done"] = *req.TutorialDone
 	}
 
 	return set, nil

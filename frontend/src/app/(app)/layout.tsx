@@ -14,6 +14,9 @@ import { PasswordChangeGate } from '@/components/account/password-change-gate'
 import { TermsAcceptGate } from '@/components/account/terms-accept-gate'
 import { UsernamePendingGate } from '@/components/account/username-pending-gate'
 import { ExplorerFilterProvider } from '@/components/explorer/explorer-filter-context'
+import { TutorialProvider } from '@/components/tutorial/tutorial-provider'
+import { TutorialTooltip } from '@/components/tutorial/tutorial-tooltip'
+import { HelpButton } from '@/components/help/help-button'
 import { FeedView } from '@/components/feed/feed-view'
 import { OverlayScrollLock } from '@/components/feed/overlay-scroll-lock'
 import { ActivityLifecycle } from '@/components/activity/activity-lifecycle'
@@ -36,6 +39,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <NotificationsProvider>
           <MessagesProvider>
             <ExplorerFilterProvider>
+              <TutorialProvider>
               <div className="bg-page relative flex min-h-screen justify-center overflow-x-clip">
                 <div className="bg-page-glow-1 pointer-events-none fixed inset-0" />
                 <div className="bg-page-glow-2 pointer-events-none fixed inset-0" />
@@ -82,7 +86,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 {/* En-tête mobile (masqué ≥ lg), rendu APRÈS les overlays en `fixed z-[60]`
                     pour rester au-dessus d'eux → header unique sur toutes les pages. */}
                 <MobileHeader />
+
+                {/* Aide : lampe flottante (desktop, fixe bas-droite) + didacticiel
+                    guidé (overlay + infobulle, monté au-dessus de tout). */}
+                <HelpButton variant="desktop" />
+                <TutorialTooltip />
               </div>
+              </TutorialProvider>
             </ExplorerFilterProvider>
           </MessagesProvider>
         </NotificationsProvider>

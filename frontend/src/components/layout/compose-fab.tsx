@@ -65,6 +65,7 @@ export function ComposeFab() {
     <CreatePostDialog>
       <button
         aria-label={t('post.create_aria')}
+        data-tour="compose"
         className="fixed bottom-[4.25rem] right-3 z-40 flex h-11 w-11 items-center justify-center rounded-full border border-[#5B6CFF]/30 bg-white/35 text-[#5B6CFF] shadow-[0_12px_28px_rgba(91,108,255,0.22)] backdrop-blur-xl transition hover:bg-white/55 hover:text-[#8D3DFF] active:scale-95 dark:bg-white/10 dark:text-[#9aa6ff] dark:hover:bg-white/20 lg:hidden"
       >
         <Plus className="h-6 w-6 stroke-[2.7]" />

@@ -31,6 +31,7 @@ export const ROUTES = {
   parametres: '/parametres',
   moderation: '/moderation',
   admin: '/admin',
+  aide: '/aide',
 } as const
 
 export type Route = (typeof ROUTES)[keyof typeof ROUTES]

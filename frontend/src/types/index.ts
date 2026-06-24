@@ -67,6 +67,8 @@ export interface ProfilDetails {
   isAdult: boolean
   /** Le contenu NSFW doit-il être affiché pour ce viewer ? `isAdult && nsfwEnabled`. */
   nsfwVisible: boolean
+  /** Didacticiel de prise en main déjà vu (terminé/ignoré) ? Défaut `false`. */
+  tutorialDone: boolean
   followersCount: number
   followingCount: number
   postsCount: number
