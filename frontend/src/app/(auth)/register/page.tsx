@@ -42,7 +42,6 @@ import {
 import { Input } from '@/components/ui/input'
 import { LegalLinks } from '@/components/legal/legal-links'
 import { ROUTES } from '@/lib/routes'
-import { hasReadTerms } from '@/lib/terms-consent'
 
 type FormErrors = Partial<{
   username: string
@@ -129,27 +128,12 @@ export default function RegisterPage() {
   const [errors, setErrors] = React.useState<FormErrors>({})
   const [isSubmitting, setIsSubmitting] = React.useState(false)
   const [oauthLoading, setOauthLoading] = React.useState<string | null>(null)
-  const [termsRead, setTermsRead] = React.useState(false)
   const [acceptedTerms, setAcceptedTerms] = React.useState(false)
   const todayDate = React.useMemo(() => toDateInputValue(new Date()), [])
   const minimumAgeBirthDate = React.useMemo(() => {
     const date = new Date()
     date.setFullYear(date.getFullYear() - 13)
     return toDateInputValue(date)
-  }, [])
-
-  React.useEffect(() => {
-    const syncTermsRead = () => {
-      setTermsRead(hasReadTerms())
-    }
-
-    syncTermsRead()
-    window.addEventListener('focus', syncTermsRead)
-    window.addEventListener('storage', syncTermsRead)
-    return () => {
-      window.removeEventListener('focus', syncTermsRead)
-      window.removeEventListener('storage', syncTermsRead)
-    }
   }, [])
 
   const validate = React.useCallback((): FormErrors => {
@@ -206,9 +190,7 @@ export default function RegisterPage() {
     }
 
     if (!acceptedTerms) {
-      nextErrors.terms = termsRead
-        ? t('auth.register.err.terms_required')
-        : t('auth.register.err.terms_read_required')
+      nextErrors.terms = t('auth.register.err.terms_required')
     }
 
     return nextErrors
@@ -220,7 +202,6 @@ export default function RegisterPage() {
     minimumAgeBirthDate,
     password,
     passwordConfirmation,
-    termsRead,
     todayDate,
     username,
     t,
@@ -480,11 +461,6 @@ export default function RegisterPage() {
               />
             </Link>
 
-            <div className="inline-flex w-fit items-center gap-2 rounded-full border border-white/70 bg-white/80 px-3 py-1 text-xs font-semibold text-[#5B6CFF] shadow-sm dark:border-white/15 dark:bg-white/10">
-              <span className="h-2 w-2 rounded-full bg-[#47D9FF]" />
-              {t('auth.register.badge')}
-            </div>
-
             <div className="space-y-1.5">
               <CardTitle className="brand-text max-w-md text-[24px] font-semibold leading-tight sm:text-[28px]">
                 {t('auth.register.title')}
@@ -497,7 +473,7 @@ export default function RegisterPage() {
           </CardHeader>
 
           <CardContent className="relative px-5 pb-3 sm:px-7 sm:pb-4">
-            <form className="space-y-1" onSubmit={handleSubmit} noValidate>
+            <form className="space-y-2" onSubmit={handleSubmit} noValidate>
               <div className="grid gap-1.5 sm:grid-cols-2">
                 <div className="space-y-0.5">
                   <div className="flex min-h-5 items-center gap-1.5">
@@ -843,11 +819,7 @@ export default function RegisterPage() {
               <div className="space-y-1">
                 <label
                   htmlFor="terms"
-                  className={`flex items-start gap-3 rounded-2xl border px-3 py-2 text-xs shadow-sm transition ${
-                    termsRead
-                      ? 'border-white/70 bg-white/80 text-foreground/80 dark:border-white/15 dark:bg-white/10'
-                      : 'border-slate-200 bg-slate-100/80 text-muted-foreground opacity-80 dark:border-white/10 dark:bg-white/5'
-                  }`}
+                  className="flex items-start gap-2.5 text-xs text-foreground/80"
                 >
                   <span className="relative mt-0.5 grid h-4 w-4 shrink-0 place-items-center">
                     <input
@@ -855,7 +827,6 @@ export default function RegisterPage() {
                       name="terms"
                       type="checkbox"
                       checked={acceptedTerms}
-                      disabled={!termsRead}
                       className="peer sr-only"
                       onChange={(event) => {
                         setAcceptedTerms(event.target.checked)
@@ -867,9 +838,8 @@ export default function RegisterPage() {
                         }
                       }}
                       aria-invalid={Boolean(errors.terms)}
-                      aria-describedby="terms-help"
                     />
-                    <span className="grid h-4 w-4 place-items-center rounded border border-slate-300 bg-white text-transparent transition peer-checked:border-[#5B6CFF] peer-checked:bg-[#5B6CFF] peer-checked:text-white peer-disabled:bg-slate-200 peer-disabled:text-transparent dark:border-white/25 dark:bg-white/10 dark:peer-disabled:bg-white/5">
+                    <span className="grid h-4 w-4 cursor-pointer place-items-center rounded border border-slate-300 bg-white text-transparent transition peer-checked:border-[#5B6CFF] peer-checked:bg-[#5B6CFF] peer-checked:text-white peer-focus-visible:ring-2 peer-focus-visible:ring-[#5B6CFF]/40 dark:border-white/25 dark:bg-white/10">
                       <Check className="h-3 w-3" />
                     </span>
                   </span>
@@ -884,14 +854,6 @@ export default function RegisterPage() {
                       {t('auth.register.terms_link')}
                     </Link>
                     .
-                    <span
-                      id="terms-help"
-                      className="block text-[11px] text-muted-foreground"
-                    >
-                      {termsRead
-                        ? t('auth.register.terms_unlocked')
-                        : t('auth.register.terms_locked')}
-                    </span>
                   </span>
                 </label>
 

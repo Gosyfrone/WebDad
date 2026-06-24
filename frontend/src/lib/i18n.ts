@@ -879,7 +879,6 @@ export const messages: Record<Locale, Messages> = {
     'auth.register.demo.alive': 'Ton compte prend vie',
     'auth.register.demo.alive_sub':
       'Profil, posts et conversations en quelques secondes.',
-    'auth.register.badge': 'Nouveau profil Breezy',
     'auth.register.title': 'Rejoins Breezy et commence à publier.',
     'auth.register.subtitle':
       "Crée ton compte, choisis ton nom d'utilisateur et entre dans le fil.",
@@ -2130,7 +2129,6 @@ export const messages: Record<Locale, Messages> = {
     'auth.register.demo.alive': 'Your account comes to life',
     'auth.register.demo.alive_sub':
       'Profile, posts and conversations in seconds.',
-    'auth.register.badge': 'New Breezy profile',
     'auth.register.title': 'Join Breezy and start posting.',
     'auth.register.subtitle':
       'Create your account, pick your username and step into the feed.',
