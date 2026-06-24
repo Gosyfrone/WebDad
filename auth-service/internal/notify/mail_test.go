@@ -2,90 +2,68 @@ package notify
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
-	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
-// ─── NewMailClient ────────────────────────────────────────────────────────────
+type roundTripFunc func(*http.Request) (*http.Response, error)
 
-func TestNewMailClient_ChampsCorrects(t *testing.T) {
+func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+func mailResponse(status int) *http.Response {
+	return &http.Response{StatusCode: status, Body: io.NopCloser(strings.NewReader("")), Header: make(http.Header)}
+}
+
+func TestNewMailClient(t *testing.T) {
 	c := NewMailClient("http://mail:8089", "secret-test")
-	if c.baseURL != "http://mail:8089" {
-		t.Fatalf("baseURL = %q, attendu 'http://mail:8089'", c.baseURL)
-	}
-	if c.secret != "secret-test" {
-		t.Fatalf("secret = %q, attendu 'secret-test'", c.secret)
-	}
-	if c.http == nil {
-		t.Fatal("http client ne doit pas être nil")
+	if c.baseURL != "http://mail:8089" || c.secret != "secret-test" || c.http == nil {
+		t.Fatalf("client mal construit: %+v", c)
 	}
 }
 
-// ─── Send ────────────────────────────────────────────────────────────────────
-
-func TestSend_TransmetPayloadCorrect(t *testing.T) {
-	var received struct {
-		To      string `json:"to"`
-		Subject string `json:"subject"`
-		HTML    string `json:"html"`
-		Text    string `json:"text"`
+func TestSend(t *testing.T) {
+	tests := []struct {
+		name    string
+		status  int
+		doErr   error
+		wantErr bool
+	}{
+		{name: "success", status: http.StatusOK},
+		{name: "server error", status: http.StatusInternalServerError, wantErr: true},
+		{name: "transport error", doErr: errors.New("mail indisponible"), wantErr: true},
 	}
-	var gotSecret string
-
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotSecret = r.Header.Get("X-Internal-Secret")
-		body, _ := io.ReadAll(r.Body)
-		_ = json.Unmarshal(body, &received)
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer srv.Close()
-
-	c := NewMailClient(srv.URL, "my-secret")
-	err := c.Send("alice@breezy.dev", "Bienvenue", "<b>Hi</b>", "Hi")
-	if err != nil {
-		t.Fatalf("Send: %v", err)
-	}
-
-	if gotSecret != "my-secret" {
-		t.Fatalf("X-Internal-Secret = %q, attendu 'my-secret'", gotSecret)
-	}
-	if received.To != "alice@breezy.dev" {
-		t.Fatalf("To = %q, attendu 'alice@breezy.dev'", received.To)
-	}
-	if received.Subject != "Bienvenue" {
-		t.Fatalf("Subject = %q, attendu 'Bienvenue'", received.Subject)
-	}
-	if received.HTML != "<b>Hi</b>" {
-		t.Fatalf("HTML = %q, attendu '<b>Hi</b>'", received.HTML)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			c := NewMailClient("http://mail.test", "my-secret")
+			var req *http.Request
+			c.http.Transport = roundTripFunc(func(r *http.Request) (*http.Response, error) {
+				req = r
+				if tc.doErr != nil {
+					return nil, tc.doErr
+				}
+				return mailResponse(tc.status), nil
+			})
+			err := c.Send("alice@breezy.dev", "Bienvenue", "<b>Hi</b>", "Hi")
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("error=%v wantErr=%v", err, tc.wantErr)
+			}
+			if req == nil || req.Method != http.MethodPost || req.Header.Get("X-Internal-Secret") != "my-secret" {
+				t.Fatalf("requête inattendue: %v", req)
+			}
+			var payload sendPayload
+			if err := json.NewDecoder(req.Body).Decode(&payload); err != nil || payload.To != "alice@breezy.dev" || payload.Subject != "Bienvenue" {
+				t.Fatalf("payload=%+v err=%v", payload, err)
+			}
+		})
 	}
 }
 
-func TestSend_ServeurErreur_RetourneErreur(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusInternalServerError)
-	}))
-	defer srv.Close()
-
-	c := NewMailClient(srv.URL, "s")
-	err := c.Send("a@b.com", "sub", "", "text")
-	if err == nil {
-		t.Fatal("serveur 500 devrait retourner une erreur")
-	}
-}
-
-func TestSend_URLInjoignable_RetourneErreur(t *testing.T) {
-	c := NewMailClient("http://127.0.0.1:1", "s")
-	err := c.Send("a@b.com", "sub", "", "text")
-	if err == nil {
-		t.Fatal("URL injoignable devrait retourner une erreur")
-	}
-}
-
-func TestSend_URLInvalide_RetourneErreur(t *testing.T) {
+func TestSendInvalidURL(t *testing.T) {
 	c := NewMailClient("://bad-url", "s")
 	if err := c.Send("a@b.com", "sub", "", "text"); err == nil {
-		t.Fatal("URL invalide devrait retourner une erreur")
+		t.Fatal("URL invalide acceptée")
 	}
 }

@@ -138,6 +138,17 @@ func TestMongoCollectionAdapter(t *testing.T) {
 	}
 }
 
+func TestNewProfilRepository(t *testing.T) {
+	client, err := mongo.Connect(options.Client().ApplyURI("mongodb://localhost:27017"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	repo := NewProfilRepository(client.Database("profil_constructor_test"))
+	if repo == nil || repo.collection == nil {
+		t.Fatalf("repository mal construit: %#v", repo)
+	}
+}
+
 func TestProfilRepository_GetByUserID_Error(t *testing.T) {
 	sentinel := errors.New("db")
 	repo := &ProfilRepository{collection: &fakeCollection{err: sentinel}}

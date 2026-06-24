@@ -100,6 +100,9 @@ func TestHandlers_DBError_500(t *testing.T) {
 	}
 	cases := []tc{
 		{"GetMe", http.MethodGet, "", nil, h.GetMe},
+		{"Create", http.MethodPost, `{"username":"validname"}`, nil, h.Create},
+		{"UpdateMe", http.MethodPatch, `{"preferred_locale":"fr"}`, nil, h.UpdateMe},
+		{"Follow", http.MethodPost, "", gin.Params{{Key: "id", Value: idTarget}}, h.Follow},
 		{"Unfollow", http.MethodDelete, "", gin.Params{{Key: "id", Value: idTarget}}, h.Unfollow},
 		{"RemoveFollower", http.MethodDelete, "", gin.Params{{Key: "id", Value: idTarget}}, h.RemoveFollower},
 		{"Block", http.MethodPost, "", gin.Params{{Key: "id", Value: idTarget}}, h.Block},
@@ -131,8 +134,22 @@ func TestHandlers_DBError_500(t *testing.T) {
 func TestHandlers_PublicAndAdmin_DBError_500(t *testing.T) {
 	h := closedHandler(t)
 
+	c, w := newCtx(http.MethodGet, "/", "")
+	c.Params = gin.Params{{Key: "id", Value: idTarget}}
+	h.GetByID(c)
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("GetByID (DB erreur) = %d, attendu 500", w.Code)
+	}
+
+	c, w = newCtx(http.MethodGet, "/", "")
+	c.Params = gin.Params{{Key: "username", Value: "validname"}}
+	h.GetByUsername(c)
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("GetByUsername (DB erreur) = %d, attendu 500", w.Code)
+	}
+
 	// Search avec un terme non vide (sinon court-circuit à 200).
-	c, w := newCtx(http.MethodGet, "/?q=term", "")
+	c, w = newCtx(http.MethodGet, "/?q=term", "")
 	h.Search(c)
 	if w.Code != http.StatusInternalServerError {
 		t.Errorf("Search (DB erreur) = %d, attendu 500", w.Code)

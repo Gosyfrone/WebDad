@@ -156,6 +156,18 @@ func TestMongoSchemaAdapters(t *testing.T) {
 	}
 }
 
+func TestEnsureSchema_AdapterPropagatesCancelledContext(t *testing.T) {
+	client, err := mongo.Connect(options.Client().ApplyURI("mongodb://localhost:27017"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := EnsureSchema(ctx, client.Database("profil_schema_test")); err == nil {
+		t.Fatal("EnsureSchema doit propager l'annulation du contexte")
+	}
+}
+
 func TestEnsureSchemaSuccessCreatesMissingCollection(t *testing.T) {
 	db := &fakeSchemaDB{modified: 2}
 	if err := ensureSchema(context.Background(), db); err != nil {

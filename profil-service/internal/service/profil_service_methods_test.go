@@ -146,6 +146,22 @@ func TestCreate_DuplicateMapsToProfilExists(t *testing.T) {
 	}
 }
 
+func TestCreate_PropagatesInsertError(t *testing.T) {
+	sentinel := errors.New("insert")
+	svc := New(&fakeProfilRepo{insertErr: sentinel}, 0)
+	if _, err := svc.Create(context.Background(), "u1", models.CreateProfilRequest{DisplayName: "Alice"}); !errors.Is(err, sentinel) {
+		t.Fatalf("attendu sentinel, obtenu %v", err)
+	}
+}
+
+func TestGetMine_PropagatesGetError(t *testing.T) {
+	sentinel := errors.New("get")
+	svc := New(&fakeProfilRepo{err: sentinel}, 0)
+	if _, err := svc.GetMine(context.Background(), "u1"); !errors.Is(err, sentinel) {
+		t.Fatalf("attendu sentinel, obtenu %v", err)
+	}
+}
+
 func TestGetMine_NormalizesActivityAndHydratesPolicy(t *testing.T) {
 	oldLogin := time.Now().UTC().Add(-2 * time.Minute)
 	birthDate := time.Now().UTC().AddDate(-17, 0, 0)
@@ -226,6 +242,28 @@ func TestUpdate_PrivateToPublicAcceptsPendingRequestsBestEffort(t *testing.T) {
 	}
 	if !follows.acceptCalled {
 		t.Fatal("passer de prive a public doit declencher AcceptAllFollowRequests")
+	}
+}
+
+func TestUpdate_PrivateToPublicWithoutFollowChecker(t *testing.T) {
+	repo := &fakeProfilRepo{profil: &models.Profil{
+		UserID: "u1", Visibility: models.VisibilityPrivate,
+	}}
+	svc := New(repo, 0)
+	got, err := svc.Update(context.Background(), "u1", models.UpdateProfilRequest{Visibility: ptr(models.VisibilityPublic)})
+	if err != nil || got.Visibility != models.VisibilityPublic {
+		t.Fatalf("Update = %#v, %v", got, err)
+	}
+}
+
+func TestUpdate_MapsRepositoryNotFound(t *testing.T) {
+	repo := &fakeProfilRepo{
+		profil:    &models.Profil{UserID: "u1", DisplayName: "Alice"},
+		updateErr: mongo.ErrNoDocuments,
+	}
+	svc := New(repo, 0)
+	if _, err := svc.Update(context.Background(), "u1", models.UpdateProfilRequest{Bio: ptr("bio")}); !errors.Is(err, ErrProfilNotFound) {
+		t.Fatalf("attendu ErrProfilNotFound, obtenu %v", err)
 	}
 }
 

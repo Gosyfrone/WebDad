@@ -50,6 +50,9 @@ func TestRepo_ErrorPaths_ClosedDB(t *testing.T) {
 	if err := r.SetActive(uA, false); err == nil {
 		t.Error("SetActive doit échouer")
 	}
+	if err := r.SoftDelete(uA); err == nil {
+		t.Error("SoftDelete doit échouer")
+	}
 	if err := r.PurgeUser(uA); err == nil {
 		t.Error("PurgeUser doit échouer")
 	}

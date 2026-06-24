@@ -2,55 +2,57 @@ package eraser
 
 import (
 	"context"
+	"errors"
+	"io"
 	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
 )
 
-// TestEraseTolerates404AndReportsFailures : un 404 est toléré (succès), un 5xx
-// remonte comme échec ; le bearer est transmis.
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+func eraseResponse(status int) *http.Response {
+	return &http.Response{StatusCode: status, Body: io.NopCloser(strings.NewReader("")), Header: make(http.Header)}
+}
+
 func TestEraseTolerates404AndReportsFailures(t *testing.T) {
-	gotAuth := ""
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodDelete {
-			w.WriteHeader(http.StatusMethodNotAllowed)
-			return
-		}
-		gotAuth = r.Header.Get("Authorization")
+	e := New(Targets{User: "http://services.test", Profil: "http://services.test", Post: "http://services.test", Message: "http://services.test", Media: "http://services.test"})
+	var auth string
+	e.client.Transport = roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		auth = r.Header.Get("Authorization")
 		switch {
-		case strings.HasSuffix(r.URL.Path, "/hard"): // étape "user" → échec serveur
-			w.WriteHeader(http.StatusInternalServerError)
-		case strings.Contains(r.URL.Path, "/profils/"): // profil → 404 toléré
-			w.WriteHeader(http.StatusNotFound)
+		case strings.HasSuffix(r.URL.Path, "/hard"):
+			return eraseResponse(http.StatusInternalServerError), nil
+		case strings.Contains(r.URL.Path, "/profils/"):
+			return eraseResponse(http.StatusNotFound), nil
 		default:
-			w.WriteHeader(http.StatusNoContent)
+			return eraseResponse(http.StatusNoContent), nil
 		}
-	}))
-	defer srv.Close()
-
-	e := New(Targets{User: srv.URL, Profil: srv.URL, Post: srv.URL, Message: srv.URL, Media: srv.URL})
+	})
 	failed := e.Erase(context.Background(), "tok123", "u1")
-
-	if len(failed) != 1 || failed[0] != "user" {
-		t.Fatalf("échecs attendus [user], eu %v", failed)
-	}
-	if gotAuth != "Bearer tok123" {
-		t.Fatalf("bearer non transmis : %q", gotAuth)
+	if len(failed) != 1 || failed[0] != "user" || auth != "Bearer tok123" {
+		t.Fatalf("failed=%v auth=%q", failed, auth)
 	}
 }
 
-// TestEraseSkipsUnconfigured : un service sans URL est ignoré (aucun échec).
 func TestEraseSkipsUnconfigured(t *testing.T) {
 	e := New(Targets{})
 	if failed := e.Erase(context.Background(), "tok", "u1"); len(failed) != 0 {
-		t.Fatalf("aucun échec attendu (rien de configuré), eu %v", failed)
+		t.Fatalf("échecs inattendus: %v", failed)
 	}
 }
 
-func TestDeleteOKRejectsMalformedURL(t *testing.T) {
+func TestDeleteOKFailures(t *testing.T) {
 	e := New(Targets{})
 	if e.deleteOK(context.Background(), "token", "://bad-url") {
-		t.Fatal("malformed URL should fail")
+		t.Fatal("URL mal formée acceptée")
+	}
+	e.client.Transport = roundTripFunc(func(*http.Request) (*http.Response, error) {
+		return nil, errors.New("service indisponible")
+	})
+	if e.deleteOK(context.Background(), "token", "http://service.test/delete") {
+		t.Fatal("erreur transport considérée comme un succès")
 	}
 }

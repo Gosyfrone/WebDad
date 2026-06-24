@@ -86,3 +86,35 @@ func TestService_Emit_NoNotifier(t *testing.T) {
 	svc.emitFollowRequestAcceptConfirm(idA, idB)
 	svc.emitFollowRequestDecision(idA, idB, client.TypeFollowRequestAccepted)
 }
+
+func TestService_Emit_WithNotifier(t *testing.T) {
+	notifier := &fakeNotifier{}
+	svc := New(nil, 0, WithNotificationClient(notifier))
+	svc.emitFollow(idA, idB)
+	svc.emitFollowRequest(idA, idB, false)
+	svc.emitFollowRequestAcceptConfirm(idA, idB)
+	svc.emitFollowRequestDecision(idA, idB, client.TypeFollowRequestRejected)
+
+	want := []string{
+		client.TypeFollow,
+		client.TypeFollowRequest,
+		client.TypeFollowRequestAcceptConfirm,
+		client.TypeFollowRequestRejected,
+	}
+	got := notifier.types()
+	if len(got) != len(want) {
+		t.Fatalf("événements = %v, attendu %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("événement %d = %q, attendu %q", i, got[i], want[i])
+		}
+	}
+}
+
+func TestService_SoftDelete_DelegatesAndWrapsError(t *testing.T) {
+	svc := closedSvc(t)
+	if err := svc.SoftDelete(idA); err == nil {
+		t.Fatal("SoftDelete doit propager l'erreur du repository")
+	}
+}
