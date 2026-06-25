@@ -1,6 +1,6 @@
 /**
  * Sauvegarde CHIFFRÉE de la clé privée d'identité E2EE, pour retrouver sa
- * messagerie sur un autre appareil (cf. CLAUDE.md, feature « phrase de passe »).
+ * messagerie sur un autre appareil (cf. la doc d'architecture, feature « phrase de passe »).
  *
  * Modèle zero-knowledge : la clé privée X25519 est *emballée* par une clé de
  * chiffrement (KEK) **dérivée d'une phrase de passe** choisie par l'utilisateur

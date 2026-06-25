@@ -2,7 +2,7 @@
  * Client média (upload / résolution d'URL) au-dessus d'`apiFetch`.
  *
  * Le stockage des fichiers est assuré par le `media-service` (adossé à MinIO),
- * atteint UNIQUEMENT via l'API Gateway (cf. CLAUDE.md §1) :
+ * atteint UNIQUEMENT via l'API Gateway (cf. la doc d'architecture) :
  *   - upload    : `POST /media`  (authentifié, multipart)
  *   - download  : `GET /media/<id>` (public, l'id est non devinable)
  *
@@ -20,7 +20,7 @@ import { isAdmin } from '@/lib/session'
  * Cap de taille d'upload pour les utilisateurs NON-admin (doit refléter le cap
  * serveur du media-service : `MEDIA_MAX_*_BYTES`, défaut 5 Mo). C'est une simple
  * garde UX — la VRAIE limite est appliquée côté serveur, jamais par le front
- * (cf. CLAUDE.md §6). Les administrateurs bypassent (cf. `exceedsMediaLimit`).
+ * (cf. la doc d'architecture). Les administrateurs bypassent (cf. `exceedsMediaLimit`).
  */
 export const MAX_MEDIA_BYTES = 5 * 1024 * 1024
 /** Cap exprimé en Mo, pour les messages i18n (`media.too_large`). */

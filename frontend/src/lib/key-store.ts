@@ -2,7 +2,7 @@
  * Stockage de la clé d'identité E2EE de l'utilisateur, **par compte et par
  * appareil**.
  *
- * Décision (cf. CLAUDE.md) : la clé privée ne quitte jamais le navigateur. Elle
+ * Décision (cf. la doc d'architecture) : la clé privée ne quitte jamais le navigateur. Elle
  * est persistée en **IndexedDB** (et non localStorage : binaire + isolé), sous
  * une clé d'enregistrement **dérivée du `userId`** → plusieurs comptes sur le
  * même navigateur n'écrasent plus leur clé mutuellement.

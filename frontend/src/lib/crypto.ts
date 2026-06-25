@@ -1,7 +1,7 @@
 /**
  * Primitives de chiffrement de bout en bout (E2EE) de la messagerie.
  *
- * Modèle (cf. CLAUDE.md, feature « Messages privés ») :
+ * Modèle (cf. la doc d'architecture, feature « Messages privés ») :
  *   - Chaque utilisateur a une paire de clés d'identité **X25519**. La clé
  *     PRIVÉE ne quitte jamais le navigateur (cf. `key-store.ts`) ; la clé
  *     publique est publiée au message-service.

@@ -13,7 +13,7 @@ import (
 // InternalHandler reçoit les événements émis par les autres services (post-service)
 // sur le réseau Docker. Protégé par un secret partagé (en-tête X-Internal-Secret),
 // JAMAIS exposé au client ni routé par la gateway : c'est de la communication
-// serveur-à-serveur (cf. décision §5 du CLAUDE.md).
+// serveur-à-serveur (cf. la doc des décisions).
 type InternalHandler struct {
 	service *service.NotificationService
 	secret  string
