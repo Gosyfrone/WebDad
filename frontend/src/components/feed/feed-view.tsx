@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { ArrowLeft, ImageIcon, Loader2, Search, Users } from 'lucide-react'
+import { ArrowLeft, ArrowUp, ImageIcon, Loader2, Search, Users } from 'lucide-react'
 
 import { cn, initialOf } from '@/lib/utils'
 import { getAccessToken } from '@/lib/auth-client'
@@ -425,6 +425,8 @@ export function FeedView() {
             onClick={revealPending}
             className="pointer-events-auto flex items-center gap-2 rounded-full border border-white/20 bg-[#5B6CFF] px-4 py-1.5 text-sm font-semibold text-white shadow-lg transition hover:brightness-110"
           >
+            {/* Flèche « remonter » : le clic révèle les nouveautés et scrolle en haut. */}
+            <ArrowUp className="-ml-1 h-4 w-4 shrink-0" aria-hidden />
             <Avatar className="h-6 w-6">
               {bannerAuthor.avatarUrl && <AvatarImage src={bannerAuthor.avatarUrl} alt="" />}
               <AvatarFallback className="bg-gradient-to-br from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] text-[10px] font-bold text-white">

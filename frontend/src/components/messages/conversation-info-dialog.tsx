@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import {
   ArrowDownCircle,
   ArrowUpCircle,
+  Link2,
   Loader2,
   LogOut,
   Trash2,
@@ -13,6 +14,7 @@ import {
 
 import {
   deleteGroup,
+  inviteToCommunity,
   inviteToGroup,
   leaveGroup,
   listMembers,
@@ -24,6 +26,7 @@ import {
   type Conversation,
   type MemberInfo,
 } from '@/lib/messages'
+import { copyLink } from '@/lib/share'
 import type { RelationUser } from '@/types'
 import { useResolvedUser } from '@/lib/use-resolved-user'
 import { initialOf } from '@/lib/utils'
@@ -124,7 +127,13 @@ export function ConversationInfoDialog({
     if (busy) return
     setBusy(true)
     try {
-      await inviteToGroup(conversation, user.id)
+      // Communauté : le serveur détient la clé → ajout direct (viewer), sans
+      // scellage. Groupe : on emballe la clé pour le destinataire (E2EE).
+      if (conversation.type === 'community') {
+        await inviteToCommunity(conversation, user.id)
+      } else {
+        await inviteToGroup(conversation, user.id)
+      }
       await refresh()
     } catch (err) {
       if (err instanceof PeerKeyMissingError) {
@@ -135,6 +144,17 @@ export function ConversationInfoDialog({
     } finally {
       setBusy(false)
     }
+  }
+
+  /** Copie le lien d'invitation public de la communauté dans le presse-papiers. */
+  async function copyInviteLink() {
+    const url = `${window.location.origin}/messages?join=${conversation.id}`
+    const ok = await copyLink(url)
+    toast(
+      ok
+        ? { title: t('messages.invite_link_copied') }
+        : { title: t('messages.action_failed'), variant: 'destructive' },
+    )
   }
 
   async function kick(userId: string) {
@@ -256,12 +276,26 @@ export function ConversationInfoDialog({
           )}
         </div>
 
-        {/* Inviter (groupes : tout membre) */}
-        {conversation.type === 'group' && (
+        {/* Inviter (groupes & communautés : tout membre) */}
+        {isManageable && (
           <div>
             <h3 className="mb-1 flex items-center gap-1.5 text-sm font-bold text-foreground">
               <UserPlus className="h-4 w-4" /> {t('messages.invite')}
             </h3>
+
+            {/* Communauté : lien d'invitation public (auto-join à l'ouverture). */}
+            {conversation.type === 'community' && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={copyInviteLink}
+                className="mb-2 w-full justify-center gap-1.5"
+              >
+                <Link2 className="h-4 w-4" /> {t('messages.copy_invite_link')}
+              </Button>
+            )}
+
             <UserSearch
               excludeIds={[myId, ...members.map((m) => m.userId)]}
               onPick={invite}

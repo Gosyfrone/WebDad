@@ -64,6 +64,9 @@ func TestHydrateViewerPolicy(t *testing.T) {
 	if !adult.IsAdult || !adult.NsfwVisible {
 		t.Errorf("majeur+ON : is_adult=%v nsfw_visible=%v, attendu true/true", adult.IsAdult, adult.NsfwVisible)
 	}
+
+	// Profil nil : ne doit pas paniquer (garde défensive).
+	HydrateViewerPolicy(nil, now)
 }
 
 func TestRoleConstants(t *testing.T) {

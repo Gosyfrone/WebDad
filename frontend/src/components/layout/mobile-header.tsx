@@ -15,7 +15,7 @@ import { useAuthGate } from '@/components/auth-prompt-provider'
 import { useNotifications } from '@/components/notifications-provider'
 import { useMessages } from '@/components/messages-provider'
 import { useT } from '@/components/language-provider'
-import { ThemeToggle } from '@/components/theme-toggle'
+import { ThemeToggle, ThemeSwitch } from '@/components/theme-toggle'
 import { CustomThemeDialog } from '@/components/custom-theme-dialog'
 import { ActivityPresenceDot } from '@/components/profil/activity-presence-dot'
 import { CertificationBadge } from '@/components/profil/certification-badge'
@@ -275,8 +275,11 @@ export function MobileHeader() {
         </Link>
       )}
 
-      {/* Droite : cloche vers les notifications (avec pastille), sinon contrepoids. */}
-      {showBell ? (
+      {/* Droite : visiteur → interrupteur clair/sombre (pas de notifications) ;
+          sinon cloche vers les notifications (avec pastille), sinon contrepoids. */}
+      {isVisitor ? (
+        <ThemeSwitch className="relative ml-auto" />
+      ) : showBell ? (
         <Link
           href={ROUTES.notifications}
           scroll={false}

@@ -65,8 +65,12 @@ export function PostPhotoModal({ post, index, onClose }: PostPhotoModalProps) {
   // couvrir tout l'écran de l'app.
   return createPortal(
     <div className="fixed inset-0 z-[60] flex flex-col bg-black/85 backdrop-blur-sm lg:flex-row" role="dialog" aria-modal="true">
-      {/* Volet média (gauche) */}
-      <div className="relative flex min-h-0 flex-1 flex-col bg-black">
+      {/* Volet média (gauche / haut). Hauteur BORNÉE en colonne (mobile + desktop
+          étroit) : `h-[50vh] shrink-0` empêche le volet droit — dont le scroll
+          interne laisserait fuiter la hauteur de tous les commentaires — d'écraser
+          la photo à 0 (sinon : photo invisible + barre d'actions remontée en haut).
+          En `lg:flex-row`, on repasse en `lg:flex-1` (la photo prend la largeur). */}
+      <div className="relative flex h-[50vh] shrink-0 flex-col bg-black lg:h-auto lg:min-h-0 lg:flex-1">
         {/* Fermer (haut-gauche, façon X) */}
         <button
           type="button"
@@ -111,56 +115,62 @@ export function PostPhotoModal({ post, index, onClose }: PostPhotoModalProps) {
         </div>
       </div>
 
-      {/* Volet infos (droite) : message en haut, commentaires en dessous */}
-      <div className="panel flex min-h-0 w-full flex-col border-l lg:w-[400px]">
-        <div className="flex items-start gap-3 border-b px-4 py-3">
-          <ProfilLink author={post.author} className="shrink-0">
-            <Avatar className="h-10 w-10">
-              {post.author.avatarUrl && <AvatarImage src={post.author.avatarUrl} alt="" />}
-              <AvatarFallback className="bg-gradient-to-br from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] font-bold text-white">
-                {initialOf(post.author.displayName, post.author.username)}
-              </AvatarFallback>
-              <ActivityPresenceDot
-                userId={post.author.id}
-                initialLastLoginAt={post.author.lastLoginAt}
-                initialIsOnline={post.author.isOnline}
-              />
-            </Avatar>
-          </ProfilLink>
-          <div className="flex min-w-0 flex-1 flex-col">
-            <div className="flex min-w-0 items-center gap-1.5 text-sm">
-              <ProfilLink author={post.author} className="truncate font-bold text-foreground hover:underline">
-                {post.author.displayName}
-              </ProfilLink>
-              <CertificationBadge userId={post.author.id} certification={post.author.certification} className="h-4 w-4" />
-              {post.author.username && (
-                <ProfilLink author={post.author} className="shrink-0 text-muted-foreground hover:underline">
-                  @{post.author.username}
+      {/* Volet infos (droite / bas). `flex-1 min-h-0` : prend la hauteur restante
+          et BORNE le scroll (sinon la hauteur des commentaires fuit et écrase la
+          photo). Description + commentaires partagent UN SEUL conteneur scrollable
+          (la description défile avec les commentaires, plus de bloc figé). */}
+      <div className="panel flex min-h-0 w-full flex-1 flex-col border-t lg:flex-none lg:w-[400px] lg:border-l lg:border-t-0">
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {/* En-tête + texte du post (défile avec les commentaires) */}
+          <div className="flex items-start gap-3 border-b px-4 py-3">
+            <ProfilLink author={post.author} className="shrink-0">
+              <Avatar className="h-10 w-10">
+                {post.author.avatarUrl && <AvatarImage src={post.author.avatarUrl} alt="" />}
+                <AvatarFallback className="bg-gradient-to-br from-[var(--brand-from)] via-[var(--brand-via)] to-[var(--brand-to)] font-bold text-white">
+                  {initialOf(post.author.displayName, post.author.username)}
+                </AvatarFallback>
+                <ActivityPresenceDot
+                  userId={post.author.id}
+                  initialLastLoginAt={post.author.lastLoginAt}
+                  initialIsOnline={post.author.isOnline}
+                />
+              </Avatar>
+            </ProfilLink>
+            <div className="flex min-w-0 flex-1 flex-col">
+              <div className="flex min-w-0 items-center gap-1.5 text-sm">
+                <ProfilLink author={post.author} className="truncate font-bold text-foreground hover:underline">
+                  {post.author.displayName}
                 </ProfilLink>
+                <CertificationBadge userId={post.author.id} certification={post.author.certification} className="h-4 w-4" />
+                {post.author.username && (
+                  <ProfilLink author={post.author} className="shrink-0 text-muted-foreground hover:underline">
+                    @{post.author.username}
+                  </ProfilLink>
+                )}
+                {showPrivateBadge && (
+                  <PrivateAuthorBadge label={t('post.private_account_tooltip')} />
+                )}
+                <span className="shrink-0 text-muted-foreground">·</span>
+                <span className="shrink-0 text-muted-foreground">{timeAgo(post.createdAt, locale)}</span>
+              </div>
+              {post.content && (
+                <TranslatedContent
+                  contentId={`post:${post.id}`}
+                  content={post.content}
+                  className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/80"
+                />
               )}
-              {showPrivateBadge && (
-                <PrivateAuthorBadge label={t('post.private_account_tooltip')} />
-              )}
-              <span className="shrink-0 text-muted-foreground">·</span>
-              <span className="shrink-0 text-muted-foreground">{timeAgo(post.createdAt, locale)}</span>
             </div>
-            {post.content && (
-              <TranslatedContent
-                contentId={`post:${post.id}`}
-                content={post.content}
-                className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/80"
-              />
-            )}
           </div>
-        </div>
 
-        {/* Commentaires (toujours visibles ici) */}
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-2">
-          <CommentSection
-            postId={post.id}
-            onCountChange={(delta) => setCommentCount((n) => Math.max(0, n + delta))}
-            canReply={post.canReply}
-          />
+          {/* Commentaires, dans le même scroll que la description */}
+          <div className="px-4 py-2">
+            <CommentSection
+              postId={post.id}
+              onCountChange={(delta) => setCommentCount((n) => Math.max(0, n + delta))}
+              canReply={post.canReply}
+            />
+          </div>
         </div>
       </div>
     </div>,

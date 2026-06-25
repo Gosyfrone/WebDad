@@ -3,6 +3,7 @@ import { Suspense } from 'react'
 import { SidebarLeft } from '@/components/layout/sidebar-left'
 import { SidebarRight } from '@/components/layout/sidebar-right'
 import { MobileHeader } from '@/components/layout/mobile-header'
+import { VisitorThemeToggle } from '@/components/layout/visitor-theme-toggle'
 import { MobileTabBar } from '@/components/layout/mobile-tab-bar'
 import { ComposeFab } from '@/components/layout/compose-fab'
 import { CurrentUserProvider } from '@/components/current-user-provider'
@@ -82,6 +83,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 {/* En-tête mobile (masqué ≥ lg), rendu APRÈS les overlays en `fixed z-[60]`
                     pour rester au-dessus d'eux → header unique sur toutes les pages. */}
                 <MobileHeader />
+
+                {/* Interrupteur clair/sombre visiteur (desktop uniquement ; sur mobile
+                    c'est l'en-tête qui le porte, à la place de la cloche). */}
+                <VisitorThemeToggle />
               </div>
             </ExplorerFilterProvider>
           </MessagesProvider>

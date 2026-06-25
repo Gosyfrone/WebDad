@@ -56,6 +56,18 @@ func TestDefaultUserServiceURL(t *testing.T) {
 	}
 }
 
+func TestDefaultNotificationServiceURL(t *testing.T) {
+	t.Setenv("DOCKERIZED", "")
+	if got := defaultNotificationServiceURL(); got != "http://localhost:8086" {
+		t.Fatalf("default local URL = %q", got)
+	}
+
+	t.Setenv("DOCKERIZED", "true")
+	if got := defaultNotificationServiceURL(); got != "http://notification-service:8086" {
+		t.Fatalf("default docker URL = %q", got)
+	}
+}
+
 func TestBuildMongoURI(t *testing.T) {
 	t.Setenv("MONGO_HOST", "mongo-profil")
 	t.Setenv("MONGO_PORT", "27018")

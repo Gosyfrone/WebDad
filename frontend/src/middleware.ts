@@ -22,7 +22,12 @@ export function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
+  // Mémorise la cible (chemin + query) pour y revenir après connexion : un lien
+  // d'invitation `/messages?join=<id>` ouvert par un visiteur le ramène ici une
+  // fois connecté (cf. page /login). `searchParams.set` encode la valeur.
   const loginUrl = new URL('/login', request.url)
+  const { pathname, search } = request.nextUrl
+  loginUrl.searchParams.set('next', pathname + search)
   return NextResponse.redirect(loginUrl)
 }
 

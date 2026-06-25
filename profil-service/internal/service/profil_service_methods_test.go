@@ -307,4 +307,24 @@ func TestServiceErrors(t *testing.T) {
 	if err := New(&fakeProfilRepo{deleteErr: sentinel}, 0).Delete(context.Background(), "u1"); !errors.Is(err, sentinel) {
 		t.Fatalf("Delete attendu sentinel, obtenu %v", err)
 	}
+	// GetMine propage l'erreur du repository (profil absent / panne DB).
+	if _, err := New(&fakeProfilRepo{err: sentinel}, 0).GetMine(context.Background(), "u1"); !errors.Is(err, sentinel) {
+		t.Fatalf("GetMine attendu sentinel, obtenu %v", err)
+	}
+	// Create refuse un display_name invalide (vide après trim) sans toucher le repo.
+	if _, err := New(&fakeProfilRepo{}, 0).Create(context.Background(), "u1", models.CreateProfilRequest{DisplayName: "   "}); !errors.Is(err, ErrInvalidDisplayName) {
+		t.Fatalf("Create attendu ErrInvalidDisplayName, obtenu %v", err)
+	}
+	// Create propage une erreur d'insertion non-duplicate telle quelle.
+	if _, err := New(&fakeProfilRepo{insertErr: sentinel}, 0).Create(context.Background(), "u1", models.CreateProfilRequest{DisplayName: "Alice"}); !errors.Is(err, sentinel) {
+		t.Fatalf("Create attendu sentinel, obtenu %v", err)
+	}
+	// Update propage l'erreur de chargement du profil courant (GetByUserID).
+	if _, err := New(&fakeProfilRepo{err: sentinel}, 0).Update(context.Background(), "u1", models.UpdateProfilRequest{Bio: ptr("bio")}); !errors.Is(err, sentinel) {
+		t.Fatalf("Update attendu sentinel (load), obtenu %v", err)
+	}
+	// Update refuse une modification invalide planifiée (display_name vide).
+	if _, err := New(&fakeProfilRepo{profil: &models.Profil{UserID: "u1", DisplayName: "Alice"}}, 0).Update(context.Background(), "u1", models.UpdateProfilRequest{DisplayName: ptr("   ")}); !errors.Is(err, ErrInvalidDisplayName) {
+		t.Fatalf("Update attendu ErrInvalidDisplayName, obtenu %v", err)
+	}
 }

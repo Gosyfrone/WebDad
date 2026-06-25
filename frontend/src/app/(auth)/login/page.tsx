@@ -51,6 +51,19 @@ function getMessage(error: unknown, fallback: string): string {
   return fallback
 }
 
+/**
+ * Destination après connexion : le `?next=<chemin>` posé par le middleware (ex.
+ * lien d'invitation `/messages?join=<id>`), sinon le feed. On n'accepte qu'un
+ * chemin INTERNE absolu (`/…`) — jamais `//evil`, `/\evil` ni une URL absolue —
+ * pour fermer tout open-redirect.
+ */
+function postLoginTarget(): string {
+  if (typeof window === 'undefined') return ROUTES.feed
+  const raw = new URLSearchParams(window.location.search).get('next')
+  if (raw && raw.startsWith('/') && raw[1] !== '/' && raw[1] !== '\\') return raw
+  return ROUTES.feed
+}
+
 export default function LoginPage() {
   const t = useT()
   const [identifier, setIdentifier] = React.useState('')
@@ -164,11 +177,11 @@ export default function LoginPage() {
         setAccessToken(payload.accessToken)
       }
 
-      // Navigation DURE vers le feed (et non `router.replace` soft) : on entre
-      // dans l'espace `(app)` depuis le groupe `(auth)` avec un access token tout
-      // juste posé. Un chargement complet repart sur un état d'app propre (feed
-      // persistant remonté, providers réinitialisés) après connexion.
-      window.location.assign(ROUTES.feed)
+      // Navigation DURE vers la cible (`?next=` ou feed, et non `router.replace`
+      // soft) : on entre dans l'espace `(app)` depuis le groupe `(auth)` avec un
+      // access token tout juste posé. Un chargement complet repart sur un état
+      // d'app propre (feed persistant remonté, providers réinitialisés).
+      window.location.assign(postLoginTarget())
     } catch (error) {
       setErrors({
         form: getMessage(error, t('auth.err.network')),
@@ -231,7 +244,7 @@ export default function LoginPage() {
       if (payload?.accessToken) {
         setAccessToken(payload.accessToken)
       }
-      window.location.assign(ROUTES.feed)
+      window.location.assign(postLoginTarget())
     } catch (error) {
       setMfaError(getMessage(error, t('auth.err.network')))
     } finally {
