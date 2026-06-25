@@ -203,15 +203,18 @@ export function ThemeToggle({ onCustomize }: ThemeToggleProps) {
 }
 
 /**
- * Interrupteur clair/sombre COMPACT et FLOTTANT, pour les pages publiques
- * (login / register) qui n'ont pas de menu. Posé en bas à gauche, **translucide**
+ * Interrupteur clair/sombre COMPACT (pilule Soleil/Lune), **translucide**
  * (`backdrop-blur` + fond très léger) pour laisser le dégradé de fond visible.
+ * Présentationnel et **sans positionnement** : chaque appelant fournit sa
+ * position via `className` (placée en dernier dans `cn` → twMerge tranche les
+ * conflits display/position). Voir {@link FloatingThemeToggle} (flottant bas
+ * gauche) et l'usage inline dans l'en-tête mobile (mode visiteur).
  *
  * Contrairement à {@link ThemeToggle}, pas d'option « système » : un clic bascule
  * simplement clair ↔ sombre (si le thème courant est « système », on part de
  * l'apparence effective `resolvedTheme` et on fige un choix manuel).
  */
-export function FloatingThemeToggle() {
+export function ThemeSwitch({ className }: { className?: string }) {
   const t = useT()
   const { resolvedTheme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
@@ -244,7 +247,10 @@ export function FloatingThemeToggle() {
       aria-checked={isDark}
       aria-label={t('theme.toggle_aria')}
       onClick={toggle}
-      className="fixed bottom-4 left-4 z-50 inline-flex h-9 w-16 animate-in items-center rounded-full border border-white/40 bg-white/20 shadow-lg backdrop-blur-md transition-colors fade-in hover:bg-white/30 dark:border-white/15 dark:bg-white/10 dark:hover:bg-white/20"
+      className={cn(
+        'inline-flex h-9 w-16 items-center rounded-full border border-white/40 bg-white/20 shadow-lg backdrop-blur-md transition-colors hover:bg-white/30 dark:border-white/15 dark:bg-white/10 dark:hover:bg-white/20',
+        className,
+      )}
     >
       {/* Curseur qui glisse (animation directionnelle au clic) */}
       <span
@@ -270,5 +276,17 @@ export function FloatingThemeToggle() {
         aria-hidden
       />
     </button>
+  )
+}
+
+/**
+ * Interrupteur clair/sombre FLOTTANT pour les pages publiques (login / register /
+ * légales) qui n'ont pas de menu. Posé en bas à gauche, au-dessus du contenu.
+ * `relative`-libre : `fixed` établit lui-même le contexte de positionnement du
+ * curseur Soleil/Lune.
+ */
+export function FloatingThemeToggle() {
+  return (
+    <ThemeSwitch className="fixed bottom-4 left-4 z-50 animate-in fade-in" />
   )
 }
