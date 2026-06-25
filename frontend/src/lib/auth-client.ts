@@ -92,9 +92,33 @@ export async function bootstrapSession(): Promise<void> {
   await refreshAccessToken()
 }
 
+/**
+ * Pages publiques consultables sans session (mode visiteur) : le fil et le
+ * détail d'un post sont VOLONTAIREMENT hors du matcher du middleware (cf.
+ * middleware.ts). Un 401 dont le refresh échoue n'y doit donc PAS forcer la
+ * connexion — sinon un access token périmé resté en localStorage (session
+ * expirée sans logout) déclenche une salve d'appels auth-only → 401 → éjection
+ * vers /login alors que le mode visiteur devrait prendre le relais.
+ */
+function isVisitorPath(pathname: string): boolean {
+  return (
+    pathname === ROUTES.feed ||
+    pathname === '/posts' ||
+    pathname.startsWith('/posts/')
+  )
+}
+
+/**
+ * Redirige vers /login après un refresh échoué — SAUF sur une page publique
+ * (mode visiteur), où l'on dégrade silencieusement : l'appelant a déjà effacé la
+ * session locale (`clearAccessToken`), donc l'UI bascule en visiteur via
+ * `AuthPromptProvider`. Sur toute route protégée, on redirige.
+ */
 function redirectToLogin(): void {
   if (typeof window === 'undefined') return
-  if (window.location.pathname !== ROUTES.login) {
+  const { pathname } = window.location
+  if (isVisitorPath(pathname)) return
+  if (pathname !== ROUTES.login) {
     window.location.assign(ROUTES.login)
   }
 }

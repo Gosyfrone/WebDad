@@ -76,8 +76,8 @@ describe('apiFetch', () => {
     expect(store['breezy-access-token']).toBe('fresh')
   })
 
-  it('401 → refresh échoue → efface la session et redirige', async () => {
-    setupWindow('old')
+  it('401 → refresh échoue sur route protégée → efface la session et redirige', async () => {
+    setupWindow('old', '/messages')
     fetchMock
       .mockResolvedValueOnce(resp(401))
       .mockResolvedValueOnce(resp(401)) // refresh KO
@@ -88,8 +88,31 @@ describe('apiFetch', () => {
     expect(assigned).toEqual(['/login'])
   })
 
-  it('401 → token frais mais toujours 401 → session morte', async () => {
-    setupWindow('old')
+  it('401 → refresh échoue sur le feed (visiteur) → efface la session SANS rediriger', async () => {
+    setupWindow('old', '/feed')
+    fetchMock
+      .mockResolvedValueOnce(resp(401))
+      .mockResolvedValueOnce(resp(401)) // refresh KO
+    const { apiFetch } = await load()
+    const r = await apiFetch('/posts')
+    expect(r.status).toBe(401)
+    expect(store['breezy-access-token']).toBeUndefined()
+    expect(assigned).toEqual([]) // mode visiteur : pas de redirection dure
+  })
+
+  it('401 → refresh échoue sur le détail d’un post (visiteur) → pas de redirection', async () => {
+    setupWindow('old', '/posts/abc123')
+    fetchMock
+      .mockResolvedValueOnce(resp(401))
+      .mockResolvedValueOnce(resp(401)) // refresh KO
+    const { apiFetch } = await load()
+    await apiFetch('/posts/abc123')
+    expect(store['breezy-access-token']).toBeUndefined()
+    expect(assigned).toEqual([])
+  })
+
+  it('401 → token frais mais toujours 401 sur route protégée → session morte + redirige', async () => {
+    setupWindow('old', '/messages')
     fetchMock
       .mockResolvedValueOnce(resp(401))
       .mockResolvedValueOnce(resp(200, { accessToken: 'fresh' }))
