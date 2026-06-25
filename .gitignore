@@ -70,3 +70,14 @@ graphify-out/
 # Pentest perso (non versionné)
 /riveta/
 PENTEST.md
+
+# Docs projet internes (non versionnées)
+ARCHITECTURE.md
+CHANGELOG.md
+CHANGELOG_ARCHIVE.md
+CLAUDE.md
+DECISIONS.md
+PROMPTING.md
+PROJECT_STATUS.md
+REPORT.md
+README.md
