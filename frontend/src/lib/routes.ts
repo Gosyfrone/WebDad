@@ -80,7 +80,7 @@ export interface NavItem {
 
 /**
  * Liens de l'espace authentifié, dans l'ordre d'affichage.
- * La visibilité par rôle reflète les 3 rôles du projet (cf. CLAUDE.md §1).
+ * La visibilité par rôle reflète les 3 rôles du projet (cf. la doc d'architecture).
  */
 export const APP_NAV: NavItem[] = [
   { labelKey: 'nav.feed', href: ROUTES.feed },

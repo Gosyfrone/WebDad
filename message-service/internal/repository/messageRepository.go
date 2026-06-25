@@ -38,7 +38,7 @@ func NewMessageRepository(db *mongo.Database) *MessageRepository {
 // messagerie (effacement RGPD) : sa clé publique, ses appartenances aux
 // conversations et les messages qu'il a envoyés. Les conversations partagées
 // (DM/groupes) subsistent pour les autres membres ; un groupe/communauté dont
-// il était propriétaire devient orphelin (compromis assumé, cf. CLAUDE.md §6).
+// il était propriétaire devient orphelin (compromis assumé, cf. la doc d'architecture).
 func (r *MessageRepository) PurgeUser(ctx context.Context, userID string) error {
 	if _, err := r.keys.DeleteMany(ctx, bson.M{"user_id": userID}); err != nil {
 		return err

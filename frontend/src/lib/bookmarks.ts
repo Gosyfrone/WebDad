@@ -8,7 +8,7 @@
  * Modèle de « rafale » côté serveur : un clic court (`quickBookmark`) range
  * automatiquement dans la dernière collection si l'utilisateur enchaîne dans la
  * fenêtre glissante (statut `filed`) ; sinon le serveur renvoie `needs_choice`
- * et le front ouvre le sélecteur de collection (cf. CLAUDE.md §5).
+ * et le front ouvre le sélecteur de collection (cf. la doc d'architecture).
  *
  * Les vues qui renvoient des posts (« Tous mes signets », contenu d'une
  * collection) réutilisent le mapper enrichi `mapPosts` de `lib/posts.ts`.

@@ -1,7 +1,7 @@
 /**
  * Configuration globale du frontend.
  *
- * Toute communication passe par l'API Gateway (cf. CLAUDE.md §1) :
+ * Toute communication passe par l'API Gateway (cf. la doc d'architecture) :
  * aucun service backend n'est appelé directement depuis le client.
  */
 

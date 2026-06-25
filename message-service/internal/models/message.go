@@ -52,7 +52,7 @@ type UserKey struct {
 // (Argon2id) d'une PHRASE DE PASSE choisie par l'utilisateur. Le serveur ne
 // stocke qu'un blob opaque (`salt`, `nonce`, `wrapped_private_key`, paramètres
 // KDF) : il ne voit jamais la passphrase ni la clé privée. La propriété
-// admin-proof des DM est donc préservée (cf. CLAUDE.md §6).
+// admin-proof des DM est donc préservée (cf. la doc d'architecture).
 type KeyBackup struct {
 	ID                bson.ObjectID `bson:"_id,omitempty" json:"id"`
 	UserID            string        `bson:"user_id" json:"user_id"`

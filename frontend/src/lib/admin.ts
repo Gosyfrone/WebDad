@@ -5,7 +5,7 @@
  * autorité pour le rôle et l'état du compte (`is_active` = login autorisé).
  * L'identité visible (username, nom affiché, avatar) est ENRICHIE côté front
  * depuis user-service + profil-service (`resolveUser`, mémoïsé) — même pattern
- * cross-service que la recherche de comptes (cf. CLAUDE.md §5).
+ * cross-service que la recherche de comptes (cf. la doc d'architecture).
  *
  * « Bannir » = bloquer le login (auth) ET masquer le compte (user) : deux
  * écritures orchestrées ici (une donnée = un service). Le changement de rôle

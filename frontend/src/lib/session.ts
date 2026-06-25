@@ -2,7 +2,7 @@
  * Session de l'utilisateur courant, dérivée du JWT (access token).
  *
  * Source de vérité UNIQUE pour l'identité côté client : le rôle, l'id et l'email
- * vivent dans le JWT (le user-service ne stocke pas le rôle ; cf. CLAUDE.md §5).
+ * vivent dans le JWT (le user-service ne stocke pas le rôle ; cf. la doc d'architecture).
  * Le client se contente de **lire** le payload du token (base64url) — la
  * signature reste vérifiée côté serveur. Ce module remplace les décodages JWT
  * jusqu'ici dupliqués (`posts.ts`, `profil-client.ts`).
