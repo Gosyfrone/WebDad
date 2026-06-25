@@ -72,7 +72,8 @@ func RegisterRoutes(
 				conv.PATCH("", convH.UpdateConversation)  // renommer (owner)
 				conv.DELETE("", convH.DeleteConversation) // supprimer (owner)
 
-				conv.POST("/join", convH.JoinCommunity) // rejoindre une communauté (viewer)
+				conv.POST("/join", convH.JoinCommunity)            // rejoindre une communauté (viewer)
+				conv.POST("/invite", convH.InviteCommunityMember) // inviter dans une communauté (tout membre, viewer)
 
 				// État par-utilisateur (membre requis, pas de diffusion).
 				conv.PATCH("/pin", convH.PinConversation)      // épingler

@@ -254,6 +254,13 @@ type AddMemberRequest struct {
 	Envelope string `json:"envelope" binding:"required"`
 }
 
+// InviteMemberRequest : corps de POST .../:id/invite (inviter dans une
+// communauté). Pas d'envelope : le serveur détient la clé de contenu et la
+// remet à l'invité (cf. buildView). Seul l'id de la cible est requis.
+type InviteMemberRequest struct {
+	UserID string `json:"user_id" binding:"required"`
+}
+
 // UpdateGroupRequest : corps de PATCH .../:id (renommer). Groupe : nom
 // re-chiffré (title+title_nonce). Communauté : nom en clair (title seul,
 // title_nonce vide).

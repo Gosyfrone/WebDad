@@ -14,6 +14,7 @@ import {
   getConversation,
   getIdentityState,
   type IdentityState,
+  joinCommunity,
   listConversations,
   listMessagesPage,
   muteConversation,
@@ -423,6 +424,27 @@ export function MessagesView() {
       .catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [convTarget, identityState])
+
+  // Lien d'invitation d'une communauté : /messages?join=<id> → auto-join (le
+  // serveur remet la clé) puis ouverture. Un visiteur est déjà redirigé vers
+  // /login par le middleware (route protégée), puis revient ici après connexion.
+  const joinTarget = searchParams.get('join')
+  const handledJoinRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!joinTarget || identityState !== 'ready' || handledJoinRef.current === joinTarget) return
+    handledJoinRef.current = joinTarget
+    ensureMyKeys()
+      .then(() => joinCommunity(joinTarget))
+      .then((conv) => {
+        upsertAndSelect(conv)
+        router.replace('/messages', { scroll: false })
+      })
+      .catch(() => {
+        toast({ title: t('messages.join_failed'), variant: 'destructive' })
+        router.replace('/messages', { scroll: false })
+      })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [joinTarget, identityState])
 
   /** Marque une conversation lue : serveur (`markRead`) + état local optimiste
    *  (curseur `lastReadAt` avancé + pastille effacée), après capture de l'ancre. */

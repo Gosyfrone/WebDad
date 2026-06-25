@@ -3794,6 +3794,65 @@ paths:
             type: object
             additionalProperties:
               type: string
+  /messages/conversations/{id}/invite:
+    post:
+      security:
+      - BearerAuth: []
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      tags:
+      - messages
+      summary: Inviter un membre dans une communauté
+      parameters:
+      - type: string
+        description: Conversation ID (communauté)
+        name: id
+        in: path
+        required: true
+      - description: Id de l'utilisateur à inviter
+        name: body
+        in: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.InviteMemberRequest'
+      responses:
+        '201':
+          description: Created
+          schema:
+            type: object
+            additionalProperties: true
+        '400':
+          description: Bad Request
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '401':
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '403':
+          description: Forbidden
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '404':
+          description: Not Found
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        '409':
+          description: Conflict
+          schema:
+            type: object
+            additionalProperties:
+              type: string
   /messages/conversations/{id}/join:
     post:
       security:
@@ -6016,6 +6075,13 @@ definitions:
         items:
           type: string
       nonce:
+        type: string
+  models.InviteMemberRequest:
+    type: object
+    required:
+    - user_id
+    properties:
+      user_id:
         type: string
   models.KeyBackup:
     type: object

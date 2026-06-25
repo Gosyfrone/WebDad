@@ -411,6 +411,48 @@ func (h *ConversationHandler) AddMember(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"data": gin.H{"user_id": req.UserID, "role": models.MemberTalker}})
 }
 
+// InviteCommunityMember : POST /messages/conversations/:id/invite — ajoute un
+// membre (viewer) à une communauté. Tout membre peut inviter ; pas d'envelope
+// (le serveur détient la clé et la remet à l'invité).
+// @Summary     Inviter un membre dans une communauté
+// @Tags        messages
+// @Accept      json
+// @Produce     json
+// @Security    BearerAuth
+// @Param       id   path string                      true "Conversation ID (communauté)"
+// @Param       body body models.InviteMemberRequest  true "Id de l'utilisateur à inviter"
+// @Success     201 {object} map[string]interface{}
+// @Failure     400 {object} map[string]string
+// @Failure     401 {object} map[string]string
+// @Failure     403 {object} map[string]string
+// @Failure     404 {object} map[string]string
+// @Failure     409 {object} map[string]string
+// @Router      /messages/conversations/{id}/invite [post]
+func (h *ConversationHandler) InviteCommunityMember(c *gin.Context) {
+	claims, ok := middleware.ClaimsFrom(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "claims absents"})
+		return
+	}
+
+	var req models.InviteMemberRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "payload invalide : " + err.Error()})
+		return
+	}
+
+	notify, err := h.service.InviteToCommunity(c.Request.Context(), c.Param("id"), claims.UserID, req.UserID)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	h.hub.Publish(notify, gin.H{"type": "member_added", "data": gin.H{
+		"conversation_id": c.Param("id"), "user_id": req.UserID,
+	}})
+	logging.FromGin(c).Info("membre de communauté invité", "conv_id", c.Param("id"), "target_id", req.UserID)
+	c.JSON(http.StatusCreated, gin.H{"data": gin.H{"user_id": req.UserID, "role": models.MemberViewer}})
+}
+
 // RemoveMember : DELETE /messages/conversations/:id/members/:userId — exclure
 // (owner) ou quitter (soi-même). `:userId` = "me" cible l'utilisateur courant.
 func (h *ConversationHandler) RemoveMember(c *gin.Context) {

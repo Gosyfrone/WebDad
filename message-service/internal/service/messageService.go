@@ -314,6 +314,45 @@ func (s *MessageService) JoinCommunity(ctx context.Context, conversationID, user
 	return view, notify, nil
 }
 
+// InviteToCommunity ajoute un utilisateur à une communauté en VIEWER, à
+// l'initiative d'un membre (la communauté est ouverte : tout membre peut
+// inviter, comme l'auto-join via la découverte). PAS d'envelope : le serveur
+// détient la clé de contenu et la remettra à l'invité (cf. buildView), au
+// contraire des groupes E2EE. Déjà membre → ErrAlreadyMember. Renvoie les ids
+// à notifier (membres + nouvel invité).
+func (s *MessageService) InviteToCommunity(ctx context.Context, conversationID, actorID, targetID string) ([]string, error) {
+	if _, err := s.requireMember(ctx, conversationID, actorID); err != nil {
+		return nil, err
+	}
+	conv, err := s.getConversationByID(ctx, conversationID)
+	if err != nil {
+		return nil, err
+	}
+	if conv.Type != models.TypeCommunity {
+		return nil, ErrNotCommunity
+	}
+
+	if _, err := s.repo.GetMember(ctx, conversationID, targetID); err == nil {
+		return nil, ErrAlreadyMember
+	} else if !errors.Is(err, mongo.ErrNoDocuments) {
+		return nil, err
+	}
+
+	now := time.Now()
+	if err := s.repo.AddMember(ctx, &models.Member{
+		ConversationID: conversationID,
+		UserID:         targetID,
+		Role:           models.MemberViewer, // invité en lecture seule (comme l'auto-join)
+		CreatedAt:      now,
+	}); err != nil {
+		return nil, err
+	}
+	if err := s.repo.PushMemberID(ctx, conv.ID, targetID); err != nil {
+		return nil, err
+	}
+	return s.repo.MemberIDs(ctx, conversationID)
+}
+
 // SetMemberRole promeut/rétrograde un membre d'une communauté entre talker
 // (peut écrire) et viewer (lecture seule). Owner uniquement. Le cap de 32 ne
 // porte que sur les talkers (la promotion le vérifie). On ne touche pas l'owner.

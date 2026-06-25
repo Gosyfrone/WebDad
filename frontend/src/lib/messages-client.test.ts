@@ -304,6 +304,14 @@ describe('communautés', () => {
     expect(c.id).toBe('c1')
   })
 
+  it('inviteToCommunity POST le membre sans scellage (juste user_id)', async () => {
+    routes([[path('/messages/conversations/cv1/invite'), json({}, { ok: true })]])
+    await m.inviteToCommunity(conv(), 'u9')
+    const call = apiFetch.mock.calls[0]
+    expect(String(call[0])).toContain('/messages/conversations/cv1/invite')
+    expect(JSON.parse(call[1].body)).toEqual({ user_id: 'u9' })
+  })
+
   it('setMemberRole PATCH le rôle', async () => {
     routes([[starts('/messages/conversations/cv1/members/u'), json({}, { ok: true })]])
     await m.setMemberRole(conv(), 'u', 'talker')

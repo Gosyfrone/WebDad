@@ -558,6 +558,22 @@ export async function inviteToGroup(conv: Conversation, userId: string): Promise
   )
 }
 
+/**
+ * Invite un utilisateur dans une COMMUNAUTÉ (ajouté en viewer). Contrairement
+ * aux groupes E2EE, aucun scellage : le serveur détient la clé de contenu et la
+ * remet à l'invité. N'importe quel membre peut inviter.
+ */
+export async function inviteToCommunity(conv: Conversation, userId: string): Promise<void> {
+  await expectOk(
+    await apiFetch(`/messages/conversations/${conv.id}/invite`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: userId }),
+    }),
+    'Invitation impossible',
+  )
+}
+
 /** Exclut un membre (owner uniquement côté back). */
 export async function removeMember(conv: Conversation, userId: string): Promise<void> {
   await expectOk(

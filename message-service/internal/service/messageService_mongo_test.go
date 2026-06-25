@@ -213,6 +213,24 @@ func TestSvc_Community(t *testing.T) {
 	if _, _, err := svc.JoinCommunity(ctx, g.ID, uC); !errors.Is(err, ErrNotCommunity) {
 		t.Fatalf("Join sur groupe → %v", err)
 	}
+
+	// InviteToCommunity : non membre / non-communauté / déjà membre / succès / re-invite.
+	if _, err := svc.InviteToCommunity(ctx, view.ID, "stranger", uC); !errors.Is(err, ErrNotMember) {
+		t.Fatalf("Invite non membre → %v", err)
+	}
+	if _, err := svc.InviteToCommunity(ctx, g.ID, uA, uC); !errors.Is(err, ErrNotCommunity) {
+		t.Fatalf("Invite sur groupe → %v", err)
+	}
+	if _, err := svc.InviteToCommunity(ctx, view.ID, uA, uB); !errors.Is(err, ErrAlreadyMember) {
+		t.Fatalf("Invite déjà membre → %v", err)
+	}
+	if notify, err := svc.InviteToCommunity(ctx, view.ID, uA, uC); err != nil || len(notify) == 0 {
+		t.Fatalf("Invite succès = %v, %v", notify, err)
+	}
+	// Idempotence-guard : ré-inviter une cible déjà ajoutée → ErrAlreadyMember.
+	if _, err := svc.InviteToCommunity(ctx, view.ID, uA, uC); !errors.Is(err, ErrAlreadyMember) {
+		t.Fatalf("Invite re-membre → %v", err)
+	}
 }
 
 // --- Membres (groupe) --------------------------------------------------------
